@@ -549,10 +549,8 @@ function getUsoSaleMetrics(uso) {
   const m2PorUnidad = unidades ? supVendible / unidades : 0;
   const precioBase = m2PorUnidad * toNumber(config.precio_uf_m2);
   const subtotalPrincipal = precioBase * unidades;
-  const subtotalEstacionamientos = toNumber(cabidaRow.estacionamientos) * toNumber(config.precio_estacionamiento);
-  const subtotalBodegas = toNumber(cabidaRow.bodegas) * toNumber(config.precio_bodega);
-  const total = subtotalPrincipal + subtotalEstacionamientos + subtotalBodegas;
-  const ticket = unidades ? total / unidades : 0;
+  const total = subtotalPrincipal;
+  const ticket = unidades ? subtotalPrincipal / unidades : 0;
 
   return {
     cabidaRow,
@@ -562,10 +560,31 @@ function getUsoSaleMetrics(uso) {
     m2PorUnidad,
     precioBase,
     subtotalPrincipal,
-    subtotalEstacionamientos,
-    subtotalBodegas,
     total,
     ticket,
+    estacionamientos: toNumber(cabidaRow.estacionamientos),
+    bodegas: toNumber(cabidaRow.bodegas),
+  };
+}
+
+function getAddonSalesMetrics() {
+  const totalEstacionamientos = state.cabida.reduce((sum, row) => sum + toNumber(row.estacionamientos), 0);
+  const totalBodegas = state.cabida.reduce((sum, row) => sum + toNumber(row.bodegas), 0);
+  const count = Math.max(1, state.ventasConfig.length);
+  const avgParkingPrice = state.ventasConfig.reduce((sum, row) => sum + toNumber(row.precio_estacionamiento), 0) / count;
+  const avgStoragePrice = state.ventasConfig.reduce((sum, row) => sum + toNumber(row.precio_bodega), 0) / count;
+
+  return {
+    estacionamientos: {
+      unidades: totalEstacionamientos,
+      precio: avgParkingPrice,
+      total: totalEstacionamientos * avgParkingPrice,
+    },
+    bodegas: {
+      unidades: totalBodegas,
+      precio: avgStoragePrice,
+      total: totalBodegas * avgStoragePrice,
+    },
   };
 }
 
@@ -602,9 +621,9 @@ function renderVentasPricing() {
         <td><input class="inp" type="number" step="0.01" data-field="precio_uf_m2" value="${toNumber(config.precio_uf_m2)}" onchange="onVentasInputChange()"/></td>
         <td style="text-align:center">${fmtUf(metrics.precioBase)}</td>
         <td style="text-align:center;color:#16a34a">${fmtUf(metrics.subtotalPrincipal)}</td>
-        <td style="text-align:center">${fmtNumber(metrics.cabidaRow.estacionamientos)}</td>
+        <td style="text-align:center">${fmtNumber(metrics.estacionamientos)}</td>
         <td><input class="inp" type="number" step="0.01" data-field="precio_estacionamiento" value="${toNumber(config.precio_estacionamiento)}" onchange="onVentasInputChange()"/></td>
-        <td style="text-align:center">${fmtNumber(metrics.cabidaRow.bodegas)}</td>
+        <td style="text-align:center">${fmtNumber(metrics.bodegas)}</td>
         <td><input class="inp" type="number" step="0.01" data-field="precio_bodega" value="${toNumber(config.precio_bodega)}" onchange="onVentasInputChange()"/></td>
         <td style="text-align:center;color:#ea580c;font-weight:800">${fmtUf(metrics.total)}</td>
         <td style="text-align:center">${fmtUf(metrics.ticket)}</td>
@@ -612,11 +631,45 @@ function renderVentasPricing() {
     `;
   }).join('');
 
-  const totalVenta = state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).total, 0);
+  const addons = getAddonSalesMetrics();
+  const totalVentaDeptos = state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).total, 0);
+  const totalVenta = totalVentaDeptos + addons.estacionamientos.total + addons.bodegas.total;
   const totalUnidades = state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).unidades, 0);
   const totalSup = state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).supVendible, 0);
 
-  setHtml('ventas-tbody', rows);
+  setHtml('ventas-tbody', `
+    ${rows}
+    <tr style="background:#f8fafc">
+      <td style="font-weight:800">ESTACIONAMIENTOS</td>
+      <td style="text-align:center">${fmtNumber(addons.estacionamientos.unidades)}</td>
+      <td style="text-align:center">-</td>
+      <td style="text-align:center">-</td>
+      <td style="text-align:center">-</td>
+      <td style="text-align:center">-</td>
+      <td style="text-align:center;color:#16a34a">${fmtUf(addons.estacionamientos.total)}</td>
+      <td style="text-align:center">${fmtNumber(addons.estacionamientos.unidades)}</td>
+      <td style="text-align:center">${fmtUf(addons.estacionamientos.precio)}</td>
+      <td style="text-align:center">-</td>
+      <td style="text-align:center">-</td>
+      <td style="text-align:center;color:#ea580c;font-weight:800">${fmtUf(addons.estacionamientos.total)}</td>
+      <td style="text-align:center">${fmtUf(addons.estacionamientos.precio)}</td>
+    </tr>
+    <tr style="background:#f8fafc">
+      <td style="font-weight:800">BODEGAS</td>
+      <td style="text-align:center">${fmtNumber(addons.bodegas.unidades)}</td>
+      <td style="text-align:center">-</td>
+      <td style="text-align:center">-</td>
+      <td style="text-align:center">-</td>
+      <td style="text-align:center">-</td>
+      <td style="text-align:center;color:#16a34a">${fmtUf(addons.bodegas.total)}</td>
+      <td style="text-align:center">-</td>
+      <td style="text-align:center">-</td>
+      <td style="text-align:center">${fmtNumber(addons.bodegas.unidades)}</td>
+      <td style="text-align:center">${fmtUf(addons.bodegas.precio)}</td>
+      <td style="text-align:center;color:#ea580c;font-weight:800">${fmtUf(addons.bodegas.total)}</td>
+      <td style="text-align:center">${fmtUf(addons.bodegas.precio)}</td>
+    </tr>
+  `);
   setHtml('ventas-tfoot', `
     <td>Total</td>
     <td>${fmtNumber(totalUnidades)}</td>
@@ -624,7 +677,7 @@ function renderVentasPricing() {
     <td>${fmtNumber(totalUnidades ? totalSup / totalUnidades : 0, 1)}</td>
     <td colspan="7"></td>
     <td style="font-weight:800;color:#22c55e">${fmtUf(totalVenta)}</td>
-    <td>${fmtUf(totalUnidades ? totalVenta / totalUnidades : 0)}</td>
+    <td>${fmtUf(totalUnidades ? totalVentaDeptos / totalUnidades : 0)}</td>
   `);
 }
 
@@ -789,6 +842,54 @@ function buildTimelineMonths() {
   return Array.from(months).sort((a, b) => a - b).slice(0, 8);
 }
 
+function renderVentasSummaryCards() {
+  const addons = getAddonSalesMetrics();
+  const totalVentaDeptos = state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).total, 0);
+  const totalVentaAccesorios = addons.estacionamientos.total + addons.bodegas.total;
+  const totalVenta = totalVentaDeptos + totalVentaAccesorios;
+  const preRows = getCronogramaByType('PREVENTA');
+  const ventaRows = getCronogramaByType('VENTA');
+  const escrRow = getCronogramaByType('ESCRITURACION')[0];
+
+  const preventaPct = preRows.reduce((sum, row) => sum + toNumber(row.porcentaje), 0);
+  const ventaPct = ventaRows.reduce((sum, row) => sum + toNumber(row.porcentaje), 0);
+  const escrituraInicio = escrRow ? getCronogramaComputed(escrRow).inicio : 0;
+  const escrituraFin = escrRow ? getCronogramaComputed(escrRow).fin : 0;
+  const escrituraDuracion = escrRow ? getCronogramaComputed(escrRow).duracion : 0;
+  const totalUnidades = state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).unidades, 0);
+  const velEntregas = escrituraDuracion ? totalUnidades / escrituraDuracion : 0;
+
+  const analysisPoints = preRows.concat(ventaRows).map((row) => getCronogramaComputed(row));
+  const analysisStart = Math.min(
+    ...analysisPoints.map((row) => row.inicio),
+    escrituraInicio || 999999
+  );
+  const analysisEnd = Math.max(
+    ...analysisPoints.map((row) => row.fin),
+    escrituraFin || 0
+  );
+  const duration = analysisEnd > analysisStart ? analysisEnd - analysisStart : 1;
+  const velUf = totalVenta / duration;
+  const velUn = totalUnidades / duration;
+
+  drawSpeedometer(velUf, Math.max(velUf * 1.3, 1));
+  setText('vel-global-uf', fmtNumber(velUf));
+  setText('vel-global-un', `${fmtNumber(velUn, 1)} un/m`);
+  setText('vel-duracion', `${fmtNumber(duration)} meses`);
+  setText('vel-analisis', `Analisis desde Mes ${fmtNumber(analysisStart)} al ${fmtNumber(analysisEnd)}`);
+  setText('vel-entregas', fmtNumber(velEntregas, 1));
+  setText('escrit-inicio', `Mes ${fmtNumber(escrituraInicio)}`);
+  setText('escrit-fin', `Mes ${fmtNumber(escrituraFin)}`);
+  setText('escrit-dur', `Duracion: ${fmtNumber(escrituraDuracion)} meses`);
+
+  setHtml('mix-ventas-list', `
+    <div class="etapa-card" style="border-color:#3b82f6"><div style="font-weight:800">Preventa departamentos</div><div style="font-size:12px;color:#64748b">${fmtPct(preventaPct)} del stock deptos · ${fmtUf(totalVentaDeptos * preventaPct / 100)}</div></div>
+    <div class="etapa-card" style="border-color:#22c55e"><div style="font-weight:800">Venta departamentos</div><div style="font-size:12px;color:#64748b">${fmtPct(ventaPct)} del stock deptos · ${fmtUf(totalVentaDeptos * ventaPct / 100)}</div></div>
+    <div class="etapa-card" style="border-color:#8b5cf6"><div style="font-weight:800">Estac. y bodegas</div><div style="font-size:12px;color:#64748b">${fmtNumber(addons.estacionamientos.unidades)} estac. + ${fmtNumber(addons.bodegas.unidades)} bod. · ${fmtUf(totalVentaAccesorios)}</div></div>
+    <div class="etapa-card" style="border-color:#f97316"><div style="font-weight:800">Escrituracion</div><div style="font-size:12px;color:#64748b">Desde Mes ${fmtNumber(escrituraInicio)} hasta ${fmtNumber(escrituraFin)}</div></div>
+  `);
+}
+
 function renderVentasCashflow() {
   const months = buildTimelineMonths();
   setHtml('flujo-ventas-header', `<th>Concepto</th>${months.map((month) => `<th>M${fmtNumber(month)}</th>`).join('')}`);
@@ -839,6 +940,75 @@ function renderVentasCashflow() {
   const rows = [
     { label: 'Reservas y promesas', values: reservations },
     { label: 'Cuotas pie', values: cuotas },
+    { label: 'Escrituraciones', values: escrituras },
+  ];
+
+  setHtml('flujo-ventas-tbody', rows.map((row) => `
+    <tr>
+      <td>${row.label}</td>
+      ${row.values.map((value) => `<td>${fmtNumber(value)}</td>`).join('')}
+    </tr>
+  `).join(''));
+
+  const totals = months.map((_, index) => rows.reduce((sum, row) => sum + row.values[index], 0));
+  setHtml('flujo-ventas-tfoot', `<td>Total</td>${totals.map((value) => `<td>${fmtNumber(value)}</td>`).join('')}`);
+}
+
+function renderVentasCashflow() {
+  const months = buildTimelineMonths();
+  setHtml('flujo-ventas-header', `<th>Concepto</th>${months.map((month) => `<th>M${fmtNumber(month)}</th>`).join('')}`);
+
+  const addons = getAddonSalesMetrics();
+  const reservations = [];
+  const cuotas = [];
+  const accesorios = [];
+  const escrituras = [];
+  const totalVentaAccesorios = addons.estacionamientos.total + addons.bodegas.total;
+
+  months.forEach((month) => {
+    let totalReserva = 0;
+    let totalCuotas = 0;
+    let totalEscritura = 0;
+
+    state.ventasConfig.forEach((config) => {
+      const metrics = getUsoSaleMetrics(config.uso);
+      const preventa = getCronogramaForUso('PREVENTA', config.uso);
+      const venta = getCronogramaForUso('VENTA', config.uso);
+      const escritura = getCronogramaByType('ESCRITURACION')[0];
+
+      if (preventa) {
+        const computed = getCronogramaComputed(preventa);
+        if (month >= computed.inicio && month < computed.fin) {
+          totalReserva += toNumber(config.reserva_uf) * (metrics.unidades * toNumber(preventa.porcentaje) / 100) / computed.duracion;
+          totalCuotas += (metrics.ticket * toNumber(config.pie_cuotas_pct) / 100) * (metrics.unidades * toNumber(preventa.porcentaje) / 100) / computed.duracion;
+        }
+      }
+
+      if (venta) {
+        const computed = getCronogramaComputed(venta);
+        if (month >= computed.inicio && month < computed.fin) {
+          totalCuotas += (metrics.ticket * toNumber(config.pie_promesa_pct) / 100) * (metrics.unidades * toNumber(venta.porcentaje) / 100) / computed.duracion;
+        }
+      }
+
+      if (escritura) {
+        const computed = getCronogramaComputed(escritura);
+        if (month >= computed.inicio && month < computed.fin) {
+          totalEscritura += (metrics.ticket * toNumber(config.hipotecario_pct) / 100) * metrics.unidades / computed.duracion;
+        }
+      }
+    });
+
+    reservations.push(totalReserva);
+    cuotas.push(totalCuotas);
+    accesorios.push(months.length ? totalVentaAccesorios / months.length : 0);
+    escrituras.push(totalEscritura);
+  });
+
+  const rows = [
+    { label: 'Reservas y promesas', values: reservations },
+    { label: 'Cuotas pie', values: cuotas },
+    { label: 'Ventas estac. y bodegas', values: accesorios },
     { label: 'Escrituraciones', values: escrituras },
   ];
 
