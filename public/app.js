@@ -12,6 +12,7 @@ const state = {
   capital: {},
   calculos: {},
   health: null,
+  costDrag: null,
   sync: {
     status: 'loading',
     message: 'Verificando conexion',
@@ -303,36 +304,6 @@ function ensureProjectControls() {
 function ensureActionButtons() {
   $('tour-interactivo-btn')?.addEventListener('click', () => {
     window.alert('Tour interactivo: 1) define cabida, 2) arma gantt, 3) configura ventas, 4) guarda y valida sincronizacion.');
-  });
-
-  $('tour-guiado-btn')?.addEventListener('click', () => {
-    window.alert('Tour guiado: parte en Cabida Proyecto, sigue con Carta Gantt y luego Ventas para que los calculos tengan sentido.');
-  });
-
-  $('bitacora-btn')?.addEventListener('click', () => {
-    const lines = [
-      `Proyecto activo: ${state.proyecto?.nombre || 'Sin proyecto'}`,
-      `Estado sistema: ${state.sync.message}`,
-      `Detalle: ${state.sync.detail}`,
-      `Ultima actualizacion proyecto: ${fmtDateTime(state.proyecto?.updated_at)}`,
-      `Ultimo guardado local: ${fmtDateTime(state.sync.lastSavedAt)}`,
-      `Hitos gantt: ${state.gantt.length}`,
-      `Usos comerciales: ${state.ventasConfig.length}`,
-    ];
-    window.alert(lines.join('\n'));
-  });
-
-  $('compartir-btn')?.addEventListener('click', async () => {
-    const url = new URL(window.location.href);
-    if (state.proyectoId) url.searchParams.set('projectId', state.proyectoId);
-    try {
-      await navigator.clipboard.writeText(url.toString());
-      setSyncStatus('ok', 'LINK COPIADO', `Proyecto ${state.proyecto?.nombre || ''}`.trim());
-      setTimeout(() => renderProjectHeader(), 1600);
-      setTimeout(() => renderSyncStatus(), 1600);
-    } catch (_error) {
-      window.prompt('Copia este enlace del proyecto', url.toString());
-    }
   });
 }
 
@@ -1348,8 +1319,115 @@ function evaluateCostPartida(partida, context) {
   return toNumber(partida.total_neto);
 }
 
-function normalizeDistribution(distribucion, total) {
-  const months = Array.from({ length: 13 }, (_, index) => toNumber(distribucion?.[index]));
+function getProjectFinalMonth() {
+  const ganttEnd = state.gantt.reduce((max, row) => Math.max(max, toNumber(row.fin), toNumber(row.inicio) + toNumber(row.duracion)), 0);
+  const ventasEnd = state.ventasCronograma.reduce((max, row) => Math.max(max, toNumber(row.mes_inicio) + toNumber(row.duracion)), 0);
+  const constructionEnd = getConstructionStartMonth() + getConstructionDuration();
+  return Math.max(12, ganttEnd, ventasEnd, constructionEnd);
+}
+
+function getCostMonthCount() {
+  return Math.max(13, Math.ceil(getProjectFinalMonth()) + 1);
+}
+
+function createMonthlyArray(length = getCostMonthCount(), fill = 0) {
+  return Array.from({ length }, () => fill);
+}
+
+function getCostMonthLabels() {
+  return Array.from({ length: getCostMonthCount() }, (_, index) => `Mes ${index}`);
+}
+
+function getGanttReferenceMonth(refName, mode = 'inicio') {
+  const exact = state.gantt.find((row) => String(row.nombre || '').trim().toLowerCase() === String(refName || '').trim().toLowerCase());
+  const partial = state.gantt.find((row) => String(row.nombre || '').toLowerCase().includes(String(refName || '').trim().toLowerCase()));
+  const match = exact || partial;
+  if (!match) return 0;
+  return mode === 'fin' ? toNumber(match.fin) : toNumber(match.inicio);
+}
+
+function placeMonthlyValue(months, monthIndex, amount) {
+  if (!amount) return;
+  const target = Math.max(0, Math.min(months.length - 1, Math.round(monthIndex)));
+  months[target] += amount;
+}
+
+function distributeEvenly(months, amount, startMonth, duration) {
+  const safeDuration = Math.max(1, Math.round(duration));
+  const share = amount / safeDuration;
+  Array.from({ length: safeDuration }, (_, offset) => {
+    placeMonthlyValue(months, toNumber(startMonth) + offset, share);
+  });
+}
+
+function buildDistributionFromPlan(planText, total) {
+  const months = createMonthlyArray();
+  const rawPlan = String(planText || '').trim();
+  if (!rawPlan || !total) return null;
+
+  const segments = rawPlan.split(/[;\n]+/).map((segment) => segment.trim()).filter(Boolean);
+  let lastTouchedMonth = 0;
+
+  segments.forEach((segment) => {
+    const match = segment.match(/^(\d+(?:[.,]\d+)?)%\s*@\s*(.+)$/i);
+    if (!match) return;
+
+    const pct = toNumber(match[1].replace(',', '.'));
+    const instruction = match[2].trim();
+    const amount = total * pct / 100;
+
+    if (/^inicio$/i.test(instruction)) {
+      placeMonthlyValue(months, 0, amount);
+      lastTouchedMonth = 0;
+      return;
+    }
+
+    if (/^fin$/i.test(instruction)) {
+      lastTouchedMonth = months.length - 1;
+      placeMonthlyValue(months, lastTouchedMonth, amount);
+      return;
+    }
+
+    const spreadMatch = instruction.match(/^meses\(\s*(\d+)\s*(?:,\s*(\d+))?\s*\)$/i);
+    if (spreadMatch) {
+      const duration = toNumber(spreadMatch[1]);
+      const startMonth = spreadMatch[2] != null ? toNumber(spreadMatch[2]) : 0;
+      distributeEvenly(months, amount, startMonth, duration);
+      lastTouchedMonth = startMonth + Math.max(0, duration - 1);
+      return;
+    }
+
+    const tramoMatch = instruction.match(/^tramo\(\s*(\d+)\s*,\s*(\d+)\s*\)$/i);
+    if (tramoMatch) {
+      const startMonth = toNumber(tramoMatch[1]);
+      const endMonth = toNumber(tramoMatch[2]);
+      distributeEvenly(months, amount, startMonth, Math.max(1, endMonth - startMonth + 1));
+      lastTouchedMonth = endMonth;
+      return;
+    }
+
+    const hitoMatch = instruction.match(/^hito\(\s*([^,]+)\s*,\s*(inicio|fin)\s*\)$/i);
+    if (hitoMatch) {
+      const refMonth = getGanttReferenceMonth(hitoMatch[1], hitoMatch[2].toLowerCase());
+      placeMonthlyValue(months, refMonth, amount);
+      lastTouchedMonth = refMonth;
+    }
+  });
+
+  if (!months.some((value) => value !== 0)) return null;
+
+  const delta = total - months.reduce((sum, value) => sum + value, 0);
+  if (Math.abs(delta) > 0.0001) {
+    placeMonthlyValue(months, lastTouchedMonth, delta);
+  }
+  return months;
+}
+
+function normalizeDistribution(distribucion, total, planPago = '') {
+  const fromPlan = buildDistributionFromPlan(planPago, total);
+  if (fromPlan) return fromPlan;
+
+  const months = createMonthlyArray().map((_, index) => toNumber(distribucion?.[index]));
   const sum = months.reduce((acc, value) => acc + value, 0);
   if (!sum && total) {
     months[0] = total;
@@ -1358,6 +1436,7 @@ function normalizeDistribution(distribucion, total) {
 }
 
 function buildFinancialCostRows(manualRows = []) {
+  const monthCount = getCostMonthCount();
   const terrainTermMonths = Math.max(1, getConstructionStartMonth());
   const constructionMonths = Math.max(1, getConstructionDuration());
   const terrenoBase = (state.costos.find((category) => category.nombre === 'TERRENO')?.partidas || [])
@@ -1393,7 +1472,40 @@ function buildFinancialCostRows(manualRows = []) {
     ...row,
   }));
 
-  return autoRows.concat(manualRows.map((row) => ({ ...row, auto_origen: false })));
+  const adjustedRows = autoRows.map((row) => {
+    const distribucion = createMonthlyArray(monthCount, 0);
+    const isTerreno = /Terreno/i.test(row.nombre || '');
+    const isInteres = /Interes/i.test(row.nombre || '');
+    const isPagoLinea = /Pago de linea/i.test(row.nombre || '');
+    const isLineaAprobada = /Linea aprobada/i.test(row.nombre || '');
+    const isTimbre = /timbre/i.test(row.nombre || '');
+    const isAlzamiento = /Alzamiento/i.test(row.nombre || '');
+
+    if (isTerreno && isLineaAprobada) distribucion[0] = toNumber(row.total_neto);
+    if (isTerreno && isInteres) distribucion[Math.min(monthCount - 1, 1)] = toNumber(row.total_neto);
+    if (isTerreno && isPagoLinea) distribucion[Math.min(monthCount - 1, terrainTermMonths)] = toNumber(row.total_neto);
+    if (!isTerreno && isLineaAprobada) {
+      Array.from({ length: constructionMonths }, (_, offset) => {
+        const month = Math.min(monthCount - 1, offset + 1);
+        distribucion[month] += toNumber(row.total_neto) / constructionMonths;
+      });
+    }
+    if (!isTerreno && isInteres) {
+      Array.from({ length: constructionMonths }, (_, offset) => {
+        const month = Math.min(monthCount - 1, offset + 1);
+        distribucion[month] += toNumber(row.total_neto) / constructionMonths;
+      });
+    }
+    if (isTimbre) distribucion[0] = toNumber(row.total_neto);
+    if (isAlzamiento || (!isTerreno && isPagoLinea)) distribucion[Math.min(monthCount - 1, constructionMonths)] = toNumber(row.total_neto);
+
+    return {
+      ...row,
+      distribucion_mensual: distribucion,
+    };
+  });
+
+  return adjustedRows.concat(manualRows.map((row) => ({ ...row, auto_origen: false })));
 }
 
 function ensureCostosState() {
@@ -1404,6 +1516,7 @@ function ensureCostosState() {
       const current = byCategory.get(target);
       current.partidas.push({
         ...partida,
+        plan_pago: partida.plan_pago || '',
         distribucion_mensual: Array.isArray(partida.distribucion_mensual) ? partida.distribucion_mensual : [],
       });
     });
@@ -1475,10 +1588,303 @@ function renderCostosModule() {
   renderCostPlanilla();
 }
 
+function ensureCostosState() {
+  const byCategory = new Map(COST_CATEGORY_ORDER.map((name) => [name, { id: '', nombre: name, partidas: [] }]));
+  (state.costos || []).forEach((category) => {
+    (category.partidas || []).forEach((partida) => {
+      const target = mapLegacyCategoryName(category.nombre, partida.nombre);
+      const current = byCategory.get(target);
+      current.partidas.push({
+        ...partida,
+        plan_pago: partida.plan_pago || '',
+        distribucion_mensual: Array.isArray(partida.distribucion_mensual) ? partida.distribucion_mensual : [],
+      });
+    });
+  });
+
+  state.costos = COST_CATEGORY_ORDER.map((name) => {
+    const category = byCategory.get(name);
+    const manualRows = (category.partidas || []).filter((row) => !row.auto_origen && row.nombre);
+    return {
+      ...category,
+      nombre: name,
+      partidas: name === 'GASTOS FINANCIEROS'
+        ? buildFinancialCostRows(manualRows.filter((row) => !/^(Terreno|Construccion)\s*[·Â]/i.test(row.nombre || '')))
+        : manualRows,
+    };
+  });
+
+  return state.costos;
+}
+
+function renderCostFlow(monthlyTotals) {
+  const labels = getCostMonthLabels();
+  const total = monthlyTotals.reduce((sum, value) => sum + value, 0);
+  setHtml('flujoEgresos-legend', labels.map((label, index) => {
+    const value = toNumber(monthlyTotals[index]);
+    const pct = total ? (value / total) * 100 : 0;
+    return `<span class="badge badge-blue">${escapeHtml(label)}: ${fmtUf(value)} · ${fmtPct(pct)}</span>`;
+  }).join(''));
+
+  if (typeof Chart === 'undefined') return;
+  const canvas = $('flujoEgresos-chart');
+  if (!canvas) return;
+  const context = canvas.getContext('2d');
+  if (state.costFlowChart) state.costFlowChart.destroy();
+  state.costFlowChart = new Chart(context, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Egresos',
+        data: monthlyTotals,
+        backgroundColor: '#0f172a',
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+      },
+      scales: {
+        x: { ticks: { maxRotation: 0, autoSkip: true } },
+        y: { beginAtZero: true },
+      },
+    },
+  });
+}
+
+function renderCostPlanilla() {
+  const categorias = ensureCostosState();
+  const context = buildCostContext();
+  const monthCount = getCostMonthCount();
+  const monthLabels = getCostMonthLabels();
+  const monthlyTotals = createMonthlyArray(monthCount, 0);
+  let totalNeto = 0;
+  let totalIva = 0;
+
+  setHtml('planilla-head', `
+    <tr>
+      <th style="width:34px"></th>
+      <th style="min-width:220px;text-align:left">Subpartida</th>
+      <th style="min-width:180px;text-align:left">Formula</th>
+      <th style="min-width:240px;text-align:left">Plan de pago</th>
+      <th style="min-width:110px">Total neto</th>
+      <th style="width:64px">IVA</th>
+      <th style="width:78px">Terreno</th>
+      ${monthLabels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}
+    </tr>
+  `);
+
+  setHtml('planilla-tbody', categorias.map((categoria) => {
+    const categoryRows = (categoria.partidas || []).map((partida, index) => {
+      const total = evaluateCostPartida(partida, context);
+      const distribucion = normalizeDistribution(partida.distribucion_mensual, total, partida.plan_pago);
+      partida.total_neto = total;
+      partida.distribucion_mensual = distribucion;
+      totalNeto += total;
+      totalIva += partida.tiene_iva ? total * 0.19 : 0;
+      distribucion.forEach((value, monthIndex) => { monthlyTotals[monthIndex] += value; });
+
+      return `
+        <tr class="partida-row" data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" ${partida.auto_origen ? 'data-auto="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
+          <td style="text-align:center">${partida.auto_origen ? '' : '<span class="drag-handle" title="Orden manual">⋮⋮</span>'}</td>
+          <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${partida.auto_origen ? 'disabled' : ''}/></td>
+          <td><input class="inp" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}" placeholder="Ej: 2500*meses_construccion" ${partida.auto_origen ? 'disabled' : ''}/></td>
+          <td><input class="inp cost-plan-input" data-field="plan_pago" value="${escapeHtml(partida.plan_pago || '')}" placeholder="15%@inicio;80%@meses(24,5);5%@fin" ${partida.auto_origen ? 'disabled' : 'onchange="aplicarPlanPagoFila(this)"'}/></td>
+          <td style="text-align:center;color:#22c55e;font-weight:800">${fmtUf(total)}</td>
+          <td style="text-align:center"><input type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''} ${partida.auto_origen ? 'disabled' : ''}/></td>
+          <td style="text-align:center"><input type="checkbox" data-field="es_terreno" ${partida.es_terreno ? 'checked' : ''} ${partida.auto_origen ? 'disabled' : ''}/></td>
+          ${distribucion.map((value, monthIndex) => `<td><input class="inp cost-month-input" data-month="${monthIndex}" type="number" step="0.01" value="${toNumber(value)}" ${partida.auto_origen ? 'disabled' : ''}/></td>`).join('')}
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <tr class="cat-row">
+        <td colspan="${7 + monthCount}" style="padding:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <span>${escapeHtml(categoria.nombre)}</span>
+            <button class="btn-outline btn-plus" type="button" onclick="agregarPartidaLinea('${escapeHtml(categoria.nombre)}')" title="Agregar subpartida">+</button>
+          </div>
+        </td>
+      </tr>
+      ${categoryRows}
+    `;
+  }).join(''));
+
+  setHtml('planilla-tfoot', `
+    <tr class="tfoot-dark">
+      <td colspan="4">Totales</td>
+      <td>${fmtUf(totalNeto)}</td>
+      <td>${fmtUf(totalIva)}</td>
+      <td>${fmtUf(totalNeto + totalIva)}</td>
+      ${monthlyTotals.map((value) => `<td>${fmtUf(value)}</td>`).join('')}
+    </tr>
+  `);
+
+  renderCostFlow(monthlyTotals);
+}
+
+function renderCostosModule() {
+  ensureCostosState();
+  renderCostPlanilla();
+  renderCostStructure();
+}
+
+function ensureCostosState() {
+  const byCategory = new Map(COST_CATEGORY_ORDER.map((name) => [name, { id: '', nombre: name, partidas: [] }]));
+  (state.costos || []).forEach((category) => {
+    (category.partidas || []).forEach((partida) => {
+      const target = mapLegacyCategoryName(category.nombre, partida.nombre);
+      const current = byCategory.get(target);
+      current.partidas.push({
+        ...partida,
+        plan_pago: partida.plan_pago || '',
+        distribucion_mensual: Array.isArray(partida.distribucion_mensual) ? partida.distribucion_mensual : [],
+      });
+    });
+  });
+
+  state.costos = COST_CATEGORY_ORDER.map((name) => {
+    const category = byCategory.get(name);
+    const manualRows = (category.partidas || []).filter((row) => !row.auto_origen && row.nombre);
+    return {
+      ...category,
+      nombre: name,
+      partidas: name === 'GASTOS FINANCIEROS'
+        ? buildFinancialCostRows(manualRows.filter((row) => !(
+          /^(Terreno|Construccion)/i.test(row.nombre || '')
+          && /(Linea aprobada|Interes|Pago de linea|Impuesto de timbre|Alzamiento)/i.test(row.nombre || '')
+        )))
+        : manualRows,
+    };
+  });
+
+  return state.costos;
+}
+
+function renderCostFlow(monthlyTotals) {
+  const labels = getCostMonthLabels();
+  const total = monthlyTotals.reduce((sum, value) => sum + value, 0);
+  setHtml('flujoEgresos-legend', labels.map((label, index) => {
+    const value = toNumber(monthlyTotals[index]);
+    const pct = total ? (value / total) * 100 : 0;
+    return `<span class="badge badge-blue">${escapeHtml(label)}: ${fmtUf(value)} | ${fmtPct(pct)}</span>`;
+  }).join(''));
+
+  if (typeof Chart === 'undefined') return;
+  const canvas = $('flujoEgresos-chart');
+  if (!canvas) return;
+  const context = canvas.getContext('2d');
+  if (state.costFlowChart) state.costFlowChart.destroy();
+  state.costFlowChart = new Chart(context, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Egresos',
+        data: monthlyTotals,
+        backgroundColor: '#0f172a',
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { maxRotation: 0, autoSkip: true } },
+        y: { beginAtZero: true },
+      },
+    },
+  });
+}
+
+function renderCostPlanilla() {
+  const categorias = ensureCostosState();
+  const context = buildCostContext();
+  const monthCount = getCostMonthCount();
+  const monthLabels = getCostMonthLabels();
+  const monthlyTotals = createMonthlyArray(monthCount, 0);
+  let totalNeto = 0;
+  let totalIva = 0;
+
+  setHtml('planilla-head', `
+    <tr>
+      <th style="width:34px"></th>
+      <th style="min-width:220px;text-align:left">Subpartida</th>
+      <th style="min-width:180px;text-align:left">Formula</th>
+      <th style="min-width:240px;text-align:left">Plan de pago</th>
+      <th style="min-width:110px">Total neto</th>
+      <th style="width:64px">IVA</th>
+      <th style="width:78px">Terreno</th>
+      ${monthLabels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}
+    </tr>
+  `);
+
+  setHtml('planilla-tbody', categorias.map((categoria) => {
+    const categoryRows = (categoria.partidas || []).map((partida, index) => {
+      const total = evaluateCostPartida(partida, context);
+      const distribucion = normalizeDistribution(partida.distribucion_mensual, total, partida.plan_pago);
+      partida.total_neto = total;
+      partida.distribucion_mensual = distribucion;
+      totalNeto += total;
+      totalIva += partida.tiene_iva ? total * 0.19 : 0;
+      distribucion.forEach((value, monthIndex) => { monthlyTotals[monthIndex] += value; });
+
+      return `
+        <tr class="partida-row" data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" ${partida.auto_origen ? 'data-auto="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
+          <td style="text-align:center">${partida.auto_origen ? '' : '<span class="drag-handle" title="Orden manual">......</span>'}</td>
+          <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${partida.auto_origen ? 'disabled' : ''}/></td>
+          <td><input class="inp" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}" placeholder="Ej: 2500*meses_construccion" ${partida.auto_origen ? 'disabled' : ''}/></td>
+          <td><input class="inp cost-plan-input" data-field="plan_pago" value="${escapeHtml(partida.plan_pago || '')}" placeholder="15%@inicio;80%@meses(24,5);5%@fin" ${partida.auto_origen ? 'disabled' : 'onchange="aplicarPlanPagoFila(this)"'}/></td>
+          <td style="text-align:center;color:#22c55e;font-weight:800">${fmtUf(total)}</td>
+          <td style="text-align:center"><input type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''} ${partida.auto_origen ? 'disabled' : ''}/></td>
+          <td style="text-align:center"><input type="checkbox" data-field="es_terreno" ${partida.es_terreno ? 'checked' : ''} ${partida.auto_origen ? 'disabled' : ''}/></td>
+          ${distribucion.map((value, monthIndex) => `<td><input class="inp cost-month-input" data-month="${monthIndex}" type="number" step="0.01" value="${toNumber(value)}" ${partida.auto_origen ? 'disabled' : ''}/></td>`).join('')}
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <tr class="cat-row">
+        <td colspan="${7 + monthCount}" style="padding:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <span>${escapeHtml(categoria.nombre)}</span>
+            <button class="btn-outline btn-plus" type="button" onclick="agregarPartidaLinea('${escapeHtml(categoria.nombre)}')" title="Agregar subpartida">+</button>
+          </div>
+        </td>
+      </tr>
+      ${categoryRows}
+    `;
+  }).join(''));
+
+  setHtml('planilla-tfoot', `
+    <tr class="tfoot-dark">
+      <td colspan="4">Totales</td>
+      <td>${fmtUf(totalNeto)}</td>
+      <td>${fmtUf(totalIva)}</td>
+      <td>${fmtUf(totalNeto + totalIva)}</td>
+      ${monthlyTotals.map((value) => `<td>${fmtUf(value)}</td>`).join('')}
+    </tr>
+  `);
+
+  renderCostFlow(monthlyTotals);
+}
+
+function renderCostosModule() {
+  ensureCostosState();
+  renderCostPlanilla();
+  renderCostStructure();
+}
+
 function renderProjectHeader() {
   setText('proj-title', state.proyecto?.nombre || 'Proyecto');
   setText('proj-dir', state.proyecto?.direccion || 'Sin direccion');
-  setText('nav-user', 'modo dinamico local');
+  setText('nav-user', 'BRICSA · version dinamica');
   if (state.proyecto?.updated_at && state.sync.status === 'ok') {
     $('sync-detail').textContent = `Ult. actualizacion ${fmtDateTime(state.proyecto.updated_at)}`;
   }
@@ -1488,7 +1894,6 @@ function renderKpis() {
   setText('kpi-ventas', fmtUf(state.calculos.ventas_brutas));
   setText('kpi-margen', fmtUf(state.calculos.margen_neto));
   setText('kpi-margen-pct', `${fmtPct(state.calculos.margen_pct)} s/ventas`);
-  setText('floating-value', fmtUf(state.calculos.costos_netos));
 
   const deudaMax = toNumber(state.calculos.costos_netos) * ((toNumber(state.financiamiento.credito_terreno_pct) + toNumber(state.financiamiento.linea_construccion_pct)) / 200);
   const intereses = toNumber(state.calculos.costos_netos) * ((toNumber(state.financiamiento.credito_terreno_tasa) + toNumber(state.financiamiento.linea_construccion_tasa)) / 200);
@@ -1680,6 +2085,7 @@ function readCostosEditor() {
     target.formula_tipo = formula.formula_tipo;
     target.formula_valor = formula.formula_valor;
     target.formula_referencia = formula.formula_referencia;
+    target.plan_pago = row.querySelector('[data-field="plan_pago"]')?.value?.trim() || '';
     target.tiene_iva = !!row.querySelector('[data-field="tiene_iva"]')?.checked;
     target.es_terreno = !!row.querySelector('[data-field="es_terreno"]')?.checked;
     target.distribucion_mensual = Array.from(row.querySelectorAll('[data-month]')).map((input) => toNumber(input.value));
@@ -1690,6 +2096,7 @@ function readCostosEditor() {
 }
 
 function agregarPartidaLinea(categoryName) {
+  readCostosEditor();
   ensureCostosState();
   const category = state.costos.find((item) => item.nombre === categoryName);
   if (!category) return;
@@ -1699,10 +2106,11 @@ function agregarPartidaLinea(categoryName) {
     formula_tipo: 'expr',
     formula_valor: 0,
     formula_referencia: '',
+    plan_pago: '',
     tiene_iva: true,
     es_terreno: categoryName === 'TERRENO',
     total_neto: 0,
-    distribucion_mensual: Array.from({ length: 13 }, () => 0),
+    distribucion_mensual: createMonthlyArray(),
   });
   renderCostosModule();
 }
@@ -1710,16 +2118,67 @@ function agregarPartidaLinea(categoryName) {
 function redistribuirPartida(button) {
   const row = button.closest('[data-cost-row]');
   if (!row) return;
-  const formula = row.querySelector('[data-field="formula"]')?.value || '';
-  const total = evaluateExpressionFormula(parseFormulaInput(formula).formula_referencia || formula, buildCostContext()) || 0;
-  const months = Math.max(1, getConstructionDuration());
-  const normalized = Array.from({ length: 13 }, (_, index) => {
-    if (index === 0) return 0;
-    return index <= months ? total / months : 0;
-  });
+  const formulaText = row.querySelector('[data-field="formula"]')?.value || '';
+  const planText = row.querySelector('[data-field="plan_pago"]')?.value || '';
+  const parsed = parseFormulaInput(formulaText);
+  const total = parsed.formula_tipo === 'manual'
+    ? toNumber(parsed.formula_valor)
+    : evaluateExpressionFormula(parsed.formula_referencia || formulaText, buildCostContext()) || 0;
+  const normalized = normalizeDistribution([], total, planText);
   row.querySelectorAll('[data-month]').forEach((input, index) => {
     input.value = toNumber(normalized[index]);
   });
+}
+
+function aplicarPlanPagoFila(input) {
+  const row = input.closest('[data-cost-row]');
+  if (!row) return;
+  redistribuirPartida({ closest: () => row });
+  readCostosEditor();
+  renderCostosModule();
+}
+
+function startCostDrag(event) {
+  const row = event.target.closest('[data-cost-row]');
+  if (!row || row.dataset.auto === '1') return;
+  state.costDrag = {
+    category: row.dataset.category,
+    index: toNumber(row.dataset.index),
+  };
+  row.classList.add('cost-row-dragging');
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', `${row.dataset.category}:${row.dataset.index}`);
+}
+
+function allowCostDrop(event) {
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+}
+
+function endCostDrag(event) {
+  event.target.closest('[data-cost-row]')?.classList.remove('cost-row-dragging');
+}
+
+function dropCostRow(event) {
+  event.preventDefault();
+  const targetRow = event.target.closest('[data-cost-row]');
+  if (!targetRow || !state.costDrag || targetRow.dataset.auto === '1') return;
+  if (state.costDrag.category !== targetRow.dataset.category) return;
+
+  readCostosEditor();
+  const category = state.costos.find((item) => item.nombre === state.costDrag.category);
+  if (!category) return;
+
+  const sourceIndex = toNumber(state.costDrag.index);
+  const targetIndex = toNumber(targetRow.dataset.index);
+  if (sourceIndex === targetIndex) return;
+
+  const copy = [...category.partidas];
+  const [moved] = copy.splice(sourceIndex, 1);
+  copy.splice(targetIndex, 0, moved);
+  category.partidas = copy;
+  state.costDrag = null;
+  renderCostosModule();
 }
 
 async function loadProjects() {
@@ -1889,6 +2348,11 @@ window.updateConstrParams = updateConstrParams;
 window.guardarCostos = guardarCostos;
 window.agregarPartidaLinea = agregarPartidaLinea;
 window.redistribuirPartida = redistribuirPartida;
+window.aplicarPlanPagoFila = aplicarPlanPagoFila;
+window.startCostDrag = startCostDrag;
+window.allowCostDrop = allowCostDrop;
+window.dropCostRow = dropCostRow;
+window.endCostDrag = endCostDrag;
 window.agregarUso = agregarUso;
 window.agregarHito = agregarHito;
 window.onGanttInputChange = onGanttInputChange;

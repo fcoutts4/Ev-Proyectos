@@ -153,6 +153,7 @@ async function initDb() {
         formula_multiplicador DOUBLE PRECISION DEFAULT 1,
         formula_inicio_gantt TEXT,
         formula_fin_gantt TEXT,
+        plan_pago TEXT,
         tiene_iva BOOLEAN DEFAULT FALSE,
         es_terreno BOOLEAN DEFAULT FALSE,
         total_neto DOUBLE PRECISION DEFAULT 0,
@@ -206,6 +207,7 @@ async function initDb() {
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS bodegas_sup_terrazas DOUBLE PRECISION DEFAULT 0');
     await query("ALTER TABLE gantt_hitos ADD COLUMN IF NOT EXISTS dependencia_tipo TEXT DEFAULT 'fin'");
     await query('ALTER TABLE construccion ADD COLUMN IF NOT EXISTS pct_bajo_tierra_sobre_cota_0 DOUBLE PRECISION DEFAULT 0');
+    await query('ALTER TABLE costos_partidas ADD COLUMN IF NOT EXISTS plan_pago TEXT');
   })();
 
   return initPromise;
@@ -527,8 +529,8 @@ const costos = {
             `INSERT INTO costos_partidas (
               id, categoria_id, proyecto_id, nombre, formula_tipo, formula_valor,
               formula_referencia, formula_multiplicador, formula_inicio_gantt, formula_fin_gantt,
-              tiene_iva, es_terreno, total_neto, orden_index, distribucion_mensual
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb)`,
+              plan_pago, tiene_iva, es_terreno, total_neto, orden_index, distribucion_mensual
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb)`,
             [
               partida.id || uuidv4(),
               categoriaId,
@@ -540,6 +542,7 @@ const costos = {
               partida.formula_multiplicador || 1,
               partida.formula_inicio_gantt || null,
               partida.formula_fin_gantt || null,
+              partida.plan_pago || null,
               normalizeBoolean(partida.tiene_iva),
               normalizeBoolean(partida.es_terreno),
               partida.total_neto || 0,
