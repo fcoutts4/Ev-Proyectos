@@ -209,6 +209,10 @@ async function upsertSingleRow(table, pid, data) {
   );
 }
 
+async function touchProject(pid) {
+  await query('UPDATE proyectos SET updated_at = NOW() WHERE id = $1', [pid]);
+}
+
 const proyectos = {
   async getAll() {
     await initDb();
@@ -277,6 +281,7 @@ const cabida = {
           ]
         );
       }
+      await client.query('UPDATE proyectos SET updated_at = NOW() WHERE id = $1', [pid]);
     });
   },
 };
@@ -311,6 +316,7 @@ const gantt = {
           ]
         );
       }
+      await client.query('UPDATE proyectos SET updated_at = NOW() WHERE id = $1', [pid]);
     });
   },
 };
@@ -356,6 +362,7 @@ const ventas = {
           ]
         );
       }
+      await client.query('UPDATE proyectos SET updated_at = NOW() WHERE id = $1', [pid]);
     });
   },
 
@@ -380,6 +387,7 @@ const ventas = {
           ]
         );
       }
+      await client.query('UPDATE proyectos SET updated_at = NOW() WHERE id = $1', [pid]);
     });
   },
 };
@@ -404,6 +412,7 @@ const construccion = {
       ancho_curva: data.ancho_curva ?? 0.5,
       peak_gasto: data.peak_gasto ?? 0.5,
     });
+    await touchProject(pid);
   },
 };
 
@@ -469,6 +478,7 @@ const costos = {
           );
         }
       }
+      await client.query('UPDATE proyectos SET updated_at = NOW() WHERE id = $1', [pid]);
     });
   },
 };
@@ -483,6 +493,7 @@ const financiamiento = {
   async save(pid, data) {
     await initDb();
     await upsertSingleRow('financiamiento', pid, data);
+    await touchProject(pid);
   },
 };
 
@@ -502,6 +513,7 @@ const capital = {
       caja_fuerte_retencion: data.caja_fuerte_retencion || 10000,
       devolucion_minima: data.devolucion_minima || 3000,
     });
+    await touchProject(pid);
   },
 };
 
@@ -677,5 +689,6 @@ module.exports = {
   costos,
   financiamiento,
   capital,
+  touchProject,
   seedDemoProject,
 };

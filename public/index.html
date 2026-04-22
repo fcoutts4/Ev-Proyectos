@@ -121,7 +121,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     <span style="font-weight:900;font-size:13px;letter-spacing:.05em;color:#0f172a">ZITIOZ</span>
 </div>
   <div style="display:flex;align-items:center;gap:10px">
-    <button class="btn-outline" style="font-size:11px">✨ Tour Interactivo</button>
+    <button class="btn-outline" id="tour-interactivo-btn" style="font-size:11px">✨ Tour Interactivo</button>
     <span style="font-size:18px;cursor:pointer;color:#94a3b8">🔔</span>
     <span id="nav-user" style="font-size:12px;color:#475569">Hey, usuario@empresa.cl!</span>
     <button class="btn-dark" style="font-size:12px">Logout</button>
@@ -136,10 +136,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
       <h1 id="proj-title" style="font-size:22px;font-weight:800;color:#0f172a;margin:4px 0 0">Edificio Residencial Tipo</h1>
   </div>
     <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
-      <button class="btn-outline" style="font-size:11px">❓ Tour Guiado</button>
-      <button class="btn-outline" style="font-size:11px">💬 Bitácora</button>
-      <button class="btn-outline" style="font-size:11px">↗ Compartir</button>
-      <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:6px 12px">☁ ✓ SINCRONIZADO</span>
+      <button class="btn-outline" id="tour-guiado-btn" style="font-size:11px">❓ Tour Guiado</button>
+      <button class="btn-outline" id="bitacora-btn" style="font-size:11px">💬 Bitácora</button>
+      <button class="btn-outline" id="compartir-btn" style="font-size:11px">↗ Compartir</button>
+      <span id="sync-badge" style="display:flex;align-items:center;gap:4px;font-size:11px;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:6px 12px">
+        <span id="sync-icon">☁ ✓</span>
+        <span id="sync-label">SINCRONIZADO</span>
+      </span>
+      <span id="sync-detail" style="font-size:11px;color:#94a3b8">Base conectada</span>
       <span id="proj-dir" style="font-size:11px;color:#94a3b8">📍 Dirección en Las Condes, Las Condes</span>
   </div>
 </div>

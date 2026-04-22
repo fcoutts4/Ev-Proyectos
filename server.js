@@ -40,6 +40,17 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+app.get('/api/health', asyncHandler(async (req, res) => {
+  await initDb();
+  res.json({
+    ok: true,
+    service: 'ev-proyectos',
+    database: 'connected',
+    timestamp: new Date().toISOString(),
+    environment: process.env.VERCEL_ENV || process.env.NODE_ENV || 'development',
+  });
+}));
+
 app.get('/api/proyectos', asyncHandler(async (req, res) => {
   res.json(await proyectos.getAll());
 }));
