@@ -1,0 +1,50 @@
+﻿<div id="tab-cabida" class="tab-pane">
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div class="sec-title" style="margin-bottom:0">ðŸ¢ CABIDA Y SUPERFICIES DEL PROYECTO</div>
+      <button class="btn-primary" onclick="guardarCabida()">💾 Guardar</button>
+  </div>
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:start">
+
+      <!-- Unidades -->
+      <div style="min-width:400px">
+        <div style="background:#f8fafc;border-radius:8px;padding:12px;margin-bottom:8px">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#475569;margin-bottom:10px;display:flex;align-items:center;gap:6px">ðŸ› UNIDADES</div>
+          <table>
+            <thead><tr>
+              <th style="text-align:left">USO</th>
+              <th>CANT.</th><th>ESTAC.</th><th>BOD.</th><th style="color:#3b82f6">M²/UN</th>
+          </tr></thead>
+            <tbody id="cabida-tbody"></tbody>
+            <tfoot><tr class="tfoot-green" id="cabida-tfoot"></tr></tfoot>
+        </table>
+          <p style="font-size:10px;color:#94a3b8;margin-top:6px">* El ratio M²/Un se calcula dividiendo la <strong style="color:#3b82f6">Superficie Vendible Total</strong> del uso por la cantidad de unidades.</p>
+      </div>
+    </div>
+
+      <!-- Cuadro de Superficies -->
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#475569;margin-bottom:10px;display:flex;align-items:center;gap:6px">ðŸ“ CUADRO DE SUPERFICIES</div>
+        <div class="tbl-scroll">
+          <table style="min-width:650px">
+            <thead><tr>
+              <th style="text-align:left">USO</th>
+              <th>INTERIOR</th><th>TERRAZAS</th><th>COMUNES</th><th>ÚTIL MUN.</th>
+              <th style="color:#3b82f6">VENDIBLE</th><th style="color:#22c55e">LOSA</th>
+          </tr></thead>
+            <tbody id="sup-tbody"></tbody>
+            <tfoot><tr class="tfoot-dark" id="sup-tfoot"></tr></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- Editor de Unidades -->
+  <div class="card">
+    <div class="sec-title">âœï¸ EDITAR UNIDADES</div>
+    <div id="cabida-editor"></div>
+    <button class="btn-outline" style="margin-top:10px" onclick="agregarUso()">+ Agregar Uso</button>
+</div>
+</div><!-- end tab cabida -->
+

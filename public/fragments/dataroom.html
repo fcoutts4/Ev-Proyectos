@@ -1,0 +1,15 @@
+﻿<div id="tab-dataroom" class="tab-pane">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <div>
+      <div style="font-size:16px;font-weight:800;color:#0f172a">ðŸ“ DATA ROOM</div>
+      <div style="font-size:11px;color:#94a3b8">Gestión de documentos del proyecto</div>
+  </div>
+    <button class="btn-primary" onclick="document.getElementById('file-upload').click()">📎 Subir Documento</button>
+    <input type="file" id="file-upload" style="display:none" multiple onchange="handleFileUpload(event)">
+</div>
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px" id="dataroom-grid">
+    <!-- Categorías generadas por JS -->
+</div>
+</div><!-- end tab dataroom -->
+

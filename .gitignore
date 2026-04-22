@@ -1,0 +1,7 @@
+node_modules/
+.vercel/
+db.sqlite
+*.log
+*.msi
+Thumbs.db
+desktop.ini

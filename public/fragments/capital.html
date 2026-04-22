@@ -1,0 +1,118 @@
+﻿<div id="tab-capital" class="tab-pane">
+  <!-- KPIs -->
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:16px">
+    <div class="req-kpi">
+      <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px">Req. Máximo (Sin Buffer)</div>
+      <div style="font-size:1.1rem;font-weight:900;color:#0f172a" id="cap-max-sin">143.356</div>
+  </div>
+    <div class="req-kpi">
+      <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px">Req. Máximo (Con Buffer)</div>
+      <div style="font-size:1.1rem;font-weight:900;color:#3b82f6" id="cap-max-con">145.356</div>
+  </div>
+    <div class="req-kpi">
+      <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px">Total Llamados</div>
+      <div style="font-size:1.1rem;font-weight:900;color:#7c3aed" id="cap-llamados">147.667</div>
+  </div>
+    <div class="req-kpi">
+      <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px">Total Devoluciones</div>
+      <div style="font-size:1.1rem;font-weight:900;color:#22c55e" id="cap-devoluciones">231.536</div>
+  </div>
+    <div class="req-kpi">
+      <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px">Margen Bruto (Util. Neta)</div>
+      <div style="font-size:1.1rem;font-weight:900;color:#22c55e" id="cap-margen-bruto">83.869</div>
+  </div>
+    <div class="card-dark" style="border-radius:10px;padding:12px">
+      <div style="font-size:9px;color:#f59e0b;font-weight:700;text-transform:uppercase;margin-bottom:3px">$ MÚLTIPLO (MOIC)</div>
+      <div style="font-size:1.5rem;font-weight:900;color:#fff" id="cap-moic-tab">1.57x</div>
+      <div style="font-size:9px;color:#94a3b8">Múltiplo Retorno</div>
+  </div>
+    <div class="card-dark" style="border-radius:10px;padding:12px">
+      <div style="font-size:9px;color:#22c55e;font-weight:700;text-transform:uppercase;margin-bottom:3px">% TIR INVERSIONISTA</div>
+      <div style="font-size:1.5rem;font-weight:900;color:#fff" id="cap-tir-inv-tab">17.4%</div>
+      <div style="font-size:9px;color:#94a3b8">Tasa Interna Retorno</div>
+  </div>
+</div>
+
+  <!-- Parámetros -->
+  <div class="card" style="margin-bottom:16px;background:#fffbeb;border-color:#fde68a">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div>
+        <div style="font-size:13px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:6px">⚙ AJUSTA TUS PARÁMETROS DE INVERSIÓN</div>
+        <div style="font-size:11px;color:#94a3b8">Modifica los parámetros para simular escenarios. Los cambios solo se aplican al hacer clic en guardar.</div>
+    </div>
+      <button class="btn-primary" onclick="guardarCapital()">💾 Guardar Ajustes</button>
+  </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div>
+        <div class="sec-title" style="color:#3b82f6">⬇ PARÁMETROS DE LLAMADOS (CAPITAL CALLS)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+          <div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">CAJA MÍNIMA (BUFFER) 👆</div>
+            <div style="display:flex;gap:4px"><input type="number" class="inp" id="cap-buffer" value="2000" oninput="calcularCapital()"><span style="font-size:10px;padding-top:8px">UF</span></div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:3px">Piso intocable de la cta. cte.</div>
+        </div>
+          <div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">PROYECCIÓN (MESES) 👆</div>
+            <div style="display:flex;gap:4px"><input type="number" class="inp" id="cap-proyeccion" value="6" oninput="calcularCapital()"><span style="font-size:10px;padding-top:8px">Mes</span></div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:3px">Look-ahead para el llamado.</div>
+        </div>
+          <div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">LLAMADO MÍNIMO 👆</div>
+            <div style="display:flex;gap:4px"><input type="number" class="inp" id="cap-llamado-min" value="5000" oninput="calcularCapital()"><span style="font-size:10px;padding-top:8px">UF</span></div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:3px">Monto mínimo para pedir.</div>
+        </div>
+      </div>
+    </div>
+      <div>
+        <div class="sec-title" style="color:#22c55e">⬆ PARÁMETROS DE DISTRIBUCIÓN (RETURNS)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">CAJA FUERTE (RETENCIÓN) 👆</div>
+            <div style="display:flex;gap:4px"><input type="number" class="inp" id="cap-caja-fuerte" value="10000" oninput="calcularCapital()"><span style="font-size:10px;padding-top:8px">UF</span></div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:3px">Caja retenida antes de repartir excedentes.</div>
+        </div>
+          <div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">DEVOLUCIÓN MÍNIMA 👆</div>
+            <div style="display:flex;gap:4px"><input type="number" class="inp" id="cap-dev-min" value="3000" oninput="calcularCapital()"><span style="font-size:10px;padding-top:8px">UF</span></div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:3px">No se harán repartos menores a este monto.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- Gráficos Capital -->
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;gap:16px;border-bottom:1px solid #f1f5f9;margin-bottom:16px">
+      <button class="tab-btn active" onclick="setCapTab('ciclo',this)" id="cap-btn-ciclo" style="font-size:12px">CICLO OPERATIVO REAL</button>
+      <button class="tab-btn" onclick="setCapTab('curvaJ',this)" id="cap-btn-curvaj" style="font-size:12px">CURVA J (ACUMULADO NETO)</button>
+  </div>
+    <div id="cap-tab-ciclo">
+      <canvas id="cicloOperativo-chart" height="250"></canvas>
+      <div style="display:flex;gap:16px;margin-top:8px;font-size:10px;justify-content:center">
+        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:20px;height:2px;background:#ef4444;border-radius:1px;border-top:1px dashed #ef4444"></span> Caja Acum. Teórica</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:20px;height:2px;background:#3b82f6;border-radius:1px"></span> Caja Real (Cta. Corriente)</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:12px;height:12px;background:#22c55e;border-radius:2px"></span> Devoluciones</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:12px;height:12px;background:#8b5cf6;border-radius:2px"></span> Llamados de Capital</span>
+    </div>
+  </div>
+    <div id="cap-tab-curvaj" style="display:none">
+      <canvas id="curvaJ-tab-chart" height="250"></canvas>
+  </div>
+</div>
+
+  <!-- Agenda de Eventos -->
+  <div class="card">
+    <div class="sec-title">📅 AGENDA DE EVENTOS DE CAPITAL</div>
+    <table>
+      <thead><tr>
+        <th style="text-align:left">MES</th>
+        <th>CONCEPTO</th>
+        <th style="color:#7c3aed">MONTO (UF)</th>
+        <th>CAJA POST-EVENTO (UF)</th>
+    </tr></thead>
+      <tbody id="cap-agenda-tbody"></tbody>
+  </table>
+</div>
+</div><!-- end tab capital -->
+

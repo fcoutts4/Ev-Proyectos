@@ -1,0 +1,1345 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Evaluación de Proyectos Inmobiliarios</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<style>
+*{box-sizing:border-box}
+body{font-family:'Inter',system-ui,sans-serif;background:#f1f5f9;color:#1e293b}
+/* NAV */
+.topnav{position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid #e2e8f0;height:52px;display:flex;align-items:center;padding:0 24px;justify-content:space-between}
+.logo-box{width:28px;height:28px;background:#0f172a;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:12px}
+/* PROJECT HEADER */
+.proj-header{position:sticky;top:52px;z-index:40;background:#fff;border-bottom:1px solid #e2e8f0;padding:12px 24px 0}
+/* TABS */
+.tab-nav{display:flex;gap:0;overflow-x:auto;white-space:nowrap}
+.tab-nav::-webkit-scrollbar{display:none}
+.tab-btn{padding:10px 14px;font-size:13px;font-weight:500;color:#64748b;border-bottom:2px solid transparent;cursor:pointer;background:none;border-top:none;border-left:none;border-right:none;transition:all .15s}
+.tab-btn:hover{color:#1e293b}
+.tab-btn.active{color:#0f172a;font-weight:700;border-bottom-color:#0f172a}
+/* TAB CONTENT */
+.tab-pane{display:none}.tab-pane.active{display:block}
+/* CARDS */
+.card{background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:20px}
+.card-dark{background:#0f172a;border-radius:12px;padding:20px;color:#fff}
+/* KPI CARDS */
+.kpi-card{background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:16px 20px;position:relative;overflow:hidden}
+.kpi-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:12px 0 0 12px}
+.kpi-green::before{background:#22c55e}
+.kpi-blue::before{background:#3b82f6}
+.kpi-purple::before{background:#a855f7}
+.kpi-orange::before{background:#f97316}
+.kpi-gray::before{background:#94a3b8}
+.kpi-amber::before{background:#f59e0b}
+.kpi-label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#64748b;margin-bottom:4px}
+.kpi-value{font-size:1.75rem;font-weight:800;line-height:1}
+.kpi-sub{font-size:11px;color:#94a3b8;margin-top:4px}
+/* SECTION HEADERS */
+.sec-title{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#475569;display:flex;align-items:center;gap:6px;margin-bottom:14px}
+/* TABLES */
+table{width:100%;border-collapse:collapse}
+thead th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;background:#f8fafc;padding:8px 10px;border-bottom:1px solid #e2e8f0}
+tbody td{padding:9px 10px;font-size:12px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+tbody tr:hover{background:#f8fafc}
+.tfoot-dark td{background:#0f172a;color:#fff;padding:10px;font-weight:700;font-size:12px}
+.tfoot-green td{background:#15803d;color:#fff;padding:10px;font-weight:700;font-size:12px}
+/* PLANILLA COSTOS */
+.planilla-header{background:#0f172a;border-radius:10px 10px 0 0;padding:14px 20px;display:flex;justify-content:space-between;align-items:center}
+.cat-row td{background:#f8fafc;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#334155;border-bottom:2px solid #e2e8f0}
+.cat-row td:first-child{padding-left:8px}
+.partida-row td{font-size:12px;border-bottom:1px solid #f1f5f9}
+.formula-chip{display:inline-flex;align-items:center;gap:3px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:3px 8px;font-size:10px;color:#475569;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.formula-chip.ref{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
+.formula-chip.gantt{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
+/* DISTRIBUCIÓN DE COSTOS */
+.dist-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.dist-label{font-size:11px;text-align:right;min-width:130px;color:#64748b}
+.dist-bar-wrap{flex:1;height:10px;background:#f1f5f9;border-radius:4px;overflow:hidden}
+.dist-bar{height:100%;border-radius:4px}
+.dist-pct{font-size:11px;font-weight:600;min-width:36px;color:#334155}
+/* GANTT */
+.gantt-row{display:flex;align-items:center;height:32px;border-bottom:1px solid #f1f5f9}
+.gantt-label{width:170px;flex-shrink:0;font-size:11px;color:#475569;padding-right:8px;text-align:right}
+.gantt-track{flex:1;position:relative;height:22px}
+.gantt-bar{position:absolute;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff}
+/* BADGES */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700}
+.badge-green{background:#dcfce7;color:#166534}
+.badge-blue{background:#dbeafe;color:#1e40af}
+.badge-orange{background:#ffedd5;color:#9a3412}
+.badge-purple{background:#f3e8ff;color:#6b21a8}
+.badge-red{background:#fee2e2;color:#991b1b}
+.badge-yellow{background:#fef9c3;color:#854d0e}
+/* TOGGLE */
+.toggle{position:relative;width:40px;height:22px}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#cbd5e1;transition:.3s;border-radius:22px}
+.toggle-slider:before{position:absolute;content:'';height:16px;width:16px;left:3px;bottom:3px;background:#fff;transition:.3s;border-radius:50%}
+.toggle input:checked + .toggle-slider{background:#22c55e}
+.toggle input:checked + .toggle-slider:before{transform:translateX(18px)}
+/* BTN */
+.btn-primary{display:inline-flex;align-items:center;gap:6px;background:#22c55e;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;transition:background .15s}
+.btn-primary:hover{background:#16a34a}
+.btn-outline{display:inline-flex;align-items:center;gap:6px;background:#fff;color:#475569;border:1px solid #e2e8f0;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer}
+.btn-outline:hover{background:#f8fafc}
+.btn-dark{background:#0f172a;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer}
+/* INPUT */
+.inp{border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;font-size:12px;width:100%;outline:none}
+.inp:focus{border-color:#22c55e;box-shadow:0 0 0 2px rgba(34,197,94,.15)}
+/* FLOATING BALANCE */
+.floating{position:fixed;bottom:20px;right:20px;background:#0f172a;color:#fff;border-radius:14px;padding:12px 18px;box-shadow:0 8px 32px rgba(0,0,0,.3);z-index:99;min-width:200px}
+/* PROGRESS BAR */
+.prog-wrap{height:6px;background:#e2e8f0;border-radius:99px;overflow:hidden;flex:1}
+.prog-fill{height:100%;border-radius:99px}
+/* SCROLL TABLE */
+.tbl-scroll{overflow-x:auto}
+.tbl-scroll::-webkit-scrollbar{height:4px}
+.tbl-scroll::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:2px}
+/* SLIDER */
+input[type=range]{-webkit-appearance:none;width:100%;height:4px;background:#e2e8f0;border-radius:2px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;background:#0f172a;border-radius:50%;cursor:pointer}
+/* SPEEDOMETER */
+.speed-canvas{display:block;margin:0 auto}
+/* VENTAS ETAPA */
+.etapa-card{border-left:4px solid;padding:10px 14px;border-radius:0 8px 8px 0;background:#f8fafc;margin-bottom:10px}
+/* REQS CAPITAL */
+.req-kpi{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<nav class="topnav">
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="logo-box">Z</div>
+    <span style="font-weight:900;font-size:13px;letter-spacing:.05em;color:#0f172a">ZITIOZ</span>
+</div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <button class="btn-outline" style="font-size:11px">✨ Tour Interactivo</button>
+    <span style="font-size:18px;cursor:pointer;color:#94a3b8">🔔</span>
+    <span id="nav-user" style="font-size:12px;color:#475569">Hey, usuario@empresa.cl!</span>
+    <button class="btn-dark" style="font-size:12px">Logout</button>
+</div>
+</nav>
+
+<!-- PROJECT HEADER -->
+<div class="proj-header">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+    <div>
+      <a href="#" style="font-size:12px;color:#64748b;text-decoration:none">← Volver al Dashboard</a>
+      <h1 id="proj-title" style="font-size:22px;font-weight:800;color:#0f172a;margin:4px 0 0">Edificio Residencial Tipo</h1>
+  </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+      <button class="btn-outline" style="font-size:11px">❓ Tour Guiado</button>
+      <button class="btn-outline" style="font-size:11px">💬 Bitácora</button>
+      <button class="btn-outline" style="font-size:11px">↗ Compartir</button>
+      <span style="display:flex;align-items:center;gap:4px;font-size:11px;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:6px 12px">☁ ✓ SINCRONIZADO</span>
+      <span id="proj-dir" style="font-size:11px;color:#94a3b8">📍 Dirección en Las Condes, Las Condes</span>
+  </div>
+</div>
+  <div class="tab-nav" id="tabBar">
+    <button class="tab-btn active" onclick="showTab('resumen',this)">Resumen Ejecutivo</button>
+    <button class="tab-btn" onclick="showTab('cabida',this)">Cabida Proyecto</button>
+    <button class="tab-btn" onclick="showTab('ventas',this)">Ventas</button>
+    <button class="tab-btn" onclick="showTab('gantt',this)">Carta Gantt</button>
+    <button class="tab-btn" onclick="showTab('construccion',this)">Construcción</button>
+    <button class="tab-btn" onclick="showTab('costos',this)">Costos del Proyecto</button>
+    <button class="tab-btn" onclick="showTab('financiamiento',this)">Financiamiento</button>
+    <button class="tab-btn" onclick="showTab('flujo',this)">Flujo de Caja</button>
+    <button class="tab-btn" onclick="showTab('capital',this)">Req. Capital</button>
+    <button class="tab-btn" onclick="showTab('dataroom',this)">Data Room</button>
+</div>
+</div>
+
+<!-- MAIN -->
+<main style="max-width:1600px;margin:0 auto;padding:20px 24px">
+
+<div id="tab-resumen" class="tab-pane active">
+
+  <!-- Banner -->
+  <div class="card-dark" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;border-radius:12px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <div style="width:42px;height:42px;background:#22c55e;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px">📈</div>
+      <div>
+        <div style="font-size:18px;font-weight:900;letter-spacing:.05em">RESUMEN EJECUTIVO</div>
+        <div style="font-size:11px;color:#94a3b8;letter-spacing:.1em">COMITÉ DE INVERSIONES</div>
+    </div>
+  </div>
+    <button class="btn-outline" onclick="window.print()" style="background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.2)">🖨 Imprimir Reporte</button>
+</div>
+
+  <!-- KPIs -->
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:20px" id="kpi-grid">
+    <div class="kpi-card kpi-green">
+      <div class="kpi-label">Ventas Totales</div>
+      <div class="kpi-value" style="color:#16a34a" id="kpi-ventas">647.950 UF</div>
+  </div>
+    <div class="kpi-card kpi-blue">
+      <div class="kpi-label">Margen Neto (Fin)</div>
+      <div class="kpi-value" style="color:#1d4ed8" id="kpi-margen">81.569 UF</div>
+      <div class="kpi-sub" id="kpi-margen-pct">12.6% s/ventas</div>
+  </div>
+    <div class="kpi-card kpi-purple">
+      <div class="kpi-label">TIR Pura</div>
+      <div class="kpi-value" style="color:#7c3aed" id="kpi-tir-pura">11.0%</div>
+      <div class="kpi-sub">S/Financiamiento</div>
+  </div>
+    <div class="kpi-card kpi-orange">
+      <div class="kpi-label">TIR Financiada</div>
+      <div class="kpi-value" style="color:#ea580c" id="kpi-tir-fin">18.8%</div>
+      <div class="kpi-sub">Anual</div>
+  </div>
+    <div class="kpi-card kpi-gray">
+      <div class="kpi-label">ROE</div>
+      <div class="kpi-value" style="color:#0f172a" id="kpi-roe">56.0%</div>
+      <div class="kpi-sub">S/Capital Aportado</div>
+  </div>
+    <div class="kpi-card kpi-amber">
+      <div class="kpi-label">Capital Máximo</div>
+      <div class="kpi-value" style="color:#b45309" id="kpi-cap">145.655 UF</div>
+      <div class="kpi-sub" id="kpi-cap-sub">En Mes 40</div>
+  </div>
+</div>
+
+  <!-- Gantt Preview + Cabida + Ventas -->
+  <div style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:20px">
+
+    <!-- Gantt -->
+    <div class="card">
+      <div class="sec-title">📅 CARTA GANTT
+        <span style="margin-left:auto;font-weight:400;font-size:10px;text-transform:none;color:#94a3b8">Pasa el cursor sobre el gráfico para ver el detalle</span>
+    </div>
+      <div style="overflow-x:auto">
+        <div id="gantt-preview" style="min-width:800px"></div>
+    </div>
+  </div>
+</div>
+
+  <!-- Cabida + Ventas resumen -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+
+    <!-- Cabida -->
+    <div class="card">
+      <div class="sec-title">🏢 CABIDA Y SUPERFICIES</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <!-- Unidades -->
+        <div>
+          <p style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px">Unidades</p>
+          <table>
+            <thead><tr><th style="text-align:left">Uso</th><th>Cant.</th><th>Estac.</th><th>Bod.</th><th style="color:#3b82f6">M²/Un</th></tr></thead>
+            <tbody id="res-cabida-tbody"></tbody>
+            <tfoot><tr class="tfoot-green" id="res-cabida-tfoot"></tr></tfoot>
+        </table>
+      </div>
+        <!-- Superficies -->
+        <div>
+          <p style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px">Superficies</p>
+          <table>
+            <thead><tr><th style="text-align:left">Uso</th><th style="color:#3b82f6">Vendible</th><th style="color:#22c55e">Losa</th></tr></thead>
+            <tbody id="res-sup-tbody"></tbody>
+            <tfoot><tr class="tfoot-dark" id="res-sup-tfoot"></tr></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+    <!-- Estructura de Costos -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div class="sec-title" style="margin-bottom:0">📊 ESTRUCTURA DE COSTOS</div>
+        <div style="display:flex;gap:4px">
+          <button class="badge badge-blue" onclick="toggleEstructura('agrupados',this)" id="btn-agr" style="cursor:pointer">Agrupados</button>
+          <button class="badge" onclick="toggleEstructura('desglosados',this)" id="btn-des" style="cursor:pointer;background:#f1f5f9;color:#475569">Desglosados</button>
+      </div>
+    </div>
+      <div id="estructura-costos-list"></div>
+  </div>
+</div>
+
+  <!-- Financiamiento + Capital -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+
+    <!-- Financiamiento Bancario -->
+    <div class="card">
+      <div class="sec-title">🏦 FINANCIAMIENTO BANCARIO</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
+        <div style="background:#eff6ff;border-radius:8px;padding:12px">
+          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px">Deuda Máx. Acumulada</div>
+          <div style="font-size:1.4rem;font-weight:800;color:#1d4ed8" id="fin-deuda-max">297.453 UF</div>
+          <div style="font-size:10px;color:#94a3b8" id="fin-deuda-mes">Alcanzada en Mes 36</div>
+      </div>
+        <div style="background:#fef2f2;border-radius:8px;padding:12px">
+          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px">Total Intereses</div>
+          <div style="font-size:1.4rem;font-weight:800;color:#dc2626" id="fin-intereses">16.793 UF</div>
+      </div>
+        <div style="background:#f8fafc;border-radius:8px;padding:12px">
+          <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px">Tope Máx. Endeudamiento</div>
+          <div style="font-size:1.4rem;font-weight:800;color:#94a3b8">Inactivo</div>
+      </div>
+    </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div style="border:1px solid #fde68a;border-radius:8px;padding:10px">
+          <div style="font-size:10px;font-weight:700;color:#b45309;text-transform:uppercase;margin-bottom:6px">Financiamiento Terreno</div>
+          <div style="font-size:11px;color:#475569;display:flex;flex-direction:column;gap:3px">
+            <div style="display:flex;justify-content:space-between"><span>Costo Real Base</span><span>132.000 UF</span></div>
+            <div style="display:flex;justify-content:space-between"><span>% a Financiar</span><span>70%</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Monto Financiado</span><span style="color:#f59e0b;font-weight:700">92.400 UF</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Tasa Anual</span><span>3.5%</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Total Intereses</span><span style="color:#dc2626">3.773 UF</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Forma de Pago</span><span>Inicio Constr.</span></div>
+        </div>
+      </div>
+        <div style="border:1px solid #bbf7d0;border-radius:8px;padding:10px">
+          <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;margin-bottom:6px">Línea Construcción</div>
+          <div style="font-size:11px;color:#475569;display:flex;flex-direction:column;gap:3px">
+            <div style="display:flex;justify-content:space-between"><span>Costo Real Base</span><span>241.557 UF</span></div>
+            <div style="display:flex;justify-content:space-between"><span>% a Financiar</span><span>100%</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Monto Financiado</span><span style="color:#22c55e;font-weight:700">241.557 UF</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Tasa Anual</span><span>3.5%</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Total Intereses</span><span style="color:#dc2626">12.157 UF</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Forma de Pago</span><span>Contra Escritur.</span></div>
+        </div>
+      </div>
+        <div style="border:1px solid #fecaca;border-radius:8px;padding:10px">
+          <div style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;margin-bottom:6px">Línea Libre Disposición</div>
+          <div style="font-size:11px;color:#475569;display:flex;flex-direction:column;gap:3px">
+            <div style="display:flex;justify-content:space-between"><span>Monto Financiado</span><span style="color:#dc2626;font-weight:700">10.000 UF</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Tasa Anual</span><span>3%</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Total Intereses</span><span style="color:#dc2626">863 UF</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Forma de Pago</span><span>Contra Escritur.</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+    <!-- Req. Capital -->
+    <div class="card">
+      <div class="sec-title">💰 REQUERIMIENTOS DE CAPITAL</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
+        <div class="req-kpi">
+          <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase">Req. Capital</div>
+          <div style="font-size:1.4rem;font-weight:800;color:#0f172a" id="cap-req">149.967 UF</div>
+          <div style="font-size:10px;color:#94a3b8">Máxima exposición real</div>
+      </div>
+        <div class="req-kpi">
+          <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase">Buffer</div>
+          <div style="font-size:1.4rem;font-weight:800;color:#0f172a">2.000 UF</div>
+          <div style="font-size:10px;color:#94a3b8">Caja Mínima Protegida</div>
+      </div>
+        <div class="req-kpi">
+          <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase">Margen Inv.</div>
+          <div style="font-size:1.4rem;font-weight:800;color:#22c55e" id="cap-margen">81.569 UF</div>
+          <div style="font-size:10px;color:#94a3b8">Utilidad Neta Real</div>
+      </div>
+    </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+        <div class="card-dark" style="border-radius:8px;padding:14px">
+          <div style="font-size:10px;color:#f59e0b;font-weight:700;text-transform:uppercase;margin-bottom:4px">$ MOIC</div>
+          <div style="font-size:2rem;font-weight:900;color:#fff" id="cap-moic">1.54x</div>
+          <div style="font-size:10px;color:#94a3b8">Múltiplo Retorno</div>
+      </div>
+        <div class="card-dark" style="border-radius:8px;padding:14px">
+          <div style="font-size:10px;color:#22c55e;font-weight:700;text-transform:uppercase;margin-bottom:4px">% TIR INV.</div>
+          <div style="font-size:2rem;font-weight:900;color:#fff" id="cap-tir-inv">16.8%</div>
+          <div style="font-size:10px;color:#94a3b8">Tasa Interna Retorno</div>
+      </div>
+    </div>
+      <!-- Curva J mini -->
+      <canvas id="curvaJ-resumen" height="100"></canvas>
+  </div>
+</div>
+
+</div><!-- end tab resumen -->
+
+<div id="tab-cabida" class="tab-pane">
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div class="sec-title" style="margin-bottom:0">🏢 CABIDA Y SUPERFICIES DEL PROYECTO</div>
+      <button class="btn-primary" onclick="guardarCabida()">💾 Guardar</button>
+  </div>
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:start">
+
+      <!-- Unidades -->
+      <div style="min-width:400px">
+        <div style="background:#f8fafc;border-radius:8px;padding:12px;margin-bottom:8px">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#475569;margin-bottom:10px;display:flex;align-items:center;gap:6px">🏛 UNIDADES</div>
+          <table>
+            <thead><tr>
+              <th style="text-align:left">USO</th>
+              <th>CANT.</th><th>ESTAC.</th><th>BOD.</th><th style="color:#3b82f6">M²/UN</th>
+          </tr></thead>
+            <tbody id="cabida-tbody"></tbody>
+            <tfoot><tr class="tfoot-green" id="cabida-tfoot"></tr></tfoot>
+        </table>
+          <p style="font-size:10px;color:#94a3b8;margin-top:6px">* El ratio M²/Un se calcula dividiendo la <strong style="color:#3b82f6">Superficie Vendible Total</strong> del uso por la cantidad de unidades.</p>
+      </div>
+    </div>
+
+      <!-- Cuadro de Superficies -->
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#475569;margin-bottom:10px;display:flex;align-items:center;gap:6px">📐 CUADRO DE SUPERFICIES</div>
+        <div class="tbl-scroll">
+          <table style="min-width:650px">
+            <thead><tr>
+              <th style="text-align:left">USO</th>
+              <th>INTERIOR</th><th>TERRAZAS</th><th>COMUNES</th><th>ÚTIL MUN.</th>
+              <th style="color:#3b82f6">VENDIBLE</th><th style="color:#22c55e">LOSA</th>
+          </tr></thead>
+            <tbody id="sup-tbody"></tbody>
+            <tfoot><tr class="tfoot-dark" id="sup-tfoot"></tr></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- Editor de Unidades -->
+  <div class="card">
+    <div class="sec-title">✏️ EDITAR UNIDADES</div>
+    <div id="cabida-editor"></div>
+    <button class="btn-outline" style="margin-top:10px" onclick="agregarUso()">+ Agregar Uso</button>
+</div>
+</div><!-- end tab cabida -->
+
+<div id="tab-ventas" class="tab-pane">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div>
+      <div style="font-size:16px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:8px">🏦 VENTAS E INGRESOS</div>
+      <div style="font-size:11px;color:#94a3b8">Asegúrate de guardar tus cambios</div>
+  </div>
+    <button class="btn-primary" onclick="guardarVentas()">💾 Guardar</button>
+</div>
+
+  <!-- 1. Estrategia de Precios -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="sec-title">📈 ESTRATEGIA DE PRECIOS E INGRESOS</div>
+    <div class="tbl-scroll">
+      <table id="ventas-precios-table" style="min-width:1000px">
+        <thead><tr>
+          <th style="text-align:left">USO</th>
+          <th colspan="3" style="background:#1e293b;color:#fff;text-align:center">CABIDA (LECTURA)</th>
+          <th colspan="2" style="background:#92400e;color:#fff;text-align:center">PRECIOS PRINCIPALES</th>
+          <th style="color:#22c55e">VENTA UNIDADES</th>
+          <th colspan="2" style="background:#1e40af;color:#fff;text-align:center">ESTACIONAMIENTOS</th>
+          <th colspan="2" style="background:#1e40af;color:#fff;text-align:center">BODEGAS</th>
+          <th style="color:#f97316">TOTAL VENTA USO</th>
+          <th>TICKET PROM.</th>
+      </tr>
+        <tr>
+          <th></th><th>UNID.</th><th>SUP. M²</th><th>M²/UN</th>
+          <th style="color:#3b82f6">UF/M²</th><th>PRECIO BASE</th>
+          <th style="color:#22c55e">SUBTOTAL</th>
+          <th>Nº ESTAC.</th><th>PRECIO EST.</th>
+          <th>Nº BOD.</th><th>PRECIO BOD.</th>
+          <th style="color:#f97316;font-weight:800">TOTAL</th>
+          <th>TICKET FINAL</th>
+      </tr></thead>
+        <tbody id="ventas-tbody"></tbody>
+        <tfoot><tr class="tfoot-dark" id="ventas-tfoot"></tr></tfoot>
+    </table>
+  </div>
+</div>
+
+  <!-- 2. Formas de Pago -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="sec-title">💳 FORMAS DE PAGO POR USO</div>
+    <div class="tbl-scroll">
+      <table id="formas-pago-table" style="min-width:900px">
+        <thead><tr>
+          <th style="text-align:left">USO COMERCIAL</th>
+          <th>RESERVA (UF)</th>
+          <th style="color:#3b82f6">PIE PROMESA (%)</th>
+          <th>MONTO PROMESA (UF)</th>
+          <th style="color:#3b82f6">PIE CUOTAS (%)</th>
+          <th>MONTO CUOTAS (UF)</th>
+          <th style="color:#dc2626">PIE CUOTÓN (%)</th>
+          <th>MONTO CUOTÓN (UF)</th>
+          <th>HIPOTECARIO (%)</th>
+          <th style="color:#22c55e">TOTAL UNIDAD</th>
+      </tr></thead>
+        <tbody id="formas-pago-tbody"></tbody>
+    </table>
+  </div>
+    <p style="font-size:10px;color:#94a3b8;margin-top:8px">ℹ Las cuotas y la promesa forman parte del "Pie" aportado directamente por el cliente. El Monto de Promesa ya tiene descontado el valor de la Reserva.</p>
+</div>
+
+  <!-- 3. Fechas y Velocidades -->
+  <div class="card" style="margin-bottom:16px">
+    <div style="text-align:center;margin-bottom:16px">
+      <span style="font-size:18px">⚡</span>
+      <div class="sec-title" style="justify-content:center;margin-bottom:0">FECHAS Y VELOCIDADES DE VENTAS</div>
+  </div>
+
+    <!-- Pre-Ventas -->
+    <div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+        <div style="width:10px;height:10px;border-radius:50%;background:#3b82f6"></div>
+        <span style="font-size:12px;font-weight:700;color:#475569">CRONOGRAMA DE PREVENTAS</span>
+    </div>
+      <table>
+        <thead><tr>
+          <th style="text-align:left">USO (PREVENTA)</th>
+          <th>VÍNCULO EN GANTT</th>
+          <th>INICIO</th>
+          <th>DURACIÓN</th>
+          <th style="color:#22c55e">FIN</th>
+          <th style="color:#f59e0b">%</th>
+          <th>UNID</th>
+          <th>VELOCIDAD (UN/MES)</th>
+          <th style="color:#22c55e">VEL. VENTAS (UF/MES)</th>
+      </tr></thead>
+        <tbody id="preventa-tbody"></tbody>
+    </table>
+  </div>
+
+    <!-- Ventas -->
+    <div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+        <div style="width:10px;height:10px;border-radius:50%;background:#22c55e"></div>
+        <span style="font-size:12px;font-weight:700;color:#475569">CRONOGRAMA DE VENTAS</span>
+    </div>
+      <table>
+        <thead><tr>
+          <th style="text-align:left">USO (VENTA)</th>
+          <th>VÍNCULO EN GANTT</th>
+          <th>INICIO</th>
+          <th>DURACIÓN</th>
+          <th style="color:#22c55e">FIN</th>
+          <th>%</th>
+          <th>UNID</th>
+          <th>VELOCIDAD (UN/MES)</th>
+          <th style="color:#22c55e">VEL. VENTAS (UF/MES)</th>
+      </tr></thead>
+        <tbody id="venta-tbody"></tbody>
+    </table>
+  </div>
+
+    <!-- Escrituración -->
+    <div>
+      <div class="sec-title" style="margin-bottom:8px">🔑 ESCRITURACIÓN Y ENTREGAS</div>
+      <table>
+        <thead><tr>
+          <th>VÍNCULO EN GANTT</th>
+          <th>INICIO</th>
+          <th>DURACIÓN (MESES)</th>
+          <th style="color:#22c55e">FIN REAL (MES MOTOR)</th>
+          <th>CAPACIDAD MÁX. ESCRIT.</th>
+      </tr></thead>
+        <tbody id="escrituracion-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+  <!-- 4. Mix de Ventas + Velocidad + Proceso -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px">
+
+    <!-- Mix por Etapa -->
+    <div class="card">
+      <div class="sec-title">📊 MIX DE VENTAS POR ETAPA</div>
+      <div id="mix-ventas-list"></div>
+  </div>
+
+    <!-- Velocidad Comercial -->
+    <div class="card" style="display:flex;flex-direction:column;align-items:center">
+      <div class="sec-title" style="width:100%">⏱ VELOCIDAD GLOBAL COMERCIAL</div>
+      <canvas id="speedometer" width="200" height="130" class="speed-canvas"></canvas>
+      <div style="font-size:2rem;font-weight:900;color:#0f172a" id="vel-global-uf">16.614</div>
+      <div style="font-size:11px;color:#94a3b8">UF / mes</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;width:100%;text-align:center">
+        <div><div style="font-size:10px;color:#94a3b8">Vel. Unidades</div><div style="font-weight:800" id="vel-global-un">1.3 un/m</div></div>
+        <div><div style="font-size:10px;color:#94a3b8">Duración Total</div><div style="font-weight:800" id="vel-duracion">39 meses</div></div>
+    </div>
+      <div style="font-size:10px;color:#94a3b8;margin-top:6px" id="vel-analisis">Análisis desde Mes 1 al 39</div>
+  </div>
+
+    <!-- Escrituración -->
+    <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px">
+      <div class="sec-title" style="width:100%">🔑 PROCESO DE ESCRITURACIÓN</div>
+      <div style="width:56px;height:56px;background:#f1f5f9;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px">🏠</div>
+      <div style="text-align:center">
+        <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em">Velocidad de Entregas</div>
+        <div style="font-size:2.5rem;font-weight:900;color:#0f172a" id="vel-entregas">8</div>
+        <div style="font-size:11px;color:#94a3b8">un/mes</div>
+    </div>
+      <div style="width:100%;border-top:1px solid #f1f5f9;padding-top:10px">
+        <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:6px">Ciclo de Escrituración</div>
+        <div style="display:flex;align-items:center;gap:8px;justify-content:center">
+          <span style="font-size:1.1rem;font-weight:800" id="escrit-inicio">Mes 38</span>
+          <span style="color:#94a3b8">→</span>
+          <span style="font-size:1.1rem;font-weight:800" id="escrit-fin">Mes 44</span>
+      </div>
+        <div style="text-align:center;margin-top:6px">
+          <span class="badge badge-blue" id="escrit-dur">Duración: 7 meses</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- 5. Flujo de Caja Ventas -->
+  <div class="card-dark" style="border-radius:12px">
+    <div class="sec-title" style="color:#fff;margin-bottom:12px">🏦 FLUJO DE CAJA DE VENTAS (INGRESOS UF)</div>
+    <div class="tbl-scroll">
+      <table id="flujo-ventas-table" style="min-width:1200px">
+        <thead><tr id="flujo-ventas-header" style="background:#1e293b"></tr></thead>
+        <tbody id="flujo-ventas-tbody"></tbody>
+        <tfoot><tr class="tfoot-dark" id="flujo-ventas-tfoot" style="background:#0f172a"></tr></tfoot>
+    </table>
+  </div>
+</div>
+
+</div><!-- end tab ventas -->
+
+<div id="tab-gantt" class="tab-pane">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div>
+      <div style="font-size:16px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:8px">📅 Cronograma del Proyecto</div>
+      <div style="font-size:11px;color:#94a3b8">Arrastra las filas para reordenar. Asegúrate de guardar tus cambios.</div>
+  </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-outline" onclick="agregarHito()">+ Añadir Hito</button>
+      <button class="btn-primary" onclick="guardarGantt()">💾 Guardar</button>
+  </div>
+</div>
+
+  <div class="card" style="overflow-x:auto">
+    <table style="min-width:1100px">
+      <thead>
+        <tr>
+          <th style="width:32px">ACCIONES</th>
+          <th style="width:200px;text-align:left">HITO / PARTIDA</th>
+          <th style="width:160px">DEPENDENCIA</th>
+          <th style="width:70px">DESFASE</th>
+          <th style="width:60px">INICIO</th>
+          <th style="width:70px">DURACIÓN</th>
+          <th style="width:60px;color:#22c55e">FIN</th>
+          <th>TIMELINE</th>
+      </tr>
+    </thead>
+      <tbody id="gantt-tbody"></tbody>
+      <tfoot>
+        <tr style="background:#0f172a">
+          <td colspan="6" style="color:#fff;font-weight:800;font-size:12px;padding:10px">TOTAL PROYECTO</td>
+          <td style="color:#fff;font-weight:800;font-size:12px;padding:10px" id="gantt-total-fin"></td>
+          <td style="padding:4px 8px"><div style="background:#0f172a;border:1px solid #334155;border-radius:4px;height:22px;display:flex;align-items:center;justify-content:center"><span id="gantt-total-bar" style="font-size:10px;font-weight:700;color:#fff"></span></div></td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+</div><!-- end tab gantt -->
+
+<div id="tab-construccion" class="tab-pane">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div>
+      <div style="font-size:16px;font-weight:800;color:#0f172a">🏗 CONTRATO DE CONSTRUCCIÓN</div>
+      <div style="font-size:11px;color:#94a3b8">Asegúrate de guardar tus cambios</div>
+  </div>
+    <button class="btn-primary" onclick="guardarConstruccion()">💾 Guardar</button>
+</div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+
+    <!-- Definición de Costos por Losa -->
+    <div class="card">
+      <div class="sec-title">📐 DEFINICIÓN DE COSTOS POR LOSA</div>
+      <table>
+        <thead><tr>
+          <th style="text-align:left">PARTIDA</th>
+          <th>SUPERFICIE</th>
+          <th style="color:#3b82f6">UF/M² NETO</th>
+          <th style="color:#22c55e">COSTO NETO (UF)</th>
+      </tr></thead>
+        <tbody>
+          <tr>
+            <td style="font-weight:600">Superficie Sobre Tierra</td>
+            <td style="text-align:center" id="constr-sup-st">7.146 m²</td>
+            <td style="text-align:center"><input type="number" class="inp" id="constr-uf-st" value="27" style="width:80px;text-align:center"> <span style="font-size:10px;color:#94a3b8">UF/m²</span></td>
+            <td style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-st">192.942 UF</td>
+        </tr>
+          <tr>
+            <td style="font-weight:600">Superficie Bajo Tierra</td>
+            <td style="text-align:center" id="constr-sup-bt">3.241 m²</td>
+            <td style="text-align:center"><input type="number" class="inp" id="constr-uf-bt" value="15" style="width:80px;text-align:center"> <span style="font-size:10px;color:#94a3b8">UF/m²</span></td>
+            <td style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-bt">48.615 UF</td>
+        </tr>
+      </tbody>
+        <tfoot>
+          <tr style="background:#f0fdf4">
+            <td style="font-weight:800;color:#15803d;font-size:11px;text-transform:uppercase">Total Neto Construcción</td>
+            <td style="text-align:center;font-weight:700" id="constr-sup-total">10.387 m²</td>
+            <td style="text-align:center;font-weight:700;color:#3b82f6" id="constr-uf-prom">23,26 UF/m²</td>
+            <td style="text-align:center;font-weight:800;color:#22c55e" id="constr-total-neto">241.557 UF</td>
+        </tr>
+          <tr class="tfoot-dark">
+            <td colspan="2" style="font-weight:800">Total Bruto (IVA Incluido)</td>
+            <td style="text-align:center;font-weight:700" id="constr-uf-bruto">27,67 UF/m²</td>
+            <td style="text-align:center;font-weight:800;color:#22c55e" id="constr-total-bruto">287.453 UF</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+    <!-- Parámetros de Obra y Pagos -->
+    <div class="card">
+      <div class="sec-title">📊 PARÁMETROS DE OBRA Y PAGOS</div>
+
+      <div style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-size:12px;font-weight:700;color:#475569">PLAZO DE OBRA</span>
+          <span style="font-size:14px;font-weight:800;color:#22c55e" id="plazo-label">20 MESES</span>
+          <span class="badge badge-green" style="font-size:10px">SINCRONIZADO GANTT</span>
+      </div>
+        <input type="range" id="plazo-slider" min="6" max="60" value="20" oninput="updateConstrParams()">
+    </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:6px">ANCHO DE CURVA</div>
+          <input type="range" id="curva-slider" min="0.1" max="1" step="0.05" value="0.5" oninput="updateConstrParams()">
+          <div style="font-size:10px;color:#94a3b8;text-align:center" id="curva-label">0.50</div>
+      </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:6px">PEAK DE GASTO</div>
+          <input type="range" id="peak-slider" min="0.1" max="0.9" step="0.05" value="0.5" oninput="updateConstrParams()">
+          <div style="font-size:10px;color:#94a3b8;text-align:center" id="peak-label">0.50</div>
+      </div>
+    </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div style="background:#fef9c3;border-radius:8px;padding:12px">
+          <div style="font-size:10px;font-weight:700;color:#b45309;margin-bottom:6px">🏦 ANTICIPO</div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="range" id="anticipo-slider" min="0" max="50" step="1" value="15" oninput="updateConstrParams()">
+            <span style="font-weight:800;font-size:14px" id="anticipo-label">15%</span>
+        </div>
+      </div>
+        <div style="background:#fef2f2;border-radius:8px;padding:12px">
+          <div style="font-size:10px;font-weight:700;color:#991b1b;margin-bottom:6px">🔒 RETENCIONES</div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="range" id="retencion-slider" min="0" max="20" step="1" value="5" oninput="updateConstrParams()">
+            <span style="font-weight:800;font-size:14px" id="retencion-label">5%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- Curva S -->
+  <div class="card-dark" style="border-radius:12px;margin-bottom:16px">
+    <div class="sec-title" style="color:#fff">📈 CURVA S: AVANCE FÍSICO VS FLUJO DE PAGOS</div>
+    <canvas id="curvaS-chart" height="180"></canvas>
+</div>
+
+  <!-- Detalle de Flujos Mensuales -->
+  <div class="card">
+    <div class="sec-title">📋 DETALLE DE FLUJOS MENSUALES Y GARANTÍAS</div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr>
+          <th style="text-align:left">MES CALENDARIO</th>
+          <th>AVANCE OBRA (UF)</th>
+          <th style="color:#dc2626">AMORTIZACIÓN ANTICIPO</th>
+          <th style="color:#dc2626">RETENCIÓN GARANTÍA</th>
+          <th style="color:#22c55e">PAGO NETO FINAL (UF)</th>
+          <th>% AVANCE FÍSICO</th>
+      </tr></thead>
+        <tbody id="constr-flujo-tbody"></tbody>
+    </table>
+  </div>
+</div>
+</div><!-- end tab construccion -->
+
+<div id="tab-costos" class="tab-pane">
+
+  <!-- Top: Total Neto/Bruto + Distribución + Flujo -->
+  <div style="display:grid;grid-template-columns:auto 1fr;gap:16px;margin-bottom:16px">
+
+    <!-- Left: Totales + Distribución -->
+    <div style="display:flex;flex-direction:column;gap:12px;min-width:320px">
+      <!-- Totales -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="card">
+          <div style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;margin-bottom:4px;display:flex;align-items:center;gap:4px">📋 TOTAL NETO</div>
+          <div style="font-size:1.8rem;font-weight:900;color:#0f172a" id="costos-total-neto">483.471 UF</div>
+      </div>
+        <div style="background:#f0fdf4;border-radius:12px;border:1px solid #bbf7d0;padding:16px">
+          <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;margin-bottom:4px;display:flex;align-items:center;gap:4px">📈 TOTAL BRUTO</div>
+          <div style="font-size:1.8rem;font-weight:900;color:#16a34a" id="costos-total-bruto">545.157 UF</div>
+      </div>
+    </div>
+
+      <!-- Distribución de Costos -->
+      <div class="card" style="flex:1">
+        <div class="sec-title">≡ DISTRIBUCIÓN DE COSTOS</div>
+        <div id="dist-costos-list" style="font-size:11px"></div>
+    </div>
+  </div>
+
+    <!-- Right: Flujo de Egresos Chart -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="sec-title" style="margin-bottom:0">📊 FLUJO DE EGRESOS</div>
+        <div style="display:flex;gap:4px">
+          <button class="badge badge-blue" id="btn-ambos" onclick="setCostosView('ambos',this)" style="cursor:pointer">Ambos</button>
+          <button class="badge" id="btn-mensual" onclick="setCostosView('mensual',this)" style="cursor:pointer;background:#f1f5f9;color:#475569">Mensual</button>
+          <button class="badge" id="btn-acumulado" onclick="setCostosView('acumulado',this)" style="cursor:pointer;background:#f1f5f9;color:#475569">Acumulado</button>
+      </div>
+    </div>
+      <canvas id="flujoEgresos-chart" height="200"></canvas>
+      <div id="flujoEgresos-legend" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;font-size:10px"></div>
+  </div>
+</div>
+
+  <!-- Planilla de Costos -->
+  <div style="margin-bottom:16px">
+    <div class="planilla-header">
+      <div>
+        <div style="font-size:13px;font-weight:900;color:#fff;letter-spacing:.08em;text-transform:uppercase">PLANILLA DE COSTOS</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:2px">Arrastra las partidas manuales desde los 6 puntos para reordenarlas.</div>
+    </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-outline" onclick="expandAllCostos()" style="font-size:11px">⊕ Expandir todas</button>
+        <button class="btn-primary" onclick="guardarCostos()">💾 Guardar</button>
+    </div>
+  </div>
+
+    <div class="tbl-scroll" style="border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px">
+      <table id="planilla-table" style="min-width:1300px">
+        <thead>
+          <tr style="background:#1e293b">
+            <th style="color:#94a3b8;text-align:left;width:240px">CATEGORÍA / PARTIDA</th>
+            <th style="color:#94a3b8;width:280px">FÓRMULA DE CÁLCULO</th>
+            <th style="color:#22c55e;width:110px">TOTAL NETO</th>
+            <th style="color:#94a3b8;width:80px">IVA (19%)</th>
+            <th style="color:#94a3b8;width:75px">TERRENO</th>
+            <th style="color:#94a3b8;width:60px">CONFIG</th>
+            <th style="color:#64748b;min-width:70px">MES 0</th>
+            <th style="color:#64748b;min-width:70px">MES 1</th>
+            <th style="color:#64748b;min-width:70px">MES 2</th>
+            <th style="color:#64748b;min-width:70px">MES 3</th>
+            <th style="color:#64748b;min-width:70px">MES 4</th>
+            <th style="color:#64748b;min-width:70px">MES 5</th>
+            <th style="color:#64748b;min-width:70px">MES 6</th>
+            <th style="color:#64748b;min-width:70px">MES 7</th>
+            <th style="color:#64748b;min-width:70px">MES 8</th>
+            <th style="color:#64748b;min-width:70px">MES 9</th>
+            <th style="color:#64748b;min-width:70px">MES 10</th>
+            <th style="color:#64748b;min-width:70px">MES 11</th>
+            <th style="color:#64748b;min-width:70px">MES 12</th>
+        </tr>
+      </thead>
+        <tbody id="planilla-tbody"></tbody>
+        <tfoot id="planilla-tfoot">
+          <tr style="background:#0f172a">
+            <td colspan="2" style="color:#fff;font-weight:800;font-size:11px;text-transform:uppercase;padding:10px">TOTAL NETO EGRESOS</td>
+            <td style="color:#22c55e;font-weight:800;font-size:12px;padding:10px;text-align:center" id="plan-total-neto"></td>
+            <td style="color:#94a3b8;padding:10px;text-align:center" id="plan-total-iva"></td>
+            <td colspan="2"></td>
+            <td id="plan-m0" style="color:#94a3b8;text-align:center;padding:8px;font-size:11px"></td>
+            <td id="plan-m1" style="color:#94a3b8;text-align:center;padding:8px;font-size:11px"></td>
+            <td id="plan-m2" style="color:#94a3b8;text-align:center;padding:8px;font-size:11px"></td>
+            <td id="plan-m3" style="color:#94a3b8;text-align:center;padding:8px;font-size:11px"></td>
+            <td id="plan-m4" style="color:#94a3b8;text-align:center;padding:8px;font-size:11px"></td>
+            <td id="plan-m5" style="color:#94a3b8;text-align:center;padding:8px;font-size:11px"></td>
+            <td id="plan-m6" style="color:#94a3b8;text-align:center;padding:8px;font-size:11px"></td>
+            <td id="plan-m7" style="color:#94a3b8;text-align:center;padding:8px;font-size:11px"></td>
+            <td id="plan-m8" style="color:#94a3b8;text-align:center;padding:8px;font-size:11px"></td>
+            <td id="plan-m9" style="color:#94a3b8;text-align:center;padding:8px;font-size:11px"></td>
+            <td id="plan-m10" style="color:#94a3b8;text-align:center;padding:8px;font-size:11px"></td>
+            <td id="plan-m11" style="color:#94a3b8;text-align:center;padding:8px;font-size:11px"></td>
+            <td id="plan-m12" style="color:#94a3b8;text-align:center;padding:8px;font-size:11px"></td>
+        </tr>
+          <tr style="background:#0f172a;border-top:1px solid #1e293b">
+            <td colspan="2" style="color:#94a3b8;font-weight:700;font-size:11px;text-transform:uppercase;padding:8px 10px">IVA CRÉDITO (19%)</td>
+            <td style="color:#94a3b8;font-weight:700;font-size:11px;padding:8px;text-align:center" id="plan-iva-credito"></td>
+            <td colspan="16"></td>
+        </tr>
+          <tr style="background:#0f172a;border-top:1px solid #1e293b">
+            <td colspan="2" style="color:#fff;font-weight:800;font-size:11px;text-transform:uppercase;padding:10px">TOTAL BRUTO PROYECTO</td>
+            <td style="color:#22c55e;font-weight:800;font-size:12px;padding:10px;text-align:center" id="plan-total-bruto"></td>
+            <td colspan="16"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+</div><!-- end tab costos -->
+
+<div id="tab-financiamiento" class="tab-pane">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div>
+      <div style="font-size:16px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:8px">🏦 ESTRUCTURA DE FINANCIAMIENTO</div>
+      <div style="font-size:11px;color:#94a3b8">Asegúrate de guardar tus cambios</div>
+  </div>
+    <button class="btn-primary" onclick="guardarFinanciamiento()">💾 Guardar</button>
+</div>
+
+  <div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr;gap:14px;margin-bottom:16px;align-items:start">
+
+    <!-- Control de Deuda -->
+    <div class="card" style="min-width:200px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div class="sec-title" style="margin-bottom:0">🛡 CONTROL DE DEUDA</div>
+        <label class="toggle"><input type="checkbox" id="fin-tope-activo"><span class="toggle-slider"></span></label>
+    </div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700;margin-bottom:4px">Exposición Máxima Real</div>
+        <div style="font-size:1.5rem;font-weight:900;color:#3b82f6" id="fin-exp-max">297.453 UF</div>
+    </div>
+      <div>
+        <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700;margin-bottom:4px">Intereses Totales a Pagar</div>
+        <div style="font-size:1.5rem;font-weight:900;color:#dc2626" id="fin-int-total">16.793 UF</div>
+    </div>
+  </div>
+
+    <!-- Crédito Terreno -->
+    <div class="card" style="border:2px solid #fde68a">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="sec-title" style="margin-bottom:0;color:#b45309">🏦 CRÉDITO TERRENO</div>
+        <label class="toggle"><input type="checkbox" id="fin-terreno-activo" checked onchange="calcularFinanciamiento()"><span class="toggle-slider"></span></label>
+    </div>
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px;margin-bottom:12px;font-size:11px;color:#92400e">
+        ℹ Este crédito agrupa automáticamente todas las partidas de la pestaña de Costos que tienen activo el switch "Es Terreno".
+    </div>
+      <div id="fin-terreno-partidas" style="margin-bottom:12px;font-size:11px;color:#475569"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Costo Real Detectado</div><div style="font-weight:800;color:#b45309" id="fin-terreno-costo">132.000 UF</div></div>
+        <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Monto a Financiar</div><div style="font-weight:800;color:#22c55e" id="fin-terreno-monto">92.400 UF</div></div>
+    </div>
+      <div style="font-size:10px;color:#94a3b8;margin-bottom:10px" id="fin-terreno-plazos">PLAZOS: MES 1</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">% A FINANCIAR</div>
+          <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-terreno-pct" value="70" min="0" max="100" oninput="calcularFinanciamiento()"><span style="font-size:11px">%</span></div>
+      </div>
+        <div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">TASA INTERÉS</div>
+          <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-terreno-tasa" value="3.50" step="0.1" oninput="calcularFinanciamiento()"><span style="font-size:11px">ANUAL</span></div>
+      </div>
+        <div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">PAGO INTERESES</div>
+          <select class="inp" id="fin-terreno-pago-int" onchange="calcularFinanciamiento()">
+            <option>Semestral</option><option>Mensual</option><option>Anual</option><option>Contra Escrituraciones</option>
+        </select>
+      </div>
+        <div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">PAGO CAPITAL</div>
+          <select class="inp" id="fin-terreno-pago-cap" onchange="calcularFinanciamiento()">
+            <option>Inicio Construccion</option><option>Contra Escrituraciones</option><option>Fin Proyecto</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+    <!-- Línea Construcción -->
+    <div class="card" style="border:2px solid #bbf7d0">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="sec-title" style="margin-bottom:0;color:#16a34a">🏗 LÍNEA CONSTRUCCIÓN</div>
+        <label class="toggle"><input type="checkbox" id="fin-constr-activo" checked onchange="calcularFinanciamiento()"><span class="toggle-slider"></span></label>
+    </div>
+      <div style="margin-bottom:10px">
+        <button class="btn-outline" style="font-size:11px;margin-bottom:8px" onclick="agregarPartidaLinea()">+ Añadir</button>
+        <div id="fin-constr-partidas" style="font-size:11px;color:#475569"></div>
+    </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Costo Real</div><div style="font-weight:800;color:#22c55e" id="fin-constr-costo">241.557 UF</div></div>
+        <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">A Financiar</div><div style="font-weight:800;color:#22c55e" id="fin-constr-monto">241.557 UF</div></div>
+    </div>
+      <div style="font-size:10px;color:#94a3b8;margin-bottom:10px" id="fin-constr-plazos">PLAZOS: MES 15 A MES 36</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">% A FINANCIAR</div>
+          <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-constr-pct" value="100" min="0" max="100" oninput="calcularFinanciamiento()"><span style="font-size:11px">%</span></div>
+      </div>
+        <div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">TASA INTERÉS</div>
+          <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-constr-tasa" value="3.50" step="0.1" oninput="calcularFinanciamiento()"><span style="font-size:11px">ANUAL</span></div>
+      </div>
+        <div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">PAGO INTERESES</div>
+          <select class="inp" id="fin-constr-pago-int" onchange="calcularFinanciamiento()">
+            <option>Anual</option><option>Mensual</option><option>Semestral</option><option>Contra Escrituraciones</option>
+        </select>
+      </div>
+        <div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">PAGO CAPITAL</div>
+          <select class="inp" id="fin-constr-pago-cap" onchange="calcularFinanciamiento()">
+            <option>Contra Escrituraciones</option><option>Fin Proyecto</option><option>Inicio Construccion</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+    <!-- Línea Adicional -->
+    <div class="card" style="border:2px solid #fecaca">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="sec-title" style="margin-bottom:0;color:#dc2626">⚡ LÍNEA ADICIONAL</div>
+        <label class="toggle"><input type="checkbox" id="fin-adic-activo" checked onchange="calcularFinanciamiento()"><span class="toggle-slider"></span></label>
+    </div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:10px;color:#94a3b8;margin-bottom:2px">A FINANCIAR</div>
+        <div style="font-weight:800;color:#dc2626;font-size:1.2rem" id="fin-adic-monto-label">10.000 UF</div>
+        <div style="font-size:10px;color:#94a3b8" id="fin-adic-plazos">MES 5 A MES 8</div>
+    </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">MONTO A PEDIR</div>
+          <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-adic-monto" value="10000" oninput="calcularFinanciamiento()"><span style="font-size:10px;color:#94a3b8">UF</span></div>
+      </div>
+        <div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">TASA INTERÉS</div>
+          <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-adic-tasa" value="3" step="0.1" oninput="calcularFinanciamiento()"><span style="font-size:11px">ANUAL</span></div>
+      </div>
+        <div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">MES INICIO (GIRO)</div>
+          <input type="number" class="inp" id="fin-adic-mes-ini" value="5" oninput="calcularFinanciamiento()">
+      </div>
+        <div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">MES FIN (GIRO)</div>
+          <input type="number" class="inp" id="fin-adic-mes-fin" value="8" oninput="calcularFinanciamiento()">
+      </div>
+        <div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">PAGO INTERESES</div>
+          <select class="inp" id="fin-adic-pago-int" onchange="calcularFinanciamiento()">
+            <option>Semestral</option><option>Mensual</option><option>Anual</option><option>Contra Escrituraciones</option>
+        </select>
+      </div>
+        <div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">PAGO CAPITAL</div>
+          <select class="inp" id="fin-adic-pago-cap" onchange="calcularFinanciamiento()">
+            <option>Contra Escrituraciones</option><option>Fin Proyecto</option><option>Inicio Construccion</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- Gráficos Financiamiento -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+    <div class="card-dark" style="border-radius:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="sec-title" style="color:#fff">🏦 EVOLUCIÓN DE DEUDA BANCARIA</div>
+        <div style="display:flex;gap:4px">
+          <button class="badge" onclick="setDeudaView('giros',this)" style="cursor:pointer;background:rgba(255,255,255,.1);color:#fff">Giros</button>
+          <button class="badge" onclick="setDeudaView('amort',this)" style="cursor:pointer;background:rgba(255,255,255,.1);color:#fff">Amortización</button>
+          <button class="badge badge-blue" onclick="setDeudaView('saldo',this)" style="cursor:pointer">Saldo</button>
+      </div>
+    </div>
+      <canvas id="deuda-chart" height="200"></canvas>
+  </div>
+    <div class="card-dark" style="border-radius:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="sec-title" style="color:#fff">📈 INTERESES FINANCIEROS</div>
+        <div style="display:flex;gap:4px">
+          <button class="badge" onclick="setInteresView('m_dev',this)" style="cursor:pointer;background:rgba(255,255,255,.1);color:#fff">M.Dev</button>
+          <button class="badge" onclick="setInteresView('m_pag',this)" style="cursor:pointer;background:rgba(255,255,255,.1);color:#fff">M.Pag</button>
+          <button class="badge" onclick="setInteresView('ac_dev',this)" style="cursor:pointer;background:rgba(255,255,255,.1);color:#fff">Ac.Dev</button>
+          <button class="badge badge-blue" onclick="setInteresView('ac_pag',this)" style="cursor:pointer">Ac.Pag</button>
+      </div>
+    </div>
+      <canvas id="intereses-chart" height="200"></canvas>
+  </div>
+</div>
+
+  <!-- Tabla detalle -->
+  <div class="card">
+    <div class="sec-title">📋 TABLA DE FINANCIAMIENTO MENSUAL</div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr>
+          <th style="text-align:left">CONCEPTO</th>
+          <th>TOTAL</th>
+          <th id="fin-tabla-header"></th>
+      </tr></thead>
+        <tbody id="fin-tabla-tbody"></tbody>
+        <tfoot><tr style="background:#0f172a">
+          <td style="color:#fff;font-weight:800;padding:10px;font-size:11px;text-transform:uppercase">TOTAL GENERAL</td>
+          <td style="color:#22c55e;font-weight:800;padding:10px" id="fin-total-general"></td>
+          <td></td>
+      </tr></tfoot>
+    </table>
+  </div>
+</div>
+</div><!-- end tab financiamiento -->
+
+<div id="tab-flujo" class="tab-pane">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div>
+      <div style="font-size:16px;font-weight:800;color:#0f172a">💵 FLUJO DE CAJA DEL PROYECTO</div>
+      <div style="font-size:11px;color:#94a3b8">Métricas y consolidado mensual (Lectura Rápida)</div>
+  </div>
+    <button class="btn-outline" onclick="exportarExcel()">📥 Exportar Excel (.xlsx)</button>
+</div>
+
+  <!-- KPIs Flujo -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px">
+
+    <!-- Margen -->
+    <div class="card-dark" style="border-radius:12px;padding:18px">
+      <div style="font-size:10px;font-weight:700;color:#22c55e;text-transform:uppercase;margin-bottom:8px">📈 MARGEN DEL PROYECTO</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:10px;color:#94a3b8">SIN FINANCIACIÓN</div>
+          <div style="font-size:1.4rem;font-weight:900;color:#fff" id="flujo-margen-sin">100.661 UF</div>
+          <div style="font-size:10px;color:#22c55e" id="flujo-margen-sin-pct">15.5%</div>
+      </div>
+        <div>
+          <div style="font-size:10px;color:#94a3b8">CON FINANCIACIÓN</div>
+          <div style="font-size:1.4rem;font-weight:900;color:#3b82f6" id="flujo-margen-con">81.569 UF</div>
+          <div style="font-size:10px;color:#3b82f6" id="flujo-margen-con-pct">12.6%</div>
+      </div>
+    </div>
+  </div>
+
+    <!-- Capital Necesario -->
+    <div class="card" style="border:1px solid #e2e8f0">
+      <div style="font-size:10px;font-weight:700;color:#f59e0b;text-transform:uppercase;margin-bottom:8px">💰 CAPITAL NECESARIO (MÁX. EXPOSICIÓN)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:10px;color:#94a3b8">K SIN FIN.</div>
+          <div style="font-size:1.3rem;font-weight:900;color:#0f172a" id="flujo-k-sin">421.210 UF</div>
+      </div>
+        <div>
+          <div style="font-size:10px;color:#94a3b8">K CON FIN.</div>
+          <div style="font-size:1.3rem;font-weight:900;color:#3b82f6" id="flujo-k-con">145.655 UF</div>
+      </div>
+    </div>
+  </div>
+
+    <!-- ROE -->
+    <div class="card" style="border:1px solid #e2e8f0">
+      <div style="font-size:10px;font-weight:700;color:#7c3aed;text-transform:uppercase;margin-bottom:8px">% ROE (RETORNO SOBRE CAPITAL)</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:10px;color:#94a3b8">ROE SIN FIN.</div>
+          <div style="font-size:1.3rem;font-weight:900;color:#0f172a" id="flujo-roe-sin">23.9%</div>
+      </div>
+        <div>
+          <div style="font-size:10px;color:#94a3b8">ROE CON FIN.</div>
+          <div style="font-size:1.3rem;font-weight:900;color:#7c3aed" id="flujo-roe-con">56.0%</div>
+      </div>
+    </div>
+  </div>
+
+    <!-- TIR -->
+    <div class="card" style="border:1px solid #fecaca">
+      <div style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;margin-bottom:8px">📊 TIR ANUAL</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:10px;color:#94a3b8">Pura del Proyecto</div>
+          <div style="font-size:1.3rem;font-weight:900;color:#0f172a" id="flujo-tir-sin">11.0%</div>
+      </div>
+        <div>
+          <div style="font-size:10px;color:#94a3b8">Sobre Patrimonio</div>
+          <div style="font-size:1.3rem;font-weight:900;color:#7c3aed" id="flujo-tir-con">18.8%</div>
+      </div>
+    </div>
+  </div>
+
+    <!-- Payback -->
+    <div class="card" style="border:1px solid #bbf7d0">
+      <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;margin-bottom:8px">⏱ PAYBACK TIME</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:10px;color:#94a3b8">Mes Sin Fin.</div>
+          <div style="font-size:1.3rem;font-weight:900;color:#0f172a" id="flujo-payback-sin">Mes 42</div>
+      </div>
+        <div>
+          <div style="font-size:10px;color:#94a3b8">Mes Con Fin.</div>
+          <div style="font-size:1.3rem;font-weight:900;color:#3b82f6" id="flujo-payback-con">Mes 43</div>
+      </div>
+    </div>
+  </div>
+
+    <!-- Leverage -->
+    <div class="card" style="border:1px solid #e2e8f0">
+      <div style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;margin-bottom:8px">📐 LEVERAGE MÁXIMO</div>
+      <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Deuda Máxima / Ingresos Totales</div>
+      <div style="display:flex;align-items:baseline;gap:4px">
+        <div style="font-size:2rem;font-weight:900;color:#7c3aed" id="flujo-leverage">0.46x</div>
+        <div style="font-size:11px;color:#94a3b8">VECES</div>
+    </div>
+  </div>
+</div>
+
+  <!-- Gráficos -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="sec-title" style="margin-bottom:0">COSTOS VS INGRESOS</div>
+        <button class="btn-outline" style="font-size:10px">Ver Mensual</button>
+    </div>
+      <canvas id="costosVsIngresos-chart" height="180"></canvas>
+  </div>
+    <div class="card">
+      <div class="sec-title">EVOLUCIÓN DE DEUDA (LEVERAGE)</div>
+      <canvas id="leverage-chart" height="180"></canvas>
+  </div>
+    <div class="card">
+      <div class="sec-title">ESTRUCTURA DEL PROYECTO</div>
+      <div id="estructura-proyecto-list" style="font-size:11px"></div>
+  </div>
+</div>
+
+  <!-- Tabla Flujo de Caja Completo -->
+  <div class="card-dark" style="border-radius:12px">
+    <div class="sec-title" style="color:#fff;margin-bottom:14px">📋 FLUJO DE CAJA COMPLETO</div>
+    <div class="tbl-scroll">
+      <table style="min-width:1400px" id="flujo-tabla">
+        <thead id="flujo-tabla-header"></thead>
+        <tbody id="flujo-tabla-tbody"></tbody>
+    </table>
+  </div>
+</div>
+</div><!-- end tab flujo -->
+
+<div id="tab-capital" class="tab-pane">
+  <!-- KPIs -->
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:16px">
+    <div class="req-kpi">
+      <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px">Req. Máximo (Sin Buffer)</div>
+      <div style="font-size:1.1rem;font-weight:900;color:#0f172a" id="cap-max-sin">143.356</div>
+  </div>
+    <div class="req-kpi">
+      <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px">Req. Máximo (Con Buffer)</div>
+      <div style="font-size:1.1rem;font-weight:900;color:#3b82f6" id="cap-max-con">145.356</div>
+  </div>
+    <div class="req-kpi">
+      <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px">Total Llamados</div>
+      <div style="font-size:1.1rem;font-weight:900;color:#7c3aed" id="cap-llamados">147.667</div>
+  </div>
+    <div class="req-kpi">
+      <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px">Total Devoluciones</div>
+      <div style="font-size:1.1rem;font-weight:900;color:#22c55e" id="cap-devoluciones">231.536</div>
+  </div>
+    <div class="req-kpi">
+      <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px">Margen Bruto (Util. Neta)</div>
+      <div style="font-size:1.1rem;font-weight:900;color:#22c55e" id="cap-margen-bruto">83.869</div>
+  </div>
+    <div class="card-dark" style="border-radius:10px;padding:12px">
+      <div style="font-size:9px;color:#f59e0b;font-weight:700;text-transform:uppercase;margin-bottom:3px">$ MÚLTIPLO (MOIC)</div>
+      <div style="font-size:1.5rem;font-weight:900;color:#fff" id="cap-moic-tab">1.57x</div>
+      <div style="font-size:9px;color:#94a3b8">Múltiplo Retorno</div>
+  </div>
+    <div class="card-dark" style="border-radius:10px;padding:12px">
+      <div style="font-size:9px;color:#22c55e;font-weight:700;text-transform:uppercase;margin-bottom:3px">% TIR INVERSIONISTA</div>
+      <div style="font-size:1.5rem;font-weight:900;color:#fff" id="cap-tir-inv-tab">17.4%</div>
+      <div style="font-size:9px;color:#94a3b8">Tasa Interna Retorno</div>
+  </div>
+</div>
+
+  <!-- Parámetros -->
+  <div class="card" style="margin-bottom:16px;background:#fffbeb;border-color:#fde68a">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div>
+        <div style="font-size:13px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:6px">⚙ AJUSTA TUS PARÁMETROS DE INVERSIÓN</div>
+        <div style="font-size:11px;color:#94a3b8">Modifica los parámetros para simular escenarios. Los cambios solo se aplican al hacer clic en guardar.</div>
+    </div>
+      <button class="btn-primary" onclick="guardarCapital()">💾 Guardar Ajustes</button>
+  </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <div>
+        <div class="sec-title" style="color:#3b82f6">⬇ PARÁMETROS DE LLAMADOS (CAPITAL CALLS)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+          <div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">CAJA MÍNIMA (BUFFER) 👆</div>
+            <div style="display:flex;gap:4px"><input type="number" class="inp" id="cap-buffer" value="2000" oninput="calcularCapital()"><span style="font-size:10px;padding-top:8px">UF</span></div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:3px">Piso intocable de la cta. cte.</div>
+        </div>
+          <div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">PROYECCIÓN (MESES) 👆</div>
+            <div style="display:flex;gap:4px"><input type="number" class="inp" id="cap-proyeccion" value="6" oninput="calcularCapital()"><span style="font-size:10px;padding-top:8px">Mes</span></div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:3px">Look-ahead para el llamado.</div>
+        </div>
+          <div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">LLAMADO MÍNIMO 👆</div>
+            <div style="display:flex;gap:4px"><input type="number" class="inp" id="cap-llamado-min" value="5000" oninput="calcularCapital()"><span style="font-size:10px;padding-top:8px">UF</span></div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:3px">Monto mínimo para pedir.</div>
+        </div>
+      </div>
+    </div>
+      <div>
+        <div class="sec-title" style="color:#22c55e">⬆ PARÁMETROS DE DISTRIBUCIÓN (RETURNS)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">CAJA FUERTE (RETENCIÓN) 👆</div>
+            <div style="display:flex;gap:4px"><input type="number" class="inp" id="cap-caja-fuerte" value="10000" oninput="calcularCapital()"><span style="font-size:10px;padding-top:8px">UF</span></div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:3px">Caja retenida antes de repartir excedentes.</div>
+        </div>
+          <div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">DEVOLUCIÓN MÍNIMA 👆</div>
+            <div style="display:flex;gap:4px"><input type="number" class="inp" id="cap-dev-min" value="3000" oninput="calcularCapital()"><span style="font-size:10px;padding-top:8px">UF</span></div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:3px">No se harán repartos menores a este monto.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- Gráficos Capital -->
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;gap:16px;border-bottom:1px solid #f1f5f9;margin-bottom:16px">
+      <button class="tab-btn active" onclick="setCapTab('ciclo',this)" id="cap-btn-ciclo" style="font-size:12px">CICLO OPERATIVO REAL</button>
+      <button class="tab-btn" onclick="setCapTab('curvaJ',this)" id="cap-btn-curvaj" style="font-size:12px">CURVA J (ACUMULADO NETO)</button>
+  </div>
+    <div id="cap-tab-ciclo">
+      <canvas id="cicloOperativo-chart" height="250"></canvas>
+      <div style="display:flex;gap:16px;margin-top:8px;font-size:10px;justify-content:center">
+        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:20px;height:2px;background:#ef4444;border-radius:1px;border-top:1px dashed #ef4444"></span> Caja Acum. Teórica</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:20px;height:2px;background:#3b82f6;border-radius:1px"></span> Caja Real (Cta. Corriente)</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:12px;height:12px;background:#22c55e;border-radius:2px"></span> Devoluciones</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:12px;height:12px;background:#8b5cf6;border-radius:2px"></span> Llamados de Capital</span>
+    </div>
+  </div>
+    <div id="cap-tab-curvaj" style="display:none">
+      <canvas id="curvaJ-tab-chart" height="250"></canvas>
+  </div>
+</div>
+
+  <!-- Agenda de Eventos -->
+  <div class="card">
+    <div class="sec-title">📅 AGENDA DE EVENTOS DE CAPITAL</div>
+    <table>
+      <thead><tr>
+        <th style="text-align:left">MES</th>
+        <th>CONCEPTO</th>
+        <th style="color:#7c3aed">MONTO (UF)</th>
+        <th>CAJA POST-EVENTO (UF)</th>
+    </tr></thead>
+      <tbody id="cap-agenda-tbody"></tbody>
+  </table>
+</div>
+</div><!-- end tab capital -->
+
+<div id="tab-dataroom" class="tab-pane">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <div>
+      <div style="font-size:16px;font-weight:800;color:#0f172a">📁 DATA ROOM</div>
+      <div style="font-size:11px;color:#94a3b8">Gestión de documentos del proyecto</div>
+  </div>
+    <button class="btn-primary" onclick="document.getElementById('file-upload').click()">📎 Subir Documento</button>
+    <input type="file" id="file-upload" style="display:none" multiple onchange="handleFileUpload(event)">
+</div>
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px" id="dataroom-grid">
+    <!-- Categorías generadas por JS -->
+</div>
+</div><!-- end tab dataroom -->
+
+</main><!-- end main -->
+
+<!-- FLOATING BALANCE -->
+<div class="floating" id="floating-balance">
+  <div style="font-size:10px;color:#22c55e;font-weight:700;display:flex;align-items:center;gap:4px;margin-bottom:4px">📈 BALANCE BRUTO EN LÍNEA</div>
+  <div style="font-size:1.6rem;font-weight:900" id="floating-value">545.157 UF</div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,228 @@
+
+<!-- ═══════ TAB: VENTAS ═══════ -->
+<div id="tab-ventas" class="tab-pane">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div>
+      <div style="font-size:16px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:8px">🏦 VENTAS E INGRESOS</div>
+      <div style="font-size:11px;color:#94a3b8">Asegúrate de guardar tus cambios</div>
+  </div>
+    <button class="btn-primary" onclick="guardarVentas()">💾 Guardar</button>
+</div>
+
+  <!-- 1. Estrategia de Precios -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="sec-title">📈 ESTRATEGIA DE PRECIOS E INGRESOS</div>
+    <div class="tbl-scroll">
+      <table id="ventas-precios-table" style="min-width:1000px">
+        <thead><tr>
+          <th style="text-align:left">USO</th>
+          <th colspan="3" style="background:#1e293b;color:#fff;text-align:center">CABIDA (LECTURA)</th>
+          <th colspan="2" style="background:#92400e;color:#fff;text-align:center">PRECIOS PRINCIPALES</th>
+          <th style="color:#22c55e">VENTA UNIDADES</th>
+          <th colspan="2" style="background:#1e40af;color:#fff;text-align:center">ESTACIONAMIENTOS</th>
+          <th colspan="2" style="background:#1e40af;color:#fff;text-align:center">BODEGAS</th>
+          <th style="color:#f97316">TOTAL VENTA USO</th>
+          <th>TICKET PROM.</th>
+      </tr>
+        <tr>
+          <th></th><th>UNID.</th><th>SUP. M²</th><th>M²/UN</th>
+          <th style="color:#3b82f6">UF/M²</th><th>PRECIO BASE</th>
+          <th style="color:#22c55e">SUBTOTAL</th>
+          <th>Nº ESTAC.</th><th>PRECIO EST.</th>
+          <th>Nº BOD.</th><th>PRECIO BOD.</th>
+          <th style="color:#f97316;font-weight:800">TOTAL</th>
+          <th>TICKET FINAL</th>
+      </tr></thead>
+        <tbody id="ventas-tbody"></tbody>
+        <tfoot><tr class="tfoot-dark" id="ventas-tfoot"></tr></tfoot>
+    </table>
+  </div>
+</div>
+
+  <!-- 2. Formas de Pago -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="sec-title">💳 FORMAS DE PAGO POR USO</div>
+    <div class="tbl-scroll">
+      <table id="formas-pago-table" style="min-width:900px">
+        <thead><tr>
+          <th style="text-align:left">USO COMERCIAL</th>
+          <th>RESERVA (UF)</th>
+          <th style="color:#3b82f6">PIE PROMESA (%)</th>
+          <th>MONTO PROMESA (UF)</th>
+          <th style="color:#3b82f6">PIE CUOTAS (%)</th>
+          <th>MONTO CUOTAS (UF)</th>
+          <th style="color:#dc2626">PIE CUOTÓN (%)</th>
+          <th>MONTO CUOTÓN (UF)</th>
+          <th>HIPOTECARIO (%)</th>
+          <th style="color:#22c55e">TOTAL UNIDAD</th>
+      </tr></thead>
+        <tbody id="formas-pago-tbody"></tbody>
+    </table>
+  </div>
+    <p style="font-size:10px;color:#94a3b8;margin-top:8px">ℹ Las cuotas y la promesa forman parte del "Pie" aportado directamente por el cliente. El Monto de Promesa ya tiene descontado el valor de la Reserva.</p>
+</div>
+
+  <!-- 3. Fechas y Velocidades -->
+  <div class="card" style="margin-bottom:16px">
+    <div style="text-align:center;margin-bottom:16px">
+      <span style="font-size:18px">⚡</span>
+      <div class="sec-title" style="justify-content:center;margin-bottom:0">FECHAS Y VELOCIDADES DE VENTAS</div>
+  </div>
+
+    <!-- Pre-Ventas -->
+    <div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+        <div style="width:10px;height:10px;border-radius:50%;background:#3b82f6"></div>
+        <span style="font-size:12px;font-weight:700;color:#475569">CRONOGRAMA DE PREVENTAS</span>
+    </div>
+      <table>
+        <thead><tr>
+          <th style="text-align:left">USO (PREVENTA)</th>
+          <th>VÍNCULO EN GANTT</th>
+          <th>INICIO</th>
+          <th>DURACIÓN</th>
+          <th style="color:#22c55e">FIN</th>
+          <th style="color:#f59e0b">%</th>
+          <th>UNID</th>
+          <th>VELOCIDAD (UN/MES)</th>
+          <th style="color:#22c55e">VEL. VENTAS (UF/MES)</th>
+      </tr></thead>
+        <tbody id="preventa-tbody"></tbody>
+    </table>
+  </div>
+
+    <!-- Ventas -->
+    <div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+        <div style="width:10px;height:10px;border-radius:50%;background:#22c55e"></div>
+        <span style="font-size:12px;font-weight:700;color:#475569">CRONOGRAMA DE VENTAS</span>
+    </div>
+      <table>
+        <thead><tr>
+          <th style="text-align:left">USO (VENTA)</th>
+          <th>VÍNCULO EN GANTT</th>
+          <th>INICIO</th>
+          <th>DURACIÓN</th>
+          <th style="color:#22c55e">FIN</th>
+          <th>%</th>
+          <th>UNID</th>
+          <th>VELOCIDAD (UN/MES)</th>
+          <th style="color:#22c55e">VEL. VENTAS (UF/MES)</th>
+      </tr></thead>
+        <tbody id="venta-tbody"></tbody>
+    </table>
+  </div>
+
+    <!-- Escrituración -->
+    <div>
+      <div class="sec-title" style="margin-bottom:8px">🔑 ESCRITURACIÓN Y ENTREGAS</div>
+      <table>
+        <thead><tr>
+          <th>VÍNCULO EN GANTT</th>
+          <th>INICIO</th>
+          <th>DURACIÓN (MESES)</th>
+          <th style="color:#22c55e">FIN REAL (MES MOTOR)</th>
+          <th>CAPACIDAD MÁX. ESCRIT.</th>
+      </tr></thead>
+        <tbody id="escrituracion-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+  <!-- 4. Mix de Ventas + Velocidad + Proceso -->
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px">
+
+    <!-- Mix por Etapa -->
+    <div class="card">
+      <div class="sec-title">📊 MIX DE VENTAS POR ETAPA</div>
+      <div id="mix-ventas-list"></div>
+  </div>
+
+    <!-- Velocidad Comercial -->
+    <div class="card" style="display:flex;flex-direction:column;align-items:center">
+      <div class="sec-title" style="width:100%">⏱ VELOCIDAD GLOBAL COMERCIAL</div>
+      <canvas id="speedometer" width="200" height="130" class="speed-canvas"></canvas>
+      <div style="font-size:2rem;font-weight:900;color:#0f172a" id="vel-global-uf">16.614</div>
+      <div style="font-size:11px;color:#94a3b8">UF / mes</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;width:100%;text-align:center">
+        <div><div style="font-size:10px;color:#94a3b8">Vel. Unidades</div><div style="font-weight:800" id="vel-global-un">1.3 un/m</div></div>
+        <div><div style="font-size:10px;color:#94a3b8">Duración Total</div><div style="font-weight:800" id="vel-duracion">39 meses</div></div>
+    </div>
+      <div style="font-size:10px;color:#94a3b8;margin-top:6px" id="vel-analisis">Análisis desde Mes 1 al 39</div>
+  </div>
+
+    <!-- Escrituración -->
+    <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px">
+      <div class="sec-title" style="width:100%">🔑 PROCESO DE ESCRITURACIÓN</div>
+      <div style="width:56px;height:56px;background:#f1f5f9;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px">🏠</div>
+      <div style="text-align:center">
+        <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em">Velocidad de Entregas</div>
+        <div style="font-size:2.5rem;font-weight:900;color:#0f172a" id="vel-entregas">8</div>
+        <div style="font-size:11px;color:#94a3b8">un/mes</div>
+    </div>
+      <div style="width:100%;border-top:1px solid #f1f5f9;padding-top:10px">
+        <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:6px">Ciclo de Escrituración</div>
+        <div style="display:flex;align-items:center;gap:8px;justify-content:center">
+          <span style="font-size:1.1rem;font-weight:800" id="escrit-inicio">Mes 38</span>
+          <span style="color:#94a3b8">→</span>
+          <span style="font-size:1.1rem;font-weight:800" id="escrit-fin">Mes 44</span>
+      </div>
+        <div style="text-align:center;margin-top:6px">
+          <span class="badge badge-blue" id="escrit-dur">Duración: 7 meses</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <!-- 5. Flujo de Caja Ventas -->
+  <div class="card-dark" style="border-radius:12px">
+    <div class="sec-title" style="color:#fff;margin-bottom:12px">🏦 FLUJO DE CAJA DE VENTAS (INGRESOS UF)</div>
+    <div class="tbl-scroll">
+      <table id="flujo-ventas-table" style="min-width:1200px">
+        <thead><tr id="flujo-ventas-header" style="background:#1e293b"></tr></thead>
+        <tbody id="flujo-ventas-tbody"></tbody>
+        <tfoot><tr class="tfoot-dark" id="flujo-ventas-tfoot" style="background:#0f172a"></tr></tfoot>
+    </table>
+  </div>
+</div>
+
+</div><!-- end tab ventas -->
+
+<!-- ═══════ TAB: CARTA GANTT ═══════ -->
+<div id="tab-gantt" class="tab-pane">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div>
+      <div style="font-size:16px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:8px">📅 Cronograma del Proyecto</div>
+      <div style="font-size:11px;color:#94a3b8">Arrastra las filas para reordenar. Asegúrate de guardar tus cambios.</div>
+  </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-outline" onclick="agregarHito()">+ Añadir Hito</button>
+      <button class="btn-primary" onclick="guardarGantt()">💾 Guardar</button>
+  </div>
+</div>
+
+  <div class="card" style="overflow-x:auto">
+    <table style="min-width:1100px">
+      <thead>
+        <tr>
+          <th style="width:32px">ACCIONES</th>
+          <th style="width:200px;text-align:left">HITO / PARTIDA</th>
+          <th style="width:160px">DEPENDENCIA</th>
+          <th style="width:70px">DESFASE</th>
+          <th style="width:60px">INICIO</th>
+          <th style="width:70px">DURACIÓN</th>
+          <th style="width:60px;color:#22c55e">FIN</th>
+          <th>TIMELINE</th>
+      </tr>
+    </thead>
+      <tbody id="gantt-tbody"></tbody>
+      <tfoot>
+        <tr style="background:#0f172a">
+          <td colspan="6" style="color:#fff;font-weight:800;font-size:12px;padding:10px">TOTAL PROYECTO</td>
+          <td style="color:#fff;font-weight:800;font-size:12px;padding:10px" id="gantt-total-fin"></td>
+          <td style="padding:4px 8px"><div style="background:#0f172a;border:1px solid #334155;border-radius:4px;height:22px;display:flex;align-items:center;justify-content:center"><span id="gantt-total-bar" style="font-size:10px;font-weight:700;color:#fff"></span></div></td>
+      </tr>
+    </tfoot>
+  </table>
+</div>
+</div><!-- end tab gantt -->
