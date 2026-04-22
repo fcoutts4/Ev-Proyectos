@@ -1,6 +1,8 @@
 node_modules/
 .vercel/
 db.sqlite
+.env
+.env.local
 *.log
 *.msi
 Thumbs.db

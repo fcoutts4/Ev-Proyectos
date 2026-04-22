@@ -6,27 +6,31 @@ Hoy la app corre como:
 
 - frontend en `public/`
 - backend Express en `server.js`
-- base local SQLite en `db.sqlite`
+- base Postgres externa via `DATABASE_URL`
 
-## Lo que ya podemos hacer
+## Base de datos recomendada
 
-1. Subir este repo a GitHub.
-2. Dejar conectado el proyecto con Vercel.
-3. Seguir iterando sobre esta base dinamica.
+Segun la documentacion oficial de Vercel consultada hoy, `Vercel Postgres` ya no se ofrece para proyectos nuevos y ahora se usan integraciones Postgres del Marketplace, por ejemplo:
 
-## Lo que falta para que quede funcional online
-
-Antes del deploy productivo necesitamos migrar la persistencia a una base externa compatible con Vercel.
-
-Opciones recomendadas:
-
-- Vercel Postgres
 - Neon
 - Supabase
+- Prisma Postgres
 
 ## Flujo sugerido
 
-1. Subir repo a GitHub.
-2. Mantener esta version para desarrollo local.
-3. Migrar `db.js` a base cloud.
+1. Conectar el repo a Vercel.
+2. Crear una base Postgres en Neon o Supabase.
+3. Configurar `DATABASE_URL` en Vercel.
 4. Desplegar la version online desde Vercel.
+
+## Desarrollo local
+
+1. Crear `.env` a partir de `.env.example`.
+2. Pegar la misma `DATABASE_URL` de tu base cloud.
+3. Ejecutar `npm install` y luego `npm start`.
+
+## Variables necesarias
+
+```bash
+DATABASE_URL=postgres://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require
+```
