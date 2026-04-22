@@ -66,6 +66,8 @@ tbody tr:hover{background:#f8fafc}
 .formula-chip{display:inline-flex;align-items:center;gap:3px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:3px 8px;font-size:10px;color:#475569;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .formula-chip.ref{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
 .formula-chip.gantt{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
+.chart-shell{position:relative;width:100%;height:clamp(240px,36vh,420px);overflow:hidden}
+.chart-shell canvas{display:block !important;width:100% !important;height:100% !important;max-height:100% !important}
 /* DISTRIBUCIÓN DE COSTOS */
 .dist-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
 .dist-label{font-size:11px;text-align:right;min-width:130px;color:#64748b}
@@ -759,7 +761,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 <div id="tab-costos" class="tab-pane">
 
   <!-- Top: Total Neto/Bruto + Distribución + Flujo -->
-  <div style="display:grid;grid-template-columns:auto 1fr;gap:16px;margin-bottom:16px">
+  <div style="display:grid;grid-template-columns:minmax(320px,420px) minmax(0,1fr);gap:16px;margin-bottom:16px;align-items:start">
 
     <!-- Left: Totales + Distribución -->
     <div style="display:flex;flex-direction:column;gap:12px;min-width:320px">
@@ -783,11 +785,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   </div>
 
     <!-- Right: Flujo de Egresos Chart -->
-    <div class="card">
+    <div class="card" style="min-width:0;overflow:hidden">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <div class="sec-title" style="margin-bottom:0">📊 FLUJO DE EGRESOS</div>
     </div>
-      <canvas id="flujoEgresos-chart" height="200"></canvas>
+      <div class="chart-shell">
+        <canvas id="flujoEgresos-chart"></canvas>
+      </div>
       <div id="flujoEgresos-legend" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;font-size:10px"></div>
   </div>
 </div>
