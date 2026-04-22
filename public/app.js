@@ -17,6 +17,8 @@ const state = {
     collapsed: {},
     activePaymentCategory: null,
     activePaymentIndex: null,
+    formulaInputId: null,
+    costFlowMode: 'monthly',
   },
   sync: {
     status: 'loading',
@@ -1289,18 +1291,21 @@ function buildCostContext() {
     ventas_brutas: toNumber(state.calculos.ventas_brutas),
   };
 }
-
 function evaluateExpressionFormula(expression, context) {
   if (!expression) return 0;
   let normalized = String(expression);
-  getCostFormulaCatalog().forEach(([label, value]) => {
-    const token = `[${label}]`;
-    normalized = normalized.replace(new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), String(toNumber(value)));
+  getCostFormulaCatalog().forEach(({ label, value, token }) => {
+    const bracketToken = `[${label}]`;
+    normalized = normalized.replace(new RegExp(bracketToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), String(toNumber(value)));
+    normalized = normalized.replace(new RegExp(String(token ?? '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), String(toNumber(value)));
   });
   normalized = normalized
     .toLowerCase()
     .replace(/cantidad de meses de construcci[oó]n/g, 'meses_construccion')
     .replace(/meses de construcci[oó]n/g, 'meses_construccion')
+    .replace(/meses preventa/g, 'meses_preventa')
+    .replace(/meses venta/g, 'meses_venta')
+    .replace(/meses escrituracion/g, 'meses_escrituracion')
     .replace(/m2 utiles/g, 'm2_utiles')
     .replace(/m2 municipales/g, 'm2_municipales')
     .replace(/m2 sobre cota 0/g, 'm2_sobre_cota_0')
@@ -1555,11 +1560,21 @@ function ensureCostosState() {
 function renderCostFlow(monthlyTotals) {
   const labels = getCostMonthLabels();
   const total = monthlyTotals.reduce((sum, value) => sum + value, 0);
-  setHtml('flujoEgresos-legend', labels.map((label, index) => {
-    const value = toNumber(monthlyTotals[index]);
-    const pct = total ? (value / total) * 100 : 0;
-    return `<span class="badge badge-blue">${escapeHtml(label)}: ${fmtUf(value)} | ${fmtPct(pct)}</span>`;
-  }).join(''));
+  const mode = state.costosUi?.costFlowMode || 'monthly';
+  const chartValues = mode === 'cumulative'
+    ? monthlyTotals.reduce((acc, value, index) => {
+      acc.push((acc[index - 1] || 0) + toNumber(value));
+      return acc;
+    }, [])
+    : monthlyTotals;
+
+  setHtml('flujoEgresos-legend', '');
+  const monthlyBtn = $('cost-flow-monthly-btn');
+  const cumulativeBtn = $('cost-flow-cumulative-btn');
+  if (monthlyBtn) monthlyBtn.style.background = mode === 'monthly' ? '#fee2e2' : '#fff';
+  if (monthlyBtn) monthlyBtn.style.color = mode === 'monthly' ? '#991b1b' : '#475569';
+  if (cumulativeBtn) cumulativeBtn.style.background = mode === 'cumulative' ? '#fee2e2' : '#fff';
+  if (cumulativeBtn) cumulativeBtn.style.color = mode === 'cumulative' ? '#991b1b' : '#475569';
 
   if (typeof Chart === 'undefined') return;
   const canvas = $('flujoEgresos-chart');
@@ -1571,16 +1586,31 @@ function renderCostFlow(monthlyTotals) {
     data: {
       labels,
       datasets: [{
-        label: 'Egresos',
-        data: monthlyTotals,
-        backgroundColor: '#0f172a',
+        label: mode === 'cumulative' ? 'Egresos acumulados' : 'Egresos mensuales',
+        data: chartValues,
+        backgroundColor: '#dc2626',
         borderRadius: 4,
       }],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label(contextTooltip) {
+              const rawValue = toNumber(contextTooltip.raw);
+              const monthValue = toNumber(monthlyTotals[contextTooltip.dataIndex]);
+              const pct = total ? (monthValue / total) * 100 : 0;
+              return mode === 'cumulative'
+                ? `Acumulado ${fmtUf(rawValue)} | Mes ${fmtUf(monthValue)} | ${fmtPct(pct)}`
+                : `${fmtUf(rawValue)} | ${fmtPct(pct)}`;
+            },
+          },
+        },
+      },
       scales: {
         x: { ticks: { maxRotation: 0, autoSkip: true } },
         y: { beginAtZero: true },
@@ -1630,12 +1660,9 @@ function renderCostPlanilla() {
         <tr class="partida-row" data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" ${partida.auto_origen ? 'data-auto="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
           <td style="text-align:center">${partida.auto_origen ? '' : '<span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span>'}</td>
           <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${partida.auto_origen ? 'disabled' : ''}/></td>
-          <td>
-            <input class="inp" list="cost-formula-refs" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}" placeholder="Ej: 2500*[tiempo construccion]" ${partida.auto_origen ? 'disabled' : ''}/>
-            ${partida.auto_origen ? '' : `<select class="inp" style="margin-top:6px;font-size:11px" onchange="insertCostFormulaReference(this)">
-              <option value="">Insertar referencia...</option>
-              ${getCostFormulaCatalog().map(([label]) => `<option value="[${escapeHtml(label)}]">${escapeHtml(label)}</option>`).join('')}
-            </select>`}
+          <td class="formula-cell">
+            <input class="inp" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}" placeholder="Ej: 2500 * _meses_construccion + 3000 * _meses_preventa" ${partida.auto_origen ? 'disabled' : 'oninput="handleCostFormulaInput(this)" onfocus="handleCostFormulaInput(this)" onblur="hideCostFormulaSuggestionsLater()"'}/>
+            ${partida.auto_origen ? '' : '<div class="formula-suggest"></div>'}
           </td>
           <td>${partida.auto_origen ? '<span class="badge badge-yellow">AUTO</span>' : `<button class="btn-outline" type="button" onclick="openPaymentPlanModal('${escapeHtml(categoria.nombre)}', ${index})">${escapeHtml(summarizePaymentPlan(partida.plan_pago))}</button><div style="font-size:10px;color:${Math.abs(getPaymentPlanAssignedPct(partida.plan_pago) - 100) < 0.01 ? '#16a34a' : '#b45309'};margin-top:4px">${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))} asignado</div>`}</td>
           <td style="text-align:center;color:#22c55e;font-weight:800">${fmtUf(total)}</td>
@@ -1683,33 +1710,52 @@ function renderCostosModule() {
 
 function getCostFormulaCatalog() {
   const context = buildCostContext();
+  const mesesPreventa = Math.max(0, ...state.ventasCronograma.filter((row) => row.tipo === 'preventa').map((row) => toNumber(row.duracion)));
+  const mesesVenta = Math.max(0, ...state.ventasCronograma.filter((row) => row.tipo === 'venta').map((row) => toNumber(row.duracion)));
+  const mesesEscrituracion = Math.max(0, ...state.ventasCronograma.filter((row) => row.tipo === 'escrituracion').map((row) => toNumber(row.duracion)));
   return [
-    ['tiempo construccion', context.meses_construccion],
-    ['meses construccion', context.meses_construccion],
-    ['m2 utiles', context.m2_utiles],
-    ['m2 municipales', context.m2_municipales],
-    ['m2 sobre cota 0', context.m2_sobre_cota_0],
-    ['m2 subterraneo', context.m2_subterraneo],
-    ['m2 losa total', context.m2_losa_total],
-    ['m2 vendible deptos', context.m2_vendible_deptos],
-    ['total construccion', context.total_construccion],
-    ['total terreno', context.total_terreno],
-    ['ventas brutas', context.ventas_brutas],
-    ...COST_CATEGORY_ORDER.map((name) => [
-      `total categoria ${name.toLowerCase()}`,
-      ((state.costos.find((item) => item.nombre === name)?.partidas || []).reduce((sum, partida) => sum + toNumber(partida.total_neto), 0)),
-    ]),
+    { label: 'tiempo construccion', token: '_tiempo_construccion', value: context.meses_construccion },
+    { label: 'meses construccion', token: '_meses_construccion', value: context.meses_construccion },
+    { label: 'meses preventa', token: '_meses_preventa', value: mesesPreventa },
+    { label: 'meses venta', token: '_meses_venta', value: mesesVenta },
+    { label: 'meses escrituracion', token: '_meses_escrituracion', value: mesesEscrituracion },
+    { label: 'm2 utiles', token: '_m2_utiles', value: context.m2_utiles },
+    { label: 'm2 municipales', token: '_m2_municipales', value: context.m2_municipales },
+    { label: 'm2 sobre cota 0', token: '_m2_sobre_cota_0', value: context.m2_sobre_cota_0 },
+    { label: 'm2 subterraneo', token: '_m2_subterraneo', value: context.m2_subterraneo },
+    { label: 'm2 losa total', token: '_m2_losa_total', value: context.m2_losa_total },
+    { label: 'm2 vendible deptos', token: '_m2_vendible_deptos', value: context.m2_vendible_deptos },
+    { label: 'total construccion', token: '_total_construccion', value: context.total_construccion },
+    { label: 'total terreno', token: '_total_terreno', value: context.total_terreno },
+    { label: 'ventas brutas', token: '_ventas_brutas', value: context.ventas_brutas },
+    ...COST_CATEGORY_ORDER.map((name) => ({
+      label: `total categoria ${name.toLowerCase()}`,
+      token: `_total_categoria_${String(name).toLowerCase().replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}`,
+      value: ((state.costos.find((item) => item.nombre === name)?.partidas || []).reduce((sum, partida) => sum + toNumber(partida.total_neto), 0)),
+    })),
     ...state.gantt.flatMap((row) => ([
-      [`inicio ${String(row.nombre || '').toLowerCase()}`, toNumber(row.inicio)],
-      [`fin ${String(row.nombre || '').toLowerCase()}`, toNumber(row.fin)],
-      [`duracion ${String(row.nombre || '').toLowerCase()}`, toNumber(row.duracion)],
+      {
+        label: `inicio ${String(row.nombre || '').toLowerCase()}`,
+        token: `_inicio_${String(row.nombre || '').toLowerCase().replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}`,
+        value: toNumber(row.inicio),
+      },
+      {
+        label: `fin ${String(row.nombre || '').toLowerCase()}`,
+        token: `_fin_${String(row.nombre || '').toLowerCase().replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}`,
+        value: toNumber(row.fin),
+      },
+      {
+        label: `duracion ${String(row.nombre || '').toLowerCase()}`,
+        token: `_duracion_${String(row.nombre || '').toLowerCase().replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}`,
+        value: toNumber(row.duracion),
+      },
     ])),
   ];
 }
 
 function renderCostFormulaOptions() {
-  setHtml('cost-formula-refs', getCostFormulaCatalog().map(([label, value]) => (
-    `<option value="[${escapeHtml(label)}]">${escapeHtml(label)} (${fmtNumber(value, 2)})</option>`
+  setHtml('cost-formula-refs', getCostFormulaCatalog().map(({ label, token, value }) => (
+    `<option value="${escapeHtml(token)}">${escapeHtml(label)} (${fmtNumber(value, 2)})</option>`
   )).join(''));
 }
 
@@ -1718,12 +1764,66 @@ function toggleCostCategoryCollapse(categoryName) {
   renderCostosModule();
 }
 
-function insertCostFormulaReference(select) {
-  const row = select.closest('[data-cost-row]');
-  const input = row?.querySelector('[data-field="formula"]');
-  if (!row || !input || !select.value) return;
-  input.value = `${input.value || ''}${input.value ? ' + ' : ''}${select.value}`;
-  select.value = '';
+function setCostFlowMode(mode) {
+  state.costosUi.costFlowMode = mode === 'cumulative' ? 'cumulative' : 'monthly';
+  renderCostosModule();
+}
+
+function insertCostFormulaReference(input, token) {
+  if (!input || !token) return;
+  const value = input.value || '';
+  const match = value.match(/_[a-z0-9_]*$/i);
+  input.value = match ? `${value.slice(0, match.index)}${token}` : `${value}${token}`;
+  input.focus();
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function renderCostFormulaSuggestions(input, query = '') {
+  const panel = input?.closest('.formula-cell')?.querySelector('.formula-suggest');
+  if (!panel) return;
+  const normalizedQuery = String(query || '').toLowerCase().replace(/^_/, '');
+  const options = getCostFormulaCatalog().filter(({ label, token }) => (
+    !normalizedQuery
+    || label.toLowerCase().includes(normalizedQuery)
+    || token.toLowerCase().includes(`_${normalizedQuery}`)
+  )).slice(0, 12);
+
+  if (!options.length) {
+    panel.style.display = 'none';
+    panel.innerHTML = '';
+    return;
+  }
+
+  panel.innerHTML = options.map(({ label, token, value }) => (
+    `<button type="button" onmousedown="event.preventDefault(); pickCostFormulaSuggestion(this)" data-token="${escapeHtml(token)}" data-input-id="${escapeHtml(input.id)}">${escapeHtml(token)}<small>${escapeHtml(label)} | ${fmtNumber(value, 2)}</small></button>`
+  )).join('');
+  panel.style.display = 'block';
+}
+
+function handleCostFormulaInput(input) {
+  if (!input.id) input.id = `cost-formula-${Math.random().toString(36).slice(2, 9)}`;
+  state.costosUi.formulaInputId = input.id;
+  const match = String(input.value || '').match(/_([a-z0-9_]*)$/i);
+  if (!match) {
+    renderCostFormulaSuggestions(input, '');
+    const panel = input.closest('.formula-cell')?.querySelector('.formula-suggest');
+    if (panel) panel.style.display = 'none';
+    return;
+  }
+  renderCostFormulaSuggestions(input, match[0]);
+}
+
+function hideCostFormulaSuggestionsLater() {
+  window.setTimeout(() => {
+    document.querySelectorAll('.formula-suggest').forEach((panel) => { panel.style.display = 'none'; });
+  }, 120);
+}
+
+function pickCostFormulaSuggestion(button) {
+  const input = $(button.dataset.inputId);
+  if (!input) return;
+  insertCostFormulaReference(input, button.dataset.token);
+  hideCostFormulaSuggestionsLater();
 }
 
 function getPaymentReferenceOptions() {
@@ -2111,8 +2211,11 @@ function readCostosEditor() {
 function agregarPartidaLinea(categoryName) {
   readCostosEditor();
   ensureCostosState();
-  const category = state.costos.find((item) => item.nombre === categoryName);
-  if (!category) return;
+  let category = state.costos.find((item) => item.nombre === categoryName);
+  if (!category) {
+    category = { id: '', nombre: categoryName, partidas: [] };
+    state.costos.push(category);
+  }
   category.partidas.push({
     id: '',
     nombre: 'Nueva subpartida',
@@ -2364,8 +2467,12 @@ window.guardarCostos = guardarCostos;
 window.agregarPartidaLinea = agregarPartidaLinea;
 window.redistribuirPartida = redistribuirPartida;
 window.aplicarPlanPagoFila = aplicarPlanPagoFila;
+window.setCostFlowMode = setCostFlowMode;
 window.toggleCostCategoryCollapse = toggleCostCategoryCollapse;
 window.insertCostFormulaReference = insertCostFormulaReference;
+window.handleCostFormulaInput = handleCostFormulaInput;
+window.hideCostFormulaSuggestionsLater = hideCostFormulaSuggestionsLater;
+window.pickCostFormulaSuggestion = pickCostFormulaSuggestion;
 window.openPaymentPlanModal = openPaymentPlanModal;
 window.closePaymentPlanModal = closePaymentPlanModal;
 window.addPaymentPlanItem = addPaymentPlanItem;
@@ -2404,3 +2511,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     setText('proj-dir', error.message);
   }
 });
+
+
