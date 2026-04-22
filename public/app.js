@@ -13,6 +13,11 @@ const state = {
   calculos: {},
   health: null,
   costDrag: null,
+  costosUi: {
+    collapsed: {},
+    activePaymentCategory: null,
+    activePaymentIndex: null,
+  },
   sync: {
     status: 'loading',
     message: 'Verificando conexion',
@@ -1287,7 +1292,12 @@ function buildCostContext() {
 
 function evaluateExpressionFormula(expression, context) {
   if (!expression) return 0;
-  const normalized = String(expression)
+  let normalized = String(expression);
+  getCostFormulaCatalog().forEach(([label, value]) => {
+    const token = `[${label}]`;
+    normalized = normalized.replace(new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), String(toNumber(value)));
+  });
+  normalized = normalized
     .toLowerCase()
     .replace(/cantidad de meses de construcci[oó]n/g, 'meses_construccion')
     .replace(/meses de construcci[oó]n/g, 'meses_construccion')
@@ -1424,6 +1434,8 @@ function buildDistributionFromPlan(planText, total) {
 }
 
 function normalizeDistribution(distribucion, total, planPago = '') {
+  const fromInteractivePlan = buildDistributionFromInteractivePlan(planPago, total);
+  if (fromInteractivePlan) return fromInteractivePlan;
   const fromPlan = buildDistributionFromPlan(planPago, total);
   if (fromPlan) return fromPlan;
 
@@ -1522,232 +1534,6 @@ function ensureCostosState() {
     });
   });
 
-  const normalized = COST_CATEGORY_ORDER.map((name) => {
-    const category = byCategory.get(name);
-    const manualRows = (category.partidas || []).filter((row) => !row.auto_origen && row.nombre);
-    return {
-      ...category,
-      nombre: name,
-      partidas: name === 'GASTOS FINANCIEROS' ? buildFinancialCostRows(manualRows.filter((row) => !/^Terreno ·|^Construccion ·/.test(row.nombre || ''))) : manualRows,
-    };
-  });
-
-  state.costos = normalized;
-  return normalized;
-}
-
-function renderCostPlanilla() {
-  const categorias = ensureCostosState();
-  const context = buildCostContext();
-  const monthlyTotals = Array.from({ length: 13 }, () => 0);
-  let totalNeto = 0;
-  let totalIva = 0;
-
-  setHtml('planilla-tbody', categorias.map((categoria) => {
-    const categoryRows = (categoria.partidas || []).map((partida, index) => {
-      const total = evaluateCostPartida(partida, context);
-      const distribucion = normalizeDistribution(partida.distribucion_mensual, total);
-      totalNeto += total;
-      totalIva += partida.tiene_iva ? total * 0.19 : 0;
-      distribucion.forEach((value, monthIndex) => { monthlyTotals[monthIndex] += value; });
-
-      return `
-        <tr data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" ${partida.auto_origen ? 'data-auto="1"' : ''}>
-          <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${partida.auto_origen ? 'disabled' : ''}/></td>
-          <td><input class="inp" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}" placeholder="Ej: 2500*meses_construccion" ${partida.auto_origen ? 'disabled' : ''}/></td>
-          <td style="text-align:center;color:#22c55e;font-weight:800">${fmtUf(total)}</td>
-          <td style="text-align:center"><input type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''} ${partida.auto_origen ? 'disabled' : ''}/></td>
-          <td style="text-align:center"><input type="checkbox" data-field="es_terreno" ${partida.es_terreno ? 'checked' : ''} ${partida.auto_origen ? 'disabled' : ''}/></td>
-          <td style="text-align:center">${partida.auto_origen ? 'AUTO' : '<button class="btn-outline" type="button" onclick="redistribuirPartida(this)">Plan</button>'}</td>
-          ${distribucion.map((value, monthIndex) => `<td><input class="inp" data-month="${monthIndex}" type="number" step="0.01" value="${toNumber(value)}" ${partida.auto_origen ? 'disabled' : ''}/></td>`).join('')}
-        </tr>
-      `;
-    }).join('');
-
-    return `
-      <tr style="background:#e2e8f0">
-        <td colspan="19" style="font-weight:800;color:#0f172a;padding:10px;display:flex;justify-content:space-between;align-items:center">
-          <span>${escapeHtml(categoria.nombre)}</span>
-          <button class="btn-outline" type="button" onclick="agregarPartidaLinea('${escapeHtml(categoria.nombre)}')">+ Subpartida</button>
-        </td>
-      </tr>
-      ${categoryRows}
-    `;
-  }).join(''));
-
-  setText('plan-total-neto', fmtUf(totalNeto));
-  setText('plan-total-iva', fmtUf(totalIva));
-  setText('plan-iva-credito', fmtUf(totalIva));
-  setText('plan-total-bruto', fmtUf(totalNeto + totalIva));
-  monthlyTotals.forEach((value, index) => setText(`plan-m${index}`, fmtUf(value)));
-}
-
-function renderCostosModule() {
-  ensureCostosState();
-  renderCostStructure();
-  renderCostPlanilla();
-}
-
-function ensureCostosState() {
-  const byCategory = new Map(COST_CATEGORY_ORDER.map((name) => [name, { id: '', nombre: name, partidas: [] }]));
-  (state.costos || []).forEach((category) => {
-    (category.partidas || []).forEach((partida) => {
-      const target = mapLegacyCategoryName(category.nombre, partida.nombre);
-      const current = byCategory.get(target);
-      current.partidas.push({
-        ...partida,
-        plan_pago: partida.plan_pago || '',
-        distribucion_mensual: Array.isArray(partida.distribucion_mensual) ? partida.distribucion_mensual : [],
-      });
-    });
-  });
-
-  state.costos = COST_CATEGORY_ORDER.map((name) => {
-    const category = byCategory.get(name);
-    const manualRows = (category.partidas || []).filter((row) => !row.auto_origen && row.nombre);
-    return {
-      ...category,
-      nombre: name,
-      partidas: name === 'GASTOS FINANCIEROS'
-        ? buildFinancialCostRows(manualRows.filter((row) => !/^(Terreno|Construccion)\s*[·Â]/i.test(row.nombre || '')))
-        : manualRows,
-    };
-  });
-
-  return state.costos;
-}
-
-function renderCostFlow(monthlyTotals) {
-  const labels = getCostMonthLabels();
-  const total = monthlyTotals.reduce((sum, value) => sum + value, 0);
-  setHtml('flujoEgresos-legend', labels.map((label, index) => {
-    const value = toNumber(monthlyTotals[index]);
-    const pct = total ? (value / total) * 100 : 0;
-    return `<span class="badge badge-blue">${escapeHtml(label)}: ${fmtUf(value)} · ${fmtPct(pct)}</span>`;
-  }).join(''));
-
-  if (typeof Chart === 'undefined') return;
-  const canvas = $('flujoEgresos-chart');
-  if (!canvas) return;
-  const context = canvas.getContext('2d');
-  if (state.costFlowChart) state.costFlowChart.destroy();
-  state.costFlowChart = new Chart(context, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Egresos',
-        data: monthlyTotals,
-        backgroundColor: '#0f172a',
-        borderRadius: 4,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-      },
-      scales: {
-        x: { ticks: { maxRotation: 0, autoSkip: true } },
-        y: { beginAtZero: true },
-      },
-    },
-  });
-}
-
-function renderCostPlanilla() {
-  const categorias = ensureCostosState();
-  const context = buildCostContext();
-  const monthCount = getCostMonthCount();
-  const monthLabels = getCostMonthLabels();
-  const monthlyTotals = createMonthlyArray(monthCount, 0);
-  let totalNeto = 0;
-  let totalIva = 0;
-
-  setHtml('planilla-head', `
-    <tr>
-      <th style="width:34px"></th>
-      <th style="min-width:220px;text-align:left">Subpartida</th>
-      <th style="min-width:180px;text-align:left">Formula</th>
-      <th style="min-width:240px;text-align:left">Plan de pago</th>
-      <th style="min-width:110px">Total neto</th>
-      <th style="width:64px">IVA</th>
-      <th style="width:78px">Terreno</th>
-      ${monthLabels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}
-    </tr>
-  `);
-
-  setHtml('planilla-tbody', categorias.map((categoria) => {
-    const categoryRows = (categoria.partidas || []).map((partida, index) => {
-      const total = evaluateCostPartida(partida, context);
-      const distribucion = normalizeDistribution(partida.distribucion_mensual, total, partida.plan_pago);
-      partida.total_neto = total;
-      partida.distribucion_mensual = distribucion;
-      totalNeto += total;
-      totalIva += partida.tiene_iva ? total * 0.19 : 0;
-      distribucion.forEach((value, monthIndex) => { monthlyTotals[monthIndex] += value; });
-
-      return `
-        <tr class="partida-row" data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" ${partida.auto_origen ? 'data-auto="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
-          <td style="text-align:center">${partida.auto_origen ? '' : '<span class="drag-handle" title="Orden manual">⋮⋮</span>'}</td>
-          <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${partida.auto_origen ? 'disabled' : ''}/></td>
-          <td><input class="inp" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}" placeholder="Ej: 2500*meses_construccion" ${partida.auto_origen ? 'disabled' : ''}/></td>
-          <td><input class="inp cost-plan-input" data-field="plan_pago" value="${escapeHtml(partida.plan_pago || '')}" placeholder="15%@inicio;80%@meses(24,5);5%@fin" ${partida.auto_origen ? 'disabled' : 'onchange="aplicarPlanPagoFila(this)"'}/></td>
-          <td style="text-align:center;color:#22c55e;font-weight:800">${fmtUf(total)}</td>
-          <td style="text-align:center"><input type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''} ${partida.auto_origen ? 'disabled' : ''}/></td>
-          <td style="text-align:center"><input type="checkbox" data-field="es_terreno" ${partida.es_terreno ? 'checked' : ''} ${partida.auto_origen ? 'disabled' : ''}/></td>
-          ${distribucion.map((value, monthIndex) => `<td><input class="inp cost-month-input" data-month="${monthIndex}" type="number" step="0.01" value="${toNumber(value)}" ${partida.auto_origen ? 'disabled' : ''}/></td>`).join('')}
-        </tr>
-      `;
-    }).join('');
-
-    return `
-      <tr class="cat-row">
-        <td colspan="${7 + monthCount}" style="padding:10px">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-            <span>${escapeHtml(categoria.nombre)}</span>
-            <button class="btn-outline btn-plus" type="button" onclick="agregarPartidaLinea('${escapeHtml(categoria.nombre)}')" title="Agregar subpartida">+</button>
-          </div>
-        </td>
-      </tr>
-      ${categoryRows}
-    `;
-  }).join(''));
-
-  setHtml('planilla-tfoot', `
-    <tr class="tfoot-dark">
-      <td colspan="4">Totales</td>
-      <td>${fmtUf(totalNeto)}</td>
-      <td>${fmtUf(totalIva)}</td>
-      <td>${fmtUf(totalNeto + totalIva)}</td>
-      ${monthlyTotals.map((value) => `<td>${fmtUf(value)}</td>`).join('')}
-    </tr>
-  `);
-
-  renderCostFlow(monthlyTotals);
-}
-
-function renderCostosModule() {
-  ensureCostosState();
-  renderCostPlanilla();
-  renderCostStructure();
-}
-
-function ensureCostosState() {
-  const byCategory = new Map(COST_CATEGORY_ORDER.map((name) => [name, { id: '', nombre: name, partidas: [] }]));
-  (state.costos || []).forEach((category) => {
-    (category.partidas || []).forEach((partida) => {
-      const target = mapLegacyCategoryName(category.nombre, partida.nombre);
-      const current = byCategory.get(target);
-      current.partidas.push({
-        ...partida,
-        plan_pago: partida.plan_pago || '',
-        distribucion_mensual: Array.isArray(partida.distribucion_mensual) ? partida.distribucion_mensual : [],
-      });
-    });
-  });
-
   state.costos = COST_CATEGORY_ORDER.map((name) => {
     const category = byCategory.get(name);
     const manualRows = (category.partidas || []).filter((row) => !row.auto_origen && row.nombre);
@@ -1809,23 +1595,28 @@ function renderCostPlanilla() {
   const monthCount = getCostMonthCount();
   const monthLabels = getCostMonthLabels();
   const monthlyTotals = createMonthlyArray(monthCount, 0);
+  const collapsedState = state.costosUi?.collapsed || {};
   let totalNeto = 0;
   let totalIva = 0;
+
+  renderCostFormulaOptions();
 
   setHtml('planilla-head', `
     <tr>
       <th style="width:34px"></th>
       <th style="min-width:220px;text-align:left">Subpartida</th>
-      <th style="min-width:180px;text-align:left">Formula</th>
-      <th style="min-width:240px;text-align:left">Plan de pago</th>
+      <th style="min-width:280px;text-align:left">Formula</th>
+      <th style="min-width:170px;text-align:left">Plan de pago</th>
       <th style="min-width:110px">Total neto</th>
       <th style="width:64px">IVA</th>
       <th style="width:78px">Terreno</th>
+      <th style="width:48px"></th>
       ${monthLabels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}
     </tr>
   `);
 
   setHtml('planilla-tbody', categorias.map((categoria) => {
+    const isCollapsed = !!collapsedState[categoria.nombre];
     const categoryRows = (categoria.partidas || []).map((partida, index) => {
       const total = evaluateCostPartida(partida, context);
       const distribucion = normalizeDistribution(partida.distribucion_mensual, total, partida.plan_pago);
@@ -1837,13 +1628,20 @@ function renderCostPlanilla() {
 
       return `
         <tr class="partida-row" data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" ${partida.auto_origen ? 'data-auto="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
-          <td style="text-align:center">${partida.auto_origen ? '' : '<span class="drag-handle" title="Orden manual">......</span>'}</td>
+          <td style="text-align:center">${partida.auto_origen ? '' : '<span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span>'}</td>
           <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${partida.auto_origen ? 'disabled' : ''}/></td>
-          <td><input class="inp" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}" placeholder="Ej: 2500*meses_construccion" ${partida.auto_origen ? 'disabled' : ''}/></td>
-          <td><input class="inp cost-plan-input" data-field="plan_pago" value="${escapeHtml(partida.plan_pago || '')}" placeholder="15%@inicio;80%@meses(24,5);5%@fin" ${partida.auto_origen ? 'disabled' : 'onchange="aplicarPlanPagoFila(this)"'}/></td>
+          <td>
+            <input class="inp" list="cost-formula-refs" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}" placeholder="Ej: 2500*[tiempo construccion]" ${partida.auto_origen ? 'disabled' : ''}/>
+            ${partida.auto_origen ? '' : `<select class="inp" style="margin-top:6px;font-size:11px" onchange="insertCostFormulaReference(this)">
+              <option value="">Insertar referencia...</option>
+              ${getCostFormulaCatalog().map(([label]) => `<option value="[${escapeHtml(label)}]">${escapeHtml(label)}</option>`).join('')}
+            </select>`}
+          </td>
+          <td>${partida.auto_origen ? '<span class="badge badge-yellow">AUTO</span>' : `<button class="btn-outline" type="button" onclick="openPaymentPlanModal('${escapeHtml(categoria.nombre)}', ${index})">${escapeHtml(summarizePaymentPlan(partida.plan_pago))}</button><div style="font-size:10px;color:${Math.abs(getPaymentPlanAssignedPct(partida.plan_pago) - 100) < 0.01 ? '#16a34a' : '#b45309'};margin-top:4px">${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))} asignado</div>`}</td>
           <td style="text-align:center;color:#22c55e;font-weight:800">${fmtUf(total)}</td>
           <td style="text-align:center"><input type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''} ${partida.auto_origen ? 'disabled' : ''}/></td>
           <td style="text-align:center"><input type="checkbox" data-field="es_terreno" ${partida.es_terreno ? 'checked' : ''} ${partida.auto_origen ? 'disabled' : ''}/></td>
+          <td style="text-align:center">${partida.auto_origen ? '' : `<button class="btn-outline btn-plus" type="button" title="Eliminar subpartida" onclick="removeCostPartida('${escapeHtml(categoria.nombre)}', ${index})">&times;</button>`}</td>
           ${distribucion.map((value, monthIndex) => `<td><input class="inp cost-month-input" data-month="${monthIndex}" type="number" step="0.01" value="${toNumber(value)}" ${partida.auto_origen ? 'disabled' : ''}/></td>`).join('')}
         </tr>
       `;
@@ -1851,14 +1649,15 @@ function renderCostPlanilla() {
 
     return `
       <tr class="cat-row">
-        <td colspan="${7 + monthCount}" style="padding:10px">
+        <td colspan="${8 + monthCount}" style="padding:10px">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-            <span>${escapeHtml(categoria.nombre)}</span>
+            <button class="btn-outline btn-plus" type="button" onclick="toggleCostCategoryCollapse('${escapeHtml(categoria.nombre)}')" title="Expandir o colapsar">${isCollapsed ? '+' : '-'}</button>
+            <span style="flex:1">${escapeHtml(categoria.nombre)}</span>
             <button class="btn-outline btn-plus" type="button" onclick="agregarPartidaLinea('${escapeHtml(categoria.nombre)}')" title="Agregar subpartida">+</button>
           </div>
         </td>
       </tr>
-      ${categoryRows}
+      ${isCollapsed ? '' : categoryRows}
     `;
   }).join(''));
 
@@ -1868,6 +1667,7 @@ function renderCostPlanilla() {
       <td>${fmtUf(totalNeto)}</td>
       <td>${fmtUf(totalIva)}</td>
       <td>${fmtUf(totalNeto + totalIva)}</td>
+      <td></td>
       ${monthlyTotals.map((value) => `<td>${fmtUf(value)}</td>`).join('')}
     </tr>
   `);
@@ -1881,10 +1681,223 @@ function renderCostosModule() {
   renderCostStructure();
 }
 
+function getCostFormulaCatalog() {
+  const context = buildCostContext();
+  return [
+    ['tiempo construccion', context.meses_construccion],
+    ['meses construccion', context.meses_construccion],
+    ['m2 utiles', context.m2_utiles],
+    ['m2 municipales', context.m2_municipales],
+    ['m2 sobre cota 0', context.m2_sobre_cota_0],
+    ['m2 subterraneo', context.m2_subterraneo],
+    ['m2 losa total', context.m2_losa_total],
+    ['m2 vendible deptos', context.m2_vendible_deptos],
+    ['total construccion', context.total_construccion],
+    ['total terreno', context.total_terreno],
+    ['ventas brutas', context.ventas_brutas],
+    ...COST_CATEGORY_ORDER.map((name) => [
+      `total categoria ${name.toLowerCase()}`,
+      ((state.costos.find((item) => item.nombre === name)?.partidas || []).reduce((sum, partida) => sum + toNumber(partida.total_neto), 0)),
+    ]),
+    ...state.gantt.flatMap((row) => ([
+      [`inicio ${String(row.nombre || '').toLowerCase()}`, toNumber(row.inicio)],
+      [`fin ${String(row.nombre || '').toLowerCase()}`, toNumber(row.fin)],
+      [`duracion ${String(row.nombre || '').toLowerCase()}`, toNumber(row.duracion)],
+    ])),
+  ];
+}
+
+function renderCostFormulaOptions() {
+  setHtml('cost-formula-refs', getCostFormulaCatalog().map(([label, value]) => (
+    `<option value="[${escapeHtml(label)}]">${escapeHtml(label)} (${fmtNumber(value, 2)})</option>`
+  )).join(''));
+}
+
+function toggleCostCategoryCollapse(categoryName) {
+  state.costosUi.collapsed[categoryName] = !state.costosUi.collapsed[categoryName];
+  renderCostosModule();
+}
+
+function insertCostFormulaReference(select) {
+  const row = select.closest('[data-cost-row]');
+  const input = row?.querySelector('[data-field="formula"]');
+  if (!row || !input || !select.value) return;
+  input.value = `${input.value || ''}${input.value ? ' + ' : ''}${select.value}`;
+  select.value = '';
+}
+
+function getPaymentReferenceOptions() {
+  return [
+    { value: 'MANUAL_0', label: 'Manual (M0)' },
+    ...state.gantt.flatMap((row) => ([
+      { value: `START:${row.id || row.nombre}`, label: `Inicio: ${row.nombre}` },
+      { value: `END:${row.id || row.nombre}`, label: `Fin: ${row.nombre}` },
+    ])),
+  ];
+}
+
+function parseInteractivePaymentPlan(rawValue) {
+  if (!rawValue) return { tramos: [], hitos: [] };
+  try {
+    const parsed = JSON.parse(rawValue);
+    return {
+      tramos: Array.isArray(parsed.tramos) ? parsed.tramos : [],
+      hitos: Array.isArray(parsed.hitos) ? parsed.hitos : [],
+    };
+  } catch {
+    return { tramos: [], hitos: [] };
+  }
+}
+
+function serializeInteractivePaymentPlan(plan) {
+  return JSON.stringify({
+    tramos: plan.tramos || [],
+    hitos: plan.hitos || [],
+  });
+}
+
+function summarizePaymentPlan(rawValue) {
+  const plan = parseInteractivePaymentPlan(rawValue);
+  if (!plan.tramos.length && !plan.hitos.length) return 'Configurar';
+  return `${plan.tramos.length} tramo(s) | ${plan.hitos.length} hito(s)`;
+}
+
+function getPaymentPlanAssignedPct(rawValue) {
+  const plan = parseInteractivePaymentPlan(rawValue);
+  return plan.tramos.reduce((sum, item) => sum + toNumber(item.pct), 0)
+    + plan.hitos.reduce((sum, item) => sum + toNumber(item.pct), 0);
+}
+
+function resolvePaymentReference(refValue, offset = 0) {
+  if (!refValue || refValue === 'MANUAL_0') return Math.max(0, toNumber(offset));
+  const [kind, rawKey] = String(refValue).split(':');
+  const match = state.gantt.find((row) => String(row.id || row.nombre) === rawKey);
+  if (!match) return Math.max(0, toNumber(offset));
+  return Math.max(0, (kind === 'END' ? toNumber(match.fin) : toNumber(match.inicio)) + toNumber(offset));
+}
+
+function buildDistributionFromInteractivePlan(rawValue, total) {
+  if (!rawValue || !total) return null;
+  const plan = parseInteractivePaymentPlan(rawValue);
+  if (!plan.tramos.length && !plan.hitos.length) return null;
+  const months = createMonthlyArray();
+
+  plan.tramos.forEach((tramo) => {
+    const amount = total * toNumber(tramo.pct) / 100;
+    const startMonth = resolvePaymentReference(tramo.inicio_ref, tramo.inicio_offset);
+    const endMonth = resolvePaymentReference(tramo.fin_ref, tramo.fin_offset);
+    distributeEvenly(months, amount, startMonth, Math.max(1, endMonth - startMonth + 1));
+  });
+
+  plan.hitos.forEach((hito) => {
+    const amount = total * toNumber(hito.pct) / 100;
+    placeMonthlyValue(months, resolvePaymentReference(hito.ref, hito.offset), amount);
+  });
+
+  return months;
+}
+
+function openPaymentPlanModal(categoryName, index) {
+  readCostosEditor();
+  const category = state.costos.find((item) => item.nombre === categoryName);
+  const partida = category?.partidas?.[index];
+  if (!partida) return;
+  state.costosUi.activePaymentCategory = categoryName;
+  state.costosUi.activePaymentIndex = index;
+  const plan = parseInteractivePaymentPlan(partida.plan_pago);
+  const refs = getPaymentReferenceOptions();
+
+  setText('payment-plan-title', `Configurar pagos: ${partida.nombre}`);
+  setText('payment-plan-total', fmtUf(evaluateCostPartida(partida, buildCostContext())));
+  setText('payment-plan-assigned', `${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))}`);
+
+  const renderRefOptions = (selectedValue) => refs.map((option) => `<option value="${escapeHtml(option.value)}" ${option.value === selectedValue ? 'selected' : ''}>${escapeHtml(option.label)}</option>`).join('');
+
+  setHtml('payment-plan-tramos', plan.tramos.map((tramo, idx) => `
+    <div class="payment-line" data-tramo-index="${idx}" style="display:grid;grid-template-columns:100px 1fr 90px 1fr 90px 40px;gap:8px;margin-bottom:10px">
+      <input class="inp" data-field="pct" type="number" step="0.01" value="${toNumber(tramo.pct)}" placeholder="%"/>
+      <select class="inp" data-field="inicio_ref">${renderRefOptions(tramo.inicio_ref || 'MANUAL_0')}</select>
+      <input class="inp" data-field="inicio_offset" type="number" value="${toNumber(tramo.inicio_offset)}" placeholder="Meses"/>
+      <select class="inp" data-field="fin_ref">${renderRefOptions(tramo.fin_ref || 'MANUAL_0')}</select>
+      <input class="inp" data-field="fin_offset" type="number" value="${toNumber(tramo.fin_offset)}" placeholder="Meses"/>
+      <button class="btn-outline btn-plus" type="button" onclick="removePaymentPlanItem('tramo', ${idx})">&times;</button>
+    </div>
+  `).join('') || '<div style="font-size:11px;color:#94a3b8">Sin tramos mensuales.</div>');
+
+  setHtml('payment-plan-hitos', plan.hitos.map((hito, idx) => `
+    <div class="payment-line" data-hito-index="${idx}" style="display:grid;grid-template-columns:100px 1fr 90px 40px;gap:8px;margin-bottom:10px">
+      <input class="inp" data-field="pct" type="number" step="0.01" value="${toNumber(hito.pct)}" placeholder="%"/>
+      <select class="inp" data-field="ref">${renderRefOptions(hito.ref || 'MANUAL_0')}</select>
+      <input class="inp" data-field="offset" type="number" value="${toNumber(hito.offset)}" placeholder="Meses"/>
+      <button class="btn-outline btn-plus" type="button" onclick="removePaymentPlanItem('hito', ${idx})">&times;</button>
+    </div>
+  `).join('') || '<div style="font-size:11px;color:#94a3b8">Sin pagos por hito.</div>');
+
+  $('payment-plan-modal').style.display = 'flex';
+}
+
+function closePaymentPlanModal() {
+  $('payment-plan-modal').style.display = 'none';
+}
+
+function addPaymentPlanItem(type) {
+  const category = state.costos.find((item) => item.nombre === state.costosUi.activePaymentCategory);
+  const partida = category?.partidas?.[state.costosUi.activePaymentIndex];
+  if (!partida) return;
+  const plan = parseInteractivePaymentPlan(partida.plan_pago);
+  if (type === 'tramo') plan.tramos.push({ pct: 0, inicio_ref: 'MANUAL_0', inicio_offset: 0, fin_ref: 'MANUAL_0', fin_offset: 0 });
+  if (type === 'hito') plan.hitos.push({ pct: 0, ref: 'MANUAL_0', offset: 0 });
+  partida.plan_pago = serializeInteractivePaymentPlan(plan);
+  openPaymentPlanModal(state.costosUi.activePaymentCategory, state.costosUi.activePaymentIndex);
+}
+
+function removePaymentPlanItem(type, index) {
+  const category = state.costos.find((item) => item.nombre === state.costosUi.activePaymentCategory);
+  const partida = category?.partidas?.[state.costosUi.activePaymentIndex];
+  if (!partida) return;
+  const plan = parseInteractivePaymentPlan(partida.plan_pago);
+  if (type === 'tramo') plan.tramos.splice(index, 1);
+  if (type === 'hito') plan.hitos.splice(index, 1);
+  partida.plan_pago = serializeInteractivePaymentPlan(plan);
+  openPaymentPlanModal(state.costosUi.activePaymentCategory, state.costosUi.activePaymentIndex);
+}
+
+function savePaymentPlanModal() {
+  const category = state.costos.find((item) => item.nombre === state.costosUi.activePaymentCategory);
+  const partida = category?.partidas?.[state.costosUi.activePaymentIndex];
+  if (!partida) return;
+
+  const tramos = Array.from(document.querySelectorAll('#payment-plan-tramos .payment-line')).map((row) => ({
+    pct: toNumber(row.querySelector('[data-field="pct"]')?.value),
+    inicio_ref: row.querySelector('[data-field="inicio_ref"]')?.value || 'MANUAL_0',
+    inicio_offset: toNumber(row.querySelector('[data-field="inicio_offset"]')?.value),
+    fin_ref: row.querySelector('[data-field="fin_ref"]')?.value || 'MANUAL_0',
+    fin_offset: toNumber(row.querySelector('[data-field="fin_offset"]')?.value),
+  }));
+
+  const hitos = Array.from(document.querySelectorAll('#payment-plan-hitos .payment-line')).map((row) => ({
+    pct: toNumber(row.querySelector('[data-field="pct"]')?.value),
+    ref: row.querySelector('[data-field="ref"]')?.value || 'MANUAL_0',
+    offset: toNumber(row.querySelector('[data-field="offset"]')?.value),
+  }));
+
+  partida.plan_pago = serializeInteractivePaymentPlan({ tramos, hitos });
+  closePaymentPlanModal();
+  renderCostosModule();
+}
+
+function removeCostPartida(categoryName, index) {
+  readCostosEditor();
+  const category = state.costos.find((item) => item.nombre === categoryName);
+  if (!category) return;
+  category.partidas.splice(index, 1);
+  renderCostosModule();
+}
+
 function renderProjectHeader() {
   setText('proj-title', state.proyecto?.nombre || 'Proyecto');
   setText('proj-dir', state.proyecto?.direccion || 'Sin direccion');
-  setText('nav-user', 'BRICSA · version dinamica');
+  setText('nav-user', 'BRICSA | version dinamica');
   if (state.proyecto?.updated_at && state.sync.status === 'ok') {
     $('sync-detail').textContent = `Ult. actualizacion ${fmtDateTime(state.proyecto.updated_at)}`;
   }
@@ -2085,7 +2098,7 @@ function readCostosEditor() {
     target.formula_tipo = formula.formula_tipo;
     target.formula_valor = formula.formula_valor;
     target.formula_referencia = formula.formula_referencia;
-    target.plan_pago = row.querySelector('[data-field="plan_pago"]')?.value?.trim() || '';
+    target.plan_pago = target.plan_pago || '';
     target.tiene_iva = !!row.querySelector('[data-field="tiene_iva"]')?.checked;
     target.es_terreno = !!row.querySelector('[data-field="es_terreno"]')?.checked;
     target.distribucion_mensual = Array.from(row.querySelectorAll('[data-month]')).map((input) => toNumber(input.value));
@@ -2119,7 +2132,9 @@ function redistribuirPartida(button) {
   const row = button.closest('[data-cost-row]');
   if (!row) return;
   const formulaText = row.querySelector('[data-field="formula"]')?.value || '';
-  const planText = row.querySelector('[data-field="plan_pago"]')?.value || '';
+  const category = state.costos.find((item) => item.nombre === row.dataset.category);
+  const partida = category?.partidas?.[toNumber(row.dataset.index)];
+  const planText = partida?.plan_pago || '';
   const parsed = parseFormulaInput(formulaText);
   const total = parsed.formula_tipo === 'manual'
     ? toNumber(parsed.formula_valor)
@@ -2349,6 +2364,14 @@ window.guardarCostos = guardarCostos;
 window.agregarPartidaLinea = agregarPartidaLinea;
 window.redistribuirPartida = redistribuirPartida;
 window.aplicarPlanPagoFila = aplicarPlanPagoFila;
+window.toggleCostCategoryCollapse = toggleCostCategoryCollapse;
+window.insertCostFormulaReference = insertCostFormulaReference;
+window.openPaymentPlanModal = openPaymentPlanModal;
+window.closePaymentPlanModal = closePaymentPlanModal;
+window.addPaymentPlanItem = addPaymentPlanItem;
+window.removePaymentPlanItem = removePaymentPlanItem;
+window.savePaymentPlanModal = savePaymentPlanModal;
+window.removeCostPartida = removeCostPartida;
 window.startCostDrag = startCostDrag;
 window.allowCostDrop = allowCostDrop;
 window.dropCostRow = dropCostRow;
