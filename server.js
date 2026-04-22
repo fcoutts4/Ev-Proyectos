@@ -162,18 +162,27 @@ app.get('/api/proyectos/:id/calculos', asyncHandler(async (req, res) => {
 
   let supVendible = 0;
   let supLosa = 0;
+  let supUtilMunicipal = 0;
   cab.forEach((row) => {
     const cantidad = row.cantidad || 1;
     const vendible = (row.sup_interior || 0) + (row.sup_terrazas || 0);
-    const losa = vendible + (row.sup_comunes || 0);
+    const utilMunicipal = (row.sup_util_mun || 0) * cantidad;
+    const losa = vendible;
     supVendible += vendible * cantidad;
     supLosa += losa * cantidad;
+    supUtilMunicipal += utilMunicipal;
   });
 
-  supVendible += ((proyecto?.estacionamientos_sup_interior || 0) + (proyecto?.estacionamientos_sup_terrazas || 0)) * (proyecto?.estacionamientos_cantidad || 0);
-  supVendible += ((proyecto?.bodegas_sup_interior || 0) + (proyecto?.bodegas_sup_terrazas || 0)) * (proyecto?.bodegas_cantidad || 0);
-  supLosa += ((proyecto?.estacionamientos_sup_interior || 0) + (proyecto?.estacionamientos_sup_terrazas || 0)) * (proyecto?.estacionamientos_cantidad || 0);
-  supLosa += ((proyecto?.bodegas_sup_interior || 0) + (proyecto?.bodegas_sup_terrazas || 0)) * (proyecto?.bodegas_cantidad || 0);
+  const vendibleEstacionamientos = ((proyecto?.estacionamientos_sup_interior || 0) + (proyecto?.estacionamientos_sup_terrazas || 0)) * (proyecto?.estacionamientos_cantidad || 0);
+  const vendibleBodegas = ((proyecto?.bodegas_sup_interior || 0) + (proyecto?.bodegas_sup_terrazas || 0)) * (proyecto?.bodegas_cantidad || 0);
+  const utilEstacionamientos = ((proyecto?.estacionamientos_sup_interior || 0) + ((proyecto?.estacionamientos_sup_terrazas || 0) * (proyecto?.terraza_util_pct || 0) / 100)) * (proyecto?.estacionamientos_cantidad || 0);
+  const utilBodegas = ((proyecto?.bodegas_sup_interior || 0) + ((proyecto?.bodegas_sup_terrazas || 0) * (proyecto?.terraza_util_pct || 0) / 100)) * (proyecto?.bodegas_cantidad || 0);
+  const commonArea = (proyecto?.comunes_tipo || 'porcentaje') === 'total'
+    ? (proyecto?.comunes_valor || 0)
+    : (supUtilMunicipal + utilEstacionamientos + utilBodegas) * (proyecto?.comunes_valor || 0) / 100;
+
+  supVendible += vendibleEstacionamientos + vendibleBodegas + commonArea;
+  supLosa += vendibleEstacionamientos + vendibleBodegas + commonArea;
 
   let ventasBrutas = 0;
   const accessorySource = ventasConfig[0] || {};

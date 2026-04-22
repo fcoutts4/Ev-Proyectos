@@ -662,13 +662,13 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
           <tr>
             <td style="font-weight:600">Superficie Sobre Tierra</td>
             <td style="text-align:center" id="constr-sup-st">7.146 m²</td>
-            <td style="text-align:center"><input type="number" class="inp" id="constr-uf-st" value="27" style="width:80px;text-align:center"> <span style="font-size:10px;color:#94a3b8">UF/m²</span></td>
+            <td style="text-align:center"><input type="number" class="inp" id="constr-uf-st" value="27" style="width:80px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">UF/m²</span></td>
             <td style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-st">192.942 UF</td>
         </tr>
           <tr>
             <td style="font-weight:600">Superficie Bajo Tierra</td>
             <td style="text-align:center" id="constr-sup-bt">3.241 m²</td>
-            <td style="text-align:center"><input type="number" class="inp" id="constr-uf-bt" value="15" style="width:80px;text-align:center"> <span style="font-size:10px;color:#94a3b8">UF/m²</span></td>
+            <td style="text-align:center"><input type="number" class="inp" id="constr-uf-bt" value="15" style="width:80px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">UF/m²</span></td>
             <td style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-bt">48.615 UF</td>
         </tr>
       </tbody>
@@ -694,38 +694,32 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 
       <div style="margin-bottom:16px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-size:12px;font-weight:700;color:#475569">% M² SUBTERRÁNEO / SOBRE COTA 0</span>
+          <span style="font-size:14px;font-weight:800;color:#3b82f6"><input type="number" class="inp" id="constr-pct-bt" value="45" style="width:90px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">%</span></span>
+      </div>
+    </div>
+
+      <div style="margin-bottom:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
           <span style="font-size:12px;font-weight:700;color:#475569">PLAZO DE OBRA</span>
           <span style="font-size:14px;font-weight:800;color:#22c55e" id="plazo-label">20 MESES</span>
           <span class="badge badge-green" style="font-size:10px">SINCRONIZADO GANTT</span>
       </div>
-        <input type="range" id="plazo-slider" min="6" max="60" value="20" oninput="updateConstrParams()">
-    </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-        <div>
-          <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:6px">ANCHO DE CURVA</div>
-          <input type="range" id="curva-slider" min="0.1" max="1" step="0.05" value="0.5" oninput="updateConstrParams()">
-          <div style="font-size:10px;color:#94a3b8;text-align:center" id="curva-label">0.50</div>
-      </div>
-        <div>
-          <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:6px">PEAK DE GASTO</div>
-          <input type="range" id="peak-slider" min="0.1" max="0.9" step="0.05" value="0.5" oninput="updateConstrParams()">
-          <div style="font-size:10px;color:#94a3b8;text-align:center" id="peak-label">0.50</div>
-      </div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:6px">La curva S se distribuye automáticamente de forma normalizada sobre la duración del hito de construcción.</div>
     </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div style="background:#fef9c3;border-radius:8px;padding:12px">
           <div style="font-size:10px;font-weight:700;color:#b45309;margin-bottom:6px">🏦 ANTICIPO</div>
           <div style="display:flex;align-items:center;gap:6px">
-            <input type="range" id="anticipo-slider" min="0" max="50" step="1" value="15" oninput="updateConstrParams()">
+            <input type="number" class="inp" id="anticipo-slider" min="0" max="50" step="0.1" value="15" oninput="updateConstrParams()">
             <span style="font-weight:800;font-size:14px" id="anticipo-label">15%</span>
         </div>
       </div>
         <div style="background:#fef2f2;border-radius:8px;padding:12px">
           <div style="font-size:10px;font-weight:700;color:#991b1b;margin-bottom:6px">🔒 RETENCIONES</div>
           <div style="display:flex;align-items:center;gap:6px">
-            <input type="range" id="retencion-slider" min="0" max="20" step="1" value="5" oninput="updateConstrParams()">
+            <input type="number" class="inp" id="retencion-slider" min="0" max="20" step="0.1" value="5" oninput="updateConstrParams()">
             <span style="font-weight:800;font-size:14px" id="retencion-label">5%</span>
         </div>
       </div>

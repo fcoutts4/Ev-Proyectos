@@ -56,6 +56,8 @@ async function initDb() {
         direccion TEXT DEFAULT '',
         tipo TEXT DEFAULT 'Residencial',
         terraza_util_pct DOUBLE PRECISION DEFAULT 50,
+        comunes_tipo TEXT DEFAULT 'porcentaje',
+        comunes_valor DOUBLE PRECISION DEFAULT 0,
         estacionamientos_cantidad INTEGER DEFAULT 0,
         estacionamientos_sup_interior DOUBLE PRECISION DEFAULT 0,
         estacionamientos_sup_terrazas DOUBLE PRECISION DEFAULT 0,
@@ -85,6 +87,7 @@ async function initDb() {
         nombre TEXT NOT NULL,
         color TEXT DEFAULT '#3b82f6',
         dependencia TEXT,
+        dependencia_tipo TEXT DEFAULT 'fin',
         desfase INTEGER DEFAULT 0,
         inicio INTEGER DEFAULT 0,
         duracion INTEGER DEFAULT 0,
@@ -123,6 +126,7 @@ async function initDb() {
         sup_sobre_tierra DOUBLE PRECISION DEFAULT 0,
         costo_uf_m2_sobre_tierra DOUBLE PRECISION DEFAULT 0,
         sup_bajo_tierra DOUBLE PRECISION DEFAULT 0,
+        pct_bajo_tierra_sobre_cota_0 DOUBLE PRECISION DEFAULT 0,
         costo_uf_m2_bajo_tierra DOUBLE PRECISION DEFAULT 0,
         plazo_meses INTEGER DEFAULT 0,
         anticipo_pct DOUBLE PRECISION DEFAULT 0,
@@ -192,12 +196,16 @@ async function initDb() {
     `);
 
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS terraza_util_pct DOUBLE PRECISION DEFAULT 50');
+    await query("ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS comunes_tipo TEXT DEFAULT 'porcentaje'");
+    await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS comunes_valor DOUBLE PRECISION DEFAULT 0');
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS estacionamientos_cantidad INTEGER DEFAULT 0');
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS estacionamientos_sup_interior DOUBLE PRECISION DEFAULT 0');
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS estacionamientos_sup_terrazas DOUBLE PRECISION DEFAULT 0');
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS bodegas_cantidad INTEGER DEFAULT 0');
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS bodegas_sup_interior DOUBLE PRECISION DEFAULT 0');
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS bodegas_sup_terrazas DOUBLE PRECISION DEFAULT 0');
+    await query("ALTER TABLE gantt_hitos ADD COLUMN IF NOT EXISTS dependencia_tipo TEXT DEFAULT 'fin'");
+    await query('ALTER TABLE construccion ADD COLUMN IF NOT EXISTS pct_bajo_tierra_sobre_cota_0 DOUBLE PRECISION DEFAULT 0');
   })();
 
   return initPromise;
@@ -246,16 +254,18 @@ const proyectos = {
     const id = uuidv4();
     await query(
       `INSERT INTO proyectos (
-        id, nombre, direccion, tipo, terraza_util_pct,
+        id, nombre, direccion, tipo, terraza_util_pct, comunes_tipo, comunes_valor,
         estacionamientos_cantidad, estacionamientos_sup_interior, estacionamientos_sup_terrazas,
         bodegas_cantidad, bodegas_sup_interior, bodegas_sup_terrazas
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         id,
         data.nombre,
         data.direccion || '',
         data.tipo || 'Residencial',
         data.terraza_util_pct ?? 50,
+        data.comunes_tipo || 'porcentaje',
+        data.comunes_valor || 0,
         data.estacionamientos_cantidad || 0,
         data.estacionamientos_sup_interior || 0,
         data.estacionamientos_sup_terrazas || 0,
@@ -275,19 +285,23 @@ const proyectos = {
         direccion = $2,
         tipo = $3,
         terraza_util_pct = $4,
-        estacionamientos_cantidad = $5,
-        estacionamientos_sup_interior = $6,
-        estacionamientos_sup_terrazas = $7,
-        bodegas_cantidad = $8,
-        bodegas_sup_interior = $9,
-        bodegas_sup_terrazas = $10,
+        comunes_tipo = $5,
+        comunes_valor = $6,
+        estacionamientos_cantidad = $7,
+        estacionamientos_sup_interior = $8,
+        estacionamientos_sup_terrazas = $9,
+        bodegas_cantidad = $10,
+        bodegas_sup_interior = $11,
+        bodegas_sup_terrazas = $12,
         updated_at = NOW()
-      WHERE id = $11`,
+      WHERE id = $13`,
       [
         data.nombre,
         data.direccion || '',
         data.tipo || 'Residencial',
         data.terraza_util_pct ?? 50,
+        data.comunes_tipo || 'porcentaje',
+        data.comunes_valor || 0,
         data.estacionamientos_cantidad || 0,
         data.estacionamientos_sup_interior || 0,
         data.estacionamientos_sup_terrazas || 0,
@@ -355,14 +369,15 @@ const gantt = {
       for (const [index, hito] of hitos.entries()) {
         await client.query(
           `INSERT INTO gantt_hitos (
-            id, proyecto_id, nombre, color, dependencia, desfase, inicio, duracion, fin, orden_index
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+            id, proyecto_id, nombre, color, dependencia, dependencia_tipo, desfase, inicio, duracion, fin, orden_index
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
           [
             hito.id || uuidv4(),
             pid,
             hito.nombre,
             hito.color || '#3b82f6',
             hito.dependencia || null,
+            hito.dependencia_tipo || 'fin',
             hito.desfase || 0,
             hito.inicio || 0,
             hito.duracion || 0,
@@ -460,6 +475,7 @@ const construccion = {
       sup_sobre_tierra: data.sup_sobre_tierra || 0,
       costo_uf_m2_sobre_tierra: data.costo_uf_m2_sobre_tierra || 0,
       sup_bajo_tierra: data.sup_bajo_tierra || 0,
+      pct_bajo_tierra_sobre_cota_0: data.pct_bajo_tierra_sobre_cota_0 || 0,
       costo_uf_m2_bajo_tierra: data.costo_uf_m2_bajo_tierra || 0,
       plazo_meses: data.plazo_meses || 0,
       anticipo_pct: data.anticipo_pct || 0,
@@ -581,15 +597,15 @@ async function seedDemoProject() {
   const pid = uuidv4();
   await query(
     `INSERT INTO proyectos (
-      id, nombre, direccion, tipo, terraza_util_pct,
+      id, nombre, direccion, tipo, terraza_util_pct, comunes_tipo, comunes_valor,
       estacionamientos_cantidad, estacionamientos_sup_interior, estacionamientos_sup_terrazas,
       bodegas_cantidad, bodegas_sup_interior, bodegas_sup_terrazas
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-    [pid, 'Edificio Residencial Tipo', 'Direccion en Las Condes, Las Condes', 'Residencial', 50, 100, 12.5, 0, 50, 3.5, 0]
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+    [pid, 'Edificio Residencial Tipo', 'Direccion en Las Condes, Las Condes', 'Residencial', 50, 'porcentaje', 20, 100, 12.5, 0, 50, 3.5, 0]
   );
 
   await cabida.upsert(pid, [
-    { uso: 'DEPARTAMENTOS', cantidad: 50, estacionamientos: 0, bodegas: 0, sup_interior: 110.8, sup_terrazas: 10, sup_comunes: 22.12, sup_util_mun: 115.8 },
+    { uso: 'DEPARTAMENTOS', cantidad: 50, estacionamientos: 0, bodegas: 0, sup_interior: 110.8, sup_terrazas: 10, sup_comunes: 0, sup_util_mun: 115.8 },
     { uso: 'ESTAC. VISITAS', cantidad: 10, estacionamientos: 0, bodegas: 0, sup_interior: 0, sup_terrazas: 0, sup_comunes: 0, sup_util_mun: 0 },
   ]);
 
@@ -621,6 +637,7 @@ async function seedDemoProject() {
     sup_sobre_tierra: 7146,
     costo_uf_m2_sobre_tierra: 27,
     sup_bajo_tierra: 3241,
+    pct_bajo_tierra_sobre_cota_0: 45.35,
     costo_uf_m2_bajo_tierra: 15,
     plazo_meses: 20,
     anticipo_pct: 15,
