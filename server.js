@@ -155,6 +155,7 @@ app.post('/api/proyectos/:id/capital', asyncHandler(async (req, res) => {
 
 app.get('/api/proyectos/:id/calculos', asyncHandler(async (req, res) => {
   const pid = req.params.id;
+  const proyecto = await proyectos.getById(pid);
   const cab = await cabida.getByProject(pid);
   const ventasConfig = await ventas.getConfig(pid);
   const partidas = await costos.getPartidas(pid);
@@ -169,17 +170,24 @@ app.get('/api/proyectos/:id/calculos', asyncHandler(async (req, res) => {
     supLosa += losa * cantidad;
   });
 
+  supVendible += ((proyecto?.estacionamientos_sup_interior || 0) + (proyecto?.estacionamientos_sup_terrazas || 0)) * (proyecto?.estacionamientos_cantidad || 0);
+  supVendible += ((proyecto?.bodegas_sup_interior || 0) + (proyecto?.bodegas_sup_terrazas || 0)) * (proyecto?.bodegas_cantidad || 0);
+  supLosa += ((proyecto?.estacionamientos_sup_interior || 0) + (proyecto?.estacionamientos_sup_terrazas || 0)) * (proyecto?.estacionamientos_cantidad || 0);
+  supLosa += ((proyecto?.bodegas_sup_interior || 0) + (proyecto?.bodegas_sup_terrazas || 0)) * (proyecto?.bodegas_cantidad || 0);
+
   let ventasBrutas = 0;
+  const accessorySource = ventasConfig[0] || {};
   ventasConfig.forEach((venta) => {
     const cabRow = cab.find((row) => row.uso.toUpperCase().includes((venta.uso || '').toUpperCase()));
     if (!cabRow) return;
 
     const precioBase = ((cabRow.sup_interior || 0) + (cabRow.sup_terrazas || 0)) * (venta.precio_uf_m2 || 0);
     const subtotalPrincipal = precioBase * (cabRow.cantidad || 0);
-    const subtotalEstac = (cabRow.estacionamientos || 0) * (venta.precio_estacionamiento || 0);
-    const subtotalBodega = (cabRow.bodegas || 0) * (venta.precio_bodega || 0);
-    ventasBrutas += subtotalPrincipal + subtotalEstac + subtotalBodega;
+    ventasBrutas += subtotalPrincipal;
   });
+
+  ventasBrutas += (proyecto?.estacionamientos_cantidad || 0) * (accessorySource.precio_estacionamiento || 0);
+  ventasBrutas += (proyecto?.bodegas_cantidad || 0) * (accessorySource.precio_bodega || 0);
 
   let costosNetos = 0;
   partidas.forEach((partida) => {

@@ -62,6 +62,65 @@ function toNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function normalizeProject(project = {}) {
+  return {
+    ...project,
+    terraza_util_pct: project.terraza_util_pct ?? 50,
+    estacionamientos_cantidad: project.estacionamientos_cantidad ?? 0,
+    estacionamientos_sup_interior: project.estacionamientos_sup_interior ?? 0,
+    estacionamientos_sup_terrazas: project.estacionamientos_sup_terrazas ?? 0,
+    bodegas_cantidad: project.bodegas_cantidad ?? 0,
+    bodegas_sup_interior: project.bodegas_sup_interior ?? 0,
+    bodegas_sup_terrazas: project.bodegas_sup_terrazas ?? 0,
+  };
+}
+
+function getMunicipalUsefulPerUnit(interior, terraza, pct = state.proyecto?.terraza_util_pct) {
+  return toNumber(interior) + (toNumber(terraza) * toNumber(pct) / 100);
+}
+
+function getCabidaAccessoryRows() {
+  const proyecto = normalizeProject(state.proyecto);
+  return [
+    {
+      uso: 'ESTACIONAMIENTOS',
+      cantidad: toNumber(proyecto.estacionamientos_cantidad),
+      sup_interior: toNumber(proyecto.estacionamientos_sup_interior),
+      sup_terrazas: toNumber(proyecto.estacionamientos_sup_terrazas),
+      sup_comunes: 0,
+      sup_util_mun: getMunicipalUsefulPerUnit(proyecto.estacionamientos_sup_interior, proyecto.estacionamientos_sup_terrazas),
+      isAccessory: true,
+    },
+    {
+      uso: 'BODEGAS',
+      cantidad: toNumber(proyecto.bodegas_cantidad),
+      sup_interior: toNumber(proyecto.bodegas_sup_interior),
+      sup_terrazas: toNumber(proyecto.bodegas_sup_terrazas),
+      sup_comunes: 0,
+      sup_util_mun: getMunicipalUsefulPerUnit(proyecto.bodegas_sup_interior, proyecto.bodegas_sup_terrazas),
+      isAccessory: true,
+    },
+  ].filter((row) => row.cantidad > 0);
+}
+
+function getCabidaDisplayRows() {
+  return state.cabida
+    .map((row) => ({
+      ...row,
+      sup_util_mun: getMunicipalUsefulPerUnit(row.sup_interior, row.sup_terrazas),
+      isAccessory: false,
+    }))
+    .concat(getCabidaAccessoryRows());
+}
+
+function getAccessorySalesConfig() {
+  const source = state.ventasConfig[0] || {};
+  return {
+    precio_estacionamiento: toNumber(source.precio_estacionamiento),
+    precio_bodega: toNumber(source.precio_bodega),
+  };
+}
+
 function fmtNumber(value, decimals = 0) {
   return new Intl.NumberFormat('es-CL', {
     minimumFractionDigits: decimals,
@@ -226,21 +285,18 @@ function getCabidaMetrics(rows) {
     const cantidad = toNumber(row.cantidad);
     const vendiblePorUnidad = toNumber(row.sup_interior) + toNumber(row.sup_terrazas);
     const losaPorUnidad = vendiblePorUnidad + toNumber(row.sup_comunes);
+    const utilPorUnidad = getMunicipalUsefulPerUnit(row.sup_interior, row.sup_terrazas);
 
     acc.unidades += cantidad;
-    acc.estacionamientos += toNumber(row.estacionamientos);
-    acc.bodegas += toNumber(row.bodegas);
     acc.interior += toNumber(row.sup_interior) * cantidad;
     acc.terrazas += toNumber(row.sup_terrazas) * cantidad;
     acc.comunes += toNumber(row.sup_comunes) * cantidad;
-    acc.util += toNumber(row.sup_util_mun) * cantidad;
+    acc.util += utilPorUnidad * cantidad;
     acc.vendible += vendiblePorUnidad * cantidad;
     acc.losa += losaPorUnidad * cantidad;
     return acc;
   }, {
     unidades: 0,
-    estacionamientos: 0,
-    bodegas: 0,
     interior: 0,
     terrazas: 0,
     comunes: 0,
@@ -251,24 +307,26 @@ function getCabidaMetrics(rows) {
 }
 
 function renderCabidaTables(rows) {
-  const totals = getCabidaMetrics(rows);
+  const displayRows = getCabidaDisplayRows();
+  const totals = getCabidaMetrics(displayRows);
 
-  const unitRows = rows.map((row) => `
+  const unitRows = displayRows.map((row) => `
     <tr>
       <td>${escapeHtml(row.uso)}</td>
       <td style="text-align:center">${fmtNumber(row.cantidad)}</td>
-      <td style="text-align:center">${fmtNumber(row.estacionamientos)}</td>
-      <td style="text-align:center">${fmtNumber(row.bodegas)}</td>
+      <td style="text-align:center">${fmtNumber(row.sup_interior, 1)}</td>
+      <td style="text-align:center">${fmtNumber(row.sup_terrazas, 1)}</td>
+      <td style="text-align:center">${fmtNumber(getMunicipalUsefulPerUnit(row.sup_interior, row.sup_terrazas), 1)}</td>
       <td style="text-align:center;color:#2563eb">${fmtNumber(toNumber(row.sup_interior) + toNumber(row.sup_terrazas), 1)}</td>
     </tr>
   `).join('');
 
-  const areaRows = rows.map((row) => {
+  const areaRows = displayRows.map((row) => {
     const cantidad = toNumber(row.cantidad);
     const interior = toNumber(row.sup_interior) * cantidad;
     const terrazas = toNumber(row.sup_terrazas) * cantidad;
     const comunes = toNumber(row.sup_comunes) * cantidad;
-    const util = toNumber(row.sup_util_mun) * cantidad;
+    const util = getMunicipalUsefulPerUnit(row.sup_interior, row.sup_terrazas) * cantidad;
     const vendible = interior + terrazas;
     const losa = vendible + comunes;
 
@@ -290,19 +348,21 @@ function renderCabidaTables(rows) {
   setHtml('res-cabida-tfoot', `
     <td>Total</td>
     <td style="text-align:center">${fmtNumber(totals.unidades)}</td>
-    <td style="text-align:center">${fmtNumber(totals.estacionamientos)}</td>
-    <td style="text-align:center">${fmtNumber(totals.bodegas)}</td>
+    <td style="text-align:center">${fmtNumber(totals.unidades ? totals.interior / totals.unidades : 0, 1)}</td>
+    <td style="text-align:center">${fmtNumber(totals.unidades ? totals.terrazas / totals.unidades : 0, 1)}</td>
+    <td style="text-align:center">${fmtNumber(totals.unidades ? totals.util / totals.unidades : 0, 1)}</td>
     <td style="text-align:center">${fmtNumber(totals.unidades ? totals.vendible / totals.unidades : 0, 1)}</td>
   `);
   setHtml('cabida-tfoot', `
     <td>Total</td>
     <td style="text-align:center">${fmtNumber(totals.unidades)}</td>
-    <td style="text-align:center">${fmtNumber(totals.estacionamientos)}</td>
-    <td style="text-align:center">${fmtNumber(totals.bodegas)}</td>
+    <td style="text-align:center">${fmtNumber(totals.unidades ? totals.interior / totals.unidades : 0, 1)}</td>
+    <td style="text-align:center">${fmtNumber(totals.unidades ? totals.terrazas / totals.unidades : 0, 1)}</td>
+    <td style="text-align:center">${fmtNumber(totals.unidades ? totals.util / totals.unidades : 0, 1)}</td>
     <td style="text-align:center">${fmtNumber(totals.unidades ? totals.vendible / totals.unidades : 0, 1)}</td>
   `);
 
-  setHtml('res-sup-tbody', rows.map((row) => {
+  setHtml('res-sup-tbody', displayRows.map((row) => {
     const cantidad = toNumber(row.cantidad);
     const vendible = (toNumber(row.sup_interior) + toNumber(row.sup_terrazas)) * cantidad;
     const losa = (toNumber(row.sup_interior) + toNumber(row.sup_terrazas) + toNumber(row.sup_comunes)) * cantidad;
@@ -334,22 +394,33 @@ function renderCabidaTables(rows) {
 }
 
 function renderCabidaEditor(rows) {
+  const proyecto = normalizeProject(state.proyecto);
   setHtml('cabida-editor', `
+    <div class="card" style="margin-bottom:12px;background:#f8fafc">
+      <div class="sec-title" style="font-size:14px">Parametros Generales de Cabida</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">% terraza util municipal</label><input id="cabida-terraza-util-pct" class="inp" type="number" step="0.01" value="${toNumber(proyecto.terraza_util_pct)}" onchange="onCabidaInputChange()"/></div>
+        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Estacionamientos</label><input id="cabida-estacionamientos-cantidad" class="inp" type="number" value="${toNumber(proyecto.estacionamientos_cantidad)}" onchange="onCabidaInputChange()"/></div>
+        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Interior estac./un</label><input id="cabida-estacionamientos-sup-interior" class="inp" type="number" step="0.01" value="${toNumber(proyecto.estacionamientos_sup_interior)}" onchange="onCabidaInputChange()"/></div>
+        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Terraza estac./un</label><input id="cabida-estacionamientos-sup-terrazas" class="inp" type="number" step="0.01" value="${toNumber(proyecto.estacionamientos_sup_terrazas)}" onchange="onCabidaInputChange()"/></div>
+        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Bodegas</label><input id="cabida-bodegas-cantidad" class="inp" type="number" value="${toNumber(proyecto.bodegas_cantidad)}" onchange="onCabidaInputChange()"/></div>
+        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Interior bodega/un</label><input id="cabida-bodegas-sup-interior" class="inp" type="number" step="0.01" value="${toNumber(proyecto.bodegas_sup_interior)}" onchange="onCabidaInputChange()"/></div>
+        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Terraza bodega/un</label><input id="cabida-bodegas-sup-terrazas" class="inp" type="number" step="0.01" value="${toNumber(proyecto.bodegas_sup_terrazas)}" onchange="onCabidaInputChange()"/></div>
+      </div>
+    </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
       ${rows.map((row) => `
         <div class="card" data-cabida-row>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div style="grid-column:1 / -1">
               <label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Uso</label>
-              <input class="inp" data-field="uso" value="${escapeHtml(row.uso)}"/>
+              <input class="inp" data-field="uso" value="${escapeHtml(row.uso)}" onchange="onCabidaInputChange()"/>
             </div>
-            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Cantidad</label><input class="inp" type="number" data-field="cantidad" value="${toNumber(row.cantidad)}"/></div>
-            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Estac.</label><input class="inp" type="number" data-field="estacionamientos" value="${toNumber(row.estacionamientos)}"/></div>
-            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Bodegas</label><input class="inp" type="number" data-field="bodegas" value="${toNumber(row.bodegas)}"/></div>
-            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Sup. interior</label><input class="inp" type="number" step="0.01" data-field="sup_interior" value="${toNumber(row.sup_interior)}"/></div>
-            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Terrazas</label><input class="inp" type="number" step="0.01" data-field="sup_terrazas" value="${toNumber(row.sup_terrazas)}"/></div>
-            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Comunes</label><input class="inp" type="number" step="0.01" data-field="sup_comunes" value="${toNumber(row.sup_comunes)}"/></div>
-            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Util mun.</label><input class="inp" type="number" step="0.01" data-field="sup_util_mun" value="${toNumber(row.sup_util_mun)}"/></div>
+            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Cantidad</label><input class="inp" type="number" data-field="cantidad" value="${toNumber(row.cantidad)}" onchange="onCabidaInputChange()"/></div>
+            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Sup. interior</label><input class="inp" type="number" step="0.01" data-field="sup_interior" value="${toNumber(row.sup_interior)}" onchange="onCabidaInputChange()"/></div>
+            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Terrazas</label><input class="inp" type="number" step="0.01" data-field="sup_terrazas" value="${toNumber(row.sup_terrazas)}" onchange="onCabidaInputChange()"/></div>
+            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Comunes</label><input class="inp" type="number" step="0.01" data-field="sup_comunes" value="${toNumber(row.sup_comunes)}" onchange="onCabidaInputChange()"/></div>
+            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Util mun.</label><input class="inp" type="number" step="0.01" value="${fmtNumber(getMunicipalUsefulPerUnit(row.sup_interior, row.sup_terrazas), 2)}" disabled/></div>
           </div>
         </div>
       `).join('')}
@@ -469,8 +540,12 @@ function renderGanttPreview() {
   }).join(''));
 }
 
+function isAccessoryUso(uso) {
+  return /ESTAC|BODEG/i.test(String(uso || ''));
+}
+
 function getCommercialRows() {
-  return state.cabida.filter((row) => toNumber(row.cantidad) > 0);
+  return state.cabida.filter((row) => toNumber(row.cantidad) > 0 && !isAccessoryUso(row.uso));
 }
 
 function getVentasConfigMap() {
@@ -568,22 +643,19 @@ function getUsoSaleMetrics(uso) {
 }
 
 function getAddonSalesMetrics() {
-  const totalEstacionamientos = state.cabida.reduce((sum, row) => sum + toNumber(row.estacionamientos), 0);
-  const totalBodegas = state.cabida.reduce((sum, row) => sum + toNumber(row.bodegas), 0);
-  const count = Math.max(1, state.ventasConfig.length);
-  const avgParkingPrice = state.ventasConfig.reduce((sum, row) => sum + toNumber(row.precio_estacionamiento), 0) / count;
-  const avgStoragePrice = state.ventasConfig.reduce((sum, row) => sum + toNumber(row.precio_bodega), 0) / count;
+  const proyecto = normalizeProject(state.proyecto);
+  const accessorySales = getAccessorySalesConfig();
 
   return {
     estacionamientos: {
-      unidades: totalEstacionamientos,
-      precio: avgParkingPrice,
-      total: totalEstacionamientos * avgParkingPrice,
+      unidades: toNumber(proyecto.estacionamientos_cantidad),
+      precio: accessorySales.precio_estacionamiento,
+      total: toNumber(proyecto.estacionamientos_cantidad) * accessorySales.precio_estacionamiento,
     },
     bodegas: {
-      unidades: totalBodegas,
-      precio: avgStoragePrice,
-      total: totalBodegas * avgStoragePrice,
+      unidades: toNumber(proyecto.bodegas_cantidad),
+      precio: accessorySales.precio_bodega,
+      total: toNumber(proyecto.bodegas_cantidad) * accessorySales.precio_bodega,
     },
   };
 }
@@ -610,6 +682,7 @@ function renderVentasModule() {
 }
 
 function renderVentasPricing() {
+  const accessorySales = getAccessorySalesConfig();
   const rows = state.ventasConfig.map((config) => {
     const metrics = getUsoSaleMetrics(config.uso);
     return `
@@ -621,10 +694,10 @@ function renderVentasPricing() {
         <td><input class="inp" type="number" step="0.01" data-field="precio_uf_m2" value="${toNumber(config.precio_uf_m2)}" onchange="onVentasInputChange()"/></td>
         <td style="text-align:center">${fmtUf(metrics.precioBase)}</td>
         <td style="text-align:center;color:#16a34a">${fmtUf(metrics.subtotalPrincipal)}</td>
-        <td style="text-align:center">${fmtNumber(metrics.estacionamientos)}</td>
-        <td><input class="inp" type="number" step="0.01" data-field="precio_estacionamiento" value="${toNumber(config.precio_estacionamiento)}" onchange="onVentasInputChange()"/></td>
-        <td style="text-align:center">${fmtNumber(metrics.bodegas)}</td>
-        <td><input class="inp" type="number" step="0.01" data-field="precio_bodega" value="${toNumber(config.precio_bodega)}" onchange="onVentasInputChange()"/></td>
+        <td style="text-align:center">-</td>
+        <td style="text-align:center">-</td>
+        <td style="text-align:center">-</td>
+        <td style="text-align:center">-</td>
         <td style="text-align:center;color:#ea580c;font-weight:800">${fmtUf(metrics.total)}</td>
         <td style="text-align:center">${fmtUf(metrics.ticket)}</td>
       </tr>
@@ -648,7 +721,7 @@ function renderVentasPricing() {
       <td style="text-align:center">-</td>
       <td style="text-align:center;color:#16a34a">${fmtUf(addons.estacionamientos.total)}</td>
       <td style="text-align:center">${fmtNumber(addons.estacionamientos.unidades)}</td>
-      <td style="text-align:center">${fmtUf(addons.estacionamientos.precio)}</td>
+      <td><input id="ventas-precio-estacionamiento-global" class="inp" type="number" step="0.01" value="${toNumber(accessorySales.precio_estacionamiento)}" onchange="onVentasInputChange()"/></td>
       <td style="text-align:center">-</td>
       <td style="text-align:center">-</td>
       <td style="text-align:center;color:#ea580c;font-weight:800">${fmtUf(addons.estacionamientos.total)}</td>
@@ -665,7 +738,7 @@ function renderVentasPricing() {
       <td style="text-align:center">-</td>
       <td style="text-align:center">-</td>
       <td style="text-align:center">${fmtNumber(addons.bodegas.unidades)}</td>
-      <td style="text-align:center">${fmtUf(addons.bodegas.precio)}</td>
+      <td><input id="ventas-precio-bodega-global" class="inp" type="number" step="0.01" value="${toNumber(accessorySales.precio_bodega)}" onchange="onVentasInputChange()"/></td>
       <td style="text-align:center;color:#ea580c;font-weight:800">${fmtUf(addons.bodegas.total)}</td>
       <td style="text-align:center">${fmtUf(addons.bodegas.precio)}</td>
     </tr>
@@ -1082,13 +1155,38 @@ function getCabidaRowsFromEditor() {
   return Array.from(document.querySelectorAll('[data-cabida-row]')).map((row) => ({
     uso: row.querySelector('[data-field="uso"]')?.value?.trim() || 'Nuevo uso',
     cantidad: toNumber(row.querySelector('[data-field="cantidad"]')?.value),
-    estacionamientos: toNumber(row.querySelector('[data-field="estacionamientos"]')?.value),
-    bodegas: toNumber(row.querySelector('[data-field="bodegas"]')?.value),
+    estacionamientos: 0,
+    bodegas: 0,
     sup_interior: toNumber(row.querySelector('[data-field="sup_interior"]')?.value),
     sup_terrazas: toNumber(row.querySelector('[data-field="sup_terrazas"]')?.value),
     sup_comunes: toNumber(row.querySelector('[data-field="sup_comunes"]')?.value),
-    sup_util_mun: toNumber(row.querySelector('[data-field="sup_util_mun"]')?.value),
+    sup_util_mun: getMunicipalUsefulPerUnit(
+      row.querySelector('[data-field="sup_interior"]')?.value,
+      row.querySelector('[data-field="sup_terrazas"]')?.value
+    ),
   }));
+}
+
+function getCabidaProjectSettingsFromEditor() {
+  return {
+    ...state.proyecto,
+    terraza_util_pct: toNumber($('cabida-terraza-util-pct')?.value),
+    estacionamientos_cantidad: toNumber($('cabida-estacionamientos-cantidad')?.value),
+    estacionamientos_sup_interior: toNumber($('cabida-estacionamientos-sup-interior')?.value),
+    estacionamientos_sup_terrazas: toNumber($('cabida-estacionamientos-sup-terrazas')?.value),
+    bodegas_cantidad: toNumber($('cabida-bodegas-cantidad')?.value),
+    bodegas_sup_interior: toNumber($('cabida-bodegas-sup-interior')?.value),
+    bodegas_sup_terrazas: toNumber($('cabida-bodegas-sup-terrazas')?.value),
+  };
+}
+
+function onCabidaInputChange() {
+  state.proyecto = normalizeProject(getCabidaProjectSettingsFromEditor());
+  state.cabida = getCabidaRowsFromEditor();
+  renderCabidaTables(state.cabida);
+  renderCabidaEditor(state.cabida);
+  ensureVentasState();
+  renderVentasModule();
 }
 
 function onGanttInputChange() {
@@ -1132,6 +1230,10 @@ function removeGanttRow(index) {
 
 function readVentasConfigEditor() {
   const map = new Map(state.ventasConfig.map((row) => [row.uso, { ...row }]));
+  const accessorySales = {
+    precio_estacionamiento: toNumber($('ventas-precio-estacionamiento-global')?.value),
+    precio_bodega: toNumber($('ventas-precio-bodega-global')?.value),
+  };
   document.querySelectorAll('[data-ventas-config-row]').forEach((row) => {
     const uso = row.dataset.uso;
     if (!uso || !map.has(uso)) return;
@@ -1139,6 +1241,8 @@ function readVentasConfigEditor() {
     row.querySelectorAll('[data-field]').forEach((input) => {
       target[input.dataset.field] = toNumber(input.value);
     });
+    target.precio_estacionamiento = accessorySales.precio_estacionamiento;
+    target.precio_bodega = accessorySales.precio_bodega;
   });
   return Array.from(map.values());
 }
@@ -1189,7 +1293,7 @@ async function loadProject(projectId) {
     api(`/api/proyectos/${projectId}/calculos`).catch(() => ({})),
   ]);
 
-  state.proyecto = proyecto;
+  state.proyecto = normalizeProject(proyecto);
   state.cabida = cabida;
   state.gantt = normalizeGanttRows(gantt);
   state.ventasConfig = ventasData.config || [];
@@ -1205,11 +1309,18 @@ async function loadProject(projectId) {
 async function guardarCabida() {
   if (!state.proyectoId) return;
   const rows = getCabidaRowsFromEditor().filter((row) => row.uso);
+  const proyecto = getCabidaProjectSettingsFromEditor();
   setSyncStatus('saving', 'GUARDANDO', 'Persistiendo cambios en la base');
-  await api(`/api/proyectos/${state.proyectoId}/cabida`, {
-    method: 'POST',
-    body: JSON.stringify(rows),
-  });
+  await Promise.all([
+    api(`/api/proyectos/${state.proyectoId}`, {
+      method: 'PUT',
+      body: JSON.stringify(proyecto),
+    }),
+    api(`/api/proyectos/${state.proyectoId}/cabida`, {
+      method: 'POST',
+      body: JSON.stringify(rows),
+    }),
+  ]);
   state.sync.lastSavedAt = new Date().toISOString();
   await loadProject(state.proyectoId);
   await refreshHealthStatus();
@@ -1258,7 +1369,7 @@ function agregarUso() {
     sup_interior: 0,
     sup_terrazas: 0,
     sup_comunes: 0,
-    sup_util_mun: 0,
+    sup_util_mun: getMunicipalUsefulPerUnit(0, 0),
   });
   renderCabidaEditor(rows);
 }
@@ -1285,6 +1396,7 @@ function agregarUso() {
 });
 
 window.showTab = showTab;
+window.onCabidaInputChange = onCabidaInputChange;
 window.guardarCabida = guardarCabida;
 window.guardarGantt = guardarGantt;
 window.guardarVentas = guardarVentas;
