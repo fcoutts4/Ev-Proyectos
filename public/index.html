@@ -116,6 +116,27 @@ tbody tr:hover{background:#f8fafc}
 .gantt-editor-bar{position:absolute;top:0;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:700;cursor:grab;user-select:none;touch-action:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
 .gantt-editor-bar:active{cursor:grabbing}
 .gantt-editor-bar.dragging{opacity:.92;box-shadow:0 0 0 2px rgba(15,23,42,.15)}
+.gantt-row-dragging{opacity:.45}
+.gantt-table{border-collapse:separate;border-spacing:0;table-layout:fixed;min-width:max-content}
+.gantt-table th,.gantt-table td{background:#fff}
+.gantt-sticky-left{position:sticky;z-index:4;background:#fff}
+.gantt-sticky-right{position:sticky;right:0;z-index:5;background:#fff;box-shadow:-10px 0 14px -14px rgba(15,23,42,.45)}
+.gantt-sticky-head{z-index:8;background:#f8fafc!important}
+.gantt-sticky-foot{z-index:7;background:#0f172a!important}
+.gantt-timeline-head{padding:0!important}
+.gantt-timeline-scale{position:relative;height:42px;background:#f8fafc}
+.gantt-timeline-scale.has-grid{background-image:linear-gradient(90deg, rgba(148,163,184,.2) 1px, transparent 1px);background-size:var(--month-width,54px) 100%}
+.gantt-quarter-mark{position:absolute;top:0;bottom:0;border-left:1px solid #cbd5e1}
+.gantt-quarter-mark span{position:absolute;top:5px;left:8px;font-size:10px;font-weight:700;color:#475569;white-space:nowrap}
+.gantt-quarter-mark strong{display:block;font-size:9px;color:#94a3b8;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.gantt-editor-track,.gantt-track{background-image:linear-gradient(90deg, rgba(148,163,184,.18) 1px, transparent 1px);background-size:var(--month-width,54px) 100%}
+.gantt-editor-track{height:24px;border:1px solid #e2e8f0}
+.gantt-editor-bar{top:3px;height:18px}
+.gantt-track{height:18px;background-color:#f8fafc;border-radius:6px}
+.gantt-bar{top:1px;height:16px}
+.gantt-cell-tight .inp{padding:5px 6px;text-align:center}
+.gantt-actions{display:flex;align-items:center;justify-content:center}
+.gantt-delete-btn{width:26px;height:26px;padding:0;justify-content:center;font-size:14px;line-height:1;color:#b91c1c}
 /* BADGES */
 .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700}
 .badge-green{background:#dcfce7;color:#166534}
@@ -792,29 +813,39 @@ tbody tr:hover{background:#f3f7fb!important}
   </div>
 </div>
 
-  <div class="card" style="overflow-x:auto">
-    <table style="min-width:1100px">
+  <div class="card">
+    <div style="display:flex;justify-content:flex-end;align-items:center;margin-bottom:12px">
+      <div class="planilla-nav">
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('gantt-editor-scroll', -480)">← Meses</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('gantt-editor-scroll', 480)">Meses →</button>
+      </div>
+    </div>
+    <div id="gantt-editor-scroll" class="tbl-scroll">
+    <table class="gantt-table">
       <thead>
         <tr>
-          <th style="width:32px">X</th>
-          <th style="width:200px;text-align:left">HITO / PARTIDA</th>
-          <th style="width:160px">DEPENDENCIA</th>
-          <th style="width:70px">DESFASE</th>
-          <th style="width:60px">INICIO</th>
-          <th style="width:70px">DURACIÓN</th>
-          <th style="width:60px;color:#22c55e">FIN</th>
-          <th>TIMELINE</th>
+          <th class="gantt-sticky-left gantt-sticky-head" style="left:0;width:40px"></th>
+          <th class="gantt-sticky-left gantt-sticky-head" style="left:40px;width:220px;text-align:left">HITO / PARTIDA</th>
+          <th class="gantt-sticky-left gantt-sticky-head" style="left:260px;width:150px">DEPENDENCIA</th>
+          <th class="gantt-sticky-left gantt-sticky-head" style="left:410px;width:62px">DESFASE</th>
+          <th class="gantt-sticky-left gantt-sticky-head" style="left:472px;width:62px">INICIO</th>
+          <th class="gantt-sticky-left gantt-sticky-head" style="left:534px;width:70px">DURACIÓN</th>
+          <th class="gantt-sticky-left gantt-sticky-head" style="left:604px;width:62px;color:#22c55e">FIN</th>
+          <th class="gantt-timeline-head"><div id="gantt-timeline-head"></div></th>
+          <th class="gantt-sticky-right gantt-sticky-head" style="width:42px">X</th>
       </tr>
     </thead>
       <tbody id="gantt-tbody"></tbody>
       <tfoot>
         <tr style="background:#0f172a">
-          <td colspan="6" style="color:#fff;font-weight:800;font-size:12px;padding:10px">TOTAL PROYECTO</td>
-          <td style="color:#fff;font-weight:800;font-size:12px;padding:10px" id="gantt-total-fin"></td>
-          <td style="padding:4px 8px"><div style="background:#0f172a;border:1px solid #334155;border-radius:4px;height:22px;display:flex;align-items:center;justify-content:center"><span id="gantt-total-bar" style="font-size:10px;font-weight:700;color:#fff"></span></div></td>
+          <td colspan="6" class="gantt-sticky-left gantt-sticky-foot" style="left:0;color:#fff;font-weight:800;font-size:12px;padding:10px">TOTAL PROYECTO</td>
+          <td class="gantt-sticky-left gantt-sticky-foot" style="left:604px;color:#fff;font-weight:800;font-size:12px;padding:10px" id="gantt-total-fin"></td>
+          <td style="padding:4px 8px;background:#0f172a"><div style="background:#0f172a;border:1px solid #334155;border-radius:4px;height:22px;display:flex;align-items:center;justify-content:center"><span id="gantt-total-bar" style="font-size:10px;font-weight:700;color:#fff"></span></div></td>
+          <td class="gantt-sticky-right gantt-sticky-foot" style="width:42px;background:#0f172a"></td>
       </tr>
     </tfoot>
   </table>
+</div>
 </div>
 </div><!-- end tab gantt -->
 

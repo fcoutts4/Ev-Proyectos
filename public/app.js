@@ -13,6 +13,7 @@ const state = {
   calculos: {},
   health: null,
   costDrag: null,
+  ganttDrag: null,
   costosUi: {
     collapsed: {},
     activePaymentCategory: null,
@@ -673,6 +674,57 @@ function getGanttDependencyOptions(currentName) {
     .join('');
 }
 
+const GANTT_MONTH_WIDTH = 54;
+
+function addMonths(date, months) {
+  const result = new Date(date.getTime());
+  result.setMonth(result.getMonth() + months);
+  return result;
+}
+
+function getGanttBaseDate() {
+  const raw = String(state.proyecto?.compra_terreno_fecha || '').slice(0, 7);
+  if (/^\d{4}-\d{2}$/.test(raw)) {
+    const parsed = new Date(`${raw}-01T00:00:00`);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), 1);
+}
+
+function formatTimelineQuarterLabel(date) {
+  return new Intl.DateTimeFormat('es-CL', { month: 'short', year: '2-digit' }).format(date);
+}
+
+function getGanttTimelineMeta(rows = state.gantt) {
+  const normalized = normalizeGanttRows(rows);
+  const totalMonths = Math.max(12, ...normalized.map((row) => toNumber(row.fin)));
+  const timelineWidth = (totalMonths + 1) * GANTT_MONTH_WIDTH;
+  const baseDate = getGanttBaseDate();
+  const quarterMarks = [];
+  for (let month = 0; month <= totalMonths; month += 3) {
+    quarterMarks.push({
+      month,
+      left: month * GANTT_MONTH_WIDTH,
+      label: formatTimelineQuarterLabel(addMonths(baseDate, month)),
+    });
+  }
+  return { totalMonths, timelineWidth, quarterMarks };
+}
+
+function renderGanttTimelineScale(containerId, meta) {
+  if (!$(containerId)) return;
+  setHtml(containerId, `
+    <div class="gantt-timeline-scale has-grid" style="width:${meta.timelineWidth}px;--month-width:${GANTT_MONTH_WIDTH}px">
+      ${meta.quarterMarks.map((mark) => `
+        <div class="gantt-quarter-mark" style="left:${mark.left}px">
+          <span><strong>M${fmtNumber(mark.month)}</strong>${escapeHtml(mark.label)}</span>
+        </div>
+      `).join('')}
+    </div>
+  `);
+}
+
 function normalizeGanttRows(rows) {
   const byName = new Map(rows.map((row) => [row.nombre, row]));
   return rows.map((row) => {
@@ -715,28 +767,25 @@ function readGanttEditor() {
 function renderGanttEditor(rows = state.gantt) {
   const normalized = normalizeGanttRows(rows);
   state.gantt = normalized;
-  const maxFin = Math.max(1, ...normalized.map((row) => toNumber(row.fin)));
+  const meta = getGanttTimelineMeta(normalized);
+  renderGanttTimelineScale('gantt-timeline-head', meta);
 
   setHtml('gantt-tbody', normalized.map((row, index) => {
-    const left = (toNumber(row.inicio) / maxFin) * 100;
-    const width = (Math.max(1, toNumber(row.duracion)) / maxFin) * 100;
+    const left = toNumber(row.inicio) * GANTT_MONTH_WIDTH;
+    const width = Math.max(1, toNumber(row.duracion)) * GANTT_MONTH_WIDTH;
     return `
-      <tr data-gantt-row data-id="${escapeHtml(row.id || '')}">
-        <td>
-          <div style="display:flex;flex-direction:column;gap:4px">
-            <button class="btn-outline" type="button" style="padding:2px 6px;font-size:10px" onclick="moveGanttRow(${index}, -1)">↑</button>
-            <button class="btn-outline" type="button" style="padding:2px 6px;font-size:10px" onclick="moveGanttRow(${index}, 1)">↓</button>
-            <button class="btn-outline" type="button" style="padding:2px 6px;font-size:10px;color:#b91c1c" onclick="removeGanttRow(${index})">×</button>
-          </div>
+      <tr data-gantt-row data-id="${escapeHtml(row.id || '')}" data-index="${index}" ondragover="allowGanttDrop(event)" ondrop="dropGanttRow(event)">
+        <td class="gantt-sticky-left gantt-actions" style="left:0;width:40px">
+          <span class="drag-handle" data-gantt-drag="1" draggable="true" ondragstart="startGanttDrag(event)" ondragend="endGanttDrag(event)" title="Orden manual">&#8226;&#8226;&#8226;</span>
         </td>
-        <td>
+        <td class="gantt-sticky-left" style="left:40px;width:220px">
           <div style="display:grid;grid-template-columns:18px 1fr;gap:8px;align-items:center">
             <input data-field="color" type="color" value="${escapeHtml(row.color || '#3b82f6')}" onchange="onGanttInputChange()"/>
             <input class="inp" data-field="nombre" value="${escapeHtml(row.nombre)}" onchange="onGanttInputChange()"/>
           </div>
         </td>
-        <td>
-          <div style="display:grid;grid-template-columns:1fr 70px;gap:6px">
+        <td class="gantt-sticky-left" style="left:260px;width:150px">
+          <div style="display:grid;grid-template-columns:1fr 56px;gap:4px">
             <select class="inp" data-field="dependencia" onchange="onGanttInputChange()">
               ${getGanttDependencyOptions(row.nombre).replace(`value="${escapeHtml(row.dependencia || '')}"`, `value="${escapeHtml(row.dependencia || '')}" selected`)}
             </select>
@@ -746,15 +795,18 @@ function renderGanttEditor(rows = state.gantt) {
             </select>
           </div>
         </td>
-        <td><input class="inp" data-field="desfase" type="number" value="${toNumber(row.desfase)}" onchange="onGanttInputChange()"/></td>
-        <td><input class="inp" data-field="inicio" type="number" value="${toNumber(row.inicio)}" ${row.dependencia ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
-        <td><input class="inp" data-field="duracion" type="number" value="${toNumber(row.duracion)}" onchange="onGanttInputChange()"/></td>
-        <td style="color:#16a34a;font-weight:800;text-align:center"><input class="inp" data-field="fin" type="number" value="${toNumber(row.fin)}" disabled/></td>
+        <td class="gantt-sticky-left gantt-cell-tight" style="left:410px;width:62px"><input class="inp" data-field="desfase" type="number" value="${toNumber(row.desfase)}" onchange="onGanttInputChange()"/></td>
+        <td class="gantt-sticky-left gantt-cell-tight" style="left:472px;width:62px"><input class="inp" data-field="inicio" type="number" value="${toNumber(row.inicio)}" ${row.dependencia ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
+        <td class="gantt-sticky-left gantt-cell-tight" style="left:534px;width:70px"><input class="inp" data-field="duracion" type="number" value="${toNumber(row.duracion)}" onchange="onGanttInputChange()"/></td>
+        <td class="gantt-sticky-left gantt-cell-tight" style="left:604px;width:62px;color:#16a34a;font-weight:800;text-align:center"><input class="inp" data-field="fin" type="number" value="${toNumber(row.fin)}" disabled/></td>
         <td>
-          <div style="position:relative;height:22px;background:#f8fafc;border-radius:6px;overflow:hidden">
-            <div style="position:absolute;left:${left}%;width:${width}%;top:0;height:100%;background:${escapeHtml(row.color || '#3b82f6')};border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700">
-              ${fmtNumber(row.inicio)}-${fmtNumber(row.fin)}
-            </div>
+          <div class="gantt-editor-track" style="width:${meta.timelineWidth}px;--month-width:${GANTT_MONTH_WIDTH}px">
+            <div class="gantt-editor-bar" title="Inicio ${fmtNumber(row.inicio)} · Fin ${fmtNumber(row.fin)}" style="left:${left}px;width:${width}px;background:${escapeHtml(row.color || '#3b82f6')}"></div>
+          </div>
+        </td>
+        <td class="gantt-sticky-right" style="width:42px">
+          <div class="gantt-actions">
+            <button class="btn-outline gantt-delete-btn" type="button" title="Eliminar fila" onclick="removeGanttRow(${index})">&times;</button>
           </div>
         </td>
       </tr>
@@ -769,21 +821,28 @@ function renderGanttEditor(rows = state.gantt) {
 
 function renderGanttPreview() {
   const normalized = normalizeGanttRows(state.gantt);
-  const maxFin = Math.max(1, ...normalized.map((hito) => toNumber(hito.fin)));
-  setHtml('gantt-preview', normalized.map((hito) => {
-    const left = (toNumber(hito.inicio) / maxFin) * 100;
-    const width = (Math.max(1, toNumber(hito.duracion)) / maxFin) * 100;
-    return `
+  const meta = getGanttTimelineMeta(normalized);
+  setHtml('gantt-preview', `
+    <div class="gantt-timeline-scale has-grid" style="width:${meta.timelineWidth}px;--month-width:${GANTT_MONTH_WIDTH}px;margin-bottom:8px">
+      ${meta.quarterMarks.map((mark) => `
+        <div class="gantt-quarter-mark" style="left:${mark.left}px">
+          <span><strong>M${fmtNumber(mark.month)}</strong>${escapeHtml(mark.label)}</span>
+        </div>
+      `).join('')}
+    </div>
+    ${normalized.map((hito) => {
+      const left = toNumber(hito.inicio) * GANTT_MONTH_WIDTH;
+      const width = Math.max(1, toNumber(hito.duracion)) * GANTT_MONTH_WIDTH;
+      return `
       <div class="gantt-row">
         <div class="gantt-label">${escapeHtml(hito.nombre)}</div>
-        <div class="gantt-track">
-          <div class="gantt-bar" style="left:${left}%;width:${width}%;background:${escapeHtml(hito.color || '#3b82f6')}">
-            ${fmtNumber(hito.duracion)} m
-          </div>
+        <div class="gantt-track" style="width:${meta.timelineWidth}px;--month-width:${GANTT_MONTH_WIDTH}px">
+          <div class="gantt-bar" title="Inicio ${fmtNumber(hito.inicio)} · Fin ${fmtNumber(hito.fin)}" style="left:${left}px;width:${width}px;background:${escapeHtml(hito.color || '#3b82f6')}"></div>
         </div>
       </div>
     `;
-  }).join(''));
+    }).join('')}
+  `);
 }
 
 function isAccessoryUso(uso) {
@@ -2878,6 +2937,44 @@ function removeGanttRow(index) {
   onGanttInputChange();
 }
 
+function startGanttDrag(event) {
+  const handle = event.target.closest('[data-gantt-drag]');
+  const row = handle?.closest('[data-gantt-row]');
+  if (!row) return;
+  state.ganttDrag = { index: toNumber(row.dataset.index) };
+  row.classList.add('gantt-row-dragging');
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', row.dataset.index || '0');
+}
+
+function allowGanttDrop(event) {
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+}
+
+function endGanttDrag(event) {
+  event.target.closest('[data-gantt-row]')?.classList.remove('gantt-row-dragging');
+}
+
+function dropGanttRow(event) {
+  event.preventDefault();
+  const targetRow = event.target.closest('[data-gantt-row]');
+  if (!targetRow || !state.ganttDrag) return;
+
+  const rows = readGanttEditor();
+  const sourceIndex = toNumber(state.ganttDrag.index);
+  const targetIndex = toNumber(targetRow.dataset.index);
+  document.querySelectorAll('[data-gantt-row]').forEach((row) => row.classList.remove('gantt-row-dragging'));
+  state.ganttDrag = null;
+  if (sourceIndex === targetIndex || sourceIndex < 0 || targetIndex < 0 || sourceIndex >= rows.length || targetIndex >= rows.length) return;
+
+  const copy = [...rows];
+  const [moved] = copy.splice(sourceIndex, 1);
+  copy.splice(targetIndex, 0, moved);
+  renderGanttEditor(copy);
+  onGanttInputChange();
+}
+
 function readVentasConfigEditor() {
   const map = new Map(state.ventasConfig.map((row) => [row.uso, { ...row }]));
   const accessorySales = {
@@ -3287,6 +3384,10 @@ window.agregarHito = agregarHito;
 window.onGanttInputChange = onGanttInputChange;
 window.moveGanttRow = moveGanttRow;
 window.removeGanttRow = removeGanttRow;
+window.startGanttDrag = startGanttDrag;
+window.allowGanttDrop = allowGanttDrop;
+window.endGanttDrag = endGanttDrag;
+window.dropGanttRow = dropGanttRow;
 window.onVentasInputChange = onVentasInputChange;
 
 document.addEventListener('DOMContentLoaded', async () => {
