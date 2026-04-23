@@ -1986,12 +1986,15 @@ function renderCostPlanilla() {
   setHtml('planilla-tbody', categorias.map((categoria) => {
     const isCollapsed = !!collapsedState[categoria.nombre];
     const hasSubpartidas = (categoria.partidas || []).length > 0;
+    const categoryReadOnly = categoria.nombre === 'GASTOS FINANCIEROS';
     const categoryRows = [];
     const categoryMonthlyTotals = createMonthlyArray(monthCount, 0);
     let categoryTotalNeto = 0;
     let categoryTotalIva = 0;
 
     (categoria.partidas || []).forEach((partida, index) => {
+      const rowReadOnly = categoryReadOnly || !!partida.auto_origen;
+
       if (categoria.nombre === 'GASTOS FINANCIEROS' && partida.auto_origen) {
         const sectionLabel = /^Terreno/i.test(partida.nombre || '')
           ? 'Financiamiento Terreno'
@@ -2026,17 +2029,17 @@ function renderCostPlanilla() {
       distribucion.forEach((value, monthIndex) => { categoryMonthlyTotals[monthIndex] += value; });
 
       categoryRows.push(`
-        <tr class="partida-row" data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" ${partida.auto_origen ? 'data-auto="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
-          <td style="text-align:center">${partida.auto_origen ? '' : `<span class="row-tools"><button class="btn-outline btn-delete-inline" type="button" title="Eliminar subpartida" onclick="removeCostPartida('${escapeHtml(categoria.nombre)}', ${index})">&times;</button><span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span></span>`}</td>
-          <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${partida.auto_origen ? 'disabled' : ''}/></td>
+        <tr class="partida-row" data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" ${rowReadOnly ? 'data-auto="1" data-readonly="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
+          <td style="text-align:center">${rowReadOnly ? '' : `<span class="row-tools"><button class="btn-outline btn-delete-inline" type="button" title="Eliminar subpartida" onclick="removeCostPartida('${escapeHtml(categoria.nombre)}', ${index})">&times;</button><span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span></span>`}</td>
+          <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${rowReadOnly ? 'disabled' : ''}/></td>
           <td style="text-align:center">
-            <input class="inp cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}" ${partida.auto_origen ? 'disabled' : ''}/>
+            <input class="inp cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}" ${rowReadOnly ? 'disabled' : ''}/>
             <button class="btn-outline btn-formula" type="button" onclick="openCostFormulaModal('${escapeHtml(categoria.nombre)}', ${index})">Ver fórmula</button>
           </td>
-          <td>${partida.auto_origen ? '<span class="badge badge-yellow">AUTO</span>' : `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><button class="btn-outline" type="button" onclick="openPaymentPlanModal('${escapeHtml(categoria.nombre)}', ${index})">${escapeHtml(summarizePaymentPlan(partida.plan_pago))}</button><div style="font-size:10px;color:${Math.abs(getPaymentPlanAssignedPct(partida.plan_pago) - 100) < 0.01 ? '#16a34a' : '#b45309'};white-space:nowrap">${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))}</div></div>`}</td>
+          <td>${rowReadOnly ? '<span class="badge badge-yellow">AUTO</span>' : `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><button class="btn-outline" type="button" onclick="openPaymentPlanModal('${escapeHtml(categoria.nombre)}', ${index})">${escapeHtml(summarizePaymentPlan(partida.plan_pago))}</button><div style="font-size:10px;color:${Math.abs(getPaymentPlanAssignedPct(partida.plan_pago) - 100) < 0.01 ? '#16a34a' : '#b45309'};white-space:nowrap">${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))}</div></div>`}</td>
           <td style="text-align:center;color:#22c55e;font-weight:800">${fmtUf(total)}</td>
-          <td style="text-align:center"><input type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''} ${partida.auto_origen ? 'disabled' : ''}/></td>
-          ${distribucion.map((value, monthIndex) => `<td data-month-cell><input class="inp cost-month-input" data-month="${monthIndex}" type="number" step="0.01" value="${toNumber(value)}" ${partida.auto_origen ? 'disabled' : ''}/></td>`).join('')}
+          <td style="text-align:center"><input type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''} ${rowReadOnly ? 'disabled' : ''}/></td>
+          ${distribucion.map((value, monthIndex) => `<td data-month-cell><input class="inp cost-month-input" data-month="${monthIndex}" type="number" step="0.01" value="${toNumber(value)}" ${rowReadOnly ? 'disabled' : ''}/></td>`).join('')}
         </tr>
       `);
     });
@@ -2048,7 +2051,7 @@ function renderCostPlanilla() {
             <div class="cost-category-title">
               <button class="btn-outline btn-plus" type="button" onclick="${hasSubpartidas ? `toggleCostCategoryCollapse('${escapeHtml(categoria.nombre)}')` : ''}" title="${hasSubpartidas ? 'Expandir o colapsar' : 'Sin subpartidas'}" ${hasSubpartidas ? '' : 'disabled style="opacity:.45;cursor:not-allowed"'}>${hasSubpartidas ? (isCollapsed ? '+' : '-') : '·'}</button>
               <span class="cost-category-name">${escapeHtml(categoria.nombre)}</span>
-              <button class="btn-outline btn-subpartida" type="button" onclick="agregarPartidaLinea('${escapeHtml(categoria.nombre)}')" title="Agregar subpartida">+</button>
+              ${categoryReadOnly ? '' : `<button class="btn-outline btn-subpartida" type="button" onclick="agregarPartidaLinea('${escapeHtml(categoria.nombre)}')" title="Agregar subpartida">+</button>`}
             </div>
             <div class="cost-category-actions">
             </div>
@@ -2546,6 +2549,7 @@ function autosavePaymentPlanModal() {
 }
 
 function removeCostPartida(categoryName, index) {
+  if (categoryName === 'GASTOS FINANCIEROS') return;
   readCostosEditor();
   const category = state.costos.find((item) => item.nombre === categoryName);
   if (!category) return;
@@ -2795,7 +2799,7 @@ function readCostosEditor() {
   const categoryMap = new Map(categories.map((category) => [category.nombre, category]));
 
   document.querySelectorAll('[data-cost-row]').forEach((row) => {
-    if (row.dataset.auto === '1') return;
+    if (row.dataset.auto === '1' || row.dataset.readonly === '1') return;
     const category = categoryMap.get(row.dataset.category);
     const index = toNumber(row.dataset.index);
     const target = category?.partidas?.[index];
@@ -2817,6 +2821,7 @@ function readCostosEditor() {
 }
 
 function agregarPartidaLinea(categoryName) {
+  if (categoryName === 'GASTOS FINANCIEROS') return;
   readCostosEditor();
   ensureCostosState();
   let category = state.costos.find((item) => item.nombre === categoryName);
@@ -2867,7 +2872,7 @@ function aplicarPlanPagoFila(input) {
 
 function startCostDrag(event) {
   const row = event.target.closest('[data-cost-row]');
-  if (!row || row.dataset.auto === '1') return;
+  if (!row || row.dataset.auto === '1' || row.dataset.readonly === '1') return;
   state.costDrag = {
     category: row.dataset.category,
     index: toNumber(row.dataset.index),
@@ -2889,7 +2894,7 @@ function endCostDrag(event) {
 function dropCostRow(event) {
   event.preventDefault();
   const targetRow = event.target.closest('[data-cost-row]');
-  if (!targetRow || !state.costDrag || targetRow.dataset.auto === '1') return;
+  if (!targetRow || !state.costDrag || targetRow.dataset.auto === '1' || targetRow.dataset.readonly === '1') return;
   if (state.costDrag.category !== targetRow.dataset.category) return;
 
   readCostosEditor();
