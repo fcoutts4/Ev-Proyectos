@@ -184,6 +184,101 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 .req-kpi{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px 18px}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+
+
+/* ===== AJUSTES VISUALES PARA PANTALLAS CON POCA RESOLUCIÓN Y MUCHO BRILLO ===== */
+:root{
+  --bg-main:#e5ebf3;
+  --bg-card:#ffffff;
+  --bg-soft:#eef3f8;
+  --bg-soft-2:#e8eef5;
+  --text-main:#0b1220;
+  --text-strong:#111827;
+  --text-muted:#334155;
+  --text-soft:#475569;
+  --border-strong:#c7d2e0;
+  --border-soft:#d7e0ea;
+  --nav-bg:#f8fbff;
+  --nav-border:#cbd5e1;
+  --accent-dark:#0b1220;
+  --green:#15803d;
+  --green-soft:#dcfce7;
+  --blue:#1d4ed8;
+  --blue-soft:#dbeafe;
+  --orange:#c2410c;
+  --orange-soft:#ffedd5;
+  --purple:#7c3aed;
+  --purple-soft:#ede9fe;
+  --amber:#a16207;
+  --amber-soft:#fef3c7;
+  --red:#b91c1c;
+}
+body{background:var(--bg-main)!important;color:var(--text-main)!important}
+.topnav,.proj-header{background:var(--nav-bg)!important;border-bottom:1px solid var(--nav-border)!important}
+.logo-box,.card-dark,.planilla-header,.tfoot-dark td{background:var(--accent-dark)!important;color:#fff!important}
+.card,.kpi-card,.req-kpi,.modal-card{background:var(--bg-card)!important;border-color:var(--border-strong)!important;box-shadow:0 1px 0 rgba(15,23,42,.04)}
+.sec-title,.kpi-label,.sync-text,.dist-label,.cost-flow-note,.formula-preview-title,.formula-preview-note,.formula-chip,.cost-formula-caption{color:var(--text-muted)!important}
+.tab-btn{color:var(--text-soft)!important}
+.tab-btn:hover,.tab-btn.active{color:var(--text-main)!important}
+.tab-btn.active{border-bottom-color:var(--text-main)!important}
+a,.btn-outline,.proj-header a{color:var(--blue)!important}
+.btn-outline{background:#fff!important;border-color:var(--border-strong)!important}
+.btn-outline:hover{background:var(--bg-soft)!important}
+.btn-primary{background:var(--green)!important;color:#fff!important}
+.btn-primary:hover{background:#166534!important}
+.btn-dark{background:var(--accent-dark)!important;color:#fff!important}
+.kpi-green::before{background:var(--green)!important}
+.kpi-blue::before{background:var(--blue)!important}
+.kpi-purple::before{background:var(--purple)!important}
+.kpi-orange::before{background:var(--orange)!important}
+.kpi-gray::before{background:#475569!important}
+.kpi-amber::before{background:var(--amber)!important}
+.kpi-value,#kpi-roe,.costos-total-neto,.req-kpi div{color:var(--text-strong)!important}
+#kpi-ventas,.badge-green,.formula-token.number{color:var(--green)!important}
+#kpi-margen,.formula-token.reference{color:var(--blue)!important}
+#kpi-tir-pura{color:var(--purple)!important}
+#kpi-tir-fin{color:var(--orange)!important}
+#kpi-cap{color:var(--amber)!important}
+thead th{background:var(--bg-soft)!important;color:var(--text-muted)!important;border-bottom:1px solid var(--border-strong)!important}
+tbody td{border-bottom:1px solid var(--border-soft)!important}
+tbody tr:hover{background:#f3f7fb!important}
+.cat-row td,.subcat-row td,.payment-section,.formula-preview,.gantt-editor-track,.dist-bar-wrap{background:var(--bg-soft)!important;border-color:var(--border-strong)!important}
+.inp,select.inp,input.inp,textarea.inp{background:#fff!important;color:var(--text-main)!important;border:1px solid var(--border-strong)!important}
+.inp:focus{border-color:var(--blue)!important;box-shadow:0 0 0 2px rgba(29,78,216,.12)!important}
+.badge-green{background:var(--green-soft)!important}
+.badge-blue{background:var(--blue-soft)!important;color:#1e3a8a!important}
+.badge-orange{background:var(--orange-soft)!important;color:#9a3412!important}
+.badge-purple{background:var(--purple-soft)!important;color:#6d28d9!important}
+.badge-red{background:#fee2e2!important;color:var(--red)!important}
+.badge-yellow{background:var(--amber-soft)!important;color:#854d0e!important}
+.formula-status-manual{background:#d9f99d!important;color:#365314!important}
+.formula-status-expr{background:var(--blue-soft)!important;color:#1e40af!important}
+.formula-status-auto{background:#e5e7eb!important;color:#334155!important}
+.toggle-slider{background:#94a3b8!important}
+.toggle input:checked + .toggle-slider{background:var(--green)!important}
+::-webkit-scrollbar-thumb{background:#94a3b8!important}
+
+/* Más legibilidad cuando la pantalla es angosta */
+@media (max-width: 1366px){
+  body{font-size:15px}
+  .topnav{height:56px;padding:0 16px}
+  .proj-header{top:56px;padding:10px 16px 0}
+  main{padding:16px!important}
+  .card,.card-dark,.kpi-card,.req-kpi{padding:16px!important;border-radius:10px!important}
+  .tab-btn{padding:12px 12px;font-size:12px}
+  .kpi-label,.sec-title,thead th{font-size:11px!important}
+  tbody td,.inp,.btn-outline,.btn-primary,.btn-dark{font-size:12px!important}
+  .kpi-value{font-size:1.5rem!important}
+}
+
+/* Cuando hay mucho brillo conviene bajar blancos puros y reforzar bordes */
+@media (prefers-contrast: more){
+  body{background:#dde5ee!important}
+  .card,.kpi-card,.req-kpi,.modal-card{border-color:#94a3b8!important;box-shadow:0 0 0 1px rgba(15,23,42,.06)}
+  thead th,.cat-row td,.subcat-row td{background:#e2e8f0!important}
+  .sync-text,.kpi-sub{color:#334155!important}
+}
+
 </style>
 </head>
 <body>
