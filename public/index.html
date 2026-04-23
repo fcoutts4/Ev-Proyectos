@@ -589,7 +589,7 @@ tbody tr:hover{background:#f3f7fb!important}
         </div>
         <div>
           <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Tasa interés</div>
-          <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-terreno-tasa" step="0.01" inputmode="decimal" oninput="onTerrenoInputChange()"><span style="font-size:11px">ANUAL</span></div>
+          <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-terreno-tasa" step="0.01" inputmode="decimal" onchange="onTerrenoInputChange()" onblur="onTerrenoInputChange()"><span style="font-size:11px">anual</span></div>
         </div>
         <div>
           <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Pago intereses</div>
@@ -968,7 +968,7 @@ tbody tr:hover{background:#f3f7fb!important}
       </div>
       <div>
         <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Tasa interés</div>
-        <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-constr-tasa" step="0.1" oninput="updateConstrParams()"><span style="font-size:11px">ANUAL</span></div>
+          <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-constr-tasa" step="0.01" inputmode="decimal" onchange="updateConstrParams()" onblur="updateConstrParams()"><span style="font-size:11px">anual</span></div>
       </div>
       <div>
         <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Pago intereses</div>
