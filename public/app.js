@@ -815,31 +815,32 @@ function renderGanttEditor(rows = state.gantt) {
   setHtml('gantt-tbody', normalized.map((row, index) => {
     const left = toNumber(row.inicio) * GANTT_MONTH_WIDTH;
     const width = Math.max(1, toNumber(row.duracion)) * GANTT_MONTH_WIDTH;
+    const lock = getGanttLockConfig(row);
     return `
       <tr data-gantt-row data-id="${escapeHtml(row.id || '')}" data-index="${index}" ondragover="allowGanttDrop(event)" ondrop="dropGanttRow(event)">
         <td class="gantt-sticky-left gantt-actions" style="left:0;width:40px">
-          <span class="drag-handle" data-gantt-drag="1" draggable="true" ondragstart="startGanttDrag(event)" ondragend="endGanttDrag(event)" title="Orden manual">&#8226;&#8226;&#8226;</span>
+          <span class="drag-handle" ${lock.drag ? '' : 'data-gantt-drag="1" draggable="true" ondragstart="startGanttDrag(event)" ondragend="endGanttDrag(event)"'} title="${escapeHtml(lock.hint || 'Orden manual')}">${lock.drag ? '&#8226;' : '&#8226;&#8226;&#8226;'}</span>
         </td>
         <td class="gantt-sticky-left" style="left:40px;width:220px">
           <div style="display:grid;grid-template-columns:18px 1fr;gap:8px;align-items:center">
-            <input data-field="color" type="color" value="${escapeHtml(row.color || '#3b82f6')}" onchange="onGanttInputChange()"/>
-            <input class="inp" data-field="nombre" value="${escapeHtml(row.nombre)}" onchange="onGanttInputChange()"/>
+            <input data-field="color" type="color" value="${escapeHtml(row.color || '#3b82f6')}" ${lock.name ? 'disabled' : ''} onchange="onGanttInputChange()"/>
+            <input class="inp" data-field="nombre" value="${escapeHtml(row.nombre)}" ${lock.name ? 'disabled' : ''} onchange="onGanttInputChange()"/>
           </div>
         </td>
         <td class="gantt-sticky-left" style="left:260px;width:150px">
           <div style="display:grid;grid-template-columns:1fr 56px;gap:4px">
-            <select class="inp" data-field="dependencia" onchange="onGanttInputChange()">
+            <select class="inp" data-field="dependencia" ${lock.dependency ? 'disabled' : ''} onchange="onGanttInputChange()">
               ${getGanttDependencyOptions(row.nombre).replace(`value="${escapeHtml(row.dependencia || '')}"`, `value="${escapeHtml(row.dependencia || '')}" selected`)}
             </select>
-            <select class="inp" data-field="dependencia_tipo" onchange="onGanttInputChange()">
+            <select class="inp" data-field="dependencia_tipo" ${lock.dependency ? 'disabled' : ''} onchange="onGanttInputChange()">
               <option value="inicio" ${row.dependencia_tipo === 'inicio' ? 'selected' : ''}>Inicio</option>
               <option value="fin" ${row.dependencia_tipo === 'fin' ? 'selected' : ''}>Fin</option>
             </select>
           </div>
         </td>
         <td class="gantt-sticky-left gantt-cell-tight" style="left:410px;width:62px"><input class="inp" data-field="desfase" type="number" value="${toNumber(row.desfase)}" onchange="onGanttInputChange()"/></td>
-        <td class="gantt-sticky-left gantt-cell-tight" style="left:472px;width:62px"><input class="inp" data-field="inicio" type="number" value="${toNumber(row.inicio)}" ${row.dependencia ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
-        <td class="gantt-sticky-left gantt-cell-tight" style="left:534px;width:70px"><input class="inp" data-field="duracion" type="number" value="${toNumber(row.duracion)}" onchange="onGanttInputChange()"/></td>
+        <td class="gantt-sticky-left gantt-cell-tight" style="left:472px;width:62px"><input class="inp" data-field="inicio" type="number" value="${toNumber(row.inicio)}" ${(row.dependencia || lock.start) ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
+        <td class="gantt-sticky-left gantt-cell-tight" style="left:534px;width:70px"><input class="inp" data-field="duracion" type="number" value="${toNumber(row.duracion)}" ${lock.duration ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
         <td>
           <div class="gantt-editor-track" style="width:${meta.timelineWidth}px;--month-width:${GANTT_MONTH_WIDTH}px">
             <div class="gantt-editor-bar" title="Inicio ${fmtNumber(row.inicio)} · Fin ${fmtNumber(row.fin)}" style="left:${left}px;width:${width}px;background:${escapeHtml(row.color || '#3b82f6')}"></div>
@@ -847,7 +848,7 @@ function renderGanttEditor(rows = state.gantt) {
         </td>
         <td class="gantt-sticky-right" style="width:42px">
           <div class="gantt-actions">
-            <button class="btn-outline gantt-delete-btn" type="button" title="Eliminar fila" onclick="removeGanttRow(${index})">&times;</button>
+            <button class="btn-outline gantt-delete-btn" type="button" title="${escapeHtml(lock.delete ? (lock.hint || 'Bloque bloqueado') : 'Eliminar fila')}" onclick="${lock.delete ? '' : `removeGanttRow(${index})`}" ${lock.delete ? 'disabled style="opacity:.35;cursor:not-allowed"' : ''}>&times;</button>
           </div>
         </td>
       </tr>
@@ -902,6 +903,42 @@ function getCronogramaForUso(type, uso) {
   return state.ventasCronograma.find((row) => row.tipo === type && row.uso === uso) || null;
 }
 
+function getVentasMetaRow(type) {
+  return state.ventasCronograma.find((row) => row.tipo === type) || null;
+}
+
+function getVentasVelocitySettings() {
+  return {
+    promesas: Math.max(1, toNumber(getVentasMetaRow('META_PROMESAS')?.velocidad || 54)),
+    escrituracion: Math.max(1, toNumber(getVentasMetaRow('META_ESCRITURACION')?.velocidad || 20)),
+  };
+}
+
+function getTotalCommercialUnits() {
+  return state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).unidades, 0);
+}
+
+function getPreventaUnitsTotal() {
+  return state.ventasCronograma
+    .filter((row) => row.tipo === 'PREVENTA')
+    .reduce((sum, row) => {
+      const metrics = getUsoSaleMetrics(row.uso);
+      return sum + Math.round(metrics.unidades * toNumber(row.porcentaje) / 100);
+    }, 0);
+}
+
+function getPromiseMilestone() {
+  return state.gantt.find((row) => /INICIO PROMESAS/i.test(String(row.nombre || '').trim())) || null;
+}
+
+function getMunicipalReceptionMilestone() {
+  return state.gantt.find((row) => /RECEPCI[ÓO]N MUNICIPAL/i.test(String(row.nombre || '').trim())) || null;
+}
+
+function getEscrituracionMilestone() {
+  return state.gantt.find((row) => /^ESCRITURACI[ÓO]N$/i.test(String(row.nombre || '').trim())) || null;
+}
+
 function ensureVentasState() {
   const rows = getCommercialRows();
   const configMap = getVentasConfigMap();
@@ -953,6 +990,30 @@ function ensureVentasState() {
     mes_inicio: toNumber(escrituracion.mes_inicio),
     duracion: toNumber(escrituracion.duracion),
     porcentaje: 0,
+  });
+
+  const metaPromesas = getVentasMetaRow('META_PROMESAS') || {};
+  nextCronograma.push({
+    id: metaPromesas.id,
+    tipo: 'META_PROMESAS',
+    uso: 'GLOBAL',
+    vinculo_gantt: null,
+    mes_inicio: 0,
+    duracion: 0,
+    porcentaje: 0,
+    velocidad: Math.max(1, toNumber(metaPromesas.velocidad || 54)),
+  });
+
+  const metaEscrituracion = getVentasMetaRow('META_ESCRITURACION') || {};
+  nextCronograma.push({
+    id: metaEscrituracion.id,
+    tipo: 'META_ESCRITURACION',
+    uso: 'GLOBAL',
+    vinculo_gantt: null,
+    mes_inicio: 0,
+    duracion: 0,
+    porcentaje: 0,
+    velocidad: Math.max(1, toNumber(metaEscrituracion.velocidad || 20)),
   });
 
   state.ventasCronograma = nextCronograma;
@@ -1016,6 +1077,10 @@ function getCronogramaComputed(item) {
 
 function renderVentasModule() {
   ensureVentasState();
+  syncSalesDrivenMilestones();
+  if ($('ventas-velocidad-promesas')) $('ventas-velocidad-promesas').value = getVentasVelocitySettings().promesas;
+  if ($('ventas-velocidad-escrituracion')) $('ventas-velocidad-escrituracion').value = getVentasVelocitySettings().escrituracion;
+  renderGanttEditor(state.gantt);
   renderVentasPricing();
   renderVentasPaymentForms();
   renderVentasSchedules();
@@ -1145,10 +1210,10 @@ function renderVentasSchedules() {
         return `
           <tr data-ventas-cronograma-row data-tipo="${escapeHtml(row.tipo)}" data-uso="${escapeHtml(row.uso)}">
             <td>
-              <select class="inp" data-field="vinculo_gantt" onchange="onVentasInputChange()">${ganttOptionsHtml(row.vinculo_gantt)}</select>
+              <select class="inp" data-field="vinculo_gantt" disabled onchange="onVentasInputChange()">${ganttOptionsHtml(row.vinculo_gantt)}</select>
             </td>
             <td style="text-align:center">${fmtNumber(computed.inicio)}</td>
-            <td><input class="inp" type="number" data-field="duracion" value="${toNumber(row.duracion)}" onchange="onVentasInputChange()"/></td>
+            <td><input class="inp" type="number" data-field="duracion" value="${toNumber(row.duracion)}" disabled onchange="onVentasInputChange()"/></td>
             <td style="text-align:center;color:#16a34a">${fmtNumber(computed.fin)}</td>
             <td style="text-align:center">${fmtNumber(velUn, 1)} un/mes</td>
           </tr>
@@ -1158,9 +1223,9 @@ function renderVentasSchedules() {
       return `
         <tr data-ventas-cronograma-row data-tipo="${escapeHtml(row.tipo)}" data-uso="${escapeHtml(row.uso)}">
           <td>${escapeHtml(row.uso)}</td>
-          <td><select class="inp" data-field="vinculo_gantt" onchange="onVentasInputChange()">${ganttOptionsHtml(row.vinculo_gantt)}</select></td>
-          <td><input class="inp" type="number" data-field="mes_inicio" value="${toNumber(row.mes_inicio)}" onchange="onVentasInputChange()"/></td>
-          <td><input class="inp" type="number" data-field="duracion" value="${toNumber(row.duracion)}" onchange="onVentasInputChange()"/></td>
+          <td><select class="inp" data-field="vinculo_gantt" ${type === 'PREVENTA' ? 'disabled' : ''} onchange="onVentasInputChange()">${ganttOptionsHtml(row.vinculo_gantt)}</select></td>
+          <td><input class="inp" type="number" data-field="mes_inicio" value="${toNumber(row.mes_inicio)}" ${type === 'PREVENTA' ? 'disabled' : ''} onchange="onVentasInputChange()"/></td>
+          <td><input class="inp" type="number" data-field="duracion" value="${toNumber(row.duracion)}" ${type === 'PREVENTA' ? 'disabled' : ''} onchange="onVentasInputChange()"/></td>
           <td style="text-align:center;color:#16a34a">${fmtNumber(computed.fin)}</td>
           <td><input class="inp" type="number" step="0.01" data-field="porcentaje" value="${toNumber(row.porcentaje)}" onchange="onVentasInputChange()"/></td>
           <td style="text-align:center">${fmtNumber(unidades)}</td>
@@ -1916,6 +1981,98 @@ function syncTerrainPurchaseMilestone() {
 
   state.gantt = normalizeGanttRows(currentRows);
   return milestone;
+}
+
+function syncSalesDrivenMilestones() {
+  const velocity = getVentasVelocitySettings();
+  const preventaUnits = Math.max(0, getPreventaUnitsTotal());
+  const totalUnits = Math.max(0, getTotalCommercialUnits());
+  const promiseDuration = Math.max(1, Math.ceil(preventaUnits / Math.max(1, velocity.promesas)));
+  const escrituraDuration = Math.max(1, Math.ceil(totalUnits / Math.max(1, velocity.escrituracion)));
+  const rows = Array.isArray(state.gantt) ? state.gantt.map((row) => ({ ...row })) : [];
+
+  const ensureMilestone = (matcher, buildRow) => {
+    const index = rows.findIndex((row) => matcher.test(String(row.nombre || '').trim()));
+    const baseRow = index >= 0 ? rows[index] : {};
+    const nextRow = buildRow(baseRow);
+    if (index >= 0) rows[index] = nextRow;
+    else rows.push(nextRow);
+    return nextRow;
+  };
+
+  const promiseRow = ensureMilestone(/^Inicio promesas$/i, (baseRow) => ({
+    id: baseRow.id || '',
+    nombre: 'Inicio promesas',
+    color: baseRow.color || '#2563eb',
+    dependencia: null,
+    dependencia_tipo: 'fin',
+    desfase: toNumber(baseRow.desfase),
+    inicio: toNumber(baseRow.inicio),
+    duracion: promiseDuration,
+    fin: toNumber(baseRow.inicio) + promiseDuration,
+  }));
+
+  const constructionRow = getConstructionMilestone() || rows.find((row) => /CONSTRUCCI[ÓO]N/i.test(String(row.nombre || '').trim()));
+  const defaultReceptionStart = constructionRow ? toNumber(constructionRow.fin) : 1;
+  const receptionRow = ensureMilestone(/^Recepción municipal$/i, (baseRow) => ({
+    id: baseRow.id || '',
+    nombre: 'Recepción municipal',
+    color: baseRow.color || '#0ea5e9',
+    dependencia: baseRow.dependencia || null,
+    dependencia_tipo: baseRow.dependencia_tipo || 'fin',
+    desfase: toNumber(baseRow.desfase),
+    inicio: indexSafeNumber(baseRow.inicio, defaultReceptionStart),
+    duracion: Math.max(1, toNumber(baseRow.duracion || 1)),
+    fin: 0,
+  }));
+
+  ensureMilestone(/^Escrituración$/i, (baseRow) => ({
+    id: baseRow.id || '',
+    nombre: 'Escrituración',
+    color: baseRow.color || '#f97316',
+    dependencia: 'Recepción municipal',
+    dependencia_tipo: 'fin',
+    desfase: 0,
+    inicio: toNumber(baseRow.inicio),
+    duracion: escrituraDuration,
+    fin: 0,
+  }));
+
+  state.gantt = normalizeGanttRows(rows);
+  state.ventasCronograma = (state.ventasCronograma || []).map((row) => {
+    if (row.tipo === 'PREVENTA') {
+      return {
+        ...row,
+        vinculo_gantt: promiseRow.nombre,
+        mes_inicio: 0,
+        duracion: promiseDuration,
+      };
+    }
+    if (row.tipo === 'ESCRITURACION') {
+      return {
+        ...row,
+        vinculo_gantt: receptionRow.nombre,
+        mes_inicio: 0,
+        duracion: escrituraDuration,
+      };
+    }
+    return row;
+  });
+}
+
+function indexSafeNumber(value, fallback) {
+  const parsed = toNumber(value);
+  return parsed || parsed === 0 ? parsed : fallback;
+}
+
+function getGanttLockConfig(row) {
+  const name = String(row?.nombre || '').trim();
+  if (/^Compra terreno$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: true, hint: 'Se define en Terreno.' };
+  if (/^Construcci[óo]n$/i.test(name)) return { fixed: true, name: true, dependency: true, start: false, duration: true, delete: true, drag: true, hint: 'Duración ligada a Construcción.' };
+  if (/^Inicio promesas$/i.test(name)) return { fixed: true, name: true, dependency: true, start: false, duration: true, delete: true, drag: true, hint: 'Duración ligada a velocidad de promesas en Ventas.' };
+  if (/^Recepci[óo]n municipal$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: true, hint: 'Se define manualmente en Carta Gantt.' };
+  if (/^Escrituraci[óo]n$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: true, hint: 'Inicio ligado a Recepción municipal y duración a Ventas.' };
+  return { fixed: false, name: false, dependency: false, start: false, duration: false, delete: false, drag: false, hint: '' };
 }
 
 function getPartidaFormulaText(partida) {
@@ -3137,10 +3294,13 @@ function updateConstrParams() {
 
 function onGanttInputChange() {
   state.gantt = readGanttEditor();
+  syncSalesDrivenMilestones();
   renderTerrainModule();
   renderGanttEditor(state.gantt);
   renderConstruccion();
   ensureVentasState();
+  if ($('ventas-velocidad-promesas')) $('ventas-velocidad-promesas').value = getVentasVelocitySettings().promesas;
+  if ($('ventas-velocidad-escrituracion')) $('ventas-velocidad-escrituracion').value = getVentasVelocitySettings().escrituracion;
   renderVentasSchedules();
   renderVentasSummaryCards();
   renderVentasCashflow();
@@ -3240,7 +3400,7 @@ function readVentasConfigEditor() {
 }
 
 function readVentasCronogramaEditor() {
-  return Array.from(document.querySelectorAll('[data-ventas-cronograma-row]')).map((row) => ({
+  const rows = Array.from(document.querySelectorAll('[data-ventas-cronograma-row]')).map((row) => ({
     id: row.dataset.id || '',
     tipo: row.dataset.tipo,
     uso: row.dataset.uso,
@@ -3249,14 +3409,38 @@ function readVentasCronogramaEditor() {
     duracion: toNumber(row.querySelector('[data-field="duracion"]')?.value),
     porcentaje: toNumber(row.querySelector('[data-field="porcentaje"]')?.value),
   }));
+  rows.push({
+    id: getVentasMetaRow('META_PROMESAS')?.id || '',
+    tipo: 'META_PROMESAS',
+    uso: 'GLOBAL',
+    vinculo_gantt: null,
+    mes_inicio: 0,
+    duracion: 0,
+    porcentaje: 0,
+    velocidad: Math.max(1, toNumber($('ventas-velocidad-promesas')?.value || 54)),
+  });
+  rows.push({
+    id: getVentasMetaRow('META_ESCRITURACION')?.id || '',
+    tipo: 'META_ESCRITURACION',
+    uso: 'GLOBAL',
+    vinculo_gantt: null,
+    mes_inicio: 0,
+    duracion: 0,
+    porcentaje: 0,
+    velocidad: Math.max(1, toNumber($('ventas-velocidad-escrituracion')?.value || 20)),
+  });
+  return rows;
 }
 
 function onVentasInputChange() {
   state.ventasConfig = readVentasConfigEditor();
   state.ventasCronograma = readVentasCronogramaEditor();
+  syncSalesDrivenMilestones();
+  renderGanttEditor(state.gantt);
   renderVentasModule();
   renderCostosModule();
   scheduleAutosave('ventas');
+  scheduleAutosave('gantt');
 }
 
 function parseFormulaInput(value) {
