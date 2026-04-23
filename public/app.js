@@ -181,6 +181,10 @@ function getMunicipalUsefulPerUnit(interior, terraza, pct = state.proyecto?.terr
   return toNumber(interior) + (toNumber(terraza) * toNumber(pct) / 100);
 }
 
+function getSellableAreaPerUnit(interior, terraza, pct = state.proyecto?.terraza_util_pct) {
+  return getMunicipalUsefulPerUnit(interior, terraza, pct);
+}
+
 function getBaseUnitRows() {
   return state.cabida.map((row) => ({
     ...row,
@@ -191,7 +195,7 @@ function getBaseUnitRows() {
 }
 
 function getUsefulMunicipalAreaTotal() {
-  const unitRows = getBaseUnitRows().concat(getCabidaAccessoryRows());
+  const unitRows = getBaseUnitRows();
   return unitRows.reduce((sum, row) => sum + (toNumber(row.sup_util_mun) * toNumber(row.cantidad)), 0);
 }
 
@@ -203,34 +207,6 @@ function getCommonAreaTotal() {
 
 function getAboveGradeAreaTotal() {
   return getUsefulMunicipalAreaTotal() + getCommonAreaTotal();
-}
-
-function getCabidaAccessoryRows() {
-  const proyecto = normalizeProject(state.proyecto);
-  return [
-    {
-      uso: 'ESTACIONAMIENTOS',
-      cantidad: toNumber(proyecto.estacionamientos_cantidad),
-      sup_interior: toNumber(proyecto.estacionamientos_sup_interior),
-      sup_terrazas: toNumber(proyecto.estacionamientos_sup_terrazas),
-      sup_comunes: 0,
-      sup_util_mun: getMunicipalUsefulPerUnit(proyecto.estacionamientos_sup_interior, proyecto.estacionamientos_sup_terrazas),
-      isAccessory: true,
-    },
-    {
-      uso: 'BODEGAS',
-      cantidad: toNumber(proyecto.bodegas_cantidad),
-      sup_interior: toNumber(proyecto.bodegas_sup_interior),
-      sup_terrazas: toNumber(proyecto.bodegas_sup_terrazas),
-      sup_comunes: 0,
-      sup_util_mun: getMunicipalUsefulPerUnit(proyecto.bodegas_sup_interior, proyecto.bodegas_sup_terrazas),
-      isAccessory: true,
-    },
-  ].filter((row) => row.cantidad > 0);
-}
-
-function getCabidaDisplayRows() {
-  return getBaseUnitRows().concat(getCabidaAccessoryRows());
 }
 
 function getAccessorySalesConfig() {
@@ -548,33 +524,30 @@ function renderProjectSelector() {
 function getCabidaMetrics(rows) {
   return rows.reduce((acc, row) => {
     const cantidad = toNumber(row.cantidad);
-    const vendiblePorUnidad = toNumber(row.sup_interior) + toNumber(row.sup_terrazas);
-    const losaPorUnidad = vendiblePorUnidad + toNumber(row.sup_comunes);
+    const vendiblePorUnidad = getSellableAreaPerUnit(row.sup_interior, row.sup_terrazas);
     const utilPorUnidad = getMunicipalUsefulPerUnit(row.sup_interior, row.sup_terrazas);
 
     acc.unidades += cantidad;
     acc.interior += toNumber(row.sup_interior) * cantidad;
     acc.terrazas += toNumber(row.sup_terrazas) * cantidad;
-    acc.comunes += toNumber(row.sup_comunes) * cantidad;
     acc.util += utilPorUnidad * cantidad;
     acc.vendible += vendiblePorUnidad * cantidad;
-    acc.losa += losaPorUnidad * cantidad;
     return acc;
   }, {
     unidades: 0,
     interior: 0,
     terrazas: 0,
-    comunes: 0,
     util: 0,
     vendible: 0,
-    losa: 0,
   });
 }
 
 function renderCabidaTables(rows) {
-  const displayRows = getCabidaDisplayRows();
+  const displayRows = getBaseUnitRows();
+  const proyecto = normalizeProject(state.proyecto);
   const totals = getCabidaMetrics(displayRows);
   const commonAreaTotal = getCommonAreaTotal();
+  const accessoryTotal = toNumber(proyecto.estacionamientos_cantidad) + toNumber(proyecto.bodegas_cantidad);
 
   const unitRows = displayRows.map((row) => `
     <tr>
@@ -582,8 +555,7 @@ function renderCabidaTables(rows) {
       <td style="text-align:center">${fmtNumber(row.cantidad)}</td>
       <td style="text-align:center">${fmtNumber(row.sup_interior, 1)}</td>
       <td style="text-align:center">${fmtNumber(row.sup_terrazas, 1)}</td>
-      <td style="text-align:center">${fmtNumber(getMunicipalUsefulPerUnit(row.sup_interior, row.sup_terrazas), 1)}</td>
-      <td style="text-align:center;color:#2563eb">${fmtNumber(toNumber(row.sup_interior) + toNumber(row.sup_terrazas), 1)}</td>
+      <td style="text-align:center;color:#2563eb">${fmtNumber(getSellableAreaPerUnit(row.sup_interior, row.sup_terrazas), 1)}</td>
     </tr>
   `).join('');
 
@@ -591,33 +563,19 @@ function renderCabidaTables(rows) {
     const cantidad = toNumber(row.cantidad);
     const interior = toNumber(row.sup_interior) * cantidad;
     const terrazas = toNumber(row.sup_terrazas) * cantidad;
-    const comunes = 0;
     const util = getMunicipalUsefulPerUnit(row.sup_interior, row.sup_terrazas) * cantidad;
-    const vendible = interior + terrazas;
-    const losa = vendible + comunes;
+    const vendible = getSellableAreaPerUnit(row.sup_interior, row.sup_terrazas) * cantidad;
 
     return `
       <tr>
         <td>${escapeHtml(row.uso)}</td>
         <td style="text-align:center">${fmtNumber(interior, 1)}</td>
         <td style="text-align:center">${fmtNumber(terrazas, 1)}</td>
-        <td style="text-align:center">${fmtNumber(comunes, 1)}</td>
         <td style="text-align:center">${fmtNumber(util, 1)}</td>
         <td style="text-align:center;color:#2563eb">${fmtNumber(vendible, 1)}</td>
-        <td style="text-align:center;color:#16a34a">${fmtNumber(losa, 1)}</td>
       </tr>
     `;
-  }).join('') + `
-    <tr>
-      <td>COMUNES EDIFICIO</td>
-      <td style="text-align:center">-</td>
-      <td style="text-align:center">-</td>
-      <td style="text-align:center">${fmtNumber(commonAreaTotal, 1)}</td>
-      <td style="text-align:center">-</td>
-      <td style="text-align:center;color:#2563eb">-</td>
-      <td style="text-align:center;color:#16a34a">${fmtNumber(commonAreaTotal, 1)}</td>
-    </tr>
-  `;
+  }).join('');
 
   setHtml('res-cabida-tbody', unitRows);
   setHtml('cabida-tbody', unitRows);
@@ -626,7 +584,6 @@ function renderCabidaTables(rows) {
     <td style="text-align:center">${fmtNumber(totals.unidades)}</td>
     <td style="text-align:center">${fmtNumber(totals.unidades ? totals.interior / totals.unidades : 0, 1)}</td>
     <td style="text-align:center">${fmtNumber(totals.unidades ? totals.terrazas / totals.unidades : 0, 1)}</td>
-    <td style="text-align:center">${fmtNumber(totals.unidades ? totals.util / totals.unidades : 0, 1)}</td>
     <td style="text-align:center">${fmtNumber(totals.unidades ? totals.vendible / totals.unidades : 0, 1)}</td>
   `);
   setHtml('cabida-tfoot', `
@@ -634,27 +591,26 @@ function renderCabidaTables(rows) {
     <td style="text-align:center">${fmtNumber(totals.unidades)}</td>
     <td style="text-align:center">${fmtNumber(totals.unidades ? totals.interior / totals.unidades : 0, 1)}</td>
     <td style="text-align:center">${fmtNumber(totals.unidades ? totals.terrazas / totals.unidades : 0, 1)}</td>
-    <td style="text-align:center">${fmtNumber(totals.unidades ? totals.util / totals.unidades : 0, 1)}</td>
     <td style="text-align:center">${fmtNumber(totals.unidades ? totals.vendible / totals.unidades : 0, 1)}</td>
   `);
 
   setHtml('res-sup-tbody', displayRows.map((row) => {
     const cantidad = toNumber(row.cantidad);
-    const vendible = (toNumber(row.sup_interior) + toNumber(row.sup_terrazas)) * cantidad;
-    const losa = (toNumber(row.sup_interior) + toNumber(row.sup_terrazas) + toNumber(row.sup_comunes)) * cantidad;
+    const util = getMunicipalUsefulPerUnit(row.sup_interior, row.sup_terrazas) * cantidad;
+    const vendible = getSellableAreaPerUnit(row.sup_interior, row.sup_terrazas) * cantidad;
     return `
       <tr>
         <td>${escapeHtml(row.uso)}</td>
-        <td style="text-align:center;color:#2563eb">${fmtNumber(vendible, 1)} m²</td>
-        <td style="text-align:center;color:#16a34a">${fmtNumber(losa, 1)} m²</td>
+        <td style="text-align:center">${fmtNumber(util, 1)} m2</td>
+        <td style="text-align:center;color:#2563eb">${fmtNumber(vendible, 1)} m2</td>
       </tr>
     `;
   }).join(''));
 
   setHtml('res-sup-tfoot', `
     <td>Total</td>
-    <td style="text-align:center">${fmtNumber(totals.vendible, 1)} m²</td>
-    <td style="text-align:center">${fmtNumber(totals.losa, 1)} m²</td>
+    <td style="text-align:center">${fmtNumber(totals.util, 1)} m2</td>
+    <td style="text-align:center">${fmtNumber(totals.vendible, 1)} m2</td>
   `);
 
   setHtml('sup-tbody', areaRows);
@@ -662,11 +618,55 @@ function renderCabidaTables(rows) {
     <td>Total</td>
     <td style="text-align:center">${fmtNumber(totals.interior, 1)}</td>
     <td style="text-align:center">${fmtNumber(totals.terrazas, 1)}</td>
-    <td style="text-align:center">${fmtNumber(commonAreaTotal, 1)}</td>
     <td style="text-align:center">${fmtNumber(totals.util, 1)}</td>
     <td style="text-align:center">${fmtNumber(totals.vendible, 1)}</td>
-    <td style="text-align:center">${fmtNumber(totals.losa + commonAreaTotal, 1)}</td>
   `);
+  setHtml('res-sup-extra', `
+    <tr>
+      <td>M2 comunes totales</td>
+      <td style="text-align:center">${fmtNumber(commonAreaTotal, 1)} m2</td>
+      <td style="text-align:center">-</td>
+    </tr>
+  `);
+  setHtml('sup-extra', `
+    <tr>
+      <td>M2 comunes totales</td>
+      <td style="text-align:center">-</td>
+      <td style="text-align:center">-</td>
+      <td style="text-align:center">${fmtNumber(commonAreaTotal, 1)}</td>
+      <td style="text-align:center">-</td>
+    </tr>
+  `);
+  setHtml('res-acc-tbody', `
+    <tr>
+      <td>Estacionamientos</td>
+      <td style="text-align:center">${fmtNumber(proyecto.estacionamientos_cantidad)}</td>
+    </tr>
+    <tr>
+      <td>Bodegas</td>
+      <td style="text-align:center">${fmtNumber(proyecto.bodegas_cantidad)}</td>
+    </tr>
+  `);
+  setHtml('cabida-acc-tbody', `
+    <tr>
+      <td>Estacionamientos</td>
+      <td style="text-align:center">${fmtNumber(proyecto.estacionamientos_cantidad)}</td>
+    </tr>
+    <tr>
+      <td>Bodegas</td>
+      <td style="text-align:center">${fmtNumber(proyecto.bodegas_cantidad)}</td>
+    </tr>
+  `);
+  setHtml('res-acc-tfoot', `<td>Total</td><td style="text-align:center">${fmtNumber(accessoryTotal)}</td>`);
+  setHtml('cabida-acc-tfoot', `<td>Total</td><td style="text-align:center">${fmtNumber(accessoryTotal)}</td>`);
+  setText('cabida-vendible-pct', `${fmtNumber(proyecto.terraza_util_pct, 1)}%`);
+  setText('res-cabida-vendible-pct', `${fmtNumber(proyecto.terraza_util_pct, 1)}%`);
+  setText('cabida-common-total', `${fmtNumber(commonAreaTotal, 1)} m2`);
+  setText('res-cabida-common-total', `${fmtNumber(commonAreaTotal, 1)} m2`);
+  setText('cabida-util-total', `${fmtNumber(totals.util, 1)} m2`);
+  setText('res-cabida-util-total', `${fmtNumber(totals.util, 1)} m2`);
+  setText('cabida-vendible-total', `${fmtNumber(totals.vendible, 1)} m2`);
+  setText('res-cabida-vendible-total', `${fmtNumber(totals.vendible, 1)} m2`);
 }
 
 function renderCabidaEditor(rows) {
@@ -675,33 +675,33 @@ function renderCabidaEditor(rows) {
     <div class="card" style="margin-bottom:12px;background:#f8fafc">
       <div class="sec-title" style="font-size:14px">Parametros Generales de Cabida</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
-        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">% terraza util municipal</label><input id="cabida-terraza-util-pct" class="inp" type="number" step="0.01" value="${toNumber(proyecto.terraza_util_pct)}" onchange="onCabidaInputChange()"/></div>
+        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">% terraza considerada en vendible</label><input id="cabida-terraza-util-pct" class="inp" type="number" step="0.01" value="${toNumber(proyecto.terraza_util_pct)}" onchange="onCabidaInputChange()"/></div>
         <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Comunes modo</label><select id="cabida-comunes-tipo" class="inp" onchange="onCabidaInputChange()"><option value="porcentaje" ${proyecto.comunes_tipo === 'porcentaje' ? 'selected' : ''}>% m2 utiles</option><option value="total" ${proyecto.comunes_tipo === 'total' ? 'selected' : ''}>Total m2</option></select></div>
-        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Comunes valor</label><input id="cabida-comunes-valor" class="inp" type="number" step="0.01" value="${toNumber(proyecto.comunes_valor)}" onchange="onCabidaInputChange()"/></div>
-        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Estacionamientos</label><input id="cabida-estacionamientos-cantidad" class="inp" type="number" value="${toNumber(proyecto.estacionamientos_cantidad)}" onchange="onCabidaInputChange()"/></div>
-        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Interior estac./un</label><input id="cabida-estacionamientos-sup-interior" class="inp" type="number" step="0.01" value="${toNumber(proyecto.estacionamientos_sup_interior)}" onchange="onCabidaInputChange()"/></div>
-        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Terraza estac./un</label><input id="cabida-estacionamientos-sup-terrazas" class="inp" type="number" step="0.01" value="${toNumber(proyecto.estacionamientos_sup_terrazas)}" onchange="onCabidaInputChange()"/></div>
-        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Bodegas</label><input id="cabida-bodegas-cantidad" class="inp" type="number" value="${toNumber(proyecto.bodegas_cantidad)}" onchange="onCabidaInputChange()"/></div>
-        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Interior bodega/un</label><input id="cabida-bodegas-sup-interior" class="inp" type="number" step="0.01" value="${toNumber(proyecto.bodegas_sup_interior)}" onchange="onCabidaInputChange()"/></div>
-        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Terraza bodega/un</label><input id="cabida-bodegas-sup-terrazas" class="inp" type="number" step="0.01" value="${toNumber(proyecto.bodegas_sup_terrazas)}" onchange="onCabidaInputChange()"/></div>
+        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">M2 comunes totales</label><input id="cabida-comunes-valor" class="inp" type="number" step="0.01" value="${toNumber(proyecto.comunes_valor)}" onchange="onCabidaInputChange()"/></div>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:12px">
       ${rows.map((row) => `
         <div class="card" data-cabida-row>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div style="grid-column:1 / -1">
-              <label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Uso</label>
+              <label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Tipo de departamento</label>
               <input class="inp" data-field="uso" value="${escapeHtml(row.uso)}" onchange="onCabidaInputChange()"/>
             </div>
             <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Cantidad</label><input class="inp" type="number" data-field="cantidad" value="${toNumber(row.cantidad)}" onchange="onCabidaInputChange()"/></div>
-            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Sup. interior</label><input class="inp" type="number" step="0.01" data-field="sup_interior" value="${toNumber(row.sup_interior)}" onchange="onCabidaInputChange()"/></div>
-            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Terrazas</label><input class="inp" type="number" step="0.01" data-field="sup_terrazas" value="${toNumber(row.sup_terrazas)}" onchange="onCabidaInputChange()"/></div>
-            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Util mun.</label><input class="inp" type="number" step="0.01" value="${fmtNumber(getMunicipalUsefulPerUnit(row.sup_interior, row.sup_terrazas), 2)}" disabled/></div>
-            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Comunes edificio</label><input class="inp" type="text" value="${proyecto.comunes_tipo === 'total' ? `${fmtNumber(getCommonAreaTotal(), 1)} m2 total` : `${fmtNumber(toNumber(proyecto.comunes_valor), 1)}% de utiles`}" disabled/></div>
+            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">M2 interior</label><input class="inp" type="number" step="0.01" data-field="sup_interior" value="${toNumber(row.sup_interior)}" onchange="onCabidaInputChange()"/></div>
+            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">M2 terraza</label><input class="inp" type="number" step="0.01" data-field="sup_terrazas" value="${toNumber(row.sup_terrazas)}" onchange="onCabidaInputChange()"/></div>
+            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">M2 vendible</label><input class="inp" type="text" value="${fmtNumber(getSellableAreaPerUnit(row.sup_interior, row.sup_terrazas), 2)}" disabled/></div>
           </div>
         </div>
       `).join('')}
+    </div>
+    <div class="card" style="background:#f8fafc">
+      <div class="sec-title" style="font-size:14px">Estacionamientos y Bodegas</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">
+        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Numero de estacionamientos</label><input id="cabida-estacionamientos-cantidad" class="inp" type="number" value="${toNumber(proyecto.estacionamientos_cantidad)}" onchange="onCabidaInputChange()"/></div>
+        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Numero de bodegas</label><input id="cabida-bodegas-cantidad" class="inp" type="number" value="${toNumber(proyecto.bodegas_cantidad)}" onchange="onCabidaInputChange()"/></div>
+      </div>
     </div>
   `);
 }
@@ -962,7 +962,7 @@ function getUsoSaleMetrics(uso) {
   const cabidaRow = state.cabida.find((row) => row.uso === uso) || {};
   const config = state.ventasConfig.find((row) => row.uso === uso) || {};
   const unidades = toNumber(cabidaRow.cantidad);
-  const supVendible = (toNumber(cabidaRow.sup_interior) + toNumber(cabidaRow.sup_terrazas)) * unidades;
+  const supVendible = getSellableAreaPerUnit(cabidaRow.sup_interior, cabidaRow.sup_terrazas) * unidades;
   const m2PorUnidad = unidades ? supVendible / unidades : 0;
   const precioBase = m2PorUnidad * toNumber(config.precio_uf_m2);
   const subtotalPrincipal = precioBase * unidades;
@@ -1645,6 +1645,14 @@ function renderConstructionSCurveChart(metrics, distribution) {
       plugins: {
         legend: {
           position: 'top',
+          onClick(event, legendItem, legend) {
+            const chart = legend.chart;
+            const datasetIndex = legendItem.datasetIndex;
+            if (typeof datasetIndex !== 'number') return;
+            const meta = chart.getDatasetMeta(datasetIndex);
+            meta.hidden = meta.hidden === null ? !chart.data.datasets[datasetIndex].hidden : null;
+            chart.update();
+          },
           labels: {
             color: '#334155',
             usePointStyle: true,
@@ -1941,7 +1949,7 @@ function buildCostContext() {
     m2_sobre_cota_0: getAboveGradeAreaTotal(),
     m2_subterraneo: construccionMetrics.sup_bajo_tierra,
     m2_losa_total: construccionMetrics.sup_total,
-    m2_vendible_deptos: state.cabida.reduce((sum, row) => sum + ((toNumber(row.sup_interior) + toNumber(row.sup_terrazas)) * toNumber(row.cantidad)), 0),
+    m2_vendible_deptos: state.cabida.reduce((sum, row) => sum + (getSellableAreaPerUnit(row.sup_interior, row.sup_terrazas) * toNumber(row.cantidad)), 0),
     total_construccion: construccionMetrics.total_neto,
     total_terreno: terrenoBase,
     ventas_brutas: toNumber(state.calculos.ventas_brutas),
@@ -2367,7 +2375,9 @@ function renderCostPlanilla() {
   `);
 
   setHtml('planilla-tbody', categorias.map((categoria) => {
-    const isCollapsed = !!collapsedState[categoria.nombre];
+    const isCollapsed = Object.prototype.hasOwnProperty.call(collapsedState, categoria.nombre)
+      ? !!collapsedState[categoria.nombre]
+      : true;
     const hasSubpartidas = (categoria.partidas || []).length > 0;
     const categoryReadOnly = categoria.nombre === 'GASTOS FINANCIEROS';
     const categoryRows = [];
@@ -2605,7 +2615,11 @@ function renderCostFormulaOptions() {
 }
 
 function toggleCostCategoryCollapse(categoryName) {
-  state.costosUi.collapsed[categoryName] = !state.costosUi.collapsed[categoryName];
+  const collapsedState = state.costosUi.collapsed || {};
+  const currentValue = Object.prototype.hasOwnProperty.call(collapsedState, categoryName)
+    ? !!collapsedState[categoryName]
+    : true;
+  state.costosUi.collapsed[categoryName] = !currentValue;
   renderCostosModule();
 }
 
@@ -3024,11 +3038,11 @@ function getCabidaProjectSettingsFromEditor() {
     comunes_tipo: $('cabida-comunes-tipo')?.value || 'porcentaje',
     comunes_valor: toNumber($('cabida-comunes-valor')?.value),
     estacionamientos_cantidad: toNumber($('cabida-estacionamientos-cantidad')?.value),
-    estacionamientos_sup_interior: toNumber($('cabida-estacionamientos-sup-interior')?.value),
-    estacionamientos_sup_terrazas: toNumber($('cabida-estacionamientos-sup-terrazas')?.value),
+    estacionamientos_sup_interior: 0,
+    estacionamientos_sup_terrazas: 0,
     bodegas_cantidad: toNumber($('cabida-bodegas-cantidad')?.value),
-    bodegas_sup_interior: toNumber($('cabida-bodegas-sup-interior')?.value),
-    bodegas_sup_terrazas: toNumber($('cabida-bodegas-sup-terrazas')?.value),
+    bodegas_sup_interior: 0,
+    bodegas_sup_terrazas: 0,
   };
 }
 

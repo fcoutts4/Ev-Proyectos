@@ -417,18 +417,33 @@ tbody tr:hover{background:#f3f7fb!important}
         <div>
           <p style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px">Unidades</p>
           <table>
-            <thead><tr><th style="text-align:left">Uso</th><th>Cant.</th><th>Interior/Un</th><th>Terraza/Un</th><th>Util Mun/Un</th><th style="color:#3b82f6">Vendible/Un</th></tr></thead>
+            <thead><tr><th style="text-align:left">Tipo</th><th>Cant.</th><th>Interior/Un</th><th>Terraza/Un</th><th style="color:#3b82f6">Vendible/Un</th></tr></thead>
             <tbody id="res-cabida-tbody"></tbody>
             <tfoot><tr class="tfoot-green" id="res-cabida-tfoot"></tr></tfoot>
         </table>
+          <div style="font-size:10px;color:#64748b;margin-top:6px">Vendible considera <strong id="res-cabida-vendible-pct">50,0%</strong> de terraza.</div>
       </div>
         <!-- Superficies -->
         <div>
           <p style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px">Superficies</p>
           <table>
-            <thead><tr><th style="text-align:left">Uso</th><th style="color:#3b82f6">Vendible</th><th style="color:#22c55e">Losa</th></tr></thead>
+            <thead><tr><th style="text-align:left">Tipo</th><th>M2 útiles</th><th style="color:#3b82f6">M2 vendibles</th></tr></thead>
             <tbody id="res-sup-tbody"></tbody>
             <tfoot><tr class="tfoot-dark" id="res-sup-tfoot"></tr></tfoot>
+            <tbody id="res-sup-extra"></tbody>
+        </table>
+          <div style="display:flex;gap:16px;font-size:10px;color:#64748b;margin-top:6px">
+            <div>M2 útiles totales: <strong id="res-cabida-util-total">0 m2</strong></div>
+            <div>M2 comunes totales: <strong id="res-cabida-common-total">0 m2</strong></div>
+            <div>M2 vendibles totales: <strong id="res-cabida-vendible-total">0 m2</strong></div>
+          </div>
+      </div>
+        <div>
+          <p style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px">Estacionamientos y Bodegas</p>
+          <table>
+            <thead><tr><th style="text-align:left">Concepto</th><th>Cantidad</th></tr></thead>
+            <tbody id="res-acc-tbody"></tbody>
+            <tfoot><tr class="tfoot-green" id="res-acc-tfoot"></tr></tfoot>
         </table>
       </div>
     </div>
@@ -487,13 +502,13 @@ tbody tr:hover{background:#f3f7fb!important}
           <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#475569;margin-bottom:10px;display:flex;align-items:center;gap:6px"> UNIDADES</div>
           <table>
             <thead><tr>
-              <th style="text-align:left">USO</th>
-              <th>CANT.</th><th>INTERIOR/UN</th><th>TERRAZA/UN</th><th>UTIL MUN/UN</th><th style="color:#3b82f6">VENDIBLE/UN</th>
+              <th style="text-align:left">TIPO</th>
+              <th>CANT.</th><th>INTERIOR/UN</th><th>TERRAZA/UN</th><th style="color:#3b82f6">VENDIBLE/UN</th>
           </tr></thead>
             <tbody id="cabida-tbody"></tbody>
             <tfoot><tr class="tfoot-green" id="cabida-tfoot"></tr></tfoot>
         </table>
-          <p style="font-size:10px;color:#94a3b8;margin-top:6px">* El ratio M²/Un se calcula dividiendo la <strong style="color:#3b82f6">Superficie Vendible Total</strong> del uso por la cantidad de unidades.</p>
+          <p style="font-size:10px;color:#94a3b8;margin-top:6px">Vendible considera <strong id="cabida-vendible-pct">50,0%</strong> de terraza.</p>
       </div>
     </div>
 
@@ -503,13 +518,26 @@ tbody tr:hover{background:#f3f7fb!important}
         <div class="tbl-scroll">
           <table style="min-width:650px">
             <thead><tr>
-              <th style="text-align:left">USO</th>
-              <th>INTERIOR</th><th>TERRAZAS</th><th>COMUNES</th><th>ÚTIL MUN.</th>
-              <th style="color:#3b82f6">VENDIBLE</th><th style="color:#22c55e">LOSA</th>
+              <th style="text-align:left">TIPO</th>
+              <th>INTERIOR</th><th>TERRAZAS</th><th>M2 ÚTILES</th><th style="color:#3b82f6">M2 VENDIBLES</th>
           </tr></thead>
             <tbody id="sup-tbody"></tbody>
             <tfoot><tr class="tfoot-dark" id="sup-tfoot"></tr></tfoot>
+            <tbody id="sup-extra"></tbody>
         </table>
+          <div style="display:flex;gap:16px;font-size:10px;color:#64748b;margin-top:6px">
+            <div>M2 útiles totales: <strong id="cabida-util-total">0 m2</strong></div>
+            <div>M2 comunes totales: <strong id="cabida-common-total">0 m2</strong></div>
+            <div>M2 vendibles totales: <strong id="cabida-vendible-total">0 m2</strong></div>
+          </div>
+      </div>
+        <div style="margin-top:16px">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#475569;margin-bottom:10px;display:flex;align-items:center;gap:6px"> ESTACIONAMIENTOS Y BODEGAS</div>
+          <table style="max-width:360px">
+            <thead><tr><th style="text-align:left">CONCEPTO</th><th>CANTIDAD</th></tr></thead>
+            <tbody id="cabida-acc-tbody"></tbody>
+            <tfoot><tr class="tfoot-green" id="cabida-acc-tfoot"></tr></tfoot>
+          </table>
       </div>
     </div>
   </div>
@@ -533,7 +561,7 @@ tbody tr:hover{background:#f3f7fb!important}
   </div>
 
   <div style="display:grid;grid-template-columns:minmax(340px,460px) minmax(320px,520px);gap:16px;margin-bottom:16px;align-items:start;justify-content:start">
-    <div class="card" style="height:100%">
+    <div class="card" style="height:100%;min-height:430px">
       <div class="sec-title"> COMPRA TERRENO</div>
       <div style="display:grid;grid-template-columns:1fr;gap:14px">
         <div>
@@ -571,7 +599,7 @@ tbody tr:hover{background:#f3f7fb!important}
       </div>
     </div>
 
-    <div class="card" style="border:2px solid #fde68a;height:100%;max-width:520px;justify-self:start">
+    <div class="card" style="border:2px solid #fde68a;height:100%;min-height:430px;max-width:520px;justify-self:start">
       <div class="sec-title" style="margin-bottom:12px;color:#b45309"> FINANCIAMIENTO TERRENO</div>
       <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px;margin-bottom:12px;font-size:11px;color:#92400e">
         Este financiamiento se refleja automáticamente en los costos del proyecto dentro de la categoría de gastos financieros.
@@ -755,7 +783,7 @@ tbody tr:hover{background:#f3f7fb!important}
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px">
 
     <!-- Mix por Etapa -->
-    <div class="card">
+    <div class="card" style="min-height:430px">
       <div class="sec-title"> MIX DE VENTAS POR ETAPA</div>
       <div id="mix-ventas-list"></div>
   </div>
@@ -861,7 +889,7 @@ tbody tr:hover{background:#f3f7fb!important}
   <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:16px;align-items:start">
 
     <!-- Superficies -->
-    <div class="card">
+    <div class="card" style="min-height:430px">
       <div class="sec-title"> SUPERFICIES</div>
       <table>
         <thead><tr>
@@ -947,7 +975,7 @@ tbody tr:hover{background:#f3f7fb!important}
     </div>
   </div>
 
-    <div class="card" style="border:2px solid #bbf7d0">
+    <div class="card" style="border:2px solid #bbf7d0;min-height:430px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div class="sec-title" style="margin-bottom:0;color:#16a34a"> FINANCIAMIENTO</div>
       <span class="badge badge-green" style="font-size:10px">ACTIVO</span>
