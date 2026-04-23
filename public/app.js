@@ -3563,10 +3563,18 @@ async function guardarCostos() {
   await refreshHealthStatus();
 }
 
-function agregarUso() {
+function agregarUso(defaultLabel = 'Departamento') {
   const rows = getCabidaRowsFromEditor();
+  const baseLabel = String(defaultLabel || 'Departamento').trim() || 'Departamento';
+  const existingLabels = new Set(rows.map((row) => String(row.uso || '').trim().toLowerCase()));
+  let nextLabel = baseLabel;
+  let counter = 2;
+  while (existingLabels.has(nextLabel.toLowerCase())) {
+    nextLabel = `${baseLabel} ${counter}`;
+    counter += 1;
+  }
   rows.push({
-    uso: 'Nuevo uso',
+    uso: nextLabel,
     cantidad: 0,
     estacionamientos: 0,
     bodegas: 0,

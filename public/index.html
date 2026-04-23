@@ -513,30 +513,30 @@ tbody tr:hover{background:#f3f7fb!important}
     </div>
 
       <!-- Cuadro de Superficies -->
-      <div>
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#475569;margin-bottom:10px;display:flex;align-items:center;gap:6px"> CUADRO DE SUPERFICIES</div>
-        <div class="tbl-scroll">
-          <table style="min-width:650px">
+      <div style="display:grid;grid-template-columns:minmax(0,1.35fr) minmax(260px,.75fr);gap:16px;align-items:start">
+        <div class="card" style="padding:14px">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#475569;margin-bottom:10px;display:flex;align-items:center;gap:6px"> CUADRO DE SUPERFICIES</div>
+          <table>
             <thead><tr>
               <th style="text-align:left">TIPO</th>
               <th>INTERIOR</th><th>TERRAZAS</th><th>M2 ÚTILES</th><th style="color:#3b82f6">M2 VENDIBLES</th>
           </tr></thead>
             <tbody id="sup-tbody"></tbody>
-            <tfoot><tr class="tfoot-dark" id="sup-tfoot"></tr></tfoot>
+            <tfoot><tr style="background:#f8fafc" id="sup-tfoot"></tr></tfoot>
             <tbody id="sup-extra"></tbody>
         </table>
-          <div style="display:flex;gap:16px;font-size:10px;color:#64748b;margin-top:6px">
+          <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:10px;color:#64748b;margin-top:8px">
             <div>M2 útiles totales: <strong id="cabida-util-total">0 m2</strong></div>
             <div>M2 comunes totales: <strong id="cabida-common-total">0 m2</strong></div>
             <div>M2 vendibles totales: <strong id="cabida-vendible-total">0 m2</strong></div>
           </div>
       </div>
-        <div style="margin-top:16px">
+        <div class="card" style="padding:14px">
           <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#475569;margin-bottom:10px;display:flex;align-items:center;gap:6px"> ESTACIONAMIENTOS Y BODEGAS</div>
-          <table style="max-width:360px">
+          <table>
             <thead><tr><th style="text-align:left">CONCEPTO</th><th>CANTIDAD</th></tr></thead>
             <tbody id="cabida-acc-tbody"></tbody>
-            <tfoot><tr class="tfoot-green" id="cabida-acc-tfoot"></tr></tfoot>
+            <tfoot><tr style="background:#f8fafc" id="cabida-acc-tfoot"></tr></tfoot>
           </table>
       </div>
     </div>
@@ -545,9 +545,12 @@ tbody tr:hover{background:#f3f7fb!important}
 
   <!-- Editor de Unidades -->
   <div class="card">
-    <div class="sec-title">✏️ EDITAR UNIDADES</div>
+    <div class="sec-title">✏️ EDITAR DEPARTAMENTOS Y LOCALES</div>
     <div id="cabida-editor"></div>
-    <button class="btn-outline" style="margin-top:10px" onclick="agregarUso()">+ Agregar Uso</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <button class="btn-outline" type="button" onclick="agregarUso('Departamento')">+ Agregar Departamento</button>
+      <button class="btn-outline" type="button" onclick="agregarUso('Local Comercial')">+ Agregar Local Comercial</button>
+    </div>
 </div>
 </div><!-- end tab cabida -->
 
@@ -561,45 +564,45 @@ tbody tr:hover{background:#f3f7fb!important}
   </div>
 
   <div style="display:grid;grid-template-columns:minmax(340px,460px) minmax(320px,520px);gap:16px;margin-bottom:16px;align-items:start;justify-content:start">
-    <div class="card" style="height:100%;min-height:430px">
+    <div class="card" style="height:100%;min-height:400px">
       <div class="sec-title"> COMPRA TERRENO</div>
-      <div style="display:grid;grid-template-columns:1fr;gap:14px">
+      <div style="display:grid;grid-template-columns:1fr;gap:10px">
         <div>
-          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Compra terreno (mes-año)</div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:3px">Compra terreno (mes-año)</div>
           <input type="month" class="inp" id="terreno-fecha-compra" onchange="onTerrenoInputChange()">
         </div>
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px">
-          <div style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;margin-bottom:6px">Vínculo con Carta Gantt</div>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px">
+          <div style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;margin-bottom:4px">Vínculo con Carta Gantt</div>
           <div id="terreno-gantt-sync" style="font-size:11px;color:#64748b">Sincronizado con el bloque Compra terreno.</div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <div style="background:#f8fafc;border-radius:10px;padding:12px">
-            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Superficie Bruta</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div style="background:#f8fafc;border-radius:10px;padding:10px">
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">Superficie Bruta</div>
             <input type="number" class="inp" id="terreno-m2-bruto" step="0.01" oninput="onTerrenoInputChange()">
           </div>
-          <div style="background:#f8fafc;border-radius:10px;padding:12px">
-            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Afectación</div>
+          <div style="background:#f8fafc;border-radius:10px;padding:10px">
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">Afectación</div>
             <input type="number" class="inp" id="terreno-m2-afectacion" step="0.01" oninput="onTerrenoInputChange()">
           </div>
-          <div style="background:#f8fafc;border-radius:10px;padding:12px">
-            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Superficie Neta</div>
+          <div style="background:#f8fafc;border-radius:10px;padding:10px">
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">Superficie Neta</div>
             <input type="number" class="inp" id="terreno-m2-neto" step="0.01" readonly style="background:#fff;color:#0f172a;font-weight:700">
-            <div style="font-size:10px;color:#94a3b8;margin-top:4px">Bruta menos afectación</div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:3px">Bruta menos afectación</div>
           </div>
-          <div style="background:#f8fafc;border-radius:10px;padding:12px">
-            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">UF / m²</div>
+          <div style="background:#f8fafc;border-radius:10px;padding:10px">
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">UF / m²</div>
             <input type="number" class="inp" id="terreno-precio-uf-m2" step="0.01" inputmode="decimal" oninput="onTerrenoInputChange()">
           </div>
-          <div style="background:#eef6ff;border:1px solid #cfe2ff;border-radius:10px;padding:12px;grid-column:1 / -1">
-            <div style="font-size:10px;color:#64748b;text-transform:uppercase;margin-bottom:4px">Precio total</div>
+          <div style="background:#eef6ff;border:1px solid #cfe2ff;border-radius:10px;padding:10px;grid-column:1 / -1">
+            <div style="font-size:10px;color:#64748b;text-transform:uppercase;margin-bottom:3px">Precio total</div>
             <input type="number" class="inp" id="terreno-precio-total" step="0.01" readonly style="background:#fff;color:#0f172a;font-weight:800">
-            <div style="font-size:10px;color:#64748b;margin-top:4px">Resultado de superficie neta por UF / m²</div>
+            <div style="font-size:10px;color:#64748b;margin-top:3px">Resultado de superficie neta por UF / m²</div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="card" style="border:2px solid #fde68a;height:100%;min-height:430px;max-width:520px;justify-self:start">
+    <div class="card" style="border:2px solid #fde68a;height:100%;min-height:400px;max-width:520px;justify-self:start">
       <div class="sec-title" style="margin-bottom:12px;color:#b45309"> FINANCIAMIENTO TERRENO</div>
       <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px;margin-bottom:12px;font-size:11px;color:#92400e">
         Este financiamiento se refleja automáticamente en los costos del proyecto dentro de la categoría de gastos financieros.
@@ -662,10 +665,11 @@ tbody tr:hover{background:#f3f7fb!important}
   <!-- 1. Estrategia de Precios -->
   <div class="card" style="margin-bottom:16px">
     <div class="sec-title"> ESTRATEGIA DE PRECIOS E INGRESOS</div>
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:12px">Define precios por tipo de producto desde la cabida: departamentos, locales comerciales, estacionamientos y bodegas.</div>
     <div class="tbl-scroll">
       <table id="ventas-precios-table" style="min-width:1000px">
         <thead><tr>
-          <th style="text-align:left">USO</th>
+          <th style="text-align:left">TIPO</th>
           <th colspan="3" style="background:#1e293b;color:#fff;text-align:center">CABIDA (LECTURA)</th>
           <th colspan="2" style="background:#92400e;color:#fff;text-align:center">PRECIOS PRINCIPALES</th>
           <th style="color:#22c55e">VENTA UNIDADES</th>
@@ -691,11 +695,11 @@ tbody tr:hover{background:#f3f7fb!important}
 
   <!-- 2. Formas de Pago -->
   <div class="card" style="margin-bottom:16px">
-    <div class="sec-title"> FORMAS DE PAGO POR USO</div>
+    <div class="sec-title"> FORMAS DE PAGO POR TIPO</div>
     <div class="tbl-scroll">
       <table id="formas-pago-table" style="min-width:900px">
         <thead><tr>
-          <th style="text-align:left">USO COMERCIAL</th>
+          <th style="text-align:left">TIPO</th>
           <th>RESERVA</th>
           <th style="color:#3b82f6">PIE PROMESA (%)</th>
           <th>MONTO PROMESA</th>
@@ -727,7 +731,7 @@ tbody tr:hover{background:#f3f7fb!important}
     </div>
       <table>
         <thead><tr>
-          <th style="text-align:left">USO (PREVENTA)</th>
+          <th style="text-align:left">TIPO (PREVENTA)</th>
           <th>VÍNCULO EN GANTT</th>
           <th>INICIO</th>
           <th>DURACIÓN</th>
@@ -749,7 +753,7 @@ tbody tr:hover{background:#f3f7fb!important}
     </div>
       <table>
         <thead><tr>
-          <th style="text-align:left">USO (VENTA)</th>
+          <th style="text-align:left">TIPO (VENTA)</th>
           <th>VÍNCULO EN GANTT</th>
           <th>INICIO</th>
           <th>DURACIÓN</th>
@@ -783,7 +787,7 @@ tbody tr:hover{background:#f3f7fb!important}
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px">
 
     <!-- Mix por Etapa -->
-    <div class="card" style="min-height:430px">
+    <div class="card" style="min-height:400px">
       <div class="sec-title"> MIX DE VENTAS POR ETAPA</div>
       <div id="mix-ventas-list"></div>
   </div>
@@ -935,7 +939,7 @@ tbody tr:hover{background:#f3f7fb!important}
   </div>
 
     <!-- Plazos y Pagos -->
-    <div class="card">
+    <div class="card" style="min-height:400px">
       <div class="sec-title"> PLAZOS Y PAGOS</div>
 
       <div style="margin-bottom:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px">
@@ -975,7 +979,7 @@ tbody tr:hover{background:#f3f7fb!important}
     </div>
   </div>
 
-    <div class="card" style="border:2px solid #bbf7d0;min-height:430px">
+    <div class="card" style="border:2px solid #bbf7d0;min-height:400px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div class="sec-title" style="margin-bottom:0;color:#16a34a"> FINANCIAMIENTO</div>
       <span class="badge badge-green" style="font-size:10px">ACTIVO</span>
