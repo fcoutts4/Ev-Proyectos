@@ -143,11 +143,16 @@ tbody tr:hover{background:#f8fafc}
 #cost-flow-monthly-btn,
 #cost-flow-cumulative-btn,
 #cost-flow-both-btn{padding:5px 10px;font-size:11px}
+.planilla-nav{display:flex;align-items:center;gap:6px}
+.planilla-nav .btn-outline{padding:4px 8px;font-size:11px}
+#planilla-table{min-width:1500px}
 #planilla-table thead th{padding:6px 8px;font-size:9px}
 #planilla-table .inp{padding:4px 8px;font-size:11px;min-height:28px}
 #planilla-table .btn-outline{padding:5px 10px;font-size:11px}
 #planilla-table .btn-plus{width:24px;height:24px;font-size:14px}
 #planilla-table .drag-handle{width:18px;font-size:12px}
+#planilla-table th[data-month-col]{min-width:84px}
+#planilla-table td[data-month-cell]{min-width:84px}
 /* INPUT */
 .inp{border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;font-size:12px;width:100%;outline:none}
 .inp:focus{border-color:#22c55e;box-shadow:0 0 0 2px rgba(34,197,94,.15)}
@@ -202,11 +207,11 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   <div class="tab-nav" id="tabBar">
     <button class="tab-btn active" onclick="showTab('resumen',this)">Resumen Ejecutivo</button>
     <button class="tab-btn" onclick="showTab('cabida',this)">Cabida Proyecto</button>
+    <button class="tab-btn" onclick="showTab('terreno',this)">Terreno</button>
     <button class="tab-btn" onclick="showTab('ventas',this)">Ventas</button>
     <button class="tab-btn" onclick="showTab('gantt',this)">Carta Gantt</button>
     <button class="tab-btn" onclick="showTab('construccion',this)">Construcción</button>
     <button class="tab-btn" onclick="showTab('costos',this)">Costos del Proyecto</button>
-    <button class="tab-btn" onclick="showTab('financiamiento',this)">Financiamiento</button>
     <button class="tab-btn" onclick="showTab('flujo',this)">Flujo de Caja</button>
 </div>
 </div>
@@ -460,6 +465,80 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     <button class="btn-outline" style="margin-top:10px" onclick="agregarUso()">+ Agregar Uso</button>
 </div>
 </div><!-- end tab cabida -->
+
+<div id="tab-terreno" class="tab-pane">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <div>
+      <div style="font-size:16px;font-weight:800;color:#0f172a"> TERRENO Y FINANCIAMIENTO TERRENO</div>
+      <div style="font-size:11px;color:#94a3b8">La fecha de compra ancla el calendario del proyecto y se relaciona con el hito de adquisición en la carta gantt.</div>
+    </div>
+    <button class="btn-primary" onclick="guardarTerreno()"> Guardar</button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:minmax(320px,420px) minmax(0,1fr);gap:16px;margin-bottom:16px;align-items:start">
+    <div class="card">
+      <div class="sec-title"> FECHA DE COMPRA DEL TERRENO</div>
+      <div style="display:grid;grid-template-columns:1fr;gap:14px">
+        <div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Fecha de compra</div>
+          <input type="date" class="inp" id="terreno-fecha-compra" onchange="onTerrenoInputChange()">
+        </div>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px">
+          <div style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;margin-bottom:6px">Vínculo con Carta Gantt</div>
+          <div id="terreno-gantt-sync" style="font-size:11px;color:#64748b">Sincronizado con el hito de adquisición de terreno.</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div style="background:#f8fafc;border-radius:10px;padding:12px">
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Costo terreno detectado</div>
+            <div style="font-size:1.4rem;font-weight:900;color:#0f172a" id="terreno-costo-base">0 UF</div>
+          </div>
+          <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px">
+            <div style="font-size:10px;color:#b45309;text-transform:uppercase;margin-bottom:4px">Monto financiado</div>
+            <div style="font-size:1.4rem;font-weight:900;color:#b45309" id="terreno-monto-financiado">0 UF</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="border:2px solid #fde68a">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="sec-title" style="margin-bottom:0;color:#b45309"> FINANCIAMIENTO TERRENO</div>
+        <label class="toggle"><input type="checkbox" id="fin-terreno-activo" onchange="onTerrenoInputChange()"><span class="toggle-slider"></span></label>
+      </div>
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px;margin-bottom:12px;font-size:11px;color:#92400e">
+        Este financiamiento se refleja automáticamente en los costos del proyecto dentro de la categoría de gastos financieros.
+      </div>
+      <div id="fin-terreno-partidas" style="margin-bottom:12px;font-size:11px;color:#475569"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Costo real detectado</div><div style="font-weight:800;color:#b45309" id="fin-terreno-costo">0 UF</div></div>
+        <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Monto a financiar</div><div style="font-weight:800;color:#22c55e" id="fin-terreno-monto">0 UF</div></div>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;margin-bottom:10px" id="fin-terreno-plazos">Plazo vinculado al inicio de construcción</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">% a financiar</div>
+          <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-terreno-pct" min="0" max="100" oninput="onTerrenoInputChange()"><span style="font-size:11px">%</span></div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Tasa interés</div>
+          <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-terreno-tasa" step="0.1" oninput="onTerrenoInputChange()"><span style="font-size:11px">ANUAL</span></div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Pago intereses</div>
+          <select class="inp" id="fin-terreno-pago-int" onchange="onTerrenoInputChange()">
+            <option>Semestral</option><option>Mensual</option><option>Anual</option><option>Contra Escrituraciones</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Pago capital</div>
+          <select class="inp" id="fin-terreno-pago-cap" onchange="onTerrenoInputChange()">
+            <option>Inicio Construccion</option><option>Contra Escrituraciones</option><option>Fin Proyecto</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+</div><!-- end tab terreno -->
 
 <div id="tab-ventas" class="tab-pane">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -777,6 +856,44 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   </div>
 </div>
 
+  <div class="card" style="border:2px solid #bbf7d0;margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="sec-title" style="margin-bottom:0;color:#16a34a"> FINANCIAMIENTO CONSTRUCCIÓN</div>
+      <label class="toggle"><input type="checkbox" id="fin-constr-activo" onchange="updateConstrParams()"><span class="toggle-slider"></span></label>
+    </div>
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px;margin-bottom:12px;font-size:11px;color:#166534">
+      Este financiamiento se usa para las referencias automáticas de gastos financieros dentro de la planilla de costos.
+    </div>
+    <div id="fin-constr-partidas" style="margin-bottom:10px;font-size:11px;color:#475569"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Costo real</div><div style="font-weight:800;color:#22c55e" id="fin-constr-costo">0 UF</div></div>
+      <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">A financiar</div><div style="font-weight:800;color:#22c55e" id="fin-constr-monto">0 UF</div></div>
+    </div>
+    <div style="font-size:10px;color:#94a3b8;margin-bottom:10px" id="fin-constr-plazos">Plazo vinculado al hito de construcción</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div>
+        <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">% a financiar</div>
+        <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-constr-pct" min="0" max="100" oninput="updateConstrParams()"><span style="font-size:11px">%</span></div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Tasa interés</div>
+        <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-constr-tasa" step="0.1" oninput="updateConstrParams()"><span style="font-size:11px">ANUAL</span></div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Pago intereses</div>
+        <select class="inp" id="fin-constr-pago-int" onchange="updateConstrParams()">
+          <option>Anual</option><option>Mensual</option><option>Semestral</option><option>Contra Escrituraciones</option>
+        </select>
+      </div>
+      <div>
+        <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Pago capital</div>
+        <select class="inp" id="fin-constr-pago-cap" onchange="updateConstrParams()">
+          <option>Contra Escrituraciones</option><option>Fin Proyecto</option><option>Inicio Construccion</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
   <!-- Curva S -->
   <div class="card-dark" style="border-radius:12px;margin-bottom:16px">
     <div class="sec-title" style="color:#fff"> CURVA S: AVANCE FÍSICO VS FLUJO DE PAGOS</div>
@@ -801,8 +918,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   </div>
 </div>
 </div><!-- end tab construccion -->
-
-<div id="tab-costos" class="tab-pane">
 
   <!-- Top: Total Neto/Bruto + Distribución + Flujo -->
   <div style="display:grid;grid-template-columns:minmax(320px,420px) minmax(0,1fr);gap:16px;margin-bottom:16px;align-items:start">
@@ -852,13 +967,17 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
         <div style="font-size:13px;font-weight:900;color:#fff;letter-spacing:.08em;text-transform:uppercase">PLANILLA DE COSTOS</div>
         <div style="font-size:10px;color:#94a3b8;margin-top:2px">Arrastra las subpartidas manuales desde los 6 puntos. El plan de pago puede ser mixto por meses o hitos.</div>
     </div>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="planilla-nav">
+          <button class="btn-outline" type="button" onclick="scrollCostPlanilla(-480)">← Meses</button>
+          <button class="btn-outline" type="button" onclick="scrollCostPlanilla(480)">Meses →</button>
+        </div>
         <button class="btn-primary" onclick="guardarCostos()"> Guardar</button>
     </div>
   </div>
 
-    <div class="tbl-scroll" style="border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px">
-      <table id="planilla-table" style="min-width:1300px">
+    <div id="cost-planilla-scroll" class="tbl-scroll" style="border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px">
+      <table id="planilla-table">
         <thead id="planilla-head"></thead>
         <tbody id="planilla-tbody"></tbody>
         <tfoot id="planilla-tfoot"></tfoot>
@@ -868,142 +987,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 </div>
 
 </div><!-- end tab costos -->
-
-<div id="tab-financiamiento" class="tab-pane">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-    <div>
-      <div style="font-size:16px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:8px"> ESTRUCTURA DE FINANCIAMIENTO</div>
-      <div style="font-size:11px;color:#94a3b8">Asegúrate de guardar tus cambios</div>
-  </div>
-    <button class="btn-primary" onclick="guardarFinanciamiento()"> Guardar</button>
-</div>
-
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;align-items:start">
-
-    <!-- Crédito Terreno -->
-    <div class="card" style="border:2px solid #fde68a">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div class="sec-title" style="margin-bottom:0;color:#b45309"> CRÉDITO TERRENO</div>
-        <label class="toggle"><input type="checkbox" id="fin-terreno-activo" checked onchange="calcularFinanciamiento()"><span class="toggle-slider"></span></label>
-    </div>
-      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px;margin-bottom:12px;font-size:11px;color:#92400e">
-        ℹ Este crédito agrupa automáticamente todas las partidas de la pestaña de Costos que tienen activo el switch "Es Terreno".
-    </div>
-      <div id="fin-terreno-partidas" style="margin-bottom:12px;font-size:11px;color:#475569"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-        <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Costo Real Detectado</div><div style="font-weight:800;color:#b45309" id="fin-terreno-costo">132.000 UF</div></div>
-        <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Monto a Financiar</div><div style="font-weight:800;color:#22c55e" id="fin-terreno-monto">92.400 UF</div></div>
-    </div>
-      <div style="font-size:10px;color:#94a3b8;margin-bottom:10px" id="fin-terreno-plazos">PLAZOS: MES 1</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div>
-          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">% A FINANCIAR</div>
-          <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-terreno-pct" value="70" min="0" max="100" oninput="calcularFinanciamiento()"><span style="font-size:11px">%</span></div>
-      </div>
-        <div>
-          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">TASA INTERÉS</div>
-          <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-terreno-tasa" value="3.50" step="0.1" oninput="calcularFinanciamiento()"><span style="font-size:11px">ANUAL</span></div>
-      </div>
-        <div>
-          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">PAGO INTERESES</div>
-          <select class="inp" id="fin-terreno-pago-int" onchange="calcularFinanciamiento()">
-            <option>Semestral</option><option>Mensual</option><option>Anual</option><option>Contra Escrituraciones</option>
-        </select>
-      </div>
-        <div>
-          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">PAGO CAPITAL</div>
-          <select class="inp" id="fin-terreno-pago-cap" onchange="calcularFinanciamiento()">
-            <option>Inicio Construccion</option><option>Contra Escrituraciones</option><option>Fin Proyecto</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-    <!-- Línea Construcción -->
-    <div class="card" style="border:2px solid #bbf7d0">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div class="sec-title" style="margin-bottom:0;color:#16a34a"> LÍNEA CONSTRUCCIÓN</div>
-        <label class="toggle"><input type="checkbox" id="fin-constr-activo" checked onchange="calcularFinanciamiento()"><span class="toggle-slider"></span></label>
-    </div>
-      <div id="fin-constr-partidas" style="margin-bottom:10px;font-size:11px;color:#475569"></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-        <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Costo Real</div><div style="font-weight:800;color:#22c55e" id="fin-constr-costo">241.557 UF</div></div>
-        <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">A Financiar</div><div style="font-weight:800;color:#22c55e" id="fin-constr-monto">241.557 UF</div></div>
-    </div>
-      <div style="font-size:10px;color:#94a3b8;margin-bottom:10px" id="fin-constr-plazos">PLAZOS: MES 15 A MES 36</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div>
-          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">% A FINANCIAR</div>
-          <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-constr-pct" value="100" min="0" max="100" oninput="calcularFinanciamiento()"><span style="font-size:11px">%</span></div>
-      </div>
-        <div>
-          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">TASA INTERÉS</div>
-          <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-constr-tasa" value="3.50" step="0.1" oninput="calcularFinanciamiento()"><span style="font-size:11px">ANUAL</span></div>
-      </div>
-        <div>
-          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">PAGO INTERESES</div>
-          <select class="inp" id="fin-constr-pago-int" onchange="calcularFinanciamiento()">
-            <option>Anual</option><option>Mensual</option><option>Semestral</option><option>Contra Escrituraciones</option>
-        </select>
-      </div>
-        <div>
-          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">PAGO CAPITAL</div>
-          <select class="inp" id="fin-constr-pago-cap" onchange="calcularFinanciamiento()">
-            <option>Contra Escrituraciones</option><option>Fin Proyecto</option><option>Inicio Construccion</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-</div>
-
-  <!-- Gráficos Financiamiento -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-    <div class="card-dark" style="border-radius:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div class="sec-title" style="color:#fff"> EVOLUCIÓN DE DEUDA BANCARIA</div>
-        <div style="display:flex;gap:4px">
-          <button class="badge" onclick="setDeudaView('giros',this)" style="cursor:pointer;background:rgba(255,255,255,.1);color:#fff">Giros</button>
-          <button class="badge" onclick="setDeudaView('amort',this)" style="cursor:pointer;background:rgba(255,255,255,.1);color:#fff">Amortización</button>
-          <button class="badge badge-blue" onclick="setDeudaView('saldo',this)" style="cursor:pointer">Saldo</button>
-      </div>
-    </div>
-      <canvas id="deuda-chart" height="200"></canvas>
-  </div>
-    <div class="card-dark" style="border-radius:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div class="sec-title" style="color:#fff"> INTERESES FINANCIEROS</div>
-        <div style="display:flex;gap:4px">
-          <button class="badge" onclick="setInteresView('m_dev',this)" style="cursor:pointer;background:rgba(255,255,255,.1);color:#fff">M.Dev</button>
-          <button class="badge" onclick="setInteresView('m_pag',this)" style="cursor:pointer;background:rgba(255,255,255,.1);color:#fff">M.Pag</button>
-          <button class="badge" onclick="setInteresView('ac_dev',this)" style="cursor:pointer;background:rgba(255,255,255,.1);color:#fff">Ac.Dev</button>
-          <button class="badge badge-blue" onclick="setInteresView('ac_pag',this)" style="cursor:pointer">Ac.Pag</button>
-      </div>
-    </div>
-      <canvas id="intereses-chart" height="200"></canvas>
-  </div>
-</div>
-
-  <!-- Tabla detalle -->
-  <div class="card">
-    <div class="sec-title"> TABLA DE FINANCIAMIENTO MENSUAL</div>
-    <div class="tbl-scroll">
-      <table>
-        <thead><tr>
-          <th style="text-align:left">CONCEPTO</th>
-          <th>TOTAL</th>
-          <th id="fin-tabla-header"></th>
-      </tr></thead>
-        <tbody id="fin-tabla-tbody"></tbody>
-        <tfoot><tr style="background:#0f172a">
-          <td style="color:#fff;font-weight:800;padding:10px;font-size:11px;text-transform:uppercase">TOTAL GENERAL</td>
-          <td style="color:#22c55e;font-weight:800;padding:10px" id="fin-total-general"></td>
-          <td></td>
-      </tr></tfoot>
-    </table>
-  </div>
-</div>
-</div><!-- end tab financiamiento -->
 
 <div id="tab-flujo" class="tab-pane">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">

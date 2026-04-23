@@ -55,6 +55,7 @@ async function initDb() {
         nombre TEXT NOT NULL,
         direccion TEXT DEFAULT '',
         tipo TEXT DEFAULT 'Residencial',
+        compra_terreno_fecha DATE,
         terraza_util_pct DOUBLE PRECISION DEFAULT 50,
         comunes_tipo TEXT DEFAULT 'porcentaje',
         comunes_valor DOUBLE PRECISION DEFAULT 0,
@@ -198,6 +199,7 @@ async function initDb() {
     `);
 
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS terraza_util_pct DOUBLE PRECISION DEFAULT 50');
+    await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS compra_terreno_fecha DATE');
     await query("ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS comunes_tipo TEXT DEFAULT 'porcentaje'");
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS comunes_valor DOUBLE PRECISION DEFAULT 0');
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS estacionamientos_cantidad INTEGER DEFAULT 0');
@@ -266,15 +268,16 @@ const proyectos = {
     const id = uuidv4();
     await query(
       `INSERT INTO proyectos (
-        id, nombre, direccion, tipo, terraza_util_pct, comunes_tipo, comunes_valor,
+        id, nombre, direccion, tipo, compra_terreno_fecha, terraza_util_pct, comunes_tipo, comunes_valor,
         estacionamientos_cantidad, estacionamientos_sup_interior, estacionamientos_sup_terrazas,
         bodegas_cantidad, bodegas_sup_interior, bodegas_sup_terrazas, updated_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
       [
         id,
         data.nombre,
         data.direccion || '',
         data.tipo || 'Residencial',
+        data.compra_terreno_fecha || null,
         data.terraza_util_pct ?? 50,
         data.comunes_tipo || 'porcentaje',
         data.comunes_valor || 0,
@@ -297,22 +300,24 @@ const proyectos = {
         nombre = $1,
         direccion = $2,
         tipo = $3,
-        terraza_util_pct = $4,
-        comunes_tipo = $5,
-        comunes_valor = $6,
-        estacionamientos_cantidad = $7,
-        estacionamientos_sup_interior = $8,
-        estacionamientos_sup_terrazas = $9,
-        bodegas_cantidad = $10,
-        bodegas_sup_interior = $11,
-        bodegas_sup_terrazas = $12,
-        updated_by = COALESCE($13, updated_by),
+        compra_terreno_fecha = $4,
+        terraza_util_pct = $5,
+        comunes_tipo = $6,
+        comunes_valor = $7,
+        estacionamientos_cantidad = $8,
+        estacionamientos_sup_interior = $9,
+        estacionamientos_sup_terrazas = $10,
+        bodegas_cantidad = $11,
+        bodegas_sup_interior = $12,
+        bodegas_sup_terrazas = $13,
+        updated_by = COALESCE($14, updated_by),
         updated_at = NOW()
-      WHERE id = $14`,
+      WHERE id = $15`,
       [
         data.nombre,
         data.direccion || '',
         data.tipo || 'Residencial',
+        data.compra_terreno_fecha || null,
         data.terraza_util_pct ?? 50,
         data.comunes_tipo || 'porcentaje',
         data.comunes_valor || 0,
@@ -628,11 +633,11 @@ async function seedDemoProject() {
   const pid = uuidv4();
   await query(
     `INSERT INTO proyectos (
-      id, nombre, direccion, tipo, terraza_util_pct, comunes_tipo, comunes_valor,
+      id, nombre, direccion, tipo, compra_terreno_fecha, terraza_util_pct, comunes_tipo, comunes_valor,
       estacionamientos_cantidad, estacionamientos_sup_interior, estacionamientos_sup_terrazas,
       bodegas_cantidad, bodegas_sup_interior, bodegas_sup_terrazas
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-    [pid, 'Edificio Residencial Tipo', 'Direccion en Las Condes, Las Condes', 'Residencial', 50, 'porcentaje', 20, 100, 12.5, 0, 50, 3.5, 0]
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+    [pid, 'Edificio Residencial Tipo', 'Direccion en Las Condes, Las Condes', 'Residencial', '2027-08-01', 50, 'porcentaje', 20, 100, 12.5, 0, 50, 3.5, 0]
   );
 
   await cabida.upsert(pid, [

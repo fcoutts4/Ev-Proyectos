@@ -1399,7 +1399,28 @@ function createMonthlyArray(length = getCostMonthCount(), fill = 0) {
 }
 
 function getCostMonthLabels() {
-  return Array.from({ length: getCostMonthCount() }, (_, index) => `Mes ${index}`);
+  const baseDate = getCostStartDate();
+  return Array.from({ length: getCostMonthCount() }, (_, index) => formatCostMonthLabel(addMonths(baseDate, index)));
+}
+
+function getCostStartDate() {
+  const reference = state.proyecto?.created_at || state.proyecto?.updated_at || new Date().toISOString();
+  const date = new Date(reference);
+  return Number.isNaN(date.getTime()) ? new Date() : date;
+}
+
+function addMonths(date, monthsToAdd) {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + monthsToAdd);
+  return next;
+}
+
+function formatCostMonthLabel(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const month = new Intl.DateTimeFormat('es-CL', { month: 'short' }).format(date).replace('.', '').toLowerCase();
+  const year = new Intl.DateTimeFormat('es-CL', { year: '2-digit' }).format(date);
+  return `${month}-${year}`;
 }
 
 function getGanttReferenceMonth(refName, mode = 'inicio') {
@@ -1720,8 +1741,7 @@ function renderCostPlanilla() {
       <th style="min-width:170px;text-align:left">Plan de pago</th>
       <th style="min-width:110px">Total neto</th>
       <th style="width:64px">IVA</th>
-      <th style="width:78px">Terreno</th>
-      ${monthLabels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}
+      ${monthLabels.map((label) => `<th data-month-col>${escapeHtml(label)}</th>`).join('')}
     </tr>
   `);
 
@@ -1747,7 +1767,7 @@ function renderCostPlanilla() {
         if (sectionLabel && sectionLabel !== previousLabel) {
           categoryRows.push(`
             <tr class="subcat-row">
-              <td colspan="${7 + monthCount}">${escapeHtml(sectionLabel)}</td>
+              <td colspan="${6 + monthCount}">${escapeHtml(sectionLabel)}</td>
             </tr>
           `);
         }
@@ -1772,15 +1792,14 @@ function renderCostPlanilla() {
           <td>${partida.auto_origen ? '<span class="badge badge-yellow">AUTO</span>' : `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><button class="btn-outline" type="button" onclick="openPaymentPlanModal('${escapeHtml(categoria.nombre)}', ${index})">${escapeHtml(summarizePaymentPlan(partida.plan_pago))}</button><div style="font-size:10px;color:${Math.abs(getPaymentPlanAssignedPct(partida.plan_pago) - 100) < 0.01 ? '#16a34a' : '#b45309'};white-space:nowrap">${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))}</div></div>`}</td>
           <td style="text-align:center;color:#22c55e;font-weight:800">${fmtUf(total)}</td>
           <td style="text-align:center"><input type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''} ${partida.auto_origen ? 'disabled' : ''}/></td>
-          <td style="text-align:center"><input type="checkbox" data-field="es_terreno" ${partida.es_terreno ? 'checked' : ''} ${partida.auto_origen ? 'disabled' : ''}/></td>
-          ${distribucion.map((value, monthIndex) => `<td><input class="inp cost-month-input" data-month="${monthIndex}" type="number" step="0.01" value="${toNumber(value)}" ${partida.auto_origen ? 'disabled' : ''}/></td>`).join('')}
+          ${distribucion.map((value, monthIndex) => `<td data-month-cell><input class="inp cost-month-input" data-month="${monthIndex}" type="number" step="0.01" value="${toNumber(value)}" ${partida.auto_origen ? 'disabled' : ''}/></td>`).join('')}
         </tr>
       `);
     });
 
     return `
       <tr class="cat-row">
-        <td colspan="${7 + monthCount}" style="padding:10px">
+        <td colspan="${6 + monthCount}" style="padding:10px">
           <div class="cost-category-header">
             <div class="cost-category-title">
               <button class="btn-outline btn-plus" type="button" onclick="${hasSubpartidas ? `toggleCostCategoryCollapse('${escapeHtml(categoria.nombre)}')` : ''}" title="${hasSubpartidas ? 'Expandir o colapsar' : 'Sin subpartidas'}" ${hasSubpartidas ? '' : 'disabled style="opacity:.45;cursor:not-allowed"'}>${hasSubpartidas ? (isCollapsed ? '+' : '-') : '·'}</button>
@@ -1801,7 +1820,6 @@ function renderCostPlanilla() {
       <td colspan="4">Totales</td>
       <td>${fmtUf(totalNeto)}</td>
       <td>${fmtUf(totalIva)}</td>
-      <td>${fmtUf(totalNeto + totalIva)}</td>
       ${monthlyTotals.map((value) => `<td>${fmtUf(value)}</td>`).join('')}
     </tr>
   `);
@@ -1960,6 +1978,12 @@ function toggleCostCategoryCollapse(categoryName) {
 function setCostFlowMode(mode) {
   state.costosUi.costFlowMode = ['monthly', 'cumulative', 'both'].includes(mode) ? mode : 'both';
   renderCostosModule();
+}
+
+function scrollCostPlanilla(offset) {
+  const container = $('cost-planilla-scroll');
+  if (!container) return;
+  container.scrollBy({ left: offset, behavior: 'smooth' });
 }
 
 function openCostFormulaModal(categoryName, index) {
@@ -2712,6 +2736,7 @@ window.agregarPartidaLinea = agregarPartidaLinea;
 window.redistribuirPartida = redistribuirPartida;
 window.aplicarPlanPagoFila = aplicarPlanPagoFila;
 window.setCostFlowMode = setCostFlowMode;
+window.scrollCostPlanilla = scrollCostPlanilla;
 window.openCostFormulaModal = openCostFormulaModal;
 window.closeCostFormulaModal = closeCostFormulaModal;
 window.saveCostFormulaModal = saveCostFormulaModal;
