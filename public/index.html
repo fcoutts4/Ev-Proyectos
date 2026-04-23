@@ -130,9 +130,9 @@ tbody tr:hover{background:#f8fafc}
 .gantt-quarter-mark span{position:absolute;top:5px;left:8px;font-size:10px;font-weight:700;color:#475569;white-space:nowrap}
 .gantt-quarter-mark strong{display:block;font-size:9px;color:#94a3b8;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 .gantt-editor-track,.gantt-track{background-image:linear-gradient(90deg, rgba(148,163,184,.18) 1px, transparent 1px);background-size:var(--month-width,54px) 100%}
-.gantt-editor-track{height:24px;border:1px solid #e2e8f0}
+.gantt-editor-track{height:24px;background-color:transparent;border:none}
 .gantt-editor-bar{top:3px;height:18px}
-.gantt-track{height:18px;background-color:#f8fafc;border-radius:6px}
+.gantt-track{height:18px;background-color:transparent;border-radius:6px}
 .gantt-bar{top:1px;height:16px}
 .gantt-cell-tight .inp{padding:5px 6px;text-align:center}
 .gantt-actions{display:flex;align-items:center;justify-content:center}
@@ -830,20 +830,11 @@ tbody tr:hover{background:#f3f7fb!important}
           <th class="gantt-sticky-left gantt-sticky-head" style="left:410px;width:62px">DESFASE</th>
           <th class="gantt-sticky-left gantt-sticky-head" style="left:472px;width:62px">INICIO</th>
           <th class="gantt-sticky-left gantt-sticky-head" style="left:534px;width:70px">DURACIÓN</th>
-          <th class="gantt-sticky-left gantt-sticky-head" style="left:604px;width:62px;color:#22c55e">FIN</th>
           <th class="gantt-timeline-head"><div id="gantt-timeline-head"></div></th>
           <th class="gantt-sticky-right gantt-sticky-head" style="width:42px">X</th>
       </tr>
     </thead>
       <tbody id="gantt-tbody"></tbody>
-      <tfoot>
-        <tr style="background:#0f172a">
-          <td colspan="6" class="gantt-sticky-left gantt-sticky-foot" style="left:0;color:#fff;font-weight:800;font-size:12px;padding:10px">TOTAL PROYECTO</td>
-          <td class="gantt-sticky-left gantt-sticky-foot" style="left:604px;color:#fff;font-weight:800;font-size:12px;padding:10px" id="gantt-total-fin"></td>
-          <td style="padding:4px 8px;background:#0f172a"><div style="background:#0f172a;border:1px solid #334155;border-radius:4px;height:22px;display:flex;align-items:center;justify-content:center"><span id="gantt-total-bar" style="font-size:10px;font-weight:700;color:#fff"></span></div></td>
-          <td class="gantt-sticky-right gantt-sticky-foot" style="width:42px;background:#0f172a"></td>
-      </tr>
-    </tfoot>
   </table>
 </div>
 </div>
@@ -858,11 +849,11 @@ tbody tr:hover{background:#f3f7fb!important}
     <button class="btn-primary" onclick="guardarConstruccion()"> Guardar</button>
 </div>
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:16px">
 
-    <!-- Definición de Costos por Losa -->
+    <!-- Superficies -->
     <div class="card">
-      <div class="sec-title"> DEFINICIÓN DE COSTOS POR LOSA</div>
+      <div class="sec-title"> SUPERFICIES</div>
       <table>
         <thead><tr>
           <th style="text-align:left">PARTIDA</th>
@@ -883,6 +874,12 @@ tbody tr:hover{background:#f3f7fb!important}
             <td style="text-align:center"><input type="number" class="inp" id="constr-uf-bt" value="15" style="width:80px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">UF/m²</span></td>
             <td style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-bt">48.615 UF</td>
         </tr>
+          <tr>
+            <td style="font-weight:600">% Subterráneo / Sobre cota 0</td>
+            <td style="text-align:center"><input type="number" class="inp" id="constr-pct-bt" value="45" style="width:90px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">%</span></td>
+            <td style="text-align:center;color:#3b82f6;font-weight:700" id="constr-ratio-bt">45,0%</td>
+            <td style="text-align:center;font-size:10px;color:#64748b">Base de cálculo subterráneo</td>
+        </tr>
       </tbody>
         <tfoot>
           <tr style="background:#f0fdf4">
@@ -900,24 +897,23 @@ tbody tr:hover{background:#f3f7fb!important}
     </table>
   </div>
 
-    <!-- Parámetros de Obra y Pagos -->
+    <!-- Plazos y Pagos -->
     <div class="card">
-      <div class="sec-title"> PARÁMETROS DE OBRA Y PAGOS</div>
-
-      <div style="margin-bottom:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <span style="font-size:12px;font-weight:700;color:#475569">% M² SUBTERRÁNEO / SOBRE COTA 0</span>
-          <span style="font-size:14px;font-weight:800;color:#3b82f6"><input type="number" class="inp" id="constr-pct-bt" value="45" style="width:90px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">%</span></span>
-      </div>
-    </div>
+      <div class="sec-title"> PLAZOS Y PAGOS</div>
 
       <div style="margin-bottom:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:12px;font-weight:700;color:#475569">PLAZO DE OBRA</span>
-          <span style="font-size:14px;font-weight:800;color:#22c55e" id="plazo-label">20 MESES</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+          <span style="font-size:12px;font-weight:700;color:#475569">PLAZO DE CONSTRUCCIÓN</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="number" class="inp" id="constr-plazo-meses" min="1" step="1" value="20" style="width:86px;text-align:center" oninput="updateConstrParams()">
+            <span style="font-size:10px;color:#94a3b8">MESES</span>
+          </div>
           <span class="badge badge-green" style="font-size:10px">SINCRONIZADO GANTT</span>
       </div>
-        <div style="font-size:10px;color:#94a3b8;margin-top:6px">La curva S se distribuye automáticamente de forma normalizada sobre la duración del hito de construcción.</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;gap:10px">
+          <div style="font-size:10px;color:#94a3b8">Sincronizado con el hito <strong>Construcción</strong> en Carta Gantt.</div>
+          <div style="font-size:12px;font-weight:800;color:#22c55e" id="plazo-label">20 MESES</div>
+        </div>
     </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
@@ -936,12 +932,10 @@ tbody tr:hover{background:#f3f7fb!important}
         </div>
       </div>
     </div>
-  </div>
-</div>
 
-  <div class="card" style="border:2px solid #bbf7d0;margin-bottom:16px">
+    <div class="card" style="border:2px solid #bbf7d0">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div class="sec-title" style="margin-bottom:0;color:#16a34a"> FINANCIAMIENTO CONSTRUCCIÓN</div>
+      <div class="sec-title" style="margin-bottom:0;color:#16a34a"> FINANCIAMIENTO</div>
       <label class="toggle"><input type="checkbox" id="fin-constr-activo" onchange="updateConstrParams()"><span class="toggle-slider"></span></label>
     </div>
     <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px;margin-bottom:12px;font-size:11px;color:#166534">
@@ -976,6 +970,7 @@ tbody tr:hover{background:#f3f7fb!important}
       </div>
     </div>
   </div>
+</div>
 
   <div class="card" style="margin-bottom:16px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -999,26 +994,9 @@ tbody tr:hover{background:#f3f7fb!important}
 
   <!-- Curva S -->
   <div class="card-dark" style="border-radius:12px;margin-bottom:16px">
-    <div class="sec-title" style="color:#fff"> CURVA S: AVANCE FÍSICO VS FLUJO DE PAGOS</div>
+    <div class="sec-title" style="color:#fff"> CURVA S DE CONSTRUCCIÓN</div>
+    <div style="font-size:11px;color:#94a3b8;margin-bottom:12px">Costo mensual estimado y avance acumulado de obra sobre el plazo de construcción.</div>
     <canvas id="curvaS-chart" height="180"></canvas>
-</div>
-
-  <!-- Detalle de Flujos Mensuales -->
-  <div class="card">
-    <div class="sec-title"> DETALLE DE FLUJOS MENSUALES Y GARANTÍAS</div>
-    <div class="tbl-scroll">
-      <table>
-        <thead><tr>
-          <th style="text-align:left">MES CALENDARIO</th>
-          <th>AVANCE OBRA (UF)</th>
-          <th style="color:#dc2626">AMORTIZACIÓN ANTICIPO</th>
-          <th style="color:#dc2626">RETENCIÓN GARANTÍA</th>
-          <th style="color:#22c55e">PAGO NETO FINAL (UF)</th>
-          <th>% AVANCE FÍSICO</th>
-      </tr></thead>
-        <tbody id="constr-flujo-tbody"></tbody>
-    </table>
-  </div>
 </div>
 </div><!-- end tab construccion -->
 

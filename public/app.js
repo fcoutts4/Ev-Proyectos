@@ -249,7 +249,7 @@ function normalizeFinanciamiento(data = {}) {
 }
 
 function getConstructionDuration() {
-  const hito = state.gantt.find((row) => /CONSTRUCCION/i.test(row.nombre || ''));
+  const hito = getConstructionMilestone();
   return hito ? Math.max(1, toNumber(hito.duracion)) : Math.max(1, toNumber(state.construccion?.plazo_meses || 1));
 }
 
@@ -759,7 +759,7 @@ function readGanttEditor() {
     desfase: toNumber(row.querySelector('[data-field="desfase"]')?.value),
     inicio: toNumber(row.querySelector('[data-field="inicio"]')?.value),
     duracion: toNumber(row.querySelector('[data-field="duracion"]')?.value),
-    fin: toNumber(row.querySelector('[data-field="fin"]')?.value),
+    fin: 0,
   }));
   return normalizeGanttRows(rows);
 }
@@ -798,7 +798,6 @@ function renderGanttEditor(rows = state.gantt) {
         <td class="gantt-sticky-left gantt-cell-tight" style="left:410px;width:62px"><input class="inp" data-field="desfase" type="number" value="${toNumber(row.desfase)}" onchange="onGanttInputChange()"/></td>
         <td class="gantt-sticky-left gantt-cell-tight" style="left:472px;width:62px"><input class="inp" data-field="inicio" type="number" value="${toNumber(row.inicio)}" ${row.dependencia ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
         <td class="gantt-sticky-left gantt-cell-tight" style="left:534px;width:70px"><input class="inp" data-field="duracion" type="number" value="${toNumber(row.duracion)}" onchange="onGanttInputChange()"/></td>
-        <td class="gantt-sticky-left gantt-cell-tight" style="left:604px;width:62px;color:#16a34a;font-weight:800;text-align:center"><input class="inp" data-field="fin" type="number" value="${toNumber(row.fin)}" disabled/></td>
         <td>
           <div class="gantt-editor-track" style="width:${meta.timelineWidth}px;--month-width:${GANTT_MONTH_WIDTH}px">
             <div class="gantt-editor-bar" title="Inicio ${fmtNumber(row.inicio)} · Fin ${fmtNumber(row.fin)}" style="left:${left}px;width:${width}px;background:${escapeHtml(row.color || '#3b82f6')}"></div>
@@ -812,10 +811,6 @@ function renderGanttEditor(rows = state.gantt) {
       </tr>
     `;
   }).join(''));
-
-  const totalFin = Math.max(0, ...normalized.map((row) => toNumber(row.fin)));
-  setText('gantt-total-fin', `Mes ${fmtNumber(totalFin)}`);
-  setText('gantt-total-bar', `${fmtNumber(totalFin)} meses`);
   renderGanttPreview();
 }
 
@@ -1437,40 +1432,24 @@ function renderConstruccion() {
   setText('constr-total-bt', fmtUf(metrics.total_bt));
   setText('constr-sup-total', `${fmtNumber(metrics.sup_total, 1)} m2`);
   setText('constr-uf-prom', `${fmtNumber(metrics.uf_prom, 2)} UF/m2`);
+  setText('constr-ratio-bt', fmtPct(metrics.pct_bajo_tierra_sobre_cota_0));
   setText('constr-total-neto', fmtUf(metrics.total_neto));
   setText('constr-uf-bruto', `${fmtNumber(metrics.uf_bruto, 2)} UF/m2`);
   setText('constr-total-bruto', fmtUf(metrics.total_bruto));
   setText('plazo-label', `${fmtNumber(metrics.plazo_meses)} MESES`);
-  setText('curva-label', fmtNumber(metrics.ancho_curva, 2));
-  setText('peak-label', fmtNumber(metrics.peak_gasto, 2));
   setText('anticipo-label', `${fmtNumber(metrics.anticipo_pct)}%`);
   setText('retencion-label', `${fmtNumber(metrics.retencion_pct)}%`);
 
   if ($('constr-uf-st')) $('constr-uf-st').value = toNumber(metrics.costo_uf_m2_sobre_tierra);
   if ($('constr-uf-bt')) $('constr-uf-bt').value = toNumber(metrics.costo_uf_m2_bajo_tierra);
   if ($('constr-pct-bt')) $('constr-pct-bt').value = toNumber(metrics.pct_bajo_tierra_sobre_cota_0);
+  if ($('constr-plazo-meses')) $('constr-plazo-meses').value = toNumber(metrics.plazo_meses);
   if ($('anticipo-slider')) $('anticipo-slider').value = toNumber(metrics.anticipo_pct);
   if ($('retencion-slider')) $('retencion-slider').value = toNumber(metrics.retencion_pct);
 
   const meses = Math.max(1, metrics.plazo_meses);
-  const normalizedCurve = Array.from({ length: meses }, (_, index) => {
-    const start = (1 - Math.cos(Math.PI * (index / meses))) / 2;
-    const end = (1 - Math.cos(Math.PI * ((index + 1) / meses))) / 2;
-    return end - start;
-  });
-  const amortizacionAnticipo = (metrics.total_neto * toNumber(metrics.anticipo_pct) / 100) / meses;
-  const retencionMensual = (metrics.total_neto * toNumber(metrics.retencion_pct) / 100) / meses;
-
-  setHtml('constr-flujo-tbody', Array.from({ length: meses }, (_, index) => `
-    <tr>
-      <td>Mes ${fmtNumber(index + 1)}</td>
-      <td style="text-align:center">${fmtUf(metrics.total_neto * normalizedCurve[index])}</td>
-      <td style="text-align:center">${fmtUf(amortizacionAnticipo)}</td>
-      <td style="text-align:center">${fmtUf(retencionMensual)}</td>
-      <td style="text-align:center;color:#16a34a">${fmtUf((metrics.total_neto * normalizedCurve[index]) - amortizacionAnticipo - retencionMensual)}</td>
-      <td style="text-align:center">${fmtPct(((index + 1) / meses) * 100)}</td>
-    </tr>
-  `).join(''));
+  const distribution = buildConstructionSCurve(metrics, meses);
+  renderConstructionSCurveChart(metrics, distribution);
 
   renderConstructionFinancing();
 }
@@ -1528,6 +1507,106 @@ function renderConstructionFinancing() {
   setText('fin-constr-plazos', `Plazo estimado: mes ${fmtNumber(start)} a mes ${fmtNumber(start + duration)}`);
   setHtml('fin-constr-partidas', `<div>Base financiera tomada desde el total neto de construcción.</div>`);
   renderFinancingSourcePlanilla('construccion');
+}
+
+function buildConstructionSCurve(metrics, meses) {
+  const width = Math.max(0.08, toNumber(metrics.ancho_curva || 0.5));
+  const peak = Math.min(0.92, Math.max(0.08, toNumber(metrics.peak_gasto || 0.5)));
+  const weights = Array.from({ length: meses }, (_, index) => {
+    const x = meses === 1 ? 1 : index / (meses - 1);
+    const gaussian = Math.exp(-((x - peak) ** 2) / (2 * (width ** 2)));
+    const rampIn = Math.min(1, (index + 1) / Math.max(1, Math.round(meses * 0.28)));
+    const rampOut = Math.min(1, (meses - index) / Math.max(1, Math.round(meses * 0.22)));
+    return Math.max(0.001, gaussian * rampIn * rampOut);
+  });
+  const weightTotal = weights.reduce((sum, value) => sum + value, 0) || 1;
+  const monthlyCosts = weights.map((weight) => (metrics.total_neto * weight) / weightTotal);
+  const cumulativeCosts = monthlyCosts.reduce((acc, value, index) => {
+    acc.push((acc[index - 1] || 0) + value);
+    return acc;
+  }, []);
+  const cumulativePct = cumulativeCosts.map((value) => value / Math.max(1, metrics.total_neto) * 100);
+  return { monthlyCosts, cumulativeCosts, cumulativePct };
+}
+
+function renderConstructionSCurveChart(metrics, distribution) {
+  if (typeof Chart === 'undefined') return;
+  const canvas = $('curvaS-chart');
+  if (!canvas) return;
+  const context = canvas.getContext('2d');
+  if (state.curvaSChart) state.curvaSChart.destroy();
+
+  const labels = Array.from({ length: distribution.monthlyCosts.length }, (_, index) => `Mes ${index + 1}`);
+  state.curvaSChart = new Chart(context, {
+    data: {
+      labels,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Costo mensual',
+          data: distribution.monthlyCosts,
+          backgroundColor: '#93c5fd',
+          borderColor: '#2563eb',
+          borderWidth: 1,
+          borderRadius: 5,
+          yAxisID: 'y',
+        },
+        {
+          type: 'line',
+          label: 'Avance acumulado',
+          data: distribution.cumulativePct,
+          borderColor: '#22c55e',
+          backgroundColor: 'rgba(34,197,94,.16)',
+          fill: true,
+          tension: 0.32,
+          pointRadius: 2,
+          pointHoverRadius: 4,
+          yAxisID: 'y1',
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: '#fff' } },
+        tooltip: {
+          callbacks: {
+            label(context) {
+              return context.dataset.yAxisID === 'y1'
+                ? `${context.dataset.label}: ${fmtPct(context.parsed.y)}`
+                : `${context.dataset.label}: ${fmtUf(context.parsed.y)}`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          ticks: { color: '#cbd5e1', maxRotation: 0, autoSkip: true },
+          grid: { color: 'rgba(148,163,184,.12)' },
+        },
+        y: {
+          position: 'left',
+          ticks: {
+            color: '#cbd5e1',
+            callback(value) { return fmtNumber(value); },
+          },
+          grid: { color: 'rgba(148,163,184,.14)' },
+        },
+        y1: {
+          position: 'right',
+          min: 0,
+          max: 100,
+          ticks: {
+            color: '#86efac',
+            callback(value) { return `${fmtNumber(value)}%`; },
+          },
+          grid: { drawOnChartArea: false },
+        },
+      },
+    },
+  });
 }
 
 function getFinancingSourceRows(sourceType) {
@@ -1636,8 +1715,39 @@ const COST_CATEGORY_ORDER = [
 ];
 
 function getConstructionStartMonth() {
-  const hito = state.gantt.find((row) => /CONSTRUCCION/i.test(row.nombre || ''));
+  const hito = getConstructionMilestone();
   return hito ? toNumber(hito.inicio) : 1;
+}
+
+function getConstructionMilestone() {
+  return state.gantt.find((row) => String(row.nombre || '').trim().toLowerCase() === 'construcción')
+    || state.gantt.find((row) => String(row.nombre || '').trim().toLowerCase() === 'construccion')
+    || state.gantt.find((row) => /CONSTRUCCI[ÓO]N/i.test(row.nombre || ''))
+    || null;
+}
+
+function syncConstructionMilestone(duration = toNumber(state.construccion?.plazo_meses || 1)) {
+  const targetDuration = Math.max(1, toNumber(duration));
+  const rows = Array.isArray(state.gantt) ? state.gantt.map((row) => ({ ...row })) : [];
+  const index = rows.findIndex((row) => /CONSTRUCCI[ÓO]N/i.test(String(row.nombre || '').trim()));
+  if (index >= 0) {
+    rows[index].nombre = 'Construcción';
+    rows[index].duracion = targetDuration;
+    rows[index].fin = toNumber(rows[index].inicio) + targetDuration;
+  } else {
+    rows.push({
+      id: '',
+      nombre: 'Construcción',
+      color: '#16a34a',
+      dependencia: null,
+      dependencia_tipo: 'fin',
+      desfase: 0,
+      inicio: 1,
+      duracion: targetDuration,
+      fin: 1 + targetDuration,
+    });
+  }
+  state.gantt = normalizeGanttRows(rows);
 }
 
 function getTerrainMilestone() {
@@ -2768,6 +2878,7 @@ function renderKpis() {
 }
 
 function renderAll() {
+  syncConstructionMilestone(state.construccion?.plazo_meses || 1);
   renderProjectSelector();
   renderProjectHeader();
   renderCabidaTables(state.cabida);
@@ -2873,7 +2984,7 @@ function readConstruccionFromEditor() {
     costo_uf_m2_sobre_tierra: toNumber($('constr-uf-st')?.value),
     pct_bajo_tierra_sobre_cota_0: toNumber($('constr-pct-bt')?.value),
     costo_uf_m2_bajo_tierra: toNumber($('constr-uf-bt')?.value),
-    plazo_meses: getConstructionDuration(),
+    plazo_meses: Math.max(1, toNumber($('constr-plazo-meses')?.value || getConstructionDuration())),
     anticipo_pct: toNumber($('anticipo-slider')?.value),
     retencion_pct: toNumber($('retencion-slider')?.value),
     ancho_curva: state.construccion?.ancho_curva ?? 0.5,
@@ -2884,10 +2995,13 @@ function readConstruccionFromEditor() {
 function updateConstrParams() {
   state.construccion = readConstruccionFromEditor();
   state.financiamiento = readConstruccionFinanciamientoFromEditor();
+  syncConstructionMilestone(state.construccion.plazo_meses);
+  renderGanttEditor(state.gantt);
   renderConstruccion();
   renderCostosModule();
   renderKpis();
   scheduleAutosave('construccion');
+  scheduleAutosave('gantt');
 }
 
 function onGanttInputChange() {
@@ -3245,6 +3359,7 @@ async function guardarTerreno() {
 
 async function guardarConstruccion() {
   if (!state.proyectoId) return;
+  syncConstructionMilestone(toNumber($('constr-plazo-meses')?.value || state.construccion?.plazo_meses || 1));
   const payload = {
     ...readConstruccionFromEditor(),
     sup_sobre_tierra: getConstructionMetrics().sup_sobre_tierra,
@@ -3256,6 +3371,10 @@ async function guardarConstruccion() {
     api(`/api/proyectos/${state.proyectoId}/construccion`, {
       method: 'POST',
       body: JSON.stringify(payload),
+    }),
+    api(`/api/proyectos/${state.proyectoId}/gantt`, {
+      method: 'POST',
+      body: JSON.stringify(state.gantt),
     }),
     api(`/api/proyectos/${state.proyectoId}/financiamiento`, {
       method: 'POST',
