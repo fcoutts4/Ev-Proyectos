@@ -849,7 +849,7 @@ tbody tr:hover{background:#f3f7fb!important}
     <button class="btn-primary" onclick="guardarConstruccion()"> Guardar</button>
 </div>
 
-  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:16px">
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:16px;align-items:start">
 
     <!-- Superficies -->
     <div class="card">
@@ -932,6 +932,7 @@ tbody tr:hover{background:#f3f7fb!important}
         </div>
       </div>
     </div>
+  </div>
 
     <div class="card" style="border:2px solid #bbf7d0">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
@@ -996,7 +997,9 @@ tbody tr:hover{background:#f3f7fb!important}
   <div class="card-dark" style="border-radius:12px;margin-bottom:16px">
     <div class="sec-title" style="color:#fff"> CURVA S DE CONSTRUCCIÓN</div>
     <div style="font-size:11px;color:#94a3b8;margin-bottom:12px">Costo mensual estimado y avance acumulado de obra sobre el plazo de construcción.</div>
-    <canvas id="curvaS-chart" height="180"></canvas>
+    <div class="chart-shell" style="height:320px;max-height:320px">
+      <canvas id="curvaS-chart"></canvas>
+    </div>
 </div>
 </div><!-- end tab construccion -->
 
