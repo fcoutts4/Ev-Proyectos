@@ -577,8 +577,12 @@ tbody tr:hover{background:#f3f7fb!important}
         <div class="sec-title" style="margin-bottom:4px"> GASTOS FINANCIEROS TERRENO</div>
         <div style="font-size:11px;color:#94a3b8">Esta categoría se configura en Terreno y se replica automáticamente en Costos del Proyecto.</div>
       </div>
+      <div class="planilla-nav">
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('terreno-fin-planilla-scroll', -480)">← Meses</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('terreno-fin-planilla-scroll', 480)">Meses →</button>
+      </div>
     </div>
-    <div class="tbl-scroll">
+    <div id="terreno-fin-planilla-scroll" class="tbl-scroll">
       <table id="terreno-fin-planilla-table" style="min-width:1200px">
         <thead id="terreno-fin-planilla-head"></thead>
         <tbody id="terreno-fin-planilla-tbody"></tbody>
@@ -948,8 +952,12 @@ tbody tr:hover{background:#f3f7fb!important}
         <div class="sec-title" style="margin-bottom:4px"> GASTOS FINANCIEROS CONSTRUCCIÓN</div>
         <div style="font-size:11px;color:#94a3b8">Esta categoría se configura en Construcción y se refleja automáticamente en Costos del Proyecto.</div>
       </div>
+      <div class="planilla-nav">
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-fin-planilla-scroll', -480)">← Meses</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-fin-planilla-scroll', 480)">Meses →</button>
+      </div>
     </div>
-    <div class="tbl-scroll">
+    <div id="constr-fin-planilla-scroll" class="tbl-scroll">
       <table id="constr-fin-planilla-table" style="min-width:1200px">
         <thead id="constr-fin-planilla-head"></thead>
         <tbody id="constr-fin-planilla-tbody"></tbody>

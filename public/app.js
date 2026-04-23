@@ -1486,7 +1486,6 @@ function renderFinancingSourcePlanilla(sourceType) {
   const monthLabels = getCostMonthLabels();
   const monthCount = getCostMonthCount();
   const rows = getFinancingSourceRows(sourceType);
-  const isEditable = sourceType === 'terreno';
   const monthlyTotals = createMonthlyArray(monthCount, 0);
   let totalNeto = 0;
   let totalIva = 0;
@@ -1510,7 +1509,7 @@ function renderFinancingSourcePlanilla(sourceType) {
     distribucion.forEach((value, index) => { monthlyTotals[index] += value; });
 
     return `
-      <tr class="partida-row" ${isEditable ? `data-terreno-fin-row data-cost-index="${partida._costIndex}"` : ''}>
+      <tr class="partida-row">
         <td>
           <input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" disabled>
           <input class="inp cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}">
@@ -1518,10 +1517,10 @@ function renderFinancingSourcePlanilla(sourceType) {
         <td style="text-align:center">
           <button class="btn-outline btn-formula" type="button" onclick="openCostFormulaModal('GASTOS FINANCIEROS', ${partida._costIndex})">Ver fórmula</button>
         </td>
-        <td>${isEditable ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><button class="btn-outline" type="button" onclick="openPaymentPlanModal('GASTOS FINANCIEROS', ${partida._costIndex})">${escapeHtml(summarizePaymentPlan(partida.plan_pago))}</button><div style="font-size:10px;color:${Math.abs(getPaymentPlanAssignedPct(partida.plan_pago) - 100) < 0.01 ? '#16a34a' : '#b45309'};white-space:nowrap">${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))}</div></div>` : `<span class="badge badge-yellow">AUTO</span>`}</td>
-        <td data-month-cell><input class="inp cost-month-input" data-field="total_neto" type="number" step="0.01" value="${toNumber(total)}" ${isEditable ? 'onchange="onTerrainFinancialInputChange()"' : 'disabled'}></td>
-        <td style="text-align:center"><input type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''} ${isEditable ? 'onchange="onTerrainFinancialInputChange()"' : 'disabled'}></td>
-        ${distribucion.map((value, monthIndex) => `<td data-month-cell><input class="inp cost-month-input" data-month="${monthIndex}" type="number" step="0.01" value="${toNumber(value)}" ${isEditable ? 'onchange="onTerrainFinancialInputChange()"' : 'disabled'}></td>`).join('')}
+        <td><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><button class="btn-outline" type="button" onclick="openPaymentPlanModal('GASTOS FINANCIEROS', ${partida._costIndex})">${escapeHtml(summarizePaymentPlan(partida.plan_pago))}</button><div style="font-size:10px;color:${Math.abs(getPaymentPlanAssignedPct(partida.plan_pago) - 100) < 0.01 ? '#16a34a' : '#b45309'};white-space:nowrap">${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))}</div></div></td>
+        <td data-month-cell style="text-align:center;color:#22c55e;font-weight:800">${fmtUf(total)}</td>
+        <td style="text-align:center">${partida.tiene_iva ? '<span class="badge badge-blue">SI</span>' : '<span class="badge">NO</span>'}</td>
+        ${distribucion.map((value) => `<td data-month-cell style="text-align:center">${fmtUf(value)}</td>`).join('')}
       </tr>
     `;
   }).join('') || `
@@ -2100,6 +2099,7 @@ function renderCostPlanilla() {
 
     (categoria.partidas || []).forEach((partida, index) => {
       const rowReadOnly = categoryReadOnly || !!partida.auto_origen;
+      const planEditable = !rowReadOnly || !!partida.editable_source;
 
       if (categoria.nombre === 'GASTOS FINANCIEROS' && partida.auto_origen) {
         const sectionLabel = /^Terreno/i.test(partida.nombre || '')
@@ -2142,10 +2142,10 @@ function renderCostPlanilla() {
             <input class="inp cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}" ${rowReadOnly ? 'disabled' : ''}/>
             <button class="btn-outline btn-formula" type="button" onclick="openCostFormulaModal('${escapeHtml(categoria.nombre)}', ${index})">Ver fórmula</button>
           </td>
-          <td>${rowReadOnly ? '<span class="badge badge-yellow">AUTO</span>' : `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><button class="btn-outline" type="button" onclick="openPaymentPlanModal('${escapeHtml(categoria.nombre)}', ${index})">${escapeHtml(summarizePaymentPlan(partida.plan_pago))}</button><div style="font-size:10px;color:${Math.abs(getPaymentPlanAssignedPct(partida.plan_pago) - 100) < 0.01 ? '#16a34a' : '#b45309'};white-space:nowrap">${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))}</div></div>`}</td>
+          <td>${planEditable ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><button class="btn-outline" type="button" onclick="openPaymentPlanModal('${escapeHtml(categoria.nombre)}', ${index})">${escapeHtml(summarizePaymentPlan(partida.plan_pago))}</button><div style="font-size:10px;color:${Math.abs(getPaymentPlanAssignedPct(partida.plan_pago) - 100) < 0.01 ? '#16a34a' : '#b45309'};white-space:nowrap">${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))}</div></div>` : '<span class="badge badge-yellow">AUTO</span>'}</td>
           <td style="text-align:center;color:#22c55e;font-weight:800">${fmtUf(total)}</td>
           <td style="text-align:center"><input type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''} ${rowReadOnly ? 'disabled' : ''}/></td>
-          ${distribucion.map((value, monthIndex) => `<td data-month-cell><input class="inp cost-month-input" data-month="${monthIndex}" type="number" step="0.01" value="${toNumber(value)}" ${rowReadOnly ? 'disabled' : ''}/></td>`).join('')}
+          ${distribucion.map((value) => `<td data-month-cell style="text-align:center">${fmtUf(value)}</td>`).join('')}
         </tr>
       `);
     });
@@ -2336,10 +2336,18 @@ function setCostFlowMode(mode) {
   renderCostosModule();
 }
 
-function scrollCostPlanilla(offset) {
-  const container = $('cost-planilla-scroll');
+function scrollTableById(containerId, offset) {
+  const container = $(containerId);
   if (!container) return;
   container.scrollBy({ left: offset, behavior: 'smooth' });
+}
+
+function scrollCostPlanilla(offset) {
+  scrollTableById('cost-planilla-scroll', offset);
+}
+
+function scrollFinancialPlanilla(containerId, offset) {
+  scrollTableById(containerId, offset);
 }
 
 function openCostFormulaModal(categoryName, index) {
@@ -2938,7 +2946,10 @@ function readCostosEditor() {
     target.plan_pago = target.plan_pago || '';
     target.tiene_iva = !!row.querySelector('[data-field="tiene_iva"]')?.checked;
     target.es_terreno = !!row.querySelector('[data-field="es_terreno"]')?.checked;
-    target.distribucion_mensual = Array.from(row.querySelectorAll('[data-month]')).map((input) => toNumber(input.value));
+    const monthInputs = Array.from(row.querySelectorAll('[data-month]'));
+    if (monthInputs.length) {
+      target.distribucion_mensual = monthInputs.map((input) => toNumber(input.value));
+    }
   });
 
   state.costos = categories;
@@ -3250,6 +3261,7 @@ window.redistribuirPartida = redistribuirPartida;
 window.aplicarPlanPagoFila = aplicarPlanPagoFila;
 window.setCostFlowMode = setCostFlowMode;
 window.scrollCostPlanilla = scrollCostPlanilla;
+window.scrollFinancialPlanilla = scrollFinancialPlanilla;
 window.openCostFormulaModal = openCostFormulaModal;
 window.closeCostFormulaModal = closeCostFormulaModal;
 window.saveCostFormulaModal = saveCostFormulaModal;
