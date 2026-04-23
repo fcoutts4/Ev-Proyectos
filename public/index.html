@@ -532,7 +532,7 @@ tbody tr:hover{background:#f3f7fb!important}
     <button class="btn-primary" onclick="guardarTerreno()"> Guardar</button>
   </div>
 
-  <div style="display:grid;grid-template-columns:minmax(320px,420px) minmax(0,1fr);gap:16px;margin-bottom:16px;align-items:stretch">
+  <div style="display:grid;grid-template-columns:minmax(340px,460px) minmax(320px,520px);gap:16px;margin-bottom:16px;align-items:start;justify-content:start">
     <div class="card" style="height:100%">
       <div class="sec-title"> COMPRA TERRENO</div>
       <div style="display:grid;grid-template-columns:1fr;gap:14px">
@@ -546,29 +546,38 @@ tbody tr:hover{background:#f3f7fb!important}
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div style="background:#f8fafc;border-radius:10px;padding:12px">
-            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">m2 bruto afecto</div>
-            <input type="number" class="inp" id="terreno-m2-bruto-afecto" step="0.01" oninput="onTerrenoInputChange()">
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Superficie Bruta</div>
+            <input type="number" class="inp" id="terreno-m2-bruto" step="0.01" oninput="onTerrenoInputChange()">
           </div>
           <div style="background:#f8fafc;border-radius:10px;padding:12px">
-            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">m2 neto</div>
-            <input type="number" class="inp" id="terreno-m2-neto" step="0.01" oninput="onTerrenoInputChange()">
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Afectación</div>
+            <input type="number" class="inp" id="terreno-m2-afectacion" step="0.01" oninput="onTerrenoInputChange()">
           </div>
           <div style="background:#f8fafc;border-radius:10px;padding:12px">
-            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Precio total</div>
-            <input type="number" class="inp" id="terreno-precio-total" step="0.01" oninput="onTerrenoInputChange()">
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Superficie Neta</div>
+            <input type="number" class="inp" id="terreno-m2-neto" step="0.01" readonly style="background:#fff;color:#0f172a;font-weight:700">
+            <div style="font-size:10px;color:#94a3b8;margin-top:4px">Bruta menos afectación</div>
           </div>
-
+          <div style="background:#f8fafc;border-radius:10px;padding:12px">
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">UF / m²</div>
+            <input type="number" class="inp" id="terreno-precio-uf-m2" step="0.01" inputmode="decimal" oninput="onTerrenoInputChange()">
+          </div>
+          <div style="background:#eef6ff;border:1px solid #cfe2ff;border-radius:10px;padding:12px;grid-column:1 / -1">
+            <div style="font-size:10px;color:#64748b;text-transform:uppercase;margin-bottom:4px">Precio total</div>
+            <input type="number" class="inp" id="terreno-precio-total" step="0.01" readonly style="background:#fff;color:#0f172a;font-weight:800">
+            <div style="font-size:10px;color:#64748b;margin-top:4px">Resultado de superficie neta por UF / m²</div>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="card" style="border:2px solid #fde68a;height:100%">
+    <div class="card" style="border:2px solid #fde68a;height:100%;max-width:520px;justify-self:start">
       <div class="sec-title" style="margin-bottom:12px;color:#b45309"> FINANCIAMIENTO TERRENO</div>
       <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px;margin-bottom:12px;font-size:11px;color:#92400e">
         Este financiamiento se refleja automáticamente en los costos del proyecto dentro de la categoría de gastos financieros.
       </div>
       <div id="fin-terreno-partidas" style="margin-bottom:12px;font-size:11px;color:#475569"></div>
-      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px">
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px">
         <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Costo</div><div style="font-weight:800;color:#b45309" id="fin-terreno-costo">0 UF</div></div>
         <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Monto a financiar</div><div style="font-weight:800;color:#22c55e" id="fin-terreno-monto">0 UF</div></div>
       </div>
@@ -580,7 +589,7 @@ tbody tr:hover{background:#f3f7fb!important}
         </div>
         <div>
           <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Tasa interés</div>
-          <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-terreno-tasa" step="0.1" oninput="onTerrenoInputChange()"><span style="font-size:11px">ANUAL</span></div>
+          <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-terreno-tasa" step="0.01" inputmode="decimal" oninput="onTerrenoInputChange()"><span style="font-size:11px">ANUAL</span></div>
         </div>
         <div>
           <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Pago intereses</div>
@@ -639,7 +648,7 @@ tbody tr:hover{background:#f3f7fb!important}
       </tr>
         <tr>
           <th></th><th>UNID.</th><th>SUP. M²</th><th>M²/UN</th>
-          <th style="color:#3b82f6">UF/M²</th><th>PRECIO BASE</th>
+          <th style="color:#3b82f6">PRECIO / M²</th><th>PRECIO BASE</th>
           <th style="color:#22c55e">SUBTOTAL</th>
           <th>Nº ESTAC.</th><th>PRECIO EST.</th>
           <th>Nº BOD.</th><th>PRECIO BOD.</th>
@@ -659,13 +668,13 @@ tbody tr:hover{background:#f3f7fb!important}
       <table id="formas-pago-table" style="min-width:900px">
         <thead><tr>
           <th style="text-align:left">USO COMERCIAL</th>
-          <th>RESERVA (UF)</th>
+          <th>RESERVA</th>
           <th style="color:#3b82f6">PIE PROMESA (%)</th>
-          <th>MONTO PROMESA (UF)</th>
+          <th>MONTO PROMESA</th>
           <th style="color:#3b82f6">PIE CUOTAS (%)</th>
-          <th>MONTO CUOTAS (UF)</th>
+          <th>MONTO CUOTAS</th>
           <th style="color:#dc2626">PIE CUOTÓN (%)</th>
-          <th>MONTO CUOTÓN (UF)</th>
+          <th>MONTO CUOTÓN</th>
           <th>HIPOTECARIO (%)</th>
           <th style="color:#22c55e">TOTAL UNIDAD</th>
       </tr></thead>
@@ -698,7 +707,7 @@ tbody tr:hover{background:#f3f7fb!important}
           <th style="color:#f59e0b">%</th>
           <th>UNID</th>
           <th>VELOCIDAD (UN/MES)</th>
-          <th style="color:#22c55e">VEL. VENTAS (UF/MES)</th>
+          <th style="color:#22c55e">VEL. VENTAS</th>
       </tr></thead>
         <tbody id="preventa-tbody"></tbody>
     </table>
@@ -720,7 +729,7 @@ tbody tr:hover{background:#f3f7fb!important}
           <th>%</th>
           <th>UNID</th>
           <th>VELOCIDAD (UN/MES)</th>
-          <th style="color:#22c55e">VEL. VENTAS (UF/MES)</th>
+          <th style="color:#22c55e">VEL. VENTAS</th>
       </tr></thead>
         <tbody id="venta-tbody"></tbody>
     </table>
@@ -789,7 +798,7 @@ tbody tr:hover{background:#f3f7fb!important}
 
   <!-- 5. Flujo de Caja Ventas -->
   <div class="card-dark" style="border-radius:12px">
-    <div class="sec-title" style="color:#fff;margin-bottom:12px"> FLUJO DE CAJA DE VENTAS (INGRESOS UF)</div>
+    <div class="sec-title" style="color:#fff;margin-bottom:12px"> FLUJO DE CAJA DE VENTAS</div>
     <div class="tbl-scroll">
       <table id="flujo-ventas-table" style="min-width:1200px">
         <thead><tr id="flujo-ventas-header" style="background:#1e293b"></tr></thead>
@@ -852,46 +861,46 @@ tbody tr:hover{background:#f3f7fb!important}
   <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:16px;align-items:start">
 
     <!-- Superficies -->
-    <div class="card" style="border-radius:16px;padding:18px;background:#fcfdff">
+    <div class="card">
       <div class="sec-title"> SUPERFICIES</div>
-      <table style="border-collapse:separate;border-spacing:0 8px">
+      <table>
         <thead><tr>
-          <th style="text-align:left;background:#f8fafc;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">PARTIDA</th>
-          <th style="background:#f8fafc;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">SUPERFICIE</th>
-          <th style="color:#3b82f6;background:#f8fafc;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">UF/M² NETO</th>
-          <th style="color:#22c55e;background:#f8fafc;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0">COSTO NETO (UF)</th>
+          <th style="text-align:left">PARTIDA</th>
+          <th>SUPERFICIE</th>
+          <th style="color:#3b82f6">PRECIO / M²</th>
+          <th style="color:#22c55e">COSTO NETO</th>
       </tr></thead>
         <tbody>
-          <tr style="background:#fff">
-            <td style="font-weight:600;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;border-left:1px solid #e2e8f0;border-radius:10px 0 0 10px">Superficie Sobre Tierra</td>
-            <td style="text-align:center;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0" id="constr-sup-st">7.146 m²</td>
-            <td style="text-align:center;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0"><input type="number" class="inp" id="constr-uf-st" value="27" style="width:80px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">UF/m²</span></td>
-            <td style="text-align:center;font-weight:700;color:#22c55e;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-radius:0 10px 10px 0" id="constr-total-st">192.942 UF</td>
+          <tr>
+            <td style="font-weight:600">Superficie Sobre Tierra</td>
+            <td style="text-align:center" id="constr-sup-st">7.146 m²</td>
+            <td style="text-align:center"><input type="number" class="inp" id="constr-uf-st" value="27" style="width:80px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">/m²</span></td>
+            <td style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-st">192.942 UF</td>
         </tr>
-          <tr style="background:#fff">
-            <td style="font-weight:600;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;border-left:1px solid #e2e8f0;border-radius:10px 0 0 10px">Superficie Bajo Tierra</td>
-            <td style="text-align:center;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0" id="constr-sup-bt">3.241 m²</td>
-            <td style="text-align:center;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0"><input type="number" class="inp" id="constr-uf-bt" value="15" style="width:80px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">UF/m²</span></td>
-            <td style="text-align:center;font-weight:700;color:#22c55e;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-radius:0 10px 10px 0" id="constr-total-bt">48.615 UF</td>
+          <tr>
+            <td style="font-weight:600">Superficie Bajo Tierra</td>
+            <td style="text-align:center" id="constr-sup-bt">3.241 m²</td>
+            <td style="text-align:center"><input type="number" class="inp" id="constr-uf-bt" value="15" style="width:80px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">/m²</span></td>
+            <td style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-bt">48.615 UF</td>
         </tr>
-          <tr style="background:#fff">
-            <td style="font-weight:600;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;border-left:1px solid #e2e8f0;border-radius:10px 0 0 10px">% Subterráneo / Sobre cota 0</td>
-            <td style="text-align:center;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0"><input type="number" class="inp" id="constr-pct-bt" value="45" style="width:90px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">%</span></td>
-            <td style="text-align:center;color:#3b82f6;font-weight:700;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0" id="constr-ratio-bt">45,0%</td>
-            <td style="text-align:center;font-size:10px;color:#64748b;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;border-right:1px solid #e2e8f0;border-radius:0 10px 10px 0" id="constr-ratio-bt-m2">3.241 m² bajo tierra</td>
+          <tr>
+            <td style="font-weight:500;font-size:11px;color:#64748b">% Subterráneo / Sobre cota 0</td>
+            <td style="text-align:center"><input type="number" class="inp" id="constr-pct-bt" value="45" style="width:78px;text-align:center;font-size:11px;padding:4px 6px" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">%</span></td>
+            <td style="text-align:center;color:#64748b;font-weight:600;font-size:11px" id="constr-ratio-bt">45,0%</td>
+            <td style="text-align:center;font-size:10px;color:#94a3b8" id="constr-ratio-bt-m2">3.241 m² bajo tierra</td>
         </tr>
       </tbody>
         <tfoot>
           <tr style="background:#f8fafc">
-            <td style="font-weight:800;color:#15803d;font-size:11px;text-transform:uppercase;border-top:1px solid #dbe4ee;border-bottom:1px solid #dbe4ee;border-left:1px solid #dbe4ee;border-radius:10px 0 0 10px">Total Neto Construcción</td>
-            <td style="text-align:center;font-weight:700;border-top:1px solid #dbe4ee;border-bottom:1px solid #dbe4ee" id="constr-sup-total">10.387 m²</td>
-            <td style="text-align:center;font-weight:700;color:#3b82f6;border-top:1px solid #dbe4ee;border-bottom:1px solid #dbe4ee" id="constr-uf-prom">23,26 UF/m²</td>
-            <td style="text-align:center;font-weight:800;color:#22c55e;border-top:1px solid #dbe4ee;border-bottom:1px solid #dbe4ee;border-right:1px solid #dbe4ee;border-radius:0 10px 10px 0" id="constr-total-neto">241.557 UF</td>
+            <td style="font-weight:800;color:#15803d;font-size:11px;text-transform:uppercase">Total Neto Construcción</td>
+            <td style="text-align:center;font-weight:700" id="constr-sup-total">10.387 m²</td>
+            <td style="text-align:center;font-weight:700;color:#3b82f6" id="constr-uf-prom">23,26 /m²</td>
+            <td style="text-align:center;font-weight:800;color:#22c55e" id="constr-total-neto">241.557 UF</td>
         </tr>
-          <tr style="background:#fff">
-            <td colspan="2" style="font-weight:800;color:#475569;border-top:1px solid #dbe4ee;border-bottom:1px solid #dbe4ee;border-left:1px solid #dbe4ee;border-radius:10px 0 0 10px">Total Bruto (IVA Incluido)</td>
-            <td style="text-align:center;font-weight:700;color:#3b82f6;border-top:1px solid #dbe4ee;border-bottom:1px solid #dbe4ee" id="constr-uf-bruto">27,67 UF/m²</td>
-            <td style="text-align:center;font-weight:800;color:#22c55e;border-top:1px solid #dbe4ee;border-bottom:1px solid #dbe4ee;border-right:1px solid #dbe4ee;border-radius:0 10px 10px 0" id="constr-total-bruto">287.453 UF</td>
+          <tr>
+            <td colspan="2" style="font-weight:800;color:#475569">Total Bruto (IVA Incluido)</td>
+            <td style="text-align:center;font-weight:700;color:#3b82f6" id="constr-uf-bruto">27,67 /m²</td>
+            <td style="text-align:center;font-weight:800;color:#22c55e" id="constr-total-bruto">287.453 UF</td>
         </tr>
       </tfoot>
     </table>
@@ -917,19 +926,23 @@ tbody tr:hover{background:#f3f7fb!important}
     </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-        <div style="background:#fef9c3;border-radius:8px;padding:12px">
-          <div style="font-size:10px;font-weight:700;color:#b45309;margin-bottom:6px"> ANTICIPO</div>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px">
+          <div style="font-size:10px;font-weight:700;color:#15803d;margin-bottom:6px"> ANTICIPO</div>
           <div style="display:flex;align-items:center;gap:6px">
             <input type="number" class="inp" id="anticipo-slider" min="0" max="50" step="0.1" value="15" oninput="updateConstrParams()">
             <span style="font-weight:800;font-size:14px" id="anticipo-label">15%</span>
-        </div>
+          </div>
+          <div style="font-size:10px;color:#166534;margin-top:6px" id="anticipo-meta">15% del contrato | descuento proporcional en EDPP</div>
+          <div style="font-size:11px;font-weight:700;color:#15803d;margin-top:4px" id="anticipo-monto">0 UF</div>
       </div>
         <div style="background:#fef2f2;border-radius:8px;padding:12px">
           <div style="font-size:10px;font-weight:700;color:#991b1b;margin-bottom:6px"> RETENCIONES</div>
           <div style="display:flex;align-items:center;gap:6px">
             <input type="number" class="inp" id="retencion-slider" min="0" max="20" step="0.1" value="5" oninput="updateConstrParams()">
             <span style="font-weight:800;font-size:14px" id="retencion-label">5%</span>
-        </div>
+          </div>
+          <div style="font-size:10px;color:#991b1b;margin-top:6px" id="retencion-meta">Retención aplicada sobre cada EDPP</div>
+          <div style="font-size:11px;font-weight:700;color:#991b1b;margin-top:4px" id="retencion-monto">0 UF</div>
       </div>
     </div>
   </div>
@@ -990,7 +1003,7 @@ tbody tr:hover{background:#f3f7fb!important}
   <!-- Curva S -->
   <div class="card" style="border-radius:12px;margin-bottom:16px">
     <div class="sec-title"> CURVA S DE CONSTRUCCIÓN</div>
-    <div style="font-size:11px;color:#64748b;margin-bottom:12px">Costo mensual estimado y avance acumulado de obra sobre el plazo de construcción.</div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:12px">EDPP bruto, EDPP neto luego de anticipo y avance acumulado de obra sobre el plazo de construcción.</div>
     <div class="chart-shell" style="height:320px;max-height:320px">
       <canvas id="curvaS-chart"></canvas>
     </div>
@@ -1308,8 +1321,8 @@ tbody tr:hover{background:#f3f7fb!important}
       <thead><tr>
         <th style="text-align:left">MES</th>
         <th>CONCEPTO</th>
-        <th style="color:#7c3aed">MONTO (UF)</th>
-        <th>CAJA POST-EVENTO (UF)</th>
+        <th style="color:#7c3aed">MONTO</th>
+        <th>CAJA POST-EVENTO</th>
     </tr></thead>
       <tbody id="cap-agenda-tbody"></tbody>
   </table>
