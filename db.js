@@ -64,6 +64,7 @@ async function initDb() {
         bodegas_cantidad INTEGER DEFAULT 0,
         bodegas_sup_interior DOUBLE PRECISION DEFAULT 0,
         bodegas_sup_terrazas DOUBLE PRECISION DEFAULT 0,
+        updated_by TEXT,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
@@ -205,6 +206,7 @@ async function initDb() {
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS bodegas_cantidad INTEGER DEFAULT 0');
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS bodegas_sup_interior DOUBLE PRECISION DEFAULT 0');
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS bodegas_sup_terrazas DOUBLE PRECISION DEFAULT 0');
+    await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS updated_by TEXT');
     await query("ALTER TABLE gantt_hitos ADD COLUMN IF NOT EXISTS dependencia_tipo TEXT DEFAULT 'fin'");
     await query('ALTER TABLE construccion ADD COLUMN IF NOT EXISTS pct_bajo_tierra_sobre_cota_0 DOUBLE PRECISION DEFAULT 0');
     await query('ALTER TABLE costos_partidas ADD COLUMN IF NOT EXISTS plan_pago TEXT');
@@ -234,8 +236,16 @@ async function upsertSingleRow(table, pid, data) {
   );
 }
 
-async function touchProject(pid) {
-  await query('UPDATE proyectos SET updated_at = NOW() WHERE id = $1', [pid]);
+function normalizeUpdatedBy(value) {
+  const normalized = String(value || '').trim();
+  return normalized ? normalized.slice(0, 120) : null;
+}
+
+async function touchProject(pid, updatedBy = null) {
+  await query(
+    'UPDATE proyectos SET updated_at = NOW(), updated_by = COALESCE($2, updated_by) WHERE id = $1',
+    [pid, normalizeUpdatedBy(updatedBy)]
+  );
 }
 
 const proyectos = {
@@ -251,15 +261,15 @@ const proyectos = {
     return result.rows[0] || null;
   },
 
-  async create(data) {
+  async create(data, updatedBy = null) {
     await initDb();
     const id = uuidv4();
     await query(
       `INSERT INTO proyectos (
         id, nombre, direccion, tipo, terraza_util_pct, comunes_tipo, comunes_valor,
         estacionamientos_cantidad, estacionamientos_sup_interior, estacionamientos_sup_terrazas,
-        bodegas_cantidad, bodegas_sup_interior, bodegas_sup_terrazas
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+        bodegas_cantidad, bodegas_sup_interior, bodegas_sup_terrazas, updated_by
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
       [
         id,
         data.nombre,
@@ -274,12 +284,13 @@ const proyectos = {
         data.bodegas_cantidad || 0,
         data.bodegas_sup_interior || 0,
         data.bodegas_sup_terrazas || 0,
+        normalizeUpdatedBy(updatedBy),
       ]
     );
     return id;
   },
 
-  async update(id, data) {
+  async update(id, data, updatedBy = null) {
     await initDb();
     await query(
       `UPDATE proyectos SET
@@ -295,8 +306,9 @@ const proyectos = {
         bodegas_cantidad = $10,
         bodegas_sup_interior = $11,
         bodegas_sup_terrazas = $12,
+        updated_by = COALESCE($13, updated_by),
         updated_at = NOW()
-      WHERE id = $13`,
+      WHERE id = $14`,
       [
         data.nombre,
         data.direccion || '',
@@ -310,6 +322,7 @@ const proyectos = {
         data.bodegas_cantidad || 0,
         data.bodegas_sup_interior || 0,
         data.bodegas_sup_terrazas || 0,
+        normalizeUpdatedBy(updatedBy),
         id,
       ]
     );
@@ -328,7 +341,7 @@ const cabida = {
     return result.rows;
   },
 
-  async upsert(pid, rows) {
+  async upsert(pid, rows, updatedBy = null) {
     await initDb();
     await withTransaction(async (client) => {
       await client.query('DELETE FROM cabida WHERE proyecto_id = $1', [pid]);
@@ -352,7 +365,10 @@ const cabida = {
           ]
         );
       }
-      await client.query('UPDATE proyectos SET updated_at = NOW() WHERE id = $1', [pid]);
+      await client.query(
+        'UPDATE proyectos SET updated_at = NOW(), updated_by = COALESCE($2, updated_by) WHERE id = $1',
+        [pid, normalizeUpdatedBy(updatedBy)]
+      );
     });
   },
 };
@@ -364,7 +380,7 @@ const gantt = {
     return result.rows;
   },
 
-  async save(pid, hitos) {
+  async save(pid, hitos, updatedBy = null) {
     await initDb();
     await withTransaction(async (client) => {
       await client.query('DELETE FROM gantt_hitos WHERE proyecto_id = $1', [pid]);
@@ -388,7 +404,10 @@ const gantt = {
           ]
         );
       }
-      await client.query('UPDATE proyectos SET updated_at = NOW() WHERE id = $1', [pid]);
+      await client.query(
+        'UPDATE proyectos SET updated_at = NOW(), updated_by = COALESCE($2, updated_by) WHERE id = $1',
+        [pid, normalizeUpdatedBy(updatedBy)]
+      );
     });
   },
 };
@@ -409,7 +428,7 @@ const ventas = {
     return result.rows;
   },
 
-  async saveConfig(pid, rows) {
+  async saveConfig(pid, rows, updatedBy = null) {
     await initDb();
     await withTransaction(async (client) => {
       await client.query('DELETE FROM ventas_config WHERE proyecto_id = $1', [pid]);
@@ -434,11 +453,14 @@ const ventas = {
           ]
         );
       }
-      await client.query('UPDATE proyectos SET updated_at = NOW() WHERE id = $1', [pid]);
+      await client.query(
+        'UPDATE proyectos SET updated_at = NOW(), updated_by = COALESCE($2, updated_by) WHERE id = $1',
+        [pid, normalizeUpdatedBy(updatedBy)]
+      );
     });
   },
 
-  async saveCronograma(pid, rows) {
+  async saveCronograma(pid, rows, updatedBy = null) {
     await initDb();
     await withTransaction(async (client) => {
       await client.query('DELETE FROM ventas_cronograma WHERE proyecto_id = $1', [pid]);
@@ -459,7 +481,10 @@ const ventas = {
           ]
         );
       }
-      await client.query('UPDATE proyectos SET updated_at = NOW() WHERE id = $1', [pid]);
+      await client.query(
+        'UPDATE proyectos SET updated_at = NOW(), updated_by = COALESCE($2, updated_by) WHERE id = $1',
+        [pid, normalizeUpdatedBy(updatedBy)]
+      );
     });
   },
 };
@@ -471,7 +496,7 @@ const construccion = {
     return result.rows[0] || null;
   },
 
-  async save(pid, data) {
+  async save(pid, data, updatedBy = null) {
     await initDb();
     await upsertSingleRow('construccion', pid, {
       sup_sobre_tierra: data.sup_sobre_tierra || 0,
@@ -485,7 +510,7 @@ const construccion = {
       ancho_curva: data.ancho_curva ?? 0.5,
       peak_gasto: data.peak_gasto ?? 0.5,
     });
-    await touchProject(pid);
+    await touchProject(pid, updatedBy);
   },
 };
 
@@ -511,7 +536,7 @@ const costos = {
     return result.rows;
   },
 
-  async saveAll(pid, categorias) {
+  async saveAll(pid, categorias, updatedBy = null) {
     await initDb();
     await withTransaction(async (client) => {
       await client.query('DELETE FROM costos_partidas WHERE proyecto_id = $1', [pid]);
@@ -552,7 +577,10 @@ const costos = {
           );
         }
       }
-      await client.query('UPDATE proyectos SET updated_at = NOW() WHERE id = $1', [pid]);
+      await client.query(
+        'UPDATE proyectos SET updated_at = NOW(), updated_by = COALESCE($2, updated_by) WHERE id = $1',
+        [pid, normalizeUpdatedBy(updatedBy)]
+      );
     });
   },
 };
@@ -564,10 +592,10 @@ const financiamiento = {
     return result.rows[0] || null;
   },
 
-  async save(pid, data) {
+  async save(pid, data, updatedBy = null) {
     await initDb();
     await upsertSingleRow('financiamiento', pid, data);
-    await touchProject(pid);
+    await touchProject(pid, updatedBy);
   },
 };
 
@@ -578,7 +606,7 @@ const capital = {
     return result.rows[0] || null;
   },
 
-  async save(pid, data) {
+  async save(pid, data, updatedBy = null) {
     await initDb();
     await upsertSingleRow('capital_config', pid, {
       caja_minima_buffer: data.caja_minima_buffer || 2000,
@@ -587,7 +615,7 @@ const capital = {
       caja_fuerte_retencion: data.caja_fuerte_retencion || 10000,
       devolucion_minima: data.devolucion_minima || 3000,
     });
-    await touchProject(pid);
+    await touchProject(pid, updatedBy);
   },
 };
 

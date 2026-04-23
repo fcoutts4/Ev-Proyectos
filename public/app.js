@@ -28,6 +28,13 @@ const state = {
   },
 };
 
+const USER_STORAGE_KEYS = [
+  'evproyectos.userName',
+  'evproyectos_user_name',
+  'userName',
+  'user_name',
+];
+
 function showTab(tabId, button) {
   document.querySelectorAll('.tab-pane').forEach((pane) => pane.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach((tab) => tab.classList.remove('active'));
@@ -64,6 +71,27 @@ function setText(id, value) {
 function setHtml(id, value) {
   const el = $(id);
   if (el) el.innerHTML = value;
+}
+
+function getStoredUserName() {
+  for (const key of USER_STORAGE_KEYS) {
+    try {
+      const value = window.localStorage.getItem(key);
+      if (value && String(value).trim()) return String(value).trim();
+    } catch {
+      // Ignore storage access issues and keep fallback behavior.
+    }
+  }
+  return '';
+}
+
+function getCurrentUserName() {
+  const explicitUser = window.__EV_USER__?.name || window.__BRICSA_USER__?.name || getStoredUserName();
+  return String(explicitUser || state.proyecto?.updated_by || 'Usuario local').trim();
+}
+
+function getLastModifierName() {
+  return String(state.proyecto?.updated_by || '').trim() || 'sin registro';
 }
 
 function toNumber(value) {
@@ -228,32 +256,51 @@ function setSyncStatus(status, message, detail) {
   renderSyncStatus();
 }
 
+function getSyncDetailText() {
+  const reference = state.proyecto?.updated_at || state.sync.lastSavedAt || state.health?.timestamp;
+  return reference
+    ? `Ultima sincronizacion: ${fmtDateTime(reference)}`
+    : 'Ultima sincronizacion: sin registro';
+}
+
 function renderSyncStatus() {
   const badge = $('sync-badge');
-  const icon = $('sync-icon');
   const label = $('sync-label');
   const detail = $('sync-detail');
-  if (!badge || !icon || !label || !detail) return;
+  const modifier = $('sync-last-modifier');
+  if (!badge || !label || !detail || !modifier) return;
 
-  const variants = {
+  const variantsOld = {
     loading: { color: '#475569', bg: '#f8fafc', border: '#cbd5e1', icon: '☁' },
     ok: { color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', icon: '☁ ✓' },
     saving: { color: '#b45309', bg: '#fffbeb', border: '#fde68a', icon: '↻' },
     error: { color: '#b91c1c', bg: '#fef2f2', border: '#fecaca', icon: '⚠' },
   };
 
+  const variants = {
+    loading: { color: '#475569', bg: '#f8fafc', border: '#cbd5e1', label: 'Sincronizando' },
+    ok: { color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', label: 'Sincronizado' },
+    saving: { color: '#b45309', bg: '#fffbeb', border: '#fde68a', label: 'Guardando' },
+    error: { color: '#b91c1c', bg: '#fef2f2', border: '#fecaca', label: 'Sin conexion' },
+  };
+
   const variant = variants[state.sync.status] || variants.loading;
   badge.style.color = variant.color;
   badge.style.background = variant.bg;
   badge.style.borderColor = variant.border;
-  icon.textContent = variant.icon;
-  label.textContent = state.sync.message;
-  detail.textContent = state.sync.detail;
+  label.textContent = variant.label;
+  detail.textContent = getSyncDetailText();
+  modifier.textContent = `Ultima modificacion por: ${getLastModifierName()}`;
 }
 
 async function api(path, options = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    'x-user-name': getCurrentUserName(),
+    ...(options.headers || {}),
+  };
   const response = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     ...options,
   });
 
@@ -1661,7 +1708,10 @@ function renderCostPlanilla() {
           <td style="text-align:center">${partida.auto_origen ? '' : '<span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span>'}</td>
           <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${partida.auto_origen ? 'disabled' : ''}/></td>
           <td class="formula-cell">
-            <input class="inp" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}" placeholder="Ej: 2500 * _meses_construccion + 3000 * _meses_preventa" ${partida.auto_origen ? 'disabled' : 'oninput="handleCostFormulaInput(this)" onfocus="handleCostFormulaInput(this)" onblur="hideCostFormulaSuggestionsLater()"'}/>
+            <div class="formula-input-wrap">
+              <input class="inp" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}" placeholder="Ej: 2500 * _meses_construccion + 3000 * _meses_preventa" ${partida.auto_origen ? 'disabled' : 'oninput="handleCostFormulaInput(this); updateCostFormulaPreview(this)" onfocus="handleCostFormulaInput(this); updateCostFormulaPreview(this)" onblur="hideCostFormulaSuggestionsLater()"'}/>
+              <div class="formula-preview" data-formula-preview>${renderCostFormulaPreviewContent(getPartidaFormulaText(partida), partida.formula_tipo, partida.auto_origen)}</div>
+            </div>
             ${partida.auto_origen ? '' : '<div class="formula-suggest"></div>'}
           </td>
           <td>${partida.auto_origen ? '<span class="badge badge-yellow">AUTO</span>' : `<button class="btn-outline" type="button" onclick="openPaymentPlanModal('${escapeHtml(categoria.nombre)}', ${index})">${escapeHtml(summarizePaymentPlan(partida.plan_pago))}</button><div style="font-size:10px;color:${Math.abs(getPaymentPlanAssignedPct(partida.plan_pago) - 100) < 0.01 ? '#16a34a' : '#b45309'};margin-top:4px">${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))} asignado</div>`}</td>
@@ -1677,10 +1727,14 @@ function renderCostPlanilla() {
     return `
       <tr class="cat-row">
         <td colspan="${8 + monthCount}" style="padding:10px">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-            <button class="btn-outline btn-plus" type="button" onclick="toggleCostCategoryCollapse('${escapeHtml(categoria.nombre)}')" title="Expandir o colapsar">${isCollapsed ? '+' : '-'}</button>
-            <span style="flex:1">${escapeHtml(categoria.nombre)}</span>
-            <button class="btn-outline btn-plus" type="button" onclick="agregarPartidaLinea('${escapeHtml(categoria.nombre)}')" title="Agregar subpartida">+</button>
+          <div class="cost-category-header">
+            <div class="cost-category-title">
+              <button class="btn-outline btn-plus" type="button" onclick="toggleCostCategoryCollapse('${escapeHtml(categoria.nombre)}')" title="Expandir o colapsar">${isCollapsed ? '+' : '-'}</button>
+              <span class="cost-category-name">${escapeHtml(categoria.nombre)}</span>
+            </div>
+            <div class="cost-category-actions">
+              <button class="btn-outline btn-subpartida" type="button" onclick="agregarPartidaLinea('${escapeHtml(categoria.nombre)}')" title="Agregar subpartida">+ Subpartida</button>
+            </div>
           </div>
         </td>
       </tr>
@@ -1751,6 +1805,75 @@ function getCostFormulaCatalog() {
       },
     ])),
   ];
+}
+
+function splitFormulaTokens(rawValue) {
+  const parts = String(rawValue || '').match(/\[[^\]]+\]|_[a-z0-9_]+|\d+(?:[.,]\d+)?|[()+\-*/]|[^\s]+/gi);
+  return Array.isArray(parts) ? parts.slice(0, 40) : [];
+}
+
+function findFormulaCatalogEntry(token) {
+  const normalizedToken = String(token || '').trim().toLowerCase();
+  return getCostFormulaCatalog().find(({ label, token: catalogToken }) => (
+    String(catalogToken || '').toLowerCase() === normalizedToken
+    || `[${String(label || '').toLowerCase()}]` === normalizedToken
+  ));
+}
+
+function renderFormulaToken(token, isAuto = false) {
+  const value = String(token || '').trim();
+  if (!value) return '';
+  if (isAuto) return `<span class="formula-token auto">${escapeHtml(value)}</span>`;
+  if (/^[()+\-*/]$/.test(value)) return `<span class="formula-token operator">${escapeHtml(value)}</span>`;
+
+  const match = findFormulaCatalogEntry(value);
+  if (match) {
+    return `<span class="formula-token reference" title="${escapeHtml(`${match.label} = ${fmtNumber(match.value, 2)}`)}">${escapeHtml(value)}</span>`;
+  }
+  if (/^[0-9.,]+$/.test(value)) return `<span class="formula-token number">${escapeHtml(value)}</span>`;
+  return `<span class="formula-token">${escapeHtml(value)}</span>`;
+}
+
+function renderCostFormulaPreviewContent(rawValue, formulaType = 'expr', isAuto = false) {
+  const value = String(rawValue || '').trim();
+  const tokens = splitFormulaTokens(value);
+  const expression = value
+    ? tokens.map((token) => renderFormulaToken(token, isAuto)).join('')
+    : '<span class="formula-token placeholder">Sin formula</span>';
+
+  const statusClass = isAuto
+    ? 'formula-status formula-status-auto'
+    : formulaType === 'manual'
+      ? 'formula-status formula-status-manual'
+      : 'formula-status formula-status-expr';
+  const statusText = isAuto
+    ? 'Automatico'
+    : formulaType === 'manual'
+      ? 'Manual'
+      : 'Formula';
+  const note = isAuto
+    ? 'Origen calculado automaticamente por el modelo.'
+    : formulaType === 'manual'
+      ? 'Monto fijo editable para esta subpartida.'
+      : 'Expresion editable con referencias y operadores del modelo.';
+
+  return `
+    <div class="formula-preview-head">
+      <span class="formula-preview-title">Vista de formula</span>
+      <span class="${statusClass}">${statusText}</span>
+    </div>
+    <div class="formula-preview-expression">${expression}</div>
+    <div class="formula-preview-note">${escapeHtml(note)}</div>
+  `;
+}
+
+function updateCostFormulaPreview(input) {
+  const cell = input?.closest('.formula-cell');
+  const preview = cell?.querySelector('[data-formula-preview]');
+  if (!preview) return;
+  const rawValue = input.value || '';
+  const parsed = parseFormulaInput(rawValue);
+  preview.innerHTML = renderCostFormulaPreviewContent(rawValue, parsed.formula_tipo, false);
 }
 
 function renderCostFormulaOptions() {
@@ -1997,10 +2120,7 @@ function removeCostPartida(categoryName, index) {
 function renderProjectHeader() {
   setText('proj-title', state.proyecto?.nombre || 'Proyecto');
   setText('proj-dir', state.proyecto?.direccion || 'Sin direccion');
-  setText('nav-user', 'BRICSA | version dinamica');
-  if (state.proyecto?.updated_at && state.sync.status === 'ok') {
-    $('sync-detail').textContent = `Ult. actualizacion ${fmtDateTime(state.proyecto.updated_at)}`;
-  }
+  renderSyncStatus();
 }
 
 function renderKpis() {
@@ -2471,6 +2591,7 @@ window.setCostFlowMode = setCostFlowMode;
 window.toggleCostCategoryCollapse = toggleCostCategoryCollapse;
 window.insertCostFormulaReference = insertCostFormulaReference;
 window.handleCostFormulaInput = handleCostFormulaInput;
+window.updateCostFormulaPreview = updateCostFormulaPreview;
 window.hideCostFormulaSuggestionsLater = hideCostFormulaSuggestionsLater;
 window.pickCostFormulaSuggestion = pickCostFormulaSuggestion;
 window.openPaymentPlanModal = openPaymentPlanModal;

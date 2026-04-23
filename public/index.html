@@ -67,6 +67,22 @@ tbody tr:hover{background:#f8fafc}
 .formula-chip.ref{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
 .formula-chip.gantt{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
 .formula-cell{position:relative}
+.formula-input-wrap{display:flex;flex-direction:column;gap:8px}
+.formula-preview{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc}
+.formula-preview-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.formula-preview-title{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#64748b}
+.formula-preview-note{font-size:10px;color:#94a3b8;line-height:1.4}
+.formula-preview-expression{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.formula-token{display:inline-flex;align-items:center;min-height:26px;padding:4px 9px;border-radius:8px;border:1px solid #dbe4ee;background:#fff;font-size:11px;font-weight:600;color:#334155}
+.formula-token.reference{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
+.formula-token.operator{background:#0f172a;border-color:#0f172a;color:#fff;padding:4px 8px}
+.formula-token.number{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
+.formula-token.placeholder{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
+.formula-token.auto{background:#f8fafc;border-color:#cbd5e1;color:#475569}
+.formula-status{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.formula-status-manual{background:#ecfccb;color:#3f6212}
+.formula-status-expr{background:#dbeafe;color:#1d4ed8}
+.formula-status-auto{background:#e2e8f0;color:#334155}
 .formula-suggest{position:absolute;left:0;right:0;top:calc(100% + 6px);background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 12px 30px rgba(15,23,42,.15);padding:6px;display:none;z-index:30;max-height:220px;overflow:auto}
 .formula-suggest button{display:block;width:100%;border:none;background:#fff;text-align:left;padding:8px 10px;border-radius:8px;font-size:11px;cursor:pointer;color:#334155}
 .formula-suggest button:hover{background:#f8fafc}
@@ -80,10 +96,14 @@ tbody tr:hover{background:#f8fafc}
 .dist-bar{height:100%;border-radius:4px}
 .dist-pct{font-size:11px;font-weight:600;min-width:36px;color:#334155}
 /* GANTT */
-.gantt-row{display:flex;align-items:center;height:32px;border-bottom:1px solid #f1f5f9}
+.gantt-row{display:flex;align-items:center;height:26px;border-bottom:1px solid #f1f5f9}
 .gantt-label{width:170px;flex-shrink:0;font-size:11px;color:#475569;padding-right:8px;text-align:right}
-.gantt-track{flex:1;position:relative;height:22px}
-.gantt-bar{position:absolute;height:22px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff}
+.gantt-track{flex:1;position:relative;height:16px}
+.gantt-bar{position:absolute;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff}
+.gantt-editor-track{position:relative;height:16px;background:#f8fafc;border-radius:5px;overflow:hidden}
+.gantt-editor-bar{position:absolute;top:0;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:700;cursor:grab;user-select:none;touch-action:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+.gantt-editor-bar:active{cursor:grabbing}
+.gantt-editor-bar.dragging{opacity:.92;box-shadow:0 0 0 2px rgba(15,23,42,.15)}
 /* BADGES */
 .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700}
 .badge-green{background:#dcfce7;color:#166534}
@@ -105,6 +125,13 @@ tbody tr:hover{background:#f8fafc}
 .btn-outline{display:inline-flex;align-items:center;gap:6px;background:#fff;color:#475569;border:1px solid #e2e8f0;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer}
 .btn-outline:hover{background:#f8fafc}
 .btn-dark{background:#0f172a;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer}
+.sync-meta{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.sync-text{font-size:11px;color:#64748b}
+.cost-category-header{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%}
+.cost-category-title{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
+.cost-category-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cost-category-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px}
+.btn-subpartida{padding:7px 12px;font-size:11px;font-weight:700;white-space:nowrap}
 /* INPUT */
 .inp{border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;font-size:12px;width:100%;outline:none}
 .inp:focus{border-color:#22c55e;box-shadow:0 0 0 2px rgba(34,197,94,.15)}
@@ -136,12 +163,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     <div class="logo-box">B</div>
     <span style="font-weight:900;font-size:13px;letter-spacing:.05em;color:#0f172a">BRICSA</span>
 </div>
-  <div style="display:flex;align-items:center;gap:10px">
-    <button class="btn-outline" id="tour-interactivo-btn" style="font-size:11px">✨ Tour Interactivo</button>
-    <span style="font-size:18px;cursor:pointer;color:#94a3b8"></span>
-    <span id="nav-user" style="font-size:12px;color:#475569">Hey, usuario@empresa.cl!</span>
-    <button class="btn-dark" style="font-size:12px">Logout</button>
-</div>
 </nav>
 
 <!-- PROJECT HEADER -->
@@ -151,13 +172,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
       <a href="#" style="font-size:12px;color:#64748b;text-decoration:none">← Volver al Dashboard</a>
       <h1 id="proj-title" style="font-size:22px;font-weight:800;color:#0f172a;margin:4px 0 0">Edificio Residencial Tipo</h1>
   </div>
-    <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
-      <span id="sync-badge" style="display:flex;align-items:center;gap:4px;font-size:11px;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:6px 12px">
-        <span id="sync-icon"> ✓</span>
-        <span id="sync-label">SINCRONIZADO</span>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:4px;flex-wrap:wrap">
+      <span id="sync-badge" style="display:inline-flex;align-items:center;font-size:11px;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:6px 12px">
+        <span id="sync-label">Sincronizado</span>
       </span>
-      <span id="sync-detail" style="font-size:11px;color:#94a3b8">Base conectada</span>
-      <span id="proj-dir" style="font-size:11px;color:#94a3b8"> Dirección en Las Condes, Las Condes</span>
+      <div class="sync-meta">
+        <span id="sync-detail" class="sync-text">Última sincronización: sin registro</span>
+        <span id="sync-last-modifier" class="sync-text">Última modificación por: sin registro</span>
+        <span id="proj-dir" class="sync-text">Dirección en Las Condes, Las Condes</span>
+      </div>
   </div>
 </div>
   <div class="tab-nav" id="tabBar">
@@ -614,7 +637,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
     <div>
       <div style="font-size:16px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:8px"> Cronograma del Proyecto</div>
-      <div style="font-size:11px;color:#94a3b8">Arrastra las filas para reordenar. Asegúrate de guardar tus cambios.</div>
+      <div style="font-size:11px;color:#94a3b8">Arrastra los bloques en la línea de tiempo para moverlos manualmente. Asegúrate de guardar tus cambios.</div>
   </div>
     <div style="display:flex;gap:8px">
       <button class="btn-outline" onclick="agregarHito()">+ Añadir Hito</button>
@@ -626,7 +649,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     <table style="min-width:1100px">
       <thead>
         <tr>
-          <th style="width:32px">ACCIONES</th>
+          <th style="width:32px">X</th>
           <th style="width:200px;text-align:left">HITO / PARTIDA</th>
           <th style="width:160px">DEPENDENCIA</th>
           <th style="width:70px">DESFASE</th>
@@ -1282,6 +1305,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   </div>
 </div>
 
-<script src="/app.js"></script>
+<script src="./app_gantt_editable.js"></script>
 </body>
 </html>

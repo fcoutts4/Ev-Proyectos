@@ -26,6 +26,11 @@ function asyncHandler(handler) {
   return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 }
 
+function getRequestUser(req) {
+  const normalized = String(req.get('x-user-name') || '').trim();
+  return normalized ? normalized.slice(0, 120) : null;
+}
+
 const bootstrapPromise = (async () => {
   await initDb();
   await seedDemoProject();
@@ -62,12 +67,12 @@ app.get('/api/proyectos/:id', asyncHandler(async (req, res) => {
 }));
 
 app.post('/api/proyectos', asyncHandler(async (req, res) => {
-  const id = await proyectos.create(req.body);
+  const id = await proyectos.create(req.body, getRequestUser(req));
   res.json({ id, ...req.body });
 }));
 
 app.put('/api/proyectos/:id', asyncHandler(async (req, res) => {
-  await proyectos.update(req.params.id, req.body);
+  await proyectos.update(req.params.id, req.body, getRequestUser(req));
   res.json({ success: true });
 }));
 
@@ -81,7 +86,7 @@ app.get('/api/proyectos/:id/cabida', asyncHandler(async (req, res) => {
 }));
 
 app.post('/api/proyectos/:id/cabida', asyncHandler(async (req, res) => {
-  await cabida.upsert(req.params.id, req.body);
+  await cabida.upsert(req.params.id, req.body, getRequestUser(req));
   res.json({ success: true });
 }));
 
@@ -90,7 +95,7 @@ app.get('/api/proyectos/:id/gantt', asyncHandler(async (req, res) => {
 }));
 
 app.post('/api/proyectos/:id/gantt', asyncHandler(async (req, res) => {
-  await gantt.save(req.params.id, req.body);
+  await gantt.save(req.params.id, req.body, getRequestUser(req));
   res.json({ success: true });
 }));
 
@@ -102,12 +107,12 @@ app.get('/api/proyectos/:id/ventas', asyncHandler(async (req, res) => {
 }));
 
 app.post('/api/proyectos/:id/ventas/config', asyncHandler(async (req, res) => {
-  await ventas.saveConfig(req.params.id, req.body);
+  await ventas.saveConfig(req.params.id, req.body, getRequestUser(req));
   res.json({ success: true });
 }));
 
 app.post('/api/proyectos/:id/ventas/cronograma', asyncHandler(async (req, res) => {
-  await ventas.saveCronograma(req.params.id, req.body);
+  await ventas.saveCronograma(req.params.id, req.body, getRequestUser(req));
   res.json({ success: true });
 }));
 
@@ -116,7 +121,7 @@ app.get('/api/proyectos/:id/construccion', asyncHandler(async (req, res) => {
 }));
 
 app.post('/api/proyectos/:id/construccion', asyncHandler(async (req, res) => {
-  await construccion.save(req.params.id, req.body);
+  await construccion.save(req.params.id, req.body, getRequestUser(req));
   res.json({ success: true });
 }));
 
@@ -131,7 +136,7 @@ app.get('/api/proyectos/:id/costos', asyncHandler(async (req, res) => {
 }));
 
 app.post('/api/proyectos/:id/costos', asyncHandler(async (req, res) => {
-  await costos.saveAll(req.params.id, req.body);
+  await costos.saveAll(req.params.id, req.body, getRequestUser(req));
   res.json({ success: true });
 }));
 
@@ -140,7 +145,7 @@ app.get('/api/proyectos/:id/financiamiento', asyncHandler(async (req, res) => {
 }));
 
 app.post('/api/proyectos/:id/financiamiento', asyncHandler(async (req, res) => {
-  await financiamiento.save(req.params.id, req.body);
+  await financiamiento.save(req.params.id, req.body, getRequestUser(req));
   res.json({ success: true });
 }));
 
@@ -149,7 +154,7 @@ app.get('/api/proyectos/:id/capital', asyncHandler(async (req, res) => {
 }));
 
 app.post('/api/proyectos/:id/capital', asyncHandler(async (req, res) => {
-  await capital.save(req.params.id, req.body);
+  await capital.save(req.params.id, req.body, getRequestUser(req));
   res.json({ success: true });
 }));
 
