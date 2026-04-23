@@ -1433,6 +1433,7 @@ function renderConstruccion() {
   setText('constr-sup-total', `${fmtNumber(metrics.sup_total, 1)} m2`);
   setText('constr-uf-prom', `${fmtNumber(metrics.uf_prom, 2)} UF/m2`);
   setText('constr-ratio-bt', fmtPct(metrics.pct_bajo_tierra_sobre_cota_0));
+  setText('constr-ratio-bt-m2', `${fmtNumber(metrics.sup_bajo_tierra, 1)} m2 bajo tierra`);
   setText('constr-total-neto', fmtUf(metrics.total_neto));
   setText('constr-uf-bruto', `${fmtNumber(metrics.uf_bruto, 2)} UF/m2`);
   setText('constr-total-bruto', fmtUf(metrics.total_bruto));
@@ -1491,17 +1492,13 @@ function renderTerrainModule() {
 
 function renderConstructionFinancing() {
   const metrics = getConstructionMetrics();
-  const approved = state.financiamiento.linea_construccion_activo
-    ? metrics.total_neto * toNumber(state.financiamiento.linea_construccion_pct) / 100
-    : 0;
+  const approved = metrics.total_neto * toNumber(state.financiamiento.linea_construccion_pct) / 100;
   const start = getConstructionStartMonth();
   const duration = getConstructionDuration();
 
-  if ($('fin-constr-activo')) $('fin-constr-activo').checked = !!state.financiamiento.linea_construccion_activo;
   if ($('fin-constr-pct')) $('fin-constr-pct').value = toNumber(state.financiamiento.linea_construccion_pct);
   if ($('fin-constr-tasa')) $('fin-constr-tasa').value = toNumber(state.financiamiento.linea_construccion_tasa);
   if ($('fin-constr-pago-int')) $('fin-constr-pago-int').value = state.financiamiento.linea_construccion_pago_intereses || 'Anual';
-  if ($('fin-constr-pago-cap')) $('fin-constr-pago-cap').value = state.financiamiento.linea_construccion_pago_capital || 'Contra Escrituraciones';
   setText('fin-constr-costo', fmtUf(metrics.total_neto));
   setText('fin-constr-monto', fmtUf(approved));
   setText('fin-constr-plazos', `Plazo estimado: mes ${fmtNumber(start)} a mes ${fmtNumber(start + duration)}`);
@@ -2946,11 +2943,11 @@ function readTerrenoFinanciamientoFromEditor() {
 function readConstruccionFinanciamientoFromEditor() {
   return normalizeFinanciamiento({
     ...state.financiamiento,
-    linea_construccion_activo: !!$('fin-constr-activo')?.checked,
+    linea_construccion_activo: true,
     linea_construccion_pct: toNumber($('fin-constr-pct')?.value),
     linea_construccion_tasa: toNumber($('fin-constr-tasa')?.value),
     linea_construccion_pago_intereses: $('fin-constr-pago-int')?.value || 'Anual',
-    linea_construccion_pago_capital: $('fin-constr-pago-cap')?.value || 'Contra Escrituraciones',
+    linea_construccion_pago_capital: 'Contra Escrituraciones',
   });
 }
 
