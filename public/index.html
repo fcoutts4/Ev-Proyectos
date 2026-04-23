@@ -318,17 +318,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     </div>
   </div>
 
-    <!-- Estructura de Costos -->
-    <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <div class="sec-title" style="margin-bottom:0"> ESTRUCTURA DE COSTOS</div>
-        <div style="display:flex;gap:4px">
-          <button class="badge badge-blue" onclick="toggleEstructura('agrupados',this)" id="btn-agr" style="cursor:pointer">Agrupados</button>
-          <button class="badge" onclick="toggleEstructura('desglosados',this)" id="btn-des" style="cursor:pointer;background:#f1f5f9;color:#475569">Desglosados</button>
-      </div>
-    </div>
-      <div id="estructura-costos-list"></div>
-  </div>
 </div>
 
   <div class="card" style="margin-bottom:20px">
@@ -488,6 +477,22 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
           </select>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div>
+        <div class="sec-title" style="margin-bottom:4px"> GASTOS FINANCIEROS TERRENO</div>
+        <div style="font-size:11px;color:#94a3b8">Esta categoría se configura en Terreno y se replica automáticamente en Costos del Proyecto.</div>
+      </div>
+    </div>
+    <div class="tbl-scroll">
+      <table id="terreno-fin-planilla-table" style="min-width:1200px">
+        <thead id="terreno-fin-planilla-head"></thead>
+        <tbody id="terreno-fin-planilla-tbody"></tbody>
+        <tfoot id="terreno-fin-planilla-tfoot"></tfoot>
+      </table>
     </div>
   </div>
 </div><!-- end tab terreno -->
@@ -843,6 +848,22 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
           <option>Contra Escrituraciones</option><option>Fin Proyecto</option><option>Inicio Construccion</option>
         </select>
       </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div>
+        <div class="sec-title" style="margin-bottom:4px"> GASTOS FINANCIEROS CONSTRUCCIÓN</div>
+        <div style="font-size:11px;color:#94a3b8">Esta categoría se configura en Construcción y se refleja automáticamente en Costos del Proyecto.</div>
+      </div>
+    </div>
+    <div class="tbl-scroll">
+      <table id="constr-fin-planilla-table" style="min-width:1200px">
+        <thead id="constr-fin-planilla-head"></thead>
+        <tbody id="constr-fin-planilla-tbody"></tbody>
+        <tfoot id="constr-fin-planilla-tfoot"></tfoot>
+      </table>
     </div>
   </div>
 

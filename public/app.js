@@ -28,6 +28,11 @@ const state = {
     detail: 'Conectando con backend',
     lastSavedAt: null,
   },
+  autosave: {
+    timers: {},
+    inFlight: {},
+    queued: {},
+  },
 };
 
 const USER_STORAGE_KEYS = [
@@ -74,6 +79,15 @@ function setHtml(id, value) {
   const el = $(id);
   if (el) el.innerHTML = value;
 }
+
+const AUTOSAVE_SCOPE_LABELS = {
+  cabida: 'cabida',
+  terreno: 'terreno',
+  construccion: 'construccion',
+  gantt: 'carta gantt',
+  ventas: 'ventas',
+  costos: 'costos del proyecto',
+};
 
 function getStoredUserName() {
   for (const key of USER_STORAGE_KEYS) {
@@ -312,6 +326,51 @@ function renderSyncStatus() {
   modifier.textContent = `Ultima modificacion por: ${getLastModifierName()}`;
 }
 
+function scheduleAutosave(scope, delay = 900) {
+  if (!state.proyectoId || !scope) return;
+  window.clearTimeout(state.autosave.timers[scope]);
+  state.autosave.queued[scope] = true;
+  setSyncStatus('saving', 'GUARDANDO', `Cambios pendientes en ${AUTOSAVE_SCOPE_LABELS[scope] || scope}`);
+  state.autosave.timers[scope] = window.setTimeout(() => {
+    runAutosave(scope);
+  }, delay);
+}
+
+async function runAutosave(scope) {
+  if (!state.proyectoId || !scope) return;
+  window.clearTimeout(state.autosave.timers[scope]);
+
+  if (state.autosave.inFlight[scope]) {
+    state.autosave.queued[scope] = true;
+    return;
+  }
+
+  const handlers = {
+    cabida: guardarCabida,
+    terreno: guardarTerreno,
+    construccion: guardarConstruccion,
+    gantt: guardarGantt,
+    ventas: guardarVentas,
+    costos: guardarCostos,
+  };
+  const handler = handlers[scope];
+  if (!handler) return;
+
+  state.autosave.inFlight[scope] = true;
+  state.autosave.queued[scope] = false;
+  try {
+    await handler();
+  } catch (error) {
+    console.error(error);
+    setSyncStatus('error', 'SIN CONEXION', error.message);
+  } finally {
+    state.autosave.inFlight[scope] = false;
+    if (state.autosave.queued[scope]) {
+      runAutosave(scope);
+    }
+  }
+}
+
 async function api(path, options = {}) {
   const headers = {
     'Content-Type': 'application/json',
@@ -378,6 +437,38 @@ function ensureActionButtons() {
   $('tour-interactivo-btn')?.addEventListener('click', () => {
     window.alert('Tour interactivo: 1) define cabida, 2) arma gantt, 3) configura ventas, 4) guarda y valida sincronizacion.');
   });
+}
+
+function setupAutosaveListeners() {
+  const formulaInput = $('cost-formula-modal-input');
+  if (formulaInput && !formulaInput.dataset.autosaveBound) {
+    const onFormulaDraftChange = () => autosaveCostFormulaModal();
+    formulaInput.addEventListener('input', onFormulaDraftChange);
+    formulaInput.addEventListener('change', onFormulaDraftChange);
+    formulaInput.dataset.autosaveBound = '1';
+  }
+
+  const paymentModal = $('payment-plan-modal');
+  if (paymentModal && !paymentModal.dataset.autosaveBound) {
+    const onPaymentDraftChange = (event) => {
+      if (!event.target.closest('.payment-line')) return;
+      autosavePaymentPlanModal();
+    };
+    paymentModal.addEventListener('input', onPaymentDraftChange);
+    paymentModal.addEventListener('change', onPaymentDraftChange);
+    paymentModal.dataset.autosaveBound = '1';
+  }
+
+  if (!document.body.dataset.costAutosaveBound) {
+    const onCostDraftChange = (event) => {
+      if (!event.target.closest('#planilla-table [data-cost-row]')) return;
+      readCostosEditor();
+      scheduleAutosave('costos');
+    };
+    document.addEventListener('input', onCostDraftChange);
+    document.addEventListener('change', onCostDraftChange);
+    document.body.dataset.costAutosaveBound = '1';
+  }
 }
 
 function renderProjectSelector() {
@@ -1252,7 +1343,7 @@ function renderCostStructure() {
     `;
   }).join('');
 
-  setHtml('estructura-costos-list', rowsHtml);
+  if ($('estructura-costos-list')) setHtml('estructura-costos-list', rowsHtml);
   setHtml('dist-costos-list', rowsHtml);
   setText('costos-total-neto', fmtUf(total));
   setText('costos-total-bruto', fmtUf(totalBruto));
@@ -1336,6 +1427,7 @@ function renderTerrainModule() {
     .filter((partida) => partida.es_terreno)
     .map((partida) => `<div>${escapeHtml(partida.nombre)} <strong>${fmtUf(partida.total_neto)}</strong></div>`)
     .join('') || '<div>Sin partidas de terreno marcadas.</div>');
+  renderFinancingSourcePlanilla('terreno');
 }
 
 function renderConstructionFinancing() {
@@ -1355,6 +1447,72 @@ function renderConstructionFinancing() {
   setText('fin-constr-monto', fmtUf(approved));
   setText('fin-constr-plazos', `Plazo estimado: mes ${fmtNumber(start)} a mes ${fmtNumber(start + duration)}`);
   setHtml('fin-constr-partidas', `<div>Base financiera tomada desde el total neto de construcción.</div>`);
+  renderFinancingSourcePlanilla('construccion');
+}
+
+function getFinancingSourceRows(sourceType) {
+  const category = ensureCostosState().find((item) => item.nombre === 'GASTOS FINANCIEROS');
+  const matcher = sourceType === 'terreno' ? /^Terreno/i : /^Construccion/i;
+  return (category?.partidas || [])
+    .map((partida, index) => ({ ...partida, _costIndex: index }))
+    .filter((partida) => matcher.test(partida.nombre || ''));
+}
+
+function renderFinancingSourcePlanilla(sourceType) {
+  const prefix = sourceType === 'terreno' ? 'terreno-fin-planilla' : 'constr-fin-planilla';
+  if (!$(`${prefix}-head`) || !$(`${prefix}-tbody`) || !$(`${prefix}-tfoot`)) return;
+
+  const monthLabels = getCostMonthLabels();
+  const monthCount = getCostMonthCount();
+  const rows = getFinancingSourceRows(sourceType);
+  const monthlyTotals = createMonthlyArray(monthCount, 0);
+  let totalNeto = 0;
+  let totalIva = 0;
+
+  setHtml(`${prefix}-head`, `
+    <tr>
+      <th style="min-width:220px;text-align:left">Subpartida</th>
+      <th style="width:126px;text-align:center">Ver formula</th>
+      <th style="min-width:120px;text-align:center">Plan de pago</th>
+      <th style="min-width:110px">Total neto</th>
+      <th style="width:64px">IVA</th>
+      ${monthLabels.map((label) => `<th data-month-col>${escapeHtml(label)}</th>`).join('')}
+    </tr>
+  `);
+
+  setHtml(`${prefix}-tbody`, rows.map((partida) => {
+    const total = toNumber(partida.total_neto);
+    const distribucion = normalizeDistribution(partida.distribucion_mensual, total, partida.plan_pago);
+    totalNeto += total;
+    totalIva += partida.tiene_iva ? total * 0.19 : 0;
+    distribucion.forEach((value, index) => { monthlyTotals[index] += value; });
+
+    return `
+      <tr class="partida-row">
+        <td><input class="inp" value="${escapeHtml(partida.nombre || '')}" disabled></td>
+        <td style="text-align:center">
+          <button class="btn-outline btn-formula" type="button" onclick="openCostFormulaModal('GASTOS FINANCIEROS', ${partida._costIndex})">Ver fórmula</button>
+        </td>
+        <td style="text-align:center"><span class="badge badge-yellow">AUTO</span></td>
+        <td style="text-align:center;color:#22c55e;font-weight:800">${fmtUf(total)}</td>
+        <td style="text-align:center"><input type="checkbox" ${partida.tiene_iva ? 'checked' : ''} disabled></td>
+        ${distribucion.map((value) => `<td data-month-cell><input class="inp cost-month-input" type="number" step="0.01" value="${toNumber(value)}" disabled></td>`).join('')}
+      </tr>
+    `;
+  }).join('') || `
+    <tr>
+      <td colspan="${5 + monthCount}" style="text-align:center;color:#94a3b8;padding:14px">Sin gastos financieros ${sourceType === 'terreno' ? 'de terreno' : 'de construcción'} para mostrar.</td>
+    </tr>
+  `);
+
+  setHtml(`${prefix}-tfoot`, `
+    <tr class="tfoot-dark">
+      <td colspan="3">Totales</td>
+      <td>${fmtUf(totalNeto)}</td>
+      <td>${fmtUf(totalIva)}</td>
+      ${monthlyTotals.map((value) => `<td>${fmtUf(value)}</td>`).join('')}
+    </tr>
+  `);
 }
 
 const COST_CATEGORY_ORDER = [
@@ -2126,6 +2284,19 @@ function saveCostFormulaModal() {
   readCostosEditor();
   closeCostFormulaModal();
   renderCostosModule();
+  scheduleAutosave('costos');
+}
+
+function autosaveCostFormulaModal() {
+  const categoryName = state.costosUi.activeFormulaCategory;
+  const index = state.costosUi.activeFormulaIndex;
+  const input = $('cost-formula-modal-input');
+  if (!categoryName || index == null || !input) return;
+  const row = document.querySelector(`[data-cost-row][data-category="${CSS.escape(categoryName)}"][data-index="${index}"]`);
+  const hiddenInput = row?.querySelector('[data-field="formula"]');
+  if (hiddenInput) hiddenInput.value = input.value || '';
+  readCostosEditor();
+  scheduleAutosave('costos');
 }
 
 function insertCostFormulaReference(input, token) {
@@ -2311,6 +2482,7 @@ function addPaymentPlanItem(type) {
   if (type === 'hito') plan.hitos.push({ pct: 0, ref: 'MANUAL_0', offset: 0 });
   partida.plan_pago = serializeInteractivePaymentPlan(plan);
   openPaymentPlanModal(state.costosUi.activePaymentCategory, state.costosUi.activePaymentIndex);
+  scheduleAutosave('costos');
 }
 
 function removePaymentPlanItem(type, index) {
@@ -2322,6 +2494,7 @@ function removePaymentPlanItem(type, index) {
   if (type === 'hito') plan.hitos.splice(index, 1);
   partida.plan_pago = serializeInteractivePaymentPlan(plan);
   openPaymentPlanModal(state.costosUi.activePaymentCategory, state.costosUi.activePaymentIndex);
+  scheduleAutosave('costos');
 }
 
 function savePaymentPlanModal() {
@@ -2346,6 +2519,30 @@ function savePaymentPlanModal() {
   partida.plan_pago = serializeInteractivePaymentPlan({ tramos, hitos });
   closePaymentPlanModal();
   renderCostosModule();
+  scheduleAutosave('costos');
+}
+
+function autosavePaymentPlanModal() {
+  const category = state.costos.find((item) => item.nombre === state.costosUi.activePaymentCategory);
+  const partida = category?.partidas?.[state.costosUi.activePaymentIndex];
+  if (!partida) return;
+
+  const tramos = Array.from(document.querySelectorAll('#payment-plan-tramos .payment-line')).map((row) => ({
+    pct: toNumber(row.querySelector('[data-field="pct"]')?.value),
+    inicio_ref: row.querySelector('[data-field="inicio_ref"]')?.value || 'MANUAL_0',
+    inicio_offset: toNumber(row.querySelector('[data-field="inicio_offset"]')?.value),
+    fin_ref: row.querySelector('[data-field="fin_ref"]')?.value || 'MANUAL_0',
+    fin_offset: toNumber(row.querySelector('[data-field="fin_offset"]')?.value),
+  }));
+
+  const hitos = Array.from(document.querySelectorAll('#payment-plan-hitos .payment-line')).map((row) => ({
+    pct: toNumber(row.querySelector('[data-field="pct"]')?.value),
+    ref: row.querySelector('[data-field="ref"]')?.value || 'MANUAL_0',
+    offset: toNumber(row.querySelector('[data-field="offset"]')?.value),
+  }));
+
+  partida.plan_pago = serializeInteractivePaymentPlan({ tramos, hitos });
+  scheduleAutosave('costos');
 }
 
 function removeCostPartida(categoryName, index) {
@@ -2354,6 +2551,7 @@ function removeCostPartida(categoryName, index) {
   if (!category) return;
   category.partidas.splice(index, 1);
   renderCostosModule();
+  scheduleAutosave('costos');
 }
 
 function renderProjectHeader() {
@@ -2461,6 +2659,7 @@ function onCabidaInputChange() {
   ensureVentasState();
   renderVentasModule();
   renderCostosModule();
+  scheduleAutosave('cabida');
 }
 
 function onTerrenoInputChange() {
@@ -2469,6 +2668,7 @@ function onTerrenoInputChange() {
   renderTerrainModule();
   renderCostosModule();
   renderKpis();
+  scheduleAutosave('terreno');
 }
 
 function readConstruccionFromEditor() {
@@ -2491,6 +2691,7 @@ function updateConstrParams() {
   renderConstruccion();
   renderCostosModule();
   renderKpis();
+  scheduleAutosave('construccion');
 }
 
 function onGanttInputChange() {
@@ -2503,6 +2704,7 @@ function onGanttInputChange() {
   renderVentasSummaryCards();
   renderVentasCashflow();
   renderCostosModule();
+  scheduleAutosave('gantt');
 }
 
 function agregarHito() {
@@ -2519,6 +2721,7 @@ function agregarHito() {
     fin: 1,
   });
   renderGanttEditor(next);
+  onGanttInputChange();
 }
 
 function moveGanttRow(index, direction) {
@@ -2528,12 +2731,14 @@ function moveGanttRow(index, direction) {
   const copy = [...rows];
   [copy[index], copy[target]] = [copy[target], copy[index]];
   renderGanttEditor(copy);
+  onGanttInputChange();
 }
 
 function removeGanttRow(index) {
   const rows = readGanttEditor();
   rows.splice(index, 1);
   renderGanttEditor(rows);
+  onGanttInputChange();
 }
 
 function readVentasConfigEditor() {
@@ -2572,6 +2777,7 @@ function onVentasInputChange() {
   state.ventasCronograma = readVentasCronogramaEditor();
   renderVentasModule();
   renderCostosModule();
+  scheduleAutosave('ventas');
 }
 
 function parseFormulaInput(value) {
@@ -2631,6 +2837,7 @@ function agregarPartidaLinea(categoryName) {
     distribucion_mensual: createMonthlyArray(),
   });
   renderCostosModule();
+  scheduleAutosave('costos');
 }
 
 function redistribuirPartida(button) {
@@ -2699,6 +2906,7 @@ function dropCostRow(event) {
   category.partidas = copy;
   state.costDrag = null;
   renderCostosModule();
+  scheduleAutosave('costos');
 }
 
 async function loadProjects() {
@@ -2867,6 +3075,7 @@ function agregarUso() {
     sup_util_mun: getMunicipalUsefulPerUnit(0, 0),
   });
   renderCabidaEditor(rows);
+  onCabidaInputChange();
 }
 
 [
@@ -2928,6 +3137,7 @@ window.onVentasInputChange = onVentasInputChange;
 document.addEventListener('DOMContentLoaded', async () => {
   ensureProjectControls();
   ensureActionButtons();
+  setupAutosaveListeners();
   renderSyncStatus();
 
   const activeTab = document.querySelector('.tab-btn.active');
