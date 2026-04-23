@@ -1609,48 +1609,69 @@ function ensureCostosState() {
 function renderCostFlow(monthlyTotals) {
   const labels = getCostMonthLabels();
   const total = monthlyTotals.reduce((sum, value) => sum + value, 0);
+  const mode = state.costosUi?.costFlowMode || 'both';
   const cumulativeValues = monthlyTotals.reduce((acc, value, index) => {
     acc.push((acc[index - 1] || 0) + toNumber(value));
     return acc;
   }, []);
 
   setHtml('flujoEgresos-legend', '');
+  const monthlyBtn = $('cost-flow-monthly-btn');
+  const cumulativeBtn = $('cost-flow-cumulative-btn');
+  const bothBtn = $('cost-flow-both-btn');
+  [
+    { button: monthlyBtn, active: mode === 'monthly' },
+    { button: cumulativeBtn, active: mode === 'cumulative' },
+    { button: bothBtn, active: mode === 'both' },
+  ].forEach(({ button, active }) => {
+    if (!button) return;
+    button.style.background = active ? '#fee2e2' : '#fff';
+    button.style.color = active ? '#991b1b' : '#475569';
+    button.style.borderColor = active ? '#fca5a5' : '#e2e8f0';
+  });
 
   if (typeof Chart === 'undefined') return;
   const canvas = $('flujoEgresos-chart');
   if (!canvas) return;
   const context = canvas.getContext('2d');
   if (state.costFlowChart) state.costFlowChart.destroy();
+  const datasets = [];
+
+  if (mode === 'monthly' || mode === 'both') {
+    datasets.push({
+      type: 'bar',
+      label: 'Egresos mensuales',
+      data: monthlyTotals,
+      backgroundColor: '#fca5a5',
+      borderColor: '#dc2626',
+      borderWidth: 1,
+      borderRadius: 4,
+      order: 2,
+    });
+  }
+
+  if (mode === 'cumulative' || mode === 'both') {
+    datasets.push({
+      type: 'line',
+      label: 'Egresos acumulados',
+      data: cumulativeValues,
+      borderColor: '#2563eb',
+      backgroundColor: '#2563eb',
+      borderWidth: 3,
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      tension: 0.25,
+      fill: false,
+      yAxisID: 'y',
+      order: 1,
+    });
+  }
+
   state.costFlowChart = new Chart(context, {
     type: 'bar',
     data: {
       labels,
-      datasets: [
-        {
-          type: 'bar',
-          label: 'Egresos mensuales',
-          data: monthlyTotals,
-          backgroundColor: '#fca5a5',
-          borderColor: '#dc2626',
-          borderWidth: 1,
-          borderRadius: 4,
-          order: 2,
-        },
-        {
-          type: 'line',
-          label: 'Egresos acumulados',
-          data: cumulativeValues,
-          borderColor: '#991b1b',
-          backgroundColor: '#991b1b',
-          borderWidth: 3,
-          pointRadius: 2,
-          pointHoverRadius: 4,
-          tension: 0.25,
-          fill: false,
-          yAxisID: 'y',
-          order: 1,
-        },
-      ],
+      datasets,
     },
     options: {
       responsive: true,
@@ -1706,6 +1727,7 @@ function renderCostPlanilla() {
 
   setHtml('planilla-tbody', categorias.map((categoria) => {
     const isCollapsed = !!collapsedState[categoria.nombre];
+    const hasSubpartidas = (categoria.partidas || []).length > 0;
     const categoryRows = (categoria.partidas || []).map((partida, index) => {
       const total = evaluateCostPartida(partida, context);
       const distribucion = normalizeDistribution(partida.distribucion_mensual, total, partida.plan_pago);
@@ -1737,9 +1759,9 @@ function renderCostPlanilla() {
         <td colspan="${7 + monthCount}" style="padding:10px">
           <div class="cost-category-header">
             <div class="cost-category-title">
-              <button class="btn-outline btn-plus" type="button" onclick="toggleCostCategoryCollapse('${escapeHtml(categoria.nombre)}')" title="Expandir o colapsar">${isCollapsed ? '+' : '-'}</button>
+              <button class="btn-outline btn-plus" type="button" onclick="${hasSubpartidas ? `toggleCostCategoryCollapse('${escapeHtml(categoria.nombre)}')` : ''}" title="${hasSubpartidas ? 'Expandir o colapsar' : 'Sin subpartidas'}" ${hasSubpartidas ? '' : 'disabled style="opacity:.45;cursor:not-allowed"'}>${hasSubpartidas ? (isCollapsed ? '+' : '-') : '·'}</button>
               <span class="cost-category-name">${escapeHtml(categoria.nombre)}</span>
-              <button class="btn-outline btn-subpartida" type="button" onclick="agregarPartidaLinea('${escapeHtml(categoria.nombre)}')" title="Agregar subpartida">+ Subpartida</button>
+              <button class="btn-outline btn-subpartida" type="button" onclick="agregarPartidaLinea('${escapeHtml(categoria.nombre)}')" title="Agregar subpartida">+</button>
             </div>
             <div class="cost-category-actions">
             </div>
@@ -1912,7 +1934,7 @@ function toggleCostCategoryCollapse(categoryName) {
 }
 
 function setCostFlowMode(mode) {
-  state.costosUi.costFlowMode = mode === 'cumulative' ? 'cumulative' : 'monthly';
+  state.costosUi.costFlowMode = ['monthly', 'cumulative', 'both'].includes(mode) ? mode : 'both';
   renderCostosModule();
 }
 
