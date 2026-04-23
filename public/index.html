@@ -48,15 +48,15 @@ tbody tr:hover{background:#f8fafc}
 .tfoot-dark td{background:#0f172a;color:#fff;padding:10px;font-weight:700;font-size:12px}
 .tfoot-green td{background:#15803d;color:#fff;padding:10px;font-weight:700;font-size:12px}
 /* PLANILLA COSTOS */
-.planilla-header{background:#0f172a;border-radius:10px 10px 0 0;padding:14px 20px;display:flex;justify-content:space-between;align-items:center}
-.cat-row td{background:#f8fafc;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#334155;border-bottom:2px solid #e2e8f0}
+.planilla-header{background:#0f172a;border-radius:10px 10px 0 0;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
+.cat-row td{background:#f8fafc;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#334155;border-bottom:2px solid #e2e8f0;padding:7px 8px}
 .cat-row td:first-child{padding-left:8px}
-.partida-row td{font-size:12px;border-bottom:1px solid #f1f5f9}
+.partida-row td{font-size:11px;border-bottom:1px solid #f1f5f9;padding:5px 6px}
 .btn-plus{width:28px;height:28px;padding:0;justify-content:center;font-size:16px;font-weight:800;line-height:1}
 .drag-handle{display:inline-flex;align-items:center;justify-content:center;width:22px;color:#94a3b8;cursor:grab;font-size:14px;letter-spacing:-2px;user-select:none}
 .drag-handle:active{cursor:grabbing}
 .cost-plan-input{min-width:220px}
-.cost-month-input{min-width:84px}
+.cost-month-input{min-width:72px}
 .cost-row-dragging{opacity:.45}
 .modal-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;padding:24px;z-index:120}
 .modal-card{background:#fff;border-radius:18px;max-width:1100px;width:100%;max-height:90vh;overflow:auto;border:1px solid #e2e8f0;box-shadow:0 30px 80px rgba(15,23,42,.25)}
@@ -68,6 +68,7 @@ tbody tr:hover{background:#f8fafc}
 .formula-chip.gantt{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
 .formula-cell{position:relative}
 .formula-input-wrap{display:flex;flex-direction:column;gap:8px}
+.cost-hidden-formula{display:none}
 .formula-preview{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc}
 .formula-preview-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .formula-preview-title{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#64748b}
@@ -132,6 +133,14 @@ tbody tr:hover{background:#f8fafc}
 .cost-category-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cost-category-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px}
 .btn-subpartida{padding:7px 12px;font-size:11px;font-weight:700;white-space:nowrap}
+.btn-formula{padding:5px 10px;font-size:11px;font-weight:700;white-space:nowrap}
+.cost-formula-caption{font-size:10px;color:#94a3b8;white-space:nowrap}
+.cost-flow-note{font-size:11px;color:#64748b}
+#planilla-table thead th{padding:6px 8px;font-size:9px}
+#planilla-table .inp{padding:4px 8px;font-size:11px;min-height:28px}
+#planilla-table .btn-outline{padding:5px 10px;font-size:11px}
+#planilla-table .btn-plus{width:24px;height:24px;font-size:14px}
+#planilla-table .drag-handle{width:18px;font-size:12px}
 /* INPUT */
 .inp{border:1px solid #e2e8f0;border-radius:6px;padding:6px 10px;font-size:12px;width:100%;outline:none}
 .inp:focus{border-color:#22c55e;box-shadow:0 0 0 2px rgba(34,197,94,.15)}
@@ -816,10 +825,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     <div class="card" style="min-width:0;overflow:hidden">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <div class="sec-title" style="margin-bottom:0"> FLUJO DE EGRESOS</div>
-        <div style="display:flex;gap:6px">
-          <button id="cost-flow-monthly-btn" class="btn-outline" type="button" onclick="setCostFlowMode('monthly')">Mensual</button>
-          <button id="cost-flow-cumulative-btn" class="btn-outline" type="button" onclick="setCostFlowMode('cumulative')">Acumulado</button>
-        </div>
+        <div class="cost-flow-note">Mensual en barras. Acumulado en línea.</div>
     </div>
       <div class="chart-shell">
         <canvas id="flujoEgresos-chart"></canvas>
@@ -1305,6 +1311,29 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   </div>
 </div>
 
-<script src="./app_gantt_editable.js"></script>
+<div id="cost-formula-modal" class="modal-backdrop">
+  <div class="modal-card" style="max-width:820px">
+    <div class="modal-head">
+      <div>
+        <div id="cost-formula-title" style="font-size:22px;font-weight:900;color:#0f172a">Ver fórmula</div>
+        <div id="cost-formula-subtitle" style="font-size:12px;color:#64748b;margin-top:4px">Revisión y edición de fórmula</div>
+      </div>
+      <button class="btn-outline btn-plus" type="button" onclick="closeCostFormulaModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="formula-cell">
+        <input id="cost-formula-modal-input" class="inp" placeholder="Ej: 2500 * _meses_construccion + 3000 * _meses_preventa" oninput="handleCostFormulaInput(this); updateCostFormulaModalPreview()" onfocus="handleCostFormulaInput(this); updateCostFormulaModalPreview()" onblur="hideCostFormulaSuggestionsLater()"/>
+        <div class="formula-suggest"></div>
+      </div>
+      <div id="cost-formula-modal-preview" class="formula-preview" style="margin-top:12px"></div>
+      <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:18px">
+        <button class="btn-outline" type="button" onclick="closeCostFormulaModal()">Cerrar</button>
+        <button id="cost-formula-save-btn" class="btn-primary" type="button" onclick="saveCostFormulaModal()">Guardar fórmula</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
 </body>
 </html>

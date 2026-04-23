@@ -17,6 +17,8 @@ const state = {
     collapsed: {},
     activePaymentCategory: null,
     activePaymentIndex: null,
+    activeFormulaCategory: null,
+    activeFormulaIndex: null,
     formulaInputId: null,
     costFlowMode: 'monthly',
   },
@@ -1607,21 +1609,12 @@ function ensureCostosState() {
 function renderCostFlow(monthlyTotals) {
   const labels = getCostMonthLabels();
   const total = monthlyTotals.reduce((sum, value) => sum + value, 0);
-  const mode = state.costosUi?.costFlowMode || 'monthly';
-  const chartValues = mode === 'cumulative'
-    ? monthlyTotals.reduce((acc, value, index) => {
-      acc.push((acc[index - 1] || 0) + toNumber(value));
-      return acc;
-    }, [])
-    : monthlyTotals;
+  const cumulativeValues = monthlyTotals.reduce((acc, value, index) => {
+    acc.push((acc[index - 1] || 0) + toNumber(value));
+    return acc;
+  }, []);
 
   setHtml('flujoEgresos-legend', '');
-  const monthlyBtn = $('cost-flow-monthly-btn');
-  const cumulativeBtn = $('cost-flow-cumulative-btn');
-  if (monthlyBtn) monthlyBtn.style.background = mode === 'monthly' ? '#fee2e2' : '#fff';
-  if (monthlyBtn) monthlyBtn.style.color = mode === 'monthly' ? '#991b1b' : '#475569';
-  if (cumulativeBtn) cumulativeBtn.style.background = mode === 'cumulative' ? '#fee2e2' : '#fff';
-  if (cumulativeBtn) cumulativeBtn.style.color = mode === 'cumulative' ? '#991b1b' : '#475569';
 
   if (typeof Chart === 'undefined') return;
   const canvas = $('flujoEgresos-chart');
@@ -1632,28 +1625,48 @@ function renderCostFlow(monthlyTotals) {
     type: 'bar',
     data: {
       labels,
-      datasets: [{
-        label: mode === 'cumulative' ? 'Egresos acumulados' : 'Egresos mensuales',
-        data: chartValues,
-        backgroundColor: '#dc2626',
-        borderRadius: 4,
-      }],
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Egresos mensuales',
+          data: monthlyTotals,
+          backgroundColor: '#fca5a5',
+          borderColor: '#dc2626',
+          borderWidth: 1,
+          borderRadius: 4,
+          order: 2,
+        },
+        {
+          type: 'line',
+          label: 'Egresos acumulados',
+          data: cumulativeValues,
+          borderColor: '#991b1b',
+          backgroundColor: '#991b1b',
+          borderWidth: 3,
+          pointRadius: 2,
+          pointHoverRadius: 4,
+          tension: 0.25,
+          fill: false,
+          yAxisID: 'y',
+          order: 1,
+        },
+      ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { display: false },
+        legend: { display: true, position: 'top' },
         tooltip: {
           callbacks: {
             label(contextTooltip) {
               const rawValue = toNumber(contextTooltip.raw);
               const monthValue = toNumber(monthlyTotals[contextTooltip.dataIndex]);
               const pct = total ? (monthValue / total) * 100 : 0;
-              return mode === 'cumulative'
+              return contextTooltip.dataset.type === 'line'
                 ? `Acumulado ${fmtUf(rawValue)} | Mes ${fmtUf(monthValue)} | ${fmtPct(pct)}`
-                : `${fmtUf(rawValue)} | ${fmtPct(pct)}`;
+                : `Mes ${fmtUf(rawValue)} | ${fmtPct(pct)}`;
             },
           },
         },
@@ -1682,7 +1695,7 @@ function renderCostPlanilla() {
     <tr>
       <th style="width:34px"></th>
       <th style="min-width:220px;text-align:left">Subpartida</th>
-      <th style="min-width:280px;text-align:left">Formula</th>
+      <th style="width:126px;text-align:center">Ver formula</th>
       <th style="min-width:170px;text-align:left">Plan de pago</th>
       <th style="min-width:110px">Total neto</th>
       <th style="width:64px">IVA</th>
@@ -1707,12 +1720,9 @@ function renderCostPlanilla() {
         <tr class="partida-row" data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" ${partida.auto_origen ? 'data-auto="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
           <td style="text-align:center">${partida.auto_origen ? '' : '<span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span>'}</td>
           <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${partida.auto_origen ? 'disabled' : ''}/></td>
-          <td class="formula-cell">
-            <div class="formula-input-wrap">
-              <input class="inp" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}" placeholder="Ej: 2500 * _meses_construccion + 3000 * _meses_preventa" ${partida.auto_origen ? 'disabled' : 'oninput="handleCostFormulaInput(this); updateCostFormulaPreview(this)" onfocus="handleCostFormulaInput(this); updateCostFormulaPreview(this)" onblur="hideCostFormulaSuggestionsLater()"'}/>
-              <div class="formula-preview" data-formula-preview>${renderCostFormulaPreviewContent(getPartidaFormulaText(partida), partida.formula_tipo, partida.auto_origen)}</div>
-            </div>
-            ${partida.auto_origen ? '' : '<div class="formula-suggest"></div>'}
+          <td style="text-align:center">
+            <input class="inp cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}" ${partida.auto_origen ? 'disabled' : ''}/>
+            <button class="btn-outline btn-formula" type="button" onclick="openCostFormulaModal('${escapeHtml(categoria.nombre)}', ${index})">Ver fórmula</button>
           </td>
           <td>${partida.auto_origen ? '<span class="badge badge-yellow">AUTO</span>' : `<button class="btn-outline" type="button" onclick="openPaymentPlanModal('${escapeHtml(categoria.nombre)}', ${index})">${escapeHtml(summarizePaymentPlan(partida.plan_pago))}</button><div style="font-size:10px;color:${Math.abs(getPaymentPlanAssignedPct(partida.plan_pago) - 100) < 0.01 ? '#16a34a' : '#b45309'};margin-top:4px">${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))} asignado</div>`}</td>
           <td style="text-align:center;color:#22c55e;font-weight:800">${fmtUf(total)}</td>
@@ -1876,6 +1886,20 @@ function updateCostFormulaPreview(input) {
   preview.innerHTML = renderCostFormulaPreviewContent(rawValue, parsed.formula_tipo, false);
 }
 
+function updateCostFormulaModalPreview() {
+  const input = $('cost-formula-modal-input');
+  const preview = $('cost-formula-modal-preview');
+  if (!input || !preview) return;
+  const isAuto = !!input.dataset.auto;
+  const rawValue = input.value || '';
+  const parsed = parseFormulaInput(rawValue);
+  preview.innerHTML = renderCostFormulaPreviewContent(
+    rawValue,
+    isAuto ? 'expr' : parsed.formula_tipo,
+    isAuto
+  );
+}
+
 function renderCostFormulaOptions() {
   setHtml('cost-formula-refs', getCostFormulaCatalog().map(({ label, token, value }) => (
     `<option value="${escapeHtml(token)}">${escapeHtml(label)} (${fmtNumber(value, 2)})</option>`
@@ -1889,6 +1913,59 @@ function toggleCostCategoryCollapse(categoryName) {
 
 function setCostFlowMode(mode) {
   state.costosUi.costFlowMode = mode === 'cumulative' ? 'cumulative' : 'monthly';
+  renderCostosModule();
+}
+
+function openCostFormulaModal(categoryName, index) {
+  readCostosEditor();
+  const category = state.costos.find((item) => item.nombre === categoryName);
+  const partida = category?.partidas?.[index];
+  if (!partida) return;
+
+  state.costosUi.activeFormulaCategory = categoryName;
+  state.costosUi.activeFormulaIndex = index;
+
+  const input = $('cost-formula-modal-input');
+  const title = $('cost-formula-title');
+  const subtitle = $('cost-formula-subtitle');
+  const saveBtn = $('cost-formula-save-btn');
+  if (!input || !title || !subtitle || !saveBtn) return;
+
+  const formulaText = getPartidaFormulaText(partida);
+  input.value = formulaText;
+  input.dataset.auto = partida.auto_origen ? '1' : '';
+  input.disabled = !!partida.auto_origen;
+  title.textContent = `Ver fórmula · ${partida.nombre || 'Subpartida'}`;
+  subtitle.textContent = partida.auto_origen
+    ? 'Fórmula calculada automáticamente para esta subpartida.'
+    : 'Edita la fórmula sin ocupar espacio en la tabla principal.';
+  saveBtn.style.display = partida.auto_origen ? 'none' : 'inline-flex';
+  updateCostFormulaModalPreview();
+  $('cost-formula-modal').style.display = 'flex';
+}
+
+function closeCostFormulaModal() {
+  state.costosUi.activeFormulaCategory = null;
+  state.costosUi.activeFormulaIndex = null;
+  const input = $('cost-formula-modal-input');
+  if (input) {
+    input.value = '';
+    input.disabled = false;
+    delete input.dataset.auto;
+  }
+  $('cost-formula-modal').style.display = 'none';
+}
+
+function saveCostFormulaModal() {
+  const categoryName = state.costosUi.activeFormulaCategory;
+  const index = state.costosUi.activeFormulaIndex;
+  const input = $('cost-formula-modal-input');
+  if (!categoryName || index == null || !input) return;
+  const row = document.querySelector(`[data-cost-row][data-category="${CSS.escape(categoryName)}"][data-index="${index}"]`);
+  const hiddenInput = row?.querySelector('[data-field="formula"]');
+  if (hiddenInput) hiddenInput.value = input.value || '';
+  readCostosEditor();
+  closeCostFormulaModal();
   renderCostosModule();
 }
 
@@ -1946,6 +2023,7 @@ function pickCostFormulaSuggestion(button) {
   const input = $(button.dataset.inputId);
   if (!input) return;
   insertCostFormulaReference(input, button.dataset.token);
+  if (input.id === 'cost-formula-modal-input') updateCostFormulaModalPreview();
   hideCostFormulaSuggestionsLater();
 }
 
@@ -2588,10 +2666,14 @@ window.agregarPartidaLinea = agregarPartidaLinea;
 window.redistribuirPartida = redistribuirPartida;
 window.aplicarPlanPagoFila = aplicarPlanPagoFila;
 window.setCostFlowMode = setCostFlowMode;
+window.openCostFormulaModal = openCostFormulaModal;
+window.closeCostFormulaModal = closeCostFormulaModal;
+window.saveCostFormulaModal = saveCostFormulaModal;
 window.toggleCostCategoryCollapse = toggleCostCategoryCollapse;
 window.insertCostFormulaReference = insertCostFormulaReference;
 window.handleCostFormulaInput = handleCostFormulaInput;
 window.updateCostFormulaPreview = updateCostFormulaPreview;
+window.updateCostFormulaModalPreview = updateCostFormulaModalPreview;
 window.hideCostFormulaSuggestionsLater = hideCostFormulaSuggestionsLater;
 window.pickCostFormulaSuggestion = pickCostFormulaSuggestion;
 window.openPaymentPlanModal = openPaymentPlanModal;
