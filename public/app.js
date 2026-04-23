@@ -1728,7 +1728,31 @@ function renderCostPlanilla() {
   setHtml('planilla-tbody', categorias.map((categoria) => {
     const isCollapsed = !!collapsedState[categoria.nombre];
     const hasSubpartidas = (categoria.partidas || []).length > 0;
-    const categoryRows = (categoria.partidas || []).map((partida, index) => {
+    const categoryRows = [];
+
+    (categoria.partidas || []).forEach((partida, index) => {
+      if (categoria.nombre === 'GASTOS FINANCIEROS' && partida.auto_origen) {
+        const sectionLabel = /^Terreno/i.test(partida.nombre || '')
+          ? 'Financiamiento Terreno'
+          : /^Construccion/i.test(partida.nombre || '')
+            ? 'Financiamiento Construcción'
+            : '';
+        const previous = (categoria.partidas || [])[index - 1];
+        const previousLabel = previous && /^Terreno/i.test(previous.nombre || '')
+          ? 'Financiamiento Terreno'
+          : previous && /^Construccion/i.test(previous.nombre || '')
+            ? 'Financiamiento Construcción'
+            : '';
+
+        if (sectionLabel && sectionLabel !== previousLabel) {
+          categoryRows.push(`
+            <tr class="subcat-row">
+              <td colspan="${7 + monthCount}">${escapeHtml(sectionLabel)}</td>
+            </tr>
+          `);
+        }
+      }
+
       const total = evaluateCostPartida(partida, context);
       const distribucion = normalizeDistribution(partida.distribucion_mensual, total, partida.plan_pago);
       partida.total_neto = total;
@@ -1737,7 +1761,7 @@ function renderCostPlanilla() {
       totalIva += partida.tiene_iva ? total * 0.19 : 0;
       distribucion.forEach((value, monthIndex) => { monthlyTotals[monthIndex] += value; });
 
-      return `
+      categoryRows.push(`
         <tr class="partida-row" data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" ${partida.auto_origen ? 'data-auto="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
           <td style="text-align:center">${partida.auto_origen ? '' : `<span class="row-tools"><button class="btn-outline btn-delete-inline" type="button" title="Eliminar subpartida" onclick="removeCostPartida('${escapeHtml(categoria.nombre)}', ${index})">&times;</button><span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span></span>`}</td>
           <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${partida.auto_origen ? 'disabled' : ''}/></td>
@@ -1751,8 +1775,8 @@ function renderCostPlanilla() {
           <td style="text-align:center"><input type="checkbox" data-field="es_terreno" ${partida.es_terreno ? 'checked' : ''} ${partida.auto_origen ? 'disabled' : ''}/></td>
           ${distribucion.map((value, monthIndex) => `<td><input class="inp cost-month-input" data-month="${monthIndex}" type="number" step="0.01" value="${toNumber(value)}" ${partida.auto_origen ? 'disabled' : ''}/></td>`).join('')}
         </tr>
-      `;
-    }).join('');
+      `);
+    });
 
     return `
       <tr class="cat-row">
@@ -1768,7 +1792,7 @@ function renderCostPlanilla() {
           </div>
         </td>
       </tr>
-      ${isCollapsed ? '' : categoryRows}
+      ${isCollapsed ? '' : categoryRows.join('')}
     `;
   }).join(''));
 
