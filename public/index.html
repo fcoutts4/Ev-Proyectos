@@ -411,30 +411,38 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
     <div>
       <div style="font-size:16px;font-weight:800;color:#0f172a"> TERRENO Y FINANCIAMIENTO TERRENO</div>
-      <div style="font-size:11px;color:#94a3b8">La fecha de compra ancla el calendario del proyecto y se relaciona con el hito de adquisición en la carta gantt.</div>
+      <div style="font-size:11px;color:#94a3b8">La compra del terreno se define por mes-año y se vincula directamente al bloque "Compra terreno" en la Carta Gantt.</div>
     </div>
     <button class="btn-primary" onclick="guardarTerreno()"> Guardar</button>
   </div>
 
   <div style="display:grid;grid-template-columns:minmax(320px,420px) minmax(0,1fr);gap:16px;margin-bottom:16px;align-items:start">
     <div class="card">
-      <div class="sec-title"> FECHA DE COMPRA DEL TERRENO</div>
+      <div class="sec-title"> COMPRA DEL TERRENO</div>
       <div style="display:grid;grid-template-columns:1fr;gap:14px">
         <div>
-          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Fecha de compra</div>
-          <input type="date" class="inp" id="terreno-fecha-compra" onchange="onTerrenoInputChange()">
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Compra terreno (mes-año)</div>
+          <input type="month" class="inp" id="terreno-fecha-compra" onchange="onTerrenoInputChange()">
         </div>
         <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px">
           <div style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;margin-bottom:6px">Vínculo con Carta Gantt</div>
-          <div id="terreno-gantt-sync" style="font-size:11px;color:#64748b">Sincronizado con el hito de adquisición de terreno.</div>
+          <div id="terreno-gantt-sync" style="font-size:11px;color:#64748b">Sincronizado con el bloque Compra terreno.</div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div style="background:#f8fafc;border-radius:10px;padding:12px">
-            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Costo terreno detectado</div>
-            <div style="font-size:1.4rem;font-weight:900;color:#0f172a" id="terreno-costo-base">0 UF</div>
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">m2 bruto afecto</div>
+            <input type="number" class="inp" id="terreno-m2-bruto-afecto" step="0.01" oninput="onTerrenoInputChange()">
+          </div>
+          <div style="background:#f8fafc;border-radius:10px;padding:12px">
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">m2 neto</div>
+            <input type="number" class="inp" id="terreno-m2-neto" step="0.01" oninput="onTerrenoInputChange()">
+          </div>
+          <div style="background:#f8fafc;border-radius:10px;padding:12px">
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Precio total</div>
+            <input type="number" class="inp" id="terreno-precio-total" step="0.01" oninput="onTerrenoInputChange()">
           </div>
           <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:12px">
-            <div style="font-size:10px;color:#b45309;text-transform:uppercase;margin-bottom:4px">Monto financiado</div>
+            <div style="font-size:10px;color:#b45309;text-transform:uppercase;margin-bottom:4px">Línea aprobada por defecto</div>
             <div style="font-size:1.4rem;font-weight:900;color:#b45309" id="terreno-monto-financiado">0 UF</div>
           </div>
         </div>
@@ -442,10 +450,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
     </div>
 
     <div class="card" style="border:2px solid #fde68a">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div class="sec-title" style="margin-bottom:0;color:#b45309"> FINANCIAMIENTO TERRENO</div>
-        <label class="toggle"><input type="checkbox" id="fin-terreno-activo" onchange="onTerrenoInputChange()"><span class="toggle-slider"></span></label>
-      </div>
+      <div class="sec-title" style="margin-bottom:12px;color:#b45309"> FINANCIAMIENTO TERRENO</div>
       <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px;margin-bottom:12px;font-size:11px;color:#92400e">
         Este financiamiento se refleja automáticamente en los costos del proyecto dentro de la categoría de gastos financieros.
       </div>
@@ -468,12 +473,6 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
           <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Pago intereses</div>
           <select class="inp" id="fin-terreno-pago-int" onchange="onTerrenoInputChange()">
             <option>Semestral</option><option>Mensual</option><option>Anual</option><option>Contra Escrituraciones</option>
-          </select>
-        </div>
-        <div>
-          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Pago capital</div>
-          <select class="inp" id="fin-terreno-pago-cap" onchange="onTerrenoInputChange()">
-            <option>Inicio Construccion</option><option>Contra Escrituraciones</option><option>Fin Proyecto</option>
           </select>
         </div>
       </div>
