@@ -104,6 +104,7 @@ function toNumber(value) {
 function normalizeProject(project = {}) {
   return {
     ...project,
+    compra_terreno_fecha: project.compra_terreno_fecha || '',
     terraza_util_pct: project.terraza_util_pct ?? 50,
     comunes_tipo: project.comunes_tipo || 'porcentaje',
     comunes_valor: project.comunes_valor ?? 0,
@@ -193,6 +194,22 @@ function normalizeConstruccion(data = {}) {
     retencion_pct: data.retencion_pct ?? 0,
     ancho_curva: data.ancho_curva ?? 0.5,
     peak_gasto: data.peak_gasto ?? 0.5,
+  };
+}
+
+function normalizeFinanciamiento(data = {}) {
+  return {
+    credito_terreno_activo: data.credito_terreno_activo ?? true,
+    credito_terreno_pct: data.credito_terreno_pct ?? 70,
+    credito_terreno_tasa: data.credito_terreno_tasa ?? 3.5,
+    credito_terreno_pago_intereses: data.credito_terreno_pago_intereses || 'Semestral',
+    credito_terreno_pago_capital: data.credito_terreno_pago_capital || 'Inicio Construccion',
+    linea_construccion_activo: data.linea_construccion_activo ?? true,
+    linea_construccion_pct: data.linea_construccion_pct ?? 100,
+    linea_construccion_tasa: data.linea_construccion_tasa ?? 3.5,
+    linea_construccion_pago_intereses: data.linea_construccion_pago_intereses || 'Anual',
+    linea_construccion_pago_capital: data.linea_construccion_pago_capital || 'Contra Escrituraciones',
+    ...data,
   };
 }
 
@@ -1284,6 +1301,60 @@ function renderConstruccion() {
       <td style="text-align:center">${fmtPct(((index + 1) / meses) * 100)}</td>
     </tr>
   `).join(''));
+
+  renderConstructionFinancing();
+}
+
+function renderTerrainModule() {
+  const terrainBase = getTerrainBaseCost();
+  const milestone = getTerrainMilestone();
+  const purchaseDate = state.proyecto?.compra_terreno_fecha || '';
+  const terrainTermMonths = Math.max(1, getConstructionStartMonth());
+  const approved = state.financiamiento.credito_terreno_activo
+    ? terrainBase * toNumber(state.financiamiento.credito_terreno_pct) / 100
+    : 0;
+
+  if ($('terreno-fecha-compra')) $('terreno-fecha-compra').value = purchaseDate;
+  setText('terreno-costo-base', fmtUf(terrainBase));
+  setText('terreno-monto-financiado', fmtUf(approved));
+  setText(
+    'terreno-gantt-sync',
+    milestone
+      ? `La compra del terreno ancla el mes ${fmtNumber(toNumber(milestone.inicio))} del hito "${milestone.nombre}".`
+      : 'Sin hito de terreno detectado en la carta gantt.'
+  );
+
+  if ($('fin-terreno-activo')) $('fin-terreno-activo').checked = !!state.financiamiento.credito_terreno_activo;
+  if ($('fin-terreno-pct')) $('fin-terreno-pct').value = toNumber(state.financiamiento.credito_terreno_pct);
+  if ($('fin-terreno-tasa')) $('fin-terreno-tasa').value = toNumber(state.financiamiento.credito_terreno_tasa);
+  if ($('fin-terreno-pago-int')) $('fin-terreno-pago-int').value = state.financiamiento.credito_terreno_pago_intereses || 'Semestral';
+  if ($('fin-terreno-pago-cap')) $('fin-terreno-pago-cap').value = state.financiamiento.credito_terreno_pago_capital || 'Inicio Construccion';
+  setText('fin-terreno-costo', fmtUf(terrainBase));
+  setText('fin-terreno-monto', fmtUf(approved));
+  setText('fin-terreno-plazos', `Plazo estimado: ${fmtNumber(terrainTermMonths)} mes(es) hasta construcción`);
+  setHtml('fin-terreno-partidas', (state.costos.find((category) => category.nombre === 'TERRENO')?.partidas || [])
+    .filter((partida) => partida.es_terreno)
+    .map((partida) => `<div>${escapeHtml(partida.nombre)} <strong>${fmtUf(partida.total_neto)}</strong></div>`)
+    .join('') || '<div>Sin partidas de terreno marcadas.</div>');
+}
+
+function renderConstructionFinancing() {
+  const metrics = getConstructionMetrics();
+  const approved = state.financiamiento.linea_construccion_activo
+    ? metrics.total_neto * toNumber(state.financiamiento.linea_construccion_pct) / 100
+    : 0;
+  const start = getConstructionStartMonth();
+  const duration = getConstructionDuration();
+
+  if ($('fin-constr-activo')) $('fin-constr-activo').checked = !!state.financiamiento.linea_construccion_activo;
+  if ($('fin-constr-pct')) $('fin-constr-pct').value = toNumber(state.financiamiento.linea_construccion_pct);
+  if ($('fin-constr-tasa')) $('fin-constr-tasa').value = toNumber(state.financiamiento.linea_construccion_tasa);
+  if ($('fin-constr-pago-int')) $('fin-constr-pago-int').value = state.financiamiento.linea_construccion_pago_intereses || 'Anual';
+  if ($('fin-constr-pago-cap')) $('fin-constr-pago-cap').value = state.financiamiento.linea_construccion_pago_capital || 'Contra Escrituraciones';
+  setText('fin-constr-costo', fmtUf(metrics.total_neto));
+  setText('fin-constr-monto', fmtUf(approved));
+  setText('fin-constr-plazos', `Plazo estimado: mes ${fmtNumber(start)} a mes ${fmtNumber(start + duration)}`);
+  setHtml('fin-constr-partidas', `<div>Base financiera tomada desde el total neto de construcción.</div>`);
 }
 
 const COST_CATEGORY_ORDER = [
@@ -1301,6 +1372,15 @@ const COST_CATEGORY_ORDER = [
 function getConstructionStartMonth() {
   const hito = state.gantt.find((row) => /CONSTRUCCION/i.test(row.nombre || ''));
   return hito ? toNumber(hito.inicio) : 1;
+}
+
+function getTerrainMilestone() {
+  return state.gantt.find((row) => /ADQUISICION DE TERRENO|COMPRA DE TERRENO|TERRENO/i.test(row.nombre || '')) || null;
+}
+
+function getTerrainBaseCost() {
+  return (state.costos.find((category) => category.nombre === 'TERRENO')?.partidas || [])
+    .reduce((sum, partida) => sum + (partida.es_terreno ? toNumber(partida.total_neto) : 0), 0);
 }
 
 function getPartidaFormulaText(partida) {
@@ -1404,7 +1484,7 @@ function getCostMonthLabels() {
 }
 
 function getCostStartDate() {
-  const reference = state.proyecto?.created_at || state.proyecto?.updated_at || new Date().toISOString();
+  const reference = state.proyecto?.compra_terreno_fecha || state.proyecto?.created_at || state.proyecto?.updated_at || new Date().toISOString();
   const date = new Date(reference);
   return Number.isNaN(date.getTime()) ? new Date() : date;
 }
@@ -1749,6 +1829,9 @@ function renderCostPlanilla() {
     const isCollapsed = !!collapsedState[categoria.nombre];
     const hasSubpartidas = (categoria.partidas || []).length > 0;
     const categoryRows = [];
+    const categoryMonthlyTotals = createMonthlyArray(monthCount, 0);
+    let categoryTotalNeto = 0;
+    let categoryTotalIva = 0;
 
     (categoria.partidas || []).forEach((partida, index) => {
       if (categoria.nombre === 'GASTOS FINANCIEROS' && partida.auto_origen) {
@@ -1779,7 +1862,10 @@ function renderCostPlanilla() {
       partida.distribucion_mensual = distribucion;
       totalNeto += total;
       totalIva += partida.tiene_iva ? total * 0.19 : 0;
+      categoryTotalNeto += total;
+      categoryTotalIva += partida.tiene_iva ? total * 0.19 : 0;
       distribucion.forEach((value, monthIndex) => { monthlyTotals[monthIndex] += value; });
+      distribucion.forEach((value, monthIndex) => { categoryMonthlyTotals[monthIndex] += value; });
 
       categoryRows.push(`
         <tr class="partida-row" data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" ${partida.auto_origen ? 'data-auto="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
@@ -1799,7 +1885,7 @@ function renderCostPlanilla() {
 
     return `
       <tr class="cat-row">
-        <td colspan="${6 + monthCount}" style="padding:10px">
+        <td colspan="4" style="padding:10px">
           <div class="cost-category-header">
             <div class="cost-category-title">
               <button class="btn-outline btn-plus" type="button" onclick="${hasSubpartidas ? `toggleCostCategoryCollapse('${escapeHtml(categoria.nombre)}')` : ''}" title="${hasSubpartidas ? 'Expandir o colapsar' : 'Sin subpartidas'}" ${hasSubpartidas ? '' : 'disabled style="opacity:.45;cursor:not-allowed"'}>${hasSubpartidas ? (isCollapsed ? '+' : '-') : '·'}</button>
@@ -1810,6 +1896,9 @@ function renderCostPlanilla() {
             </div>
           </div>
         </td>
+        <td class="cat-total-cell"><strong>${fmtUf(categoryTotalNeto)}</strong></td>
+        <td class="cat-total-cell"><strong>${fmtUf(categoryTotalIva)}</strong></td>
+        ${categoryMonthlyTotals.map((value) => `<td class="cat-total-cell"><strong>${fmtUf(value)}</strong></td>`).join('')}
       </tr>
       ${isCollapsed ? '' : categoryRows.join('')}
     `;
@@ -2181,6 +2270,8 @@ function openPaymentPlanModal(categoryName, index) {
   setText('payment-plan-title', `Configurar pagos: ${partida.nombre}`);
   setText('payment-plan-total', fmtUf(evaluateCostPartida(partida, buildCostContext())));
   setText('payment-plan-assigned', `${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))}`);
+  setText('payment-plan-assigned-card', `${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))}`);
+  setText('payment-plan-counts', `${plan.tramos.length} tramo(s) · ${plan.hitos.length} hito(s)`);
 
   const renderRefOptions = (selectedValue) => refs.map((option) => `<option value="${escapeHtml(option.value)}" ${option.value === selectedValue ? 'selected' : ''}>${escapeHtml(option.label)}</option>`).join('');
 
@@ -2291,6 +2382,7 @@ function renderAll() {
   renderProjectHeader();
   renderCabidaTables(state.cabida);
   renderCabidaEditor(state.cabida);
+  renderTerrainModule();
   renderGanttEditor(state.gantt);
   renderVentasModule();
   renderConstruccion();
@@ -2317,6 +2409,7 @@ function getCabidaRowsFromEditor() {
 function getCabidaProjectSettingsFromEditor() {
   return {
     ...state.proyecto,
+    compra_terreno_fecha: state.proyecto?.compra_terreno_fecha || '',
     terraza_util_pct: toNumber($('cabida-terraza-util-pct')?.value),
     comunes_tipo: $('cabida-comunes-tipo')?.value || 'porcentaje',
     comunes_valor: toNumber($('cabida-comunes-valor')?.value),
@@ -2329,15 +2422,53 @@ function getCabidaProjectSettingsFromEditor() {
   };
 }
 
+function readTerrenoProjectSettingsFromEditor() {
+  return {
+    ...state.proyecto,
+    compra_terreno_fecha: $('terreno-fecha-compra')?.value || '',
+  };
+}
+
+function readTerrenoFinanciamientoFromEditor() {
+  return normalizeFinanciamiento({
+    ...state.financiamiento,
+    credito_terreno_activo: !!$('fin-terreno-activo')?.checked,
+    credito_terreno_pct: toNumber($('fin-terreno-pct')?.value),
+    credito_terreno_tasa: toNumber($('fin-terreno-tasa')?.value),
+    credito_terreno_pago_intereses: $('fin-terreno-pago-int')?.value || 'Semestral',
+    credito_terreno_pago_capital: $('fin-terreno-pago-cap')?.value || 'Inicio Construccion',
+  });
+}
+
+function readConstruccionFinanciamientoFromEditor() {
+  return normalizeFinanciamiento({
+    ...state.financiamiento,
+    linea_construccion_activo: !!$('fin-constr-activo')?.checked,
+    linea_construccion_pct: toNumber($('fin-constr-pct')?.value),
+    linea_construccion_tasa: toNumber($('fin-constr-tasa')?.value),
+    linea_construccion_pago_intereses: $('fin-constr-pago-int')?.value || 'Anual',
+    linea_construccion_pago_capital: $('fin-constr-pago-cap')?.value || 'Contra Escrituraciones',
+  });
+}
+
 function onCabidaInputChange() {
   state.proyecto = normalizeProject(getCabidaProjectSettingsFromEditor());
   state.cabida = getCabidaRowsFromEditor();
   renderCabidaTables(state.cabida);
   renderCabidaEditor(state.cabida);
+  renderTerrainModule();
   renderConstruccion();
   ensureVentasState();
   renderVentasModule();
   renderCostosModule();
+}
+
+function onTerrenoInputChange() {
+  state.proyecto = normalizeProject(readTerrenoProjectSettingsFromEditor());
+  state.financiamiento = readTerrenoFinanciamientoFromEditor();
+  renderTerrainModule();
+  renderCostosModule();
+  renderKpis();
 }
 
 function readConstruccionFromEditor() {
@@ -2356,12 +2487,15 @@ function readConstruccionFromEditor() {
 
 function updateConstrParams() {
   state.construccion = readConstruccionFromEditor();
+  state.financiamiento = readConstruccionFinanciamientoFromEditor();
   renderConstruccion();
   renderCostosModule();
+  renderKpis();
 }
 
 function onGanttInputChange() {
   state.gantt = readGanttEditor();
+  renderTerrainModule();
   renderGanttEditor(state.gantt);
   renderConstruccion();
   ensureVentasState();
@@ -2603,7 +2737,7 @@ async function loadProject(projectId) {
   state.ventasCronograma = ventasData.cronograma || [];
   state.construccion = normalizeConstruccion(construccion);
   state.costos = costos;
-  state.financiamiento = financiamiento;
+  state.financiamiento = normalizeFinanciamiento(financiamiento);
   state.capital = capital;
   state.calculos = calculos;
 
@@ -2630,6 +2764,26 @@ async function guardarCabida() {
   await refreshHealthStatus();
 }
 
+async function guardarTerreno() {
+  if (!state.proyectoId) return;
+  const proyecto = readTerrenoProjectSettingsFromEditor();
+  const financiamiento = readTerrenoFinanciamientoFromEditor();
+  setSyncStatus('saving', 'GUARDANDO', 'Actualizando terreno y financiamiento terreno');
+  await Promise.all([
+    api(`/api/proyectos/${state.proyectoId}`, {
+      method: 'PUT',
+      body: JSON.stringify(proyecto),
+    }),
+    api(`/api/proyectos/${state.proyectoId}/financiamiento`, {
+      method: 'POST',
+      body: JSON.stringify(financiamiento),
+    }),
+  ]);
+  state.sync.lastSavedAt = new Date().toISOString();
+  await loadProject(state.proyectoId);
+  await refreshHealthStatus();
+}
+
 async function guardarConstruccion() {
   if (!state.proyectoId) return;
   const payload = {
@@ -2637,11 +2791,18 @@ async function guardarConstruccion() {
     sup_sobre_tierra: getConstructionMetrics().sup_sobre_tierra,
     sup_bajo_tierra: getConstructionMetrics().sup_bajo_tierra,
   };
+  const financiamiento = readConstruccionFinanciamientoFromEditor();
   setSyncStatus('saving', 'GUARDANDO', 'Actualizando parametros de construccion');
-  await api(`/api/proyectos/${state.proyectoId}/construccion`, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+  await Promise.all([
+    api(`/api/proyectos/${state.proyectoId}/construccion`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+    api(`/api/proyectos/${state.proyectoId}/financiamiento`, {
+      method: 'POST',
+      body: JSON.stringify(financiamiento),
+    }),
+  ]);
   state.sync.lastSavedAt = new Date().toISOString();
   await loadProject(state.proyectoId);
   await refreshHealthStatus();
@@ -2709,7 +2870,6 @@ function agregarUso() {
 }
 
 [
-  'guardarFinanciamiento',
   'guardarCapital',
   'toggleEstructura',
   'setCostosView',
@@ -2718,7 +2878,6 @@ function agregarUso() {
   'setCapTab',
   'exportarExcel',
   'handleFileUpload',
-  'calcularFinanciamiento',
   'calcularCapital',
 ].forEach((fnName) => {
   window[fnName] = createPendingAction(fnName);
@@ -2726,7 +2885,9 @@ function agregarUso() {
 
 window.showTab = showTab;
 window.onCabidaInputChange = onCabidaInputChange;
+window.onTerrenoInputChange = onTerrenoInputChange;
 window.guardarCabida = guardarCabida;
+window.guardarTerreno = guardarTerreno;
 window.guardarConstruccion = guardarConstruccion;
 window.guardarGantt = guardarGantt;
 window.guardarVentas = guardarVentas;

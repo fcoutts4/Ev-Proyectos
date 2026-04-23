@@ -64,6 +64,16 @@ tbody tr:hover{background:#f8fafc}
 .modal-head{display:flex;justify-content:space-between;align-items:center;padding:22px 24px;border-bottom:1px solid #e2e8f0}
 .modal-body{padding:24px}
 .payment-section{border:1px solid #e2e8f0;border-radius:16px;padding:18px;margin-bottom:18px;background:#f8fafc}
+.payment-plan-card{max-width:none;width:min(1560px,calc(100vw - 12px));max-height:calc(100vh - 12px)}
+.payment-plan-body{display:grid;grid-template-columns:1.15fr .95fr;gap:18px}
+.payment-plan-stack{display:flex;flex-direction:column;gap:18px}
+.payment-plan-grid-head{display:grid;grid-template-columns:100px 1fr 90px 1fr 90px 40px;gap:8px;font-size:10px;color:#64748b;text-transform:uppercase;margin-bottom:8px}
+.payment-plan-grid-head.hitos{grid-template-columns:100px 1fr 90px 40px}
+.cat-total-cell{font-size:10px;font-weight:800;color:#334155;text-align:center;background:#f8fafc}
+.cat-total-cell strong{display:block;font-size:11px;color:#0f172a}
+@media (max-width: 1180px){
+  .payment-plan-body{grid-template-columns:1fr}
+}
 .formula-chip{display:inline-flex;align-items:center;gap:3px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:3px 8px;font-size:10px;color:#475569;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .formula-chip.ref{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
 .formula-chip.gantt{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
@@ -1255,7 +1265,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 </main><!-- end main -->
 
 <div id="payment-plan-modal" class="modal-backdrop">
-  <div class="modal-card">
+  <div class="modal-card payment-plan-card">
     <div class="modal-head">
       <div>
         <div id="payment-plan-title" style="font-size:22px;font-weight:900;color:#0f172a">Configurar pagos</div>
@@ -1266,40 +1276,67 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
         <button class="btn-outline btn-plus" type="button" onclick="closePaymentPlanModal()">×</button>
       </div>
     </div>
-    <div class="modal-body">
-      <div class="payment-section">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-          <div class="sec-title" style="margin-bottom:0">1. Tramos de cuotas mensuales</div>
-          <button class="btn-dark" type="button" onclick="addPaymentPlanItem('tramo')">+ Agregar tramo</button>
+    <div class="modal-body payment-plan-body">
+      <div class="payment-plan-stack">
+        <div class="payment-section" style="margin-bottom:0">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <div class="sec-title" style="margin-bottom:0">1. Tramos de cuotas mensuales</div>
+            <button class="btn-dark" type="button" onclick="addPaymentPlanItem('tramo')">+ Agregar tramo</button>
+          </div>
+          <div class="payment-plan-grid-head">
+            <div>%</div>
+            <div>Inicio del periodo</div>
+            <div>Desfase</div>
+            <div>Fin del periodo</div>
+            <div>Desfase</div>
+            <div></div>
+          </div>
+          <div id="payment-plan-tramos"></div>
         </div>
-        <div style="display:grid;grid-template-columns:100px 1fr 90px 1fr 90px 40px;gap:8px;font-size:10px;color:#64748b;text-transform:uppercase;margin-bottom:8px">
-          <div>%</div>
-          <div>Inicio del periodo</div>
-          <div>Desfase</div>
-          <div>Fin del periodo</div>
-          <div>Desfase</div>
-          <div></div>
+
+        <div class="payment-section" style="margin-bottom:0">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <div class="sec-title" style="margin-bottom:0">2. Pagos específicos (hitos)</div>
+            <button class="btn-dark" type="button" onclick="addPaymentPlanItem('hito')">+ Agregar hito</button>
+          </div>
+          <div class="payment-plan-grid-head hitos">
+            <div>%</div>
+            <div>Referencia</div>
+            <div>Desfase</div>
+            <div></div>
+          </div>
+          <div id="payment-plan-hitos"></div>
         </div>
-        <div id="payment-plan-tramos"></div>
       </div>
 
-      <div class="payment-section">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-          <div class="sec-title" style="margin-bottom:0">2. Pagos específicos (hitos)</div>
-          <button class="btn-dark" type="button" onclick="addPaymentPlanItem('hito')">+ Agregar hito</button>
+      <div class="payment-plan-stack">
+        <div class="payment-section" style="margin-bottom:0">
+          <div class="sec-title"> RESUMEN DE ASIGNACIÓN</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px">
+              <div style="font-size:10px;color:#64748b;text-transform:uppercase;margin-bottom:4px">Asignado</div>
+              <div id="payment-plan-assigned-card" style="font-size:1.6rem;font-weight:900;color:#0f172a">0%</div>
+            </div>
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px">
+              <div style="font-size:10px;color:#64748b;text-transform:uppercase;margin-bottom:4px">Tramos + hitos</div>
+              <div id="payment-plan-counts" style="font-size:1rem;font-weight:800;color:#334155">0 elementos</div>
+            </div>
+          </div>
         </div>
-        <div style="display:grid;grid-template-columns:100px 1fr 90px 40px;gap:8px;font-size:10px;color:#64748b;text-transform:uppercase;margin-bottom:8px">
-          <div>%</div>
-          <div>Referencia</div>
-          <div>Desfase</div>
-          <div></div>
-        </div>
-        <div id="payment-plan-hitos"></div>
-      </div>
 
-      <div style="display:flex;justify-content:flex-end;gap:12px">
-        <button class="btn-outline" type="button" onclick="closePaymentPlanModal()">Cancelar</button>
-        <button class="btn-primary" type="button" onclick="savePaymentPlanModal()">Sincronizar partida</button>
+        <div class="payment-section" style="margin-bottom:0">
+          <div class="sec-title"> AYUDA RÁPIDA</div>
+          <div style="font-size:12px;color:#64748b;line-height:1.6">
+            <div>Usa tramos para repartir pagos entre meses o hitos.</div>
+            <div>Usa hitos para cargar pagos puntuales en un momento específico.</div>
+            <div>La asignación ideal es 100% antes de sincronizar la partida.</div>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:auto">
+          <button class="btn-outline" type="button" onclick="closePaymentPlanModal()">Cancelar</button>
+          <button class="btn-primary" type="button" onclick="savePaymentPlanModal()">Sincronizar partida</button>
+        </div>
       </div>
     </div>
   </div>
