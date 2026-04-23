@@ -1693,14 +1693,13 @@ function renderCostPlanilla() {
 
   setHtml('planilla-head', `
     <tr>
-      <th style="width:34px"></th>
+      <th style="width:60px"></th>
       <th style="min-width:220px;text-align:left">Subpartida</th>
       <th style="width:126px;text-align:center">Ver formula</th>
       <th style="min-width:170px;text-align:left">Plan de pago</th>
       <th style="min-width:110px">Total neto</th>
       <th style="width:64px">IVA</th>
       <th style="width:78px">Terreno</th>
-      <th style="width:48px"></th>
       ${monthLabels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}
     </tr>
   `);
@@ -1718,17 +1717,16 @@ function renderCostPlanilla() {
 
       return `
         <tr class="partida-row" data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" ${partida.auto_origen ? 'data-auto="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
-          <td style="text-align:center">${partida.auto_origen ? '' : '<span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span>'}</td>
+          <td style="text-align:center">${partida.auto_origen ? '' : `<span class="row-tools"><button class="btn-outline btn-delete-inline" type="button" title="Eliminar subpartida" onclick="removeCostPartida('${escapeHtml(categoria.nombre)}', ${index})">&times;</button><span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span></span>`}</td>
           <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${partida.auto_origen ? 'disabled' : ''}/></td>
           <td style="text-align:center">
             <input class="inp cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}" ${partida.auto_origen ? 'disabled' : ''}/>
             <button class="btn-outline btn-formula" type="button" onclick="openCostFormulaModal('${escapeHtml(categoria.nombre)}', ${index})">Ver fórmula</button>
           </td>
-          <td>${partida.auto_origen ? '<span class="badge badge-yellow">AUTO</span>' : `<button class="btn-outline" type="button" onclick="openPaymentPlanModal('${escapeHtml(categoria.nombre)}', ${index})">${escapeHtml(summarizePaymentPlan(partida.plan_pago))}</button><div style="font-size:10px;color:${Math.abs(getPaymentPlanAssignedPct(partida.plan_pago) - 100) < 0.01 ? '#16a34a' : '#b45309'};margin-top:4px">${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))} asignado</div>`}</td>
+          <td>${partida.auto_origen ? '<span class="badge badge-yellow">AUTO</span>' : `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><button class="btn-outline" type="button" onclick="openPaymentPlanModal('${escapeHtml(categoria.nombre)}', ${index})">${escapeHtml(summarizePaymentPlan(partida.plan_pago))}</button><div style="font-size:10px;color:${Math.abs(getPaymentPlanAssignedPct(partida.plan_pago) - 100) < 0.01 ? '#16a34a' : '#b45309'};white-space:nowrap">${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))}</div></div>`}</td>
           <td style="text-align:center;color:#22c55e;font-weight:800">${fmtUf(total)}</td>
           <td style="text-align:center"><input type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''} ${partida.auto_origen ? 'disabled' : ''}/></td>
           <td style="text-align:center"><input type="checkbox" data-field="es_terreno" ${partida.es_terreno ? 'checked' : ''} ${partida.auto_origen ? 'disabled' : ''}/></td>
-          <td style="text-align:center">${partida.auto_origen ? '' : `<button class="btn-outline btn-plus" type="button" title="Eliminar subpartida" onclick="removeCostPartida('${escapeHtml(categoria.nombre)}', ${index})">&times;</button>`}</td>
           ${distribucion.map((value, monthIndex) => `<td><input class="inp cost-month-input" data-month="${monthIndex}" type="number" step="0.01" value="${toNumber(value)}" ${partida.auto_origen ? 'disabled' : ''}/></td>`).join('')}
         </tr>
       `;
@@ -1736,14 +1734,14 @@ function renderCostPlanilla() {
 
     return `
       <tr class="cat-row">
-        <td colspan="${8 + monthCount}" style="padding:10px">
+        <td colspan="${7 + monthCount}" style="padding:10px">
           <div class="cost-category-header">
             <div class="cost-category-title">
               <button class="btn-outline btn-plus" type="button" onclick="toggleCostCategoryCollapse('${escapeHtml(categoria.nombre)}')" title="Expandir o colapsar">${isCollapsed ? '+' : '-'}</button>
               <span class="cost-category-name">${escapeHtml(categoria.nombre)}</span>
+              <button class="btn-outline btn-subpartida" type="button" onclick="agregarPartidaLinea('${escapeHtml(categoria.nombre)}')" title="Agregar subpartida">+ Subpartida</button>
             </div>
             <div class="cost-category-actions">
-              <button class="btn-outline btn-subpartida" type="button" onclick="agregarPartidaLinea('${escapeHtml(categoria.nombre)}')" title="Agregar subpartida">+ Subpartida</button>
             </div>
           </div>
         </td>
@@ -1758,7 +1756,6 @@ function renderCostPlanilla() {
       <td>${fmtUf(totalNeto)}</td>
       <td>${fmtUf(totalIva)}</td>
       <td>${fmtUf(totalNeto + totalIva)}</td>
-      <td></td>
       ${monthlyTotals.map((value) => `<td>${fmtUf(value)}</td>`).join('')}
     </tr>
   `);
@@ -1833,15 +1830,18 @@ function findFormulaCatalogEntry(token) {
 function renderFormulaToken(token, isAuto = false) {
   const value = String(token || '').trim();
   if (!value) return '';
-  if (isAuto) return `<span class="formula-token auto">${escapeHtml(value)}</span>`;
-  if (/^[()+\-*/]$/.test(value)) return `<span class="formula-token operator">${escapeHtml(value)}</span>`;
+  if (isAuto) return `<span class="formula-token auto">${escapeHtml(value.replace(/^_+/, ''))}</span>`;
+  if (/^[()+\-*/]$/.test(value)) {
+    const operatorLabel = value === '*' ? 'x' : value;
+    return `<span class="formula-token operator">${escapeHtml(operatorLabel)}</span>`;
+  }
 
   const match = findFormulaCatalogEntry(value);
   if (match) {
-    return `<span class="formula-token reference" title="${escapeHtml(`${match.label} = ${fmtNumber(match.value, 2)}`)}">${escapeHtml(value)}</span>`;
+    return `<span class="formula-token reference" title="${escapeHtml(`${match.label} = ${fmtNumber(match.value, 2)}`)}">${escapeHtml(value.replace(/^_+/, ''))}</span>`;
   }
   if (/^[0-9.,]+$/.test(value)) return `<span class="formula-token number">${escapeHtml(value)}</span>`;
-  return `<span class="formula-token">${escapeHtml(value)}</span>`;
+  return `<span class="formula-token">${escapeHtml(value.replace(/^_+/, ''))}</span>`;
 }
 
 function renderCostFormulaPreviewContent(rawValue, formulaType = 'expr', isAuto = false) {
