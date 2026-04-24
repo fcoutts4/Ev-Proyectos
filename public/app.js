@@ -891,10 +891,16 @@ function getVentasMetaRow(type) {
   return state.ventasCronograma.find((row) => row.tipo === type) || null;
 }
 
+function normalizeVentasVelocity(value, fallback) {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  return Math.max(1, toNumber(fallback || 1));
+}
+
 function getVentasVelocitySettings() {
   return {
-    promesas: Math.max(1, toNumber(getVentasMetaRow('META_PROMESAS')?.velocidad || 54)),
-    escrituracion: Math.max(1, toNumber(getVentasMetaRow('META_ESCRITURACION')?.velocidad || 20)),
+    promesas: normalizeVentasVelocity(getVentasMetaRow('META_PROMESAS')?.velocidad, 54),
+    escrituracion: normalizeVentasVelocity(getVentasMetaRow('META_ESCRITURACION')?.velocidad, 20),
   };
 }
 
@@ -979,7 +985,7 @@ function ensureVentasState() {
     mes_inicio: 0,
     duracion: 0,
     porcentaje: 0,
-    velocidad: Math.max(1, toNumber(metaPromesas.velocidad || 54)),
+    velocidad: normalizeVentasVelocity(metaPromesas.velocidad, 54),
   });
 
   const metaEscrituracion = getVentasMetaRow('META_ESCRITURACION') || {};
@@ -991,7 +997,7 @@ function ensureVentasState() {
     mes_inicio: 0,
     duracion: 0,
     porcentaje: 0,
-    velocidad: Math.max(1, toNumber(metaEscrituracion.velocidad || 20)),
+    velocidad: normalizeVentasVelocity(metaEscrituracion.velocidad, 20),
   });
 
   state.ventasCronograma = nextCronograma;
@@ -2744,7 +2750,7 @@ function renderFormulaToken(token, isAuto = false) {
 
   const match = findFormulaCatalogEntry(value);
   if (match) {
-    return `<span class="formula-token reference" title="${escapeHtml(`${match.label} = ${formatFormulaCatalogValue(match)}`)}">${escapeHtml(String(match.label || value).replace(/^_+/, ''))}</span>`;
+    return `<span class="formula-token reference" data-tech-token="${escapeHtml(match.token)}" title="${escapeHtml(`${match.label} = ${formatFormulaCatalogValue(match)}`)}">${escapeHtml(String(match.label || value).replace(/^_+/, ''))}</span>`;
   }
   if (/^[0-9.,]+$/.test(value)) return `<span class="formula-token number">${escapeHtml(value)}</span>`;
   return `<span class="formula-token">${escapeHtml(value.replace(/^_+/, ''))}</span>`;
@@ -2942,7 +2948,7 @@ function renderCostFormulaSuggestions(input, query = '') {
   }
 
   panel.innerHTML = options.map((entry) => (
-    `<button type="button" onmousedown="event.preventDefault(); pickCostFormulaSuggestion(this)" data-token="${escapeHtml(entry.token)}" data-input-id="${escapeHtml(input.id)}">${escapeHtml(entry.label)}<small>${escapeHtml(formatFormulaCatalogValue(entry))}</small></button>`
+    `<button type="button" onmousedown="event.preventDefault(); pickCostFormulaSuggestion(this)" data-token="${escapeHtml(entry.token)}" data-tech-token="${escapeHtml(entry.token)}" data-input-id="${escapeHtml(input.id)}">${escapeHtml(entry.label)}<small>${escapeHtml(formatFormulaCatalogValue(entry))}</small></button>`
   )).join('');
   panel.style.display = 'block';
 }
@@ -3454,6 +3460,16 @@ function readVentasConfigEditor() {
 
 function readVentasCronogramaEditor() {
   const rows = [];
+  const currentPromesasVelocidad = getVentasMetaRow('META_PROMESAS')?.velocidad;
+  const currentEscrituracionVelocidad = getVentasMetaRow('META_ESCRITURACION')?.velocidad;
+  const promesasInputRaw = String($('ventas-velocidad-promesas')?.value || '').trim();
+  const escrituracionInputRaw = String($('ventas-velocidad-escrituracion')?.value || '').trim();
+  const promesasVelocidad = promesasInputRaw === ''
+    ? normalizeVentasVelocity(currentPromesasVelocidad, 54)
+    : normalizeVentasVelocity(promesasInputRaw, currentPromesasVelocidad || 54);
+  const escrituracionVelocidad = escrituracionInputRaw === ''
+    ? normalizeVentasVelocity(currentEscrituracionVelocidad, 20)
+    : normalizeVentasVelocity(escrituracionInputRaw, currentEscrituracionVelocidad || 20);
 
   // PREVENTA y ESCRITURACION se calculan desde la Carta Gantt y las velocidades.
   state.ventasCronograma
@@ -3468,7 +3484,7 @@ function readVentasCronogramaEditor() {
     mes_inicio: 0,
     duracion: 0,
     porcentaje: 0,
-    velocidad: Math.max(1, toNumber($('ventas-velocidad-promesas')?.value || 54)),
+    velocidad: promesasVelocidad,
   });
   rows.push({
     id: getVentasMetaRow('META_ESCRITURACION')?.id || '',
@@ -3478,7 +3494,7 @@ function readVentasCronogramaEditor() {
     mes_inicio: 0,
     duracion: 0,
     porcentaje: 0,
-    velocidad: Math.max(1, toNumber($('ventas-velocidad-escrituracion')?.value || 20)),
+    velocidad: escrituracionVelocidad,
   });
   return rows;
 }

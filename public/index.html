@@ -87,6 +87,25 @@ tbody tr:hover{background:#f8fafc}
 .formula-preview-expression{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .formula-token{display:inline-flex;align-items:center;min-height:26px;padding:4px 9px;border-radius:8px;border:1px solid #dbe4ee;background:#fff;font-size:11px;font-weight:600;color:#334155}
 .formula-token.reference{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
+.formula-token[data-tech-token]{position:relative}
+.formula-token[data-tech-token]:hover::after{
+  content:attr(data-tech-token);
+  position:absolute;
+  left:50%;
+  bottom:calc(100% + 6px);
+  transform:translateX(-50%);
+  display:inline-flex;
+  align-items:center;
+  padding:2px 8px;
+  border-radius:999px;
+  background:#0f172a;
+  color:#fff;
+  font-size:10px;
+  font-weight:700;
+  white-space:nowrap;
+  box-shadow:0 6px 16px rgba(15,23,42,.25);
+  z-index:12;
+}
 .formula-token.operator{background:#f8fafc;border-color:#dbe4ee;color:#64748b;padding:4px 8px}
 .formula-token.number{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
 .formula-token.placeholder{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
@@ -97,6 +116,22 @@ tbody tr:hover{background:#f8fafc}
 .formula-status-auto{background:#e2e8f0;color:#334155}
 .formula-suggest{position:absolute;left:0;right:0;top:calc(100% + 6px);background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 12px 30px rgba(15,23,42,.15);padding:6px;display:none;z-index:30;max-height:220px;overflow:auto}
 .formula-suggest button{display:block;width:100%;border:none;background:#fff;text-align:left;padding:8px 10px;border-radius:8px;font-size:11px;cursor:pointer;color:#334155}
+.formula-suggest button[data-tech-token]{position:relative}
+.formula-suggest button[data-tech-token]:hover::after{
+  content:attr(data-tech-token);
+  position:absolute;
+  top:8px;
+  right:10px;
+  display:inline-flex;
+  align-items:center;
+  padding:2px 8px;
+  border-radius:999px;
+  background:#0f172a;
+  color:#fff;
+  font-size:10px;
+  font-weight:700;
+  box-shadow:0 6px 16px rgba(15,23,42,.25);
+}
 .formula-suggest button:hover{background:#f8fafc}
 .formula-suggest small{display:block;color:#94a3b8;font-size:10px;margin-top:2px}
 .chart-shell{position:relative;width:100%;height:clamp(240px,36vh,420px);overflow:hidden}
