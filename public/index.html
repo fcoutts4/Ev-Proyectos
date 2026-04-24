@@ -494,39 +494,46 @@ tbody tr:hover{background:#f3f7fb!important}
       <div class="sec-title" style="margin-bottom:0"> CABIDA Y SUPERFICIES DEL PROYECTO</div>
       <button class="btn-primary" onclick="guardarCabida()"> Guardar</button>
   </div>
-    <!-- Tabla unificada: Unidades + Superficies -->
-    <div class="tbl-scroll" style="margin-bottom:14px">
-      <table style="min-width:680px">
-        <thead><tr>
-          <th style="text-align:left">TIPO</th>
-          <th>CANT.</th>
-          <th>INT/UN (m²)</th>
-          <th>TERR/UN (m²)</th>
-          <th>ÚTIL/UN (m²)</th>
-          <th style="color:#3b82f6">VEND/UN (m²)</th>
-          <th style="color:#16a34a">TOTAL VEND (m²)</th>
-        </tr></thead>
-        <tbody id="cabida-tabla-tbody"></tbody>
-        <tfoot><tr class="tfoot-green" id="cabida-tabla-tfoot"></tr></tfoot>
-      </table>
-    </div>
-    <div style="display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap;margin-top:4px">
-      <div style="font-size:10px;color:#64748b;line-height:1.8">
-        M² comunes: <strong id="cabida-common-total">0 m²</strong> ·
-        M² útiles totales: <strong id="cabida-util-total">0 m²</strong> ·
-        M² vendibles totales: <strong id="cabida-vendible-total">0 m²</strong> ·
-        Vendible considera <strong id="cabida-vendible-pct">50%</strong> de terraza
+    <!-- Dos paneles en línea: tabla principal + estac/bodegas -->
+    <div style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start">
+
+      <!-- Panel izquierdo: tabla unificada -->
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#475569;margin-bottom:10px;display:flex;align-items:center;gap:6px"> UNIDADES Y SUPERFICIES</div>
+        <div class="tbl-scroll">
+          <table style="min-width:620px">
+            <thead><tr>
+              <th style="text-align:left">TIPO</th>
+              <th>CANT.</th>
+              <th>INT/UN (m²)</th>
+              <th>TERR/UN (m²)</th>
+              <th>ÚTIL/UN (m²)</th>
+              <th style="color:#3b82f6">VEND/UN (m²)</th>
+              <th style="color:#16a34a">TOTAL VEND (m²)</th>
+            </tr></thead>
+            <tbody id="cabida-tabla-tbody"></tbody>
+            <tfoot><tr class="tfoot-green" id="cabida-tabla-tfoot"></tr></tfoot>
+          </table>
+        </div>
+        <div style="font-size:10px;color:#64748b;margin-top:8px;line-height:1.9">
+          M² comunes: <strong id="cabida-common-total">0 m²</strong> ·
+          M² útiles: <strong id="cabida-util-total">0 m²</strong> ·
+          M² vendibles: <strong id="cabida-vendible-total">0 m²</strong> ·
+          Vendible considera <strong id="cabida-vendible-pct">50%</strong> de terraza
+        </div>
       </div>
-      <div>
-        <div style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;margin-bottom:6px">Estacionamientos y Bodegas</div>
-        <table style="width:auto;min-width:200px">
+
+      <!-- Panel derecho: estacionamientos y bodegas -->
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;min-width:220px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#475569;margin-bottom:10px;display:flex;align-items:center;gap:6px"> ESTAC. Y BODEGAS</div>
+        <table style="width:100%">
           <thead><tr><th style="text-align:left">CONCEPTO</th><th>CANTIDAD</th></tr></thead>
           <tbody id="cabida-acc-tbody"></tbody>
         </table>
       </div>
+
     </div>
   </div>
-</div>
 
   <!-- Editor de Unidades -->
   <div class="card">
@@ -536,7 +543,7 @@ tbody tr:hover{background:#f3f7fb!important}
       <button class="btn-outline" type="button" onclick="agregarUso('Departamento')">+ Agregar Departamento</button>
       <button class="btn-outline" type="button" onclick="agregarUso('Local Comercial')">+ Agregar Local Comercial</button>
     </div>
-</div>
+  </div>
 </div><!-- end tab cabida -->
 
 <div id="tab-terreno" class="tab-pane">
