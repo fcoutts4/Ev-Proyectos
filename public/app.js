@@ -3514,6 +3514,18 @@ function onVentasInputChange() {
   scheduleAutosave('gantt');
 }
 
+function onVentasVelocityChange() {
+  state.ventasCronograma = readVentasCronogramaEditor();
+  syncSalesDrivenMilestones();
+  renderGanttEditor(state.gantt);
+  renderVentasSchedules();
+  renderVentasSummaryCards();
+  renderVentasCashflow();
+  renderCostosModule();
+  scheduleAutosave('ventas');
+  scheduleAutosave('gantt');
+}
+
 function parseFormulaInput(value) {
   const raw = String(value || '').trim();
   if (!raw) return { formula_tipo: 'manual', formula_valor: 0, formula_referencia: '' };
@@ -3911,6 +3923,7 @@ window.allowGanttDrop = allowGanttDrop;
 window.endGanttDrag = endGanttDrag;
 window.dropGanttRow = dropGanttRow;
 window.onVentasInputChange = onVentasInputChange;
+window.onVentasVelocityChange = onVentasVelocityChange;
 
 document.addEventListener('DOMContentLoaded', async () => {
   ensureProjectControls();
