@@ -1035,11 +1035,46 @@ tbody tr:hover{background:#f3f7fb!important}
   </div>
 </div>
 
+  <!-- Parámetros globales de la tabla EP/GF -->
+  <div class="card" style="margin-bottom:16px;background:#f8fafc">
+    <div class="sec-title" style="margin-bottom:8px">⚙ PARÁMETROS FINANCIEROS GLOBALES</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+      <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">Tasa interés terreno (anual %)</label><input type="number" step="0.01" class="inp" id="cfg-tasa-terreno" onchange="onConfigParamChange()"/></div>
+      <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">Tasa interés construcción (anual %)</label><input type="number" step="0.01" class="inp" id="cfg-tasa-construccion" onchange="onConfigParamChange()"/></div>
+      <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">% Impuesto timbres</label><input type="number" step="0.01" class="inp" id="cfg-pct-timbres" onchange="onConfigParamChange()"/></div>
+      <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">% CEEC (beneficio IVA)</label><input type="number" step="0.01" class="inp" id="cfg-pct-ceec" onchange="onConfigParamChange()"/></div>
+      <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">% Impuesto renta</label><input type="number" step="0.01" class="inp" id="cfg-pct-renta" onchange="onConfigParamChange()"/></div>
+    </div>
+    <div style="font-size:10px;color:#94a3b8;margin-top:8px">Estos parámetros alimentan todas las tablas financieras (Terreno, Construcción, Flujo de Caja).</div>
+  </div>
+
+  <!-- TABLA 1: Estados de Pago (EP) -->
   <div class="card" style="margin-bottom:16px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div>
-        <div class="sec-title" style="margin-bottom:4px"> GASTOS FINANCIEROS CONSTRUCCIÓN</div>
-        <div style="font-size:11px;color:#94a3b8">Esta categoría se configura en Construcción y se refleja automáticamente en Costos del Proyecto.</div>
+        <div class="sec-title" style="margin-bottom:4px">📋 ESTADOS DE PAGO (EP)</div>
+        <div style="font-size:11px;color:#94a3b8">Subtotal_neto = EP + Anticipo + Retenciones. IVA efectivo = IVA bruto − CEEC. El TOTAL_A_PAGO alimenta los GIROS de la tabla siguiente.</div>
+      </div>
+      <div class="planilla-nav">
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-ep-scroll', -480)">← Meses</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-ep-scroll', 480)">Meses →</button>
+      </div>
+    </div>
+    <div id="constr-ep-scroll" class="tbl-scroll">
+      <table id="constr-ep-table" style="min-width:1200px">
+        <thead id="constr-ep-head"></thead>
+        <tbody id="constr-ep-tbody"></tbody>
+        <tfoot id="constr-ep-tfoot"></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- TABLA 2: Gastos Financieros (conectada a EP) -->
+  <div class="card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div>
+        <div class="sec-title" style="margin-bottom:4px">💰 GASTOS FINANCIEROS CONSTRUCCIÓN</div>
+        <div style="font-size:11px;color:#94a3b8">GIROS conectado dinámicamente al TOTAL_A_PAGO de Estados de Pago. ACUMULADO = ACUMULADO(t-1) + GIROS + PAGOS_LINEA.</div>
       </div>
       <div class="planilla-nav">
         <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-fin-planilla-scroll', -480)">← Meses</button>

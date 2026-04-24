@@ -174,7 +174,180 @@ function normalizeProject(project = {}) {
     bodegas_cantidad: project.bodegas_cantidad ?? 0,
     bodegas_sup_interior: project.bodegas_sup_interior ?? 0,
     bodegas_sup_terrazas: project.bodegas_sup_terrazas ?? 0,
+    tasa_interes_terreno: project.tasa_interes_terreno ?? 3.5,
+    tasa_interes_construccion: project.tasa_interes_construccion ?? 3.5,
+    pct_timbres: project.pct_timbres ?? 0.8,
+    pct_ceec: project.pct_ceec ?? 65,
+    pct_impuesto_renta: project.pct_impuesto_renta ?? 27,
   };
+}
+
+function getGlobalFinancialParams() {
+  const p = normalizeProject(state.proyecto);
+  return {
+    tasa_terreno: toNumber(p.tasa_interes_terreno),
+    tasa_construccion: toNumber(p.tasa_interes_construccion),
+    pct_timbres: toNumber(p.pct_timbres),
+    pct_ceec: toNumber(p.pct_ceec),
+    pct_impuesto_renta: toNumber(p.pct_impuesto_renta),
+  };
+}
+
+// ---- IRR (Newton-Raphson) ----
+function npv(rate, flows) {
+  return flows.reduce((acc, f, i) => acc + toNumber(f) / Math.pow(1 + rate, i), 0);
+}
+function irr(flows, guess = 0.1) {
+  if (!Array.isArray(flows) || flows.length < 2) return 0;
+  const hasPos = flows.some((v) => toNumber(v) > 0);
+  const hasNeg = flows.some((v) => toNumber(v) < 0);
+  if (!hasPos || !hasNeg) return 0;
+  let rate = guess;
+  for (let k = 0; k < 100; k += 1) {
+    let f = 0, df = 0;
+    for (let i = 0; i < flows.length; i += 1) {
+      const d = Math.pow(1 + rate, i);
+      f += toNumber(flows[i]) / d;
+      if (i > 0) df += -i * toNumber(flows[i]) / (d * (1 + rate));
+    }
+    if (!Number.isFinite(f) || !Number.isFinite(df) || Math.abs(df) < 1e-12) break;
+    const next = rate - f / df;
+    if (!Number.isFinite(next)) break;
+    if (Math.abs(next - rate) < 1e-8) { rate = next; break; }
+    rate = next;
+    if (rate < -0.99) rate = -0.99;
+  }
+  return Number.isFinite(rate) ? rate : 0;
+}
+function irrAnualFromMensual(flowsMensuales) {
+  const r = irr(flowsMensuales);
+  return Math.pow(1 + r, 12) - 1;
+}
+
+// ---- Formula tooltip (generic, for any calculated cell) ----
+function renderFormulaCell(value, formulaObj, options = {}) {
+  // formulaObj: { formula: "A + B", refs: [{label, value, unit}], note: "..." }
+  const kind = options.kind || 'neutral';
+  const cellStyle = options.style || 'text-align:center';
+  const formatted = typeof options.format === 'function'
+    ? options.format(value)
+    : fmtTableAmount(value, { kind, total: options.total });
+  const formulaText = (formulaObj?.formula || '').toString();
+  const refs = Array.isArray(formulaObj?.refs) ? formulaObj.refs : [];
+  const refsHtml = refs.map((r) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:2px 0"><span style="color:#64748b">${escapeHtml(String(r.label || ''))}</span><strong>${escapeHtml(String(r.value ?? ''))}${r.unit ? ' ' + escapeHtml(String(r.unit)) : ''}</strong></div>`).join('');
+  const noteHtml = formulaObj?.note ? `<div style="margin-top:6px;font-size:10px;color:#94a3b8">${escapeHtml(String(formulaObj.note))}</div>` : '';
+  const popId = `fpop-${Math.random().toString(36).slice(2, 9)}`;
+  return `<td style="${cellStyle};position:relative" class="formula-host">
+    <div style="display:inline-flex;align-items:center;gap:4px">
+      <span>${formatted}</span>
+      <button type="button" class="btn-formula-mini" onclick="toggleFormulaPop('${popId}', event)" title="Ver fórmula" style="background:none;border:1px solid #cbd5e1;color:#3b82f6;border-radius:4px;padding:0 4px;font-size:9px;cursor:pointer;line-height:1.4">ƒx</button>
+    </div>
+    <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;right:0;top:100%;margin-top:4px;background:#0f172a;color:#fff;border-radius:8px;padding:10px 12px;min-width:240px;max-width:340px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">
+      <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Fórmula</div>
+      <div style="font-family:'Courier New',monospace;background:#1e293b;padding:6px 8px;border-radius:6px;margin-bottom:6px;white-space:pre-wrap;word-break:break-word">${escapeHtml(formulaText)}</div>
+      ${refsHtml ? `<div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Variables</div>${refsHtml}` : ''}
+      ${noteHtml}
+    </div>
+  </td>`;
+}
+
+function toggleFormulaPop(id, event) {
+  if (event) { event.stopPropagation(); event.preventDefault(); }
+  document.querySelectorAll('.formula-pop').forEach((el) => { if (el.id !== id) el.style.display = 'none'; });
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+window.toggleFormulaPop = toggleFormulaPop;
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.formula-host')) {
+    document.querySelectorAll('.formula-pop').forEach((el) => { el.style.display = 'none'; });
+  }
+});
+
+// ---- IVA / PPM / Impuesto Renta helpers ----
+function getMonthlyIvaCredito() {
+  const monthCount = getCostMonthCount();
+  const monthly = createMonthlyArray(monthCount, 0);
+  const context = buildCostContext();
+  ensureCostosState().forEach((category) => {
+    (category.partidas || []).forEach((partida) => {
+      if (!partida.tiene_iva) return;
+      if (category.nombre === 'GASTOS FINANCIEROS' && /Linea aprobada|Pago de linea/i.test(partida.nombre || '')) return;
+      const total = evaluateCostPartida(partida, context);
+      const dist = normalizeDistribution(partida.distribucion_mensual, total, partida.plan_pago);
+      dist.forEach((v, i) => { if (i < monthly.length) monthly[i] += toNumber(v) * 0.19; });
+    });
+  });
+  return monthly;
+}
+
+function getMonthlyIvaDebito(monthlyIncome) {
+  // IVA débito sobre ventas escrituradas (al momento de la escrituración)
+  const monthCount = getCostMonthCount();
+  const monthly = createMonthlyArray(monthCount, 0);
+  const totals = getTotalSalesMetrics();
+  const settings = getGlobalPaymentSettings();
+  const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct));
+  const escrituraPct = Math.max(0, 100 - piePct);
+  const escrituraRow = getCronogramaByType('ESCRITURACION')[0];
+  const escrituraComputed = escrituraRow ? getCronogramaComputed(escrituraRow) : null;
+  const escrituraUnidad = totals.precioPromedio * escrituraPct / 100;
+  Array.from({ length: monthCount }, (_, m) => {
+    const unidades = getScheduledWholeUnits(totals.totalUnidades, escrituraComputed, m);
+    monthly[m] = unidades * escrituraUnidad * 0.19;
+  });
+  return monthly;
+}
+
+function getMonthlyPPM(monthlyIncome) {
+  // PPM = -1% * Ingresos_escrituracion
+  const monthCount = getCostMonthCount();
+  const monthly = createMonthlyArray(monthCount, 0);
+  const totals = getTotalSalesMetrics();
+  const settings = getGlobalPaymentSettings();
+  const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct));
+  const escrituraPct = Math.max(0, 100 - piePct);
+  const escrituraRow = getCronogramaByType('ESCRITURACION')[0];
+  const escrituraComputed = escrituraRow ? getCronogramaComputed(escrituraRow) : null;
+  const escrituraUnidad = totals.precioPromedio * escrituraPct / 100;
+  Array.from({ length: monthCount }, (_, m) => {
+    const unidades = getScheduledWholeUnits(totals.totalUnidades, escrituraComputed, m);
+    const ingresoEscr = unidades * escrituraUnidad;
+    // factor IVA: IN = (Ventas + 0.19*Terreno)/1.19
+    monthly[m] = -0.01 * (ingresoEscr / 1.19);
+  });
+  return monthly;
+}
+
+function getMonthlyImpuestoRenta(flujoAntesImpuestos, monthlyIncome) {
+  // Se paga en abril del año siguiente; tasa configurable
+  const monthCount = getCostMonthCount();
+  const monthly = createMonthlyArray(monthCount, 0);
+  const tasa = getGlobalFinancialParams().pct_impuesto_renta / 100;
+  const totalIncome = monthlyIncome.reduce((a, b) => a + toNumber(b), 0);
+  const totalFlujo = flujoAntesImpuestos.reduce((a, b) => a + toNumber(b), 0);
+  if (totalIncome <= 0 || totalFlujo <= 0) return monthly;
+  // Simplificación: distribuir el impuesto proporcional a escrituraciones, con desfase de 12 meses
+  const startDate = getCostStartDate();
+  const baseYear = startDate.getFullYear();
+  // Agrupar ingresos por año calendario
+  const anual = {};
+  monthlyIncome.forEach((v, i) => {
+    const d = addMonths(startDate, i);
+    const key = d.getFullYear();
+    anual[key] = (anual[key] || 0) + toNumber(v);
+  });
+  const margen = totalFlujo / totalIncome;
+  Object.keys(anual).forEach((yearKey) => {
+    const ingresos = anual[yearKey];
+    const year = Number(yearKey);
+    const tributo = -tasa * ingresos * margen;
+    // Pagadero en abril del año siguiente: mes relativo desde startDate
+    const payDate = new Date(year + 1, 3, 1); // April (mes index 3)
+    const monthIndex = (payDate.getFullYear() - baseYear) * 12 + (payDate.getMonth() - startDate.getMonth());
+    if (monthIndex >= 0 && monthIndex < monthCount) monthly[monthIndex] += tributo;
+  });
+  return monthly;
 }
 
 function getMunicipalUsefulPerUnit(interior, terraza, pct = state.proyecto?.terraza_util_pct) {
@@ -1641,8 +1814,211 @@ function renderConstructionFinancing() {
   setText('fin-constr-monto', fmtUf(approved));
   setText('fin-constr-plazos', `Plazo estimado: mes ${fmtNumber(start)} a mes ${fmtNumber(start + duration)}`);
   setHtml('fin-constr-partidas', `<div>Base financiera tomada desde el total neto de construcción.</div>`);
-  renderFinancingSourcePlanilla('construccion');
+
+  // Sync global config inputs
+  const cfg = getGlobalFinancialParams();
+  if ($('cfg-tasa-terreno')) $('cfg-tasa-terreno').value = cfg.tasa_terreno;
+  if ($('cfg-tasa-construccion')) $('cfg-tasa-construccion').value = cfg.tasa_construccion;
+  if ($('cfg-pct-timbres')) $('cfg-pct-timbres').value = cfg.pct_timbres;
+  if ($('cfg-pct-ceec')) $('cfg-pct-ceec').value = cfg.pct_ceec;
+  if ($('cfg-pct-renta')) $('cfg-pct-renta').value = cfg.pct_impuesto_renta;
+
+  // Renderizar tabla EP + GF conectadas
+  const epData = renderConstructionEP();
+  renderConstructionGF(epData);
 }
+
+function computeConstructionEP() {
+  // Devuelve arrays mensuales: { ep, anticipo, retenciones, subtotal_neto, iva_bruto, ceec, iva_efectivo, total_pago }
+  const metrics = getConstructionMetrics();
+  const meses = Math.max(1, metrics.plazo_meses);
+  const monthCount = getCostMonthCount();
+  const startMonth = getConstructionStartMonth();
+  const dist = buildConstructionSCurve(metrics, meses);
+  const cfg = getGlobalFinancialParams();
+  const ceecPct = cfg.pct_ceec / 100;
+
+  const ep = createMonthlyArray(monthCount, 0);
+  const anticipo = createMonthlyArray(monthCount, 0);
+  const retenciones = createMonthlyArray(monthCount, 0);
+  const subtotal = createMonthlyArray(monthCount, 0);
+  const ivaBruto = createMonthlyArray(monthCount, 0);
+  const ceec = createMonthlyArray(monthCount, 0);
+  const ivaEfectivo = createMonthlyArray(monthCount, 0);
+  const totalPago = createMonthlyArray(monthCount, 0);
+
+  for (let i = 0; i < meses; i += 1) {
+    const m = Math.min(monthCount - 1, startMonth + i);
+    const epVal = toNumber(dist.monthlyEdppNet[i]);
+    const antVal = -toNumber(dist.monthlyAnticipoRecovery[i]); // descuento
+    const retVal = -toNumber(dist.monthlyRetention[i]); // retención (negativa en el flujo al contratista)
+    ep[m] += epVal;
+    anticipo[m] += antVal;
+    retenciones[m] += retVal;
+    const sub = epVal + antVal + retVal; // Subtotal_neto = EP + Anticipo + Retenciones (con signo)
+    subtotal[m] += sub;
+    const ivaB = sub * 0.19;
+    ivaBruto[m] += ivaB;
+    const ceecVal = ivaB * ceecPct;
+    ceec[m] += ceecVal;
+    const ivaE = ivaB - ceecVal;
+    ivaEfectivo[m] += ivaE;
+    totalPago[m] += sub + ivaE;
+  }
+  // Devolución de retenciones al final de obra (suma)
+  const totalRet = dist.retentionAmount;
+  const finalM = Math.min(monthCount - 1, startMonth + meses);
+  retenciones[finalM] += totalRet;
+  subtotal[finalM] += totalRet;
+  ivaBruto[finalM] += totalRet * 0.19;
+  const ceecRet = totalRet * 0.19 * ceecPct;
+  ceec[finalM] += ceecRet;
+  ivaEfectivo[finalM] += totalRet * 0.19 - ceecRet;
+  totalPago[finalM] += totalRet + totalRet * 0.19 - ceecRet;
+
+  return { ep, anticipo, retenciones, subtotal, ivaBruto, ceec, ivaEfectivo, totalPago, startMonth, meses };
+}
+
+function renderConstructionEP() {
+  if (!$('constr-ep-head')) return null;
+  const labels = getCostMonthLabels();
+  const data = computeConstructionEP();
+  const cfg = getGlobalFinancialParams();
+
+  setHtml('constr-ep-head', `
+    <tr>
+      <th style="min-width:200px;text-align:left">Concepto</th>
+      <th style="width:60px;text-align:center">ƒx</th>
+      <th style="width:110px;text-align:right">Total</th>
+      ${labels.map((l) => `<th data-month-col>${escapeHtml(l)}</th>`).join('')}
+    </tr>
+  `);
+
+  const total = (arr) => arr.reduce((a, b) => a + toNumber(b), 0);
+  const rows = [
+    { label: 'EP (Estado de Pago neto)', values: data.ep, formula: 'EDPP_neto(t) desde curva S (sin anticipo ni retención)', color: '#fff' },
+    { label: 'Anticipo (descuento)', values: data.anticipo, formula: '−Anticipo% × EDPP(t)', color: '#fbbf24' },
+    { label: 'Retenciones', values: data.retenciones, formula: '−Retención% × (EDPP − Anticipo). Devolución al final.', color: '#fbbf24' },
+    { label: 'Subtotal neto', values: data.subtotal, formula: 'EP + Anticipo + Retenciones', bold: true, color: '#22c55e' },
+    { label: 'IVA bruto (19%)', values: data.ivaBruto, formula: 'Subtotal neto × 19%', color: '#94a3b8' },
+    { label: `CEEC (${cfg.pct_ceec}%)`, values: data.ceec, formula: `IVA bruto × ${cfg.pct_ceec}%  ·  Beneficio que reduce el IVA`, color: '#a855f7' },
+    { label: 'IVA efectivo', values: data.ivaEfectivo, formula: 'IVA bruto − CEEC', color: '#94a3b8' },
+    { label: 'TOTAL A PAGO (c/IVA)', values: data.totalPago, formula: 'Subtotal neto + IVA efectivo  →  alimenta GIROS', bold: true, color: '#22c55e' },
+  ];
+
+  setHtml('constr-ep-tbody', rows.map((r) => {
+    const popId = `fpop-ep-${Math.random().toString(36).slice(2, 8)}`;
+    const bg = r.bold ? 'background:#f0fdf4' : '';
+    return `
+      <tr style="${bg}">
+        <td style="text-align:left;font-weight:${r.bold ? 800 : 600};color:${r.bold ? '#166534' : '#334155'}">${escapeHtml(r.label)}</td>
+        <td style="text-align:center;position:relative" class="formula-host">
+          <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #cbd5e1;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">ƒx</button>
+          <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;left:0;top:100%;margin-top:4px;background:#0f172a;color:#fff;border-radius:8px;padding:10px 12px;min-width:260px;max-width:360px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Fórmula</div>
+            <div style="font-family:'Courier New',monospace;background:#1e293b;padding:6px 8px;border-radius:6px">${escapeHtml(r.formula)}</div>
+          </div>
+        </td>
+        <td style="text-align:right;font-weight:${r.bold ? 800 : 600};color:${r.color || '#334155'}">${fmtUf(total(r.values))}</td>
+        ${r.values.map((v) => `<td data-month-cell style="text-align:center;color:${toNumber(v) < 0 ? '#dc2626' : (r.color === '#22c55e' ? '#16a34a' : '#334155')};${r.bold ? 'font-weight:700' : ''}">${fmtTableAmount(v, { kind: 'income' })}</td>`).join('')}
+      </tr>`;
+  }).join(''));
+
+  setHtml('constr-ep-tfoot', '');
+  return data;
+}
+
+function renderConstructionGF(epData) {
+  if (!$('constr-fin-planilla-head')) return;
+  const labels = getCostMonthLabels();
+  const monthCount = getCostMonthCount();
+  const cfg = getGlobalFinancialParams();
+  const tasaMensual = (cfg.tasa_construccion / 100) / 12;
+  const timbrePct = cfg.pct_timbres / 100;
+
+  const giros = epData ? epData.totalPago.slice() : createMonthlyArray(monthCount, 0);
+  // PAGOS_LINEA: se paga la deuda contra escrituraciones (distribuido en el cronograma de escrituración)
+  const income = getProjectMonthlyIncome(monthCount);
+  // Solo tomar la parte de ingresos que corresponde a escrituraciones (post-promesa)
+  const pagosLinea = createMonthlyArray(monthCount, 0);
+  // Estrategia simple: cuando hay ingresos de escrituración, amortizar deuda
+  const acumulado = createMonthlyArray(monthCount, 0);
+  const interesMensual = createMonthlyArray(monthCount, 0);
+  const impTimbres = createMonthlyArray(monthCount, 0);
+
+  let prevAcum = 0;
+  for (let t = 0; t < monthCount; t += 1) {
+    const g = toNumber(giros[t]);
+    impTimbres[t] = g * timbrePct;
+    // Amortización: si hay ingreso y deuda, pagar hasta el ingreso
+    const pagoMax = Math.max(0, Math.min(prevAcum + g, toNumber(income[t])));
+    pagosLinea[t] = -pagoMax;
+    acumulado[t] = prevAcum + g + pagosLinea[t];
+    interesMensual[t] = acumulado[t] * tasaMensual;
+    prevAcum = acumulado[t];
+  }
+
+  setHtml('constr-fin-planilla-head', `
+    <tr>
+      <th style="min-width:200px;text-align:left">Concepto</th>
+      <th style="width:60px;text-align:center">ƒx</th>
+      <th style="width:110px;text-align:right">Total</th>
+      ${labels.map((l) => `<th data-month-col>${escapeHtml(l)}</th>`).join('')}
+    </tr>
+  `);
+
+  const total = (arr) => arr.reduce((a, b) => a + toNumber(b), 0);
+  const rows = [
+    { label: 'GIROS (desde EP)', values: giros, formula: 'GIROS(t) = TOTAL_A_PAGO_c_IVA(t)  [conectado a tabla EP]', color: '#22c55e' },
+    { label: 'PAGOS LÍNEA', values: pagosLinea, formula: 'Amortización contra escrituraciones (tope = ingresos del mes)', color: '#dc2626' },
+    { label: 'ACUMULADO', values: acumulado, formula: 'ACUMULADO(t) = ACUMULADO(t−1) + GIROS(t) + PAGOS_LINEA(t)', bold: true, color: '#0f172a' },
+    { label: `INTERÉS (${cfg.tasa_construccion}% anual)`, values: interesMensual, formula: `INTERÉS(t) = ACUMULADO(t) × ${cfg.tasa_construccion}%/12`, color: '#f59e0b' },
+    { label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, values: impTimbres, formula: `IMP_TIMBRES(t) = GIROS(t) × ${cfg.pct_timbres}%`, color: '#f59e0b' },
+  ];
+
+  setHtml('constr-fin-planilla-tbody', rows.map((r) => {
+    const popId = `fpop-gf-${Math.random().toString(36).slice(2, 8)}`;
+    const bg = r.bold ? 'background:#f8fafc' : '';
+    return `
+      <tr style="${bg}">
+        <td style="text-align:left;font-weight:${r.bold ? 800 : 600};color:${r.color}">${escapeHtml(r.label)}</td>
+        <td style="text-align:center;position:relative" class="formula-host">
+          <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #cbd5e1;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">ƒx</button>
+          <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;left:0;top:100%;margin-top:4px;background:#0f172a;color:#fff;border-radius:8px;padding:10px 12px;min-width:260px;max-width:360px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Fórmula</div>
+            <div style="font-family:'Courier New',monospace;background:#1e293b;padding:6px 8px;border-radius:6px">${escapeHtml(r.formula)}</div>
+          </div>
+        </td>
+        <td style="text-align:right;font-weight:${r.bold ? 800 : 600};color:${r.color}">${fmtUf(total(r.values))}</td>
+        ${r.values.map((v) => `<td data-month-cell style="text-align:center;color:${toNumber(v) < 0 ? '#dc2626' : '#334155'};${r.bold ? 'font-weight:700' : ''}">${fmtTableAmount(v, { kind: 'income' })}</td>`).join('')}
+      </tr>`;
+  }).join(''));
+
+  setHtml('constr-fin-planilla-tfoot', '');
+}
+
+function onConfigParamChange() {
+  if (!state.proyecto) return;
+  const fields = [
+    ['cfg-tasa-terreno', 'tasa_interes_terreno'],
+    ['cfg-tasa-construccion', 'tasa_interes_construccion'],
+    ['cfg-pct-timbres', 'pct_timbres'],
+    ['cfg-pct-ceec', 'pct_ceec'],
+    ['cfg-pct-renta', 'pct_impuesto_renta'],
+  ];
+  fields.forEach(([inputId, field]) => {
+    const el = $(inputId);
+    if (el) state.proyecto[field] = toNumber(el.value);
+  });
+  // Propagar tasas a financiamiento legacy
+  state.financiamiento.credito_terreno_tasa = toNumber(state.proyecto.tasa_interes_terreno);
+  state.financiamiento.linea_construccion_tasa = toNumber(state.proyecto.tasa_interes_construccion);
+  scheduleAutosave('terreno');
+  renderConstruccion();
+  if (typeof renderTerrainModule === 'function') renderTerrainModule();
+  if (typeof renderProjectCashflow === 'function') renderProjectCashflow();
+}
+window.onConfigParamChange = onConfigParamChange;
 
 function buildConstructionSCurve(metrics, meses) {
   const width = Math.max(0.08, toNumber(metrics.ancho_curva || 0.5));
@@ -1810,6 +2186,77 @@ function getFinancingSourceRows(sourceType) {
 function renderFinancingSourcePlanilla(sourceType) {
   const prefix = sourceType === 'terreno' ? 'terreno-fin-planilla' : 'constr-fin-planilla';
   if (!$(`${prefix}-head`) || !$(`${prefix}-tbody`) || !$(`${prefix}-tfoot`)) return;
+
+  // Terreno: patrón unificado GIROS / ACUMULADO / INTERÉS / TIMBRES con fórmulas visibles
+  if (sourceType === 'terreno') {
+    const labels = getCostMonthLabels();
+    const monthCount = getCostMonthCount();
+    const cfg = getGlobalFinancialParams();
+    const tasaMensual = (cfg.tasa_terreno / 100) / 12;
+    const timbrePct = cfg.pct_timbres / 100;
+
+    const terrainBase = getTerrainBaseCost();
+    const approved = state.financiamiento.credito_terreno_activo
+      ? terrainBase * toNumber(state.financiamiento.credito_terreno_pct) / 100
+      : 0;
+    const terrainMonthEnd = Math.min(monthCount - 1, Math.max(1, getConstructionStartMonth()));
+
+    const giros = createMonthlyArray(monthCount, 0);
+    giros[0] = approved; // Giro total en mes 0 (compra de terreno)
+
+    const pagosLinea = createMonthlyArray(monthCount, 0);
+    pagosLinea[terrainMonthEnd] = -approved; // Pago al inicio de construcción
+
+    const acumulado = createMonthlyArray(monthCount, 0);
+    const interesMensual = createMonthlyArray(monthCount, 0);
+    const impTimbres = createMonthlyArray(monthCount, 0);
+    let prevAcum = 0;
+    for (let t = 0; t < monthCount; t += 1) {
+      impTimbres[t] = toNumber(giros[t]) * timbrePct;
+      acumulado[t] = prevAcum + toNumber(giros[t]) + toNumber(pagosLinea[t]);
+      interesMensual[t] = acumulado[t] * tasaMensual;
+      prevAcum = acumulado[t];
+    }
+
+    setHtml('terreno-fin-planilla-head', `
+      <tr>
+        <th style="min-width:200px;text-align:left">Concepto</th>
+        <th style="width:60px;text-align:center">ƒx</th>
+        <th style="width:110px;text-align:right">Total</th>
+        ${labels.map((l) => `<th data-month-col>${escapeHtml(l)}</th>`).join('')}
+      </tr>
+    `);
+
+    const total = (arr) => arr.reduce((a, b) => a + toNumber(b), 0);
+    const rows = [
+      { label: 'GIROS', values: giros, formula: 'GIROS(0) = % línea × Costo terreno (desembolso en compra)', color: '#22c55e' },
+      { label: 'PAGOS LÍNEA', values: pagosLinea, formula: 'Pago de la deuda al inicio de construcción', color: '#dc2626' },
+      { label: 'ACUMULADO', values: acumulado, formula: 'ACUMULADO(t) = ACUMULADO(t−1) + GIROS(t) + PAGOS_LINEA(t)', bold: true, color: '#0f172a' },
+      { label: `INTERÉS (${cfg.tasa_terreno}% anual)`, values: interesMensual, formula: `INTERÉS(t) = ACUMULADO(t) × ${cfg.tasa_terreno}%/12`, color: '#f59e0b' },
+      { label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, values: impTimbres, formula: `IMP_TIMBRES(t) = GIROS(t) × ${cfg.pct_timbres}%`, color: '#f59e0b' },
+    ];
+
+    setHtml('terreno-fin-planilla-tbody', rows.map((r) => {
+      const popId = `fpop-tf-${Math.random().toString(36).slice(2, 8)}`;
+      const bg = r.bold ? 'background:#f8fafc' : '';
+      return `
+        <tr style="${bg}">
+          <td style="text-align:left;font-weight:${r.bold ? 800 : 600};color:${r.color}">${escapeHtml(r.label)}</td>
+          <td style="text-align:center;position:relative" class="formula-host">
+            <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #cbd5e1;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">ƒx</button>
+            <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;left:0;top:100%;margin-top:4px;background:#0f172a;color:#fff;border-radius:8px;padding:10px 12px;min-width:260px;max-width:360px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">
+              <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Fórmula</div>
+              <div style="font-family:'Courier New',monospace;background:#1e293b;padding:6px 8px;border-radius:6px">${escapeHtml(r.formula)}</div>
+            </div>
+          </td>
+          <td style="text-align:right;font-weight:${r.bold ? 800 : 600};color:${r.color}">${fmtUf(total(r.values))}</td>
+          ${r.values.map((v) => `<td data-month-cell style="text-align:center;color:${toNumber(v) < 0 ? '#dc2626' : '#334155'};${r.bold ? 'font-weight:700' : ''}">${fmtTableAmount(v, { kind: 'income' })}</td>`).join('')}
+        </tr>`;
+    }).join(''));
+
+    setHtml('terreno-fin-planilla-tfoot', '');
+    return;
+  }
 
   const monthLabels = getCostMonthLabels();
   const monthCount = getCostMonthCount();
@@ -2751,26 +3198,52 @@ function renderProjectCashflow() {
   const income = getProjectMonthlyIncome(monthCount);
   const costs = getProjectMonthlyCosts(false);
   const financialCosts = getProjectMonthlyCosts(true).map((value, index) => Math.max(0, value - costs[index]));
-  const net = income.map((value, index) => value - costs[index] - financialCosts[index]);
-  const cumulative = cumulativeSeries(net);
+  const costsTotal = costs.map((v, i) => v + financialCosts[i]);
+
+  // Flujo operativo bruto = Ingresos - Costos
+  const flujoOperativoBruto = income.map((v, i) => v - costsTotal[i]);
+
+  // IVA
+  const ivaCredito = getMonthlyIvaCredito();
+  const ivaDebito = getMonthlyIvaDebito(income);
+
+  // Flujo antes de impuestos = operativo + iva_credito - iva_debito
+  const flujoAntesImpuestos = flujoOperativoBruto.map((v, i) => v + toNumber(ivaCredito[i]) - toNumber(ivaDebito[i]));
+
+  // PPM + Impuesto Renta
+  const ppm = getMonthlyPPM(income);
+  const impRenta = getMonthlyImpuestoRenta(flujoAntesImpuestos, income);
+
+  // Flujo después de impuestos
+  const flujoDespuesImpuestos = flujoAntesImpuestos.map((v, i) => v + toNumber(ppm[i]) + toNumber(impRenta[i]));
+
+  const cumulative = cumulativeSeries(flujoDespuesImpuestos);
+  const cumulativeBruto = cumulativeSeries(flujoOperativoBruto);
   const totalIncome = income.reduce((sum, value) => sum + value, 0);
   const totalCosts = costs.reduce((sum, value) => sum + value, 0);
   const totalFinancial = financialCosts.reduce((sum, value) => sum + value, 0);
-  const margin = totalIncome - totalCosts - totalFinancial;
+  const totalFlujoBruto = flujoOperativoBruto.reduce((a, b) => a + b, 0);
+  const totalFlujoAntes = flujoAntesImpuestos.reduce((a, b) => a + b, 0);
+  const totalFlujoDespues = flujoDespuesImpuestos.reduce((a, b) => a + b, 0);
+  const margin = totalFlujoDespues;
   const capitalNeed = Math.abs(Math.min(0, ...cumulative));
+  const capitalNeedSin = Math.abs(Math.min(0, ...cumulativeBruto));
   const payback = cumulative.findIndex((value) => value >= 0);
-  const roe = capitalNeed ? margin / capitalNeed * 100 : 0;
 
-  setText('flujo-margen-sin', fmtUf(totalIncome - totalCosts));
-  setText('flujo-margen-sin-pct', `${fmtPct(totalIncome ? (totalIncome - totalCosts) / totalIncome * 100 : 0)} s/ventas`);
+  // TIR real (mensual → anual)
+  const tirNetaAnual = irrAnualFromMensual(flujoDespuesImpuestos);
+  const tirBrutaAnual = irrAnualFromMensual(flujoOperativoBruto);
+
+  setText('flujo-margen-sin', fmtUf(totalFlujoBruto));
+  setText('flujo-margen-sin-pct', `${fmtPct(totalIncome ? totalFlujoBruto / totalIncome * 100 : 0)} s/ventas`);
   setText('flujo-margen-con', fmtUf(margin));
   setText('flujo-margen-con-pct', `${fmtPct(totalIncome ? margin / totalIncome * 100 : 0)} s/ventas`);
-  setText('flujo-k-sin', fmtUf(Math.abs(Math.min(0, ...cumulativeSeries(income.map((value, index) => value - costs[index]))))));
+  setText('flujo-k-sin', fmtUf(capitalNeedSin));
   setText('flujo-k-con', fmtUf(capitalNeed));
-  setText('flujo-roe-sin', fmtPct(totalCosts ? (totalIncome - totalCosts) / totalCosts * 100 : 0));
-  setText('flujo-roe-con', fmtPct(roe));
-  setText('flujo-tir-sin', fmtPct(roe));
-  setText('flujo-tir-con', fmtPct(roe));
+  setText('flujo-roe-sin', fmtPct(capitalNeedSin ? totalFlujoBruto / capitalNeedSin * 100 : 0));
+  setText('flujo-roe-con', fmtPct(capitalNeed ? margin / capitalNeed * 100 : 0));
+  setText('flujo-tir-sin', fmtPct(tirBrutaAnual * 100));
+  setText('flujo-tir-con', fmtPct(tirNetaAnual * 100));
   setText('flujo-payback-sin', payback >= 0 ? formatTimelineMonthLabel(payback) : 'Sin recupero');
   setText('flujo-payback-con', payback >= 0 ? formatTimelineMonthLabel(payback) : 'Sin recupero');
   setText('flujo-leverage', `${fmtNumber(capitalNeed && totalIncome ? capitalNeed / totalIncome : 0, 2)}x`);
@@ -2785,20 +3258,41 @@ function renderProjectCashflow() {
     return `<div class="dist-row"><div class="dist-label">${escapeHtml(label)}</div><div class="dist-bar-wrap"><div class="dist-bar" style="width:${Math.max(2, Math.min(100, Math.abs(pct)))}%;background:${color}"></div></div><div class="dist-pct">${fmtPct(pct)}</div></div>`;
   }).join(''));
 
-  setHtml('flujo-tabla-header', `<tr><th style="text-align:left">Concepto</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}</tr>`);
+  setHtml('flujo-tabla-header', `<tr><th style="text-align:left;min-width:220px">Concepto</th><th style="text-align:center;min-width:90px">Fórmula</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}</tr>`);
+
   const rows = [
-    ['Ingresos ventas', income],
-    ['Egresos base', costs.map((value) => -value)],
-    ['Gastos financieros', financialCosts.map((value) => -value)],
-    ['Flujo neto', net],
-    ['Flujo acumulado', cumulative],
+    { label: 'Ingresos (Ventas)', values: income, sign: '+', formula: 'SUMA(Ventas por mes)', refs: [{ label: 'Total ingresos', value: fmtUf(totalIncome) }] },
+    { label: 'Costos base', values: costs.map((v) => -v), sign: '-', formula: 'SUMA(Costos proyecto sin gastos financieros)', refs: [{ label: 'Total costos', value: fmtUf(totalCosts) }] },
+    { label: 'Gastos financieros', values: financialCosts.map((v) => -v), sign: '-', formula: 'Intereses + Timbres + Alzamiento', refs: [{ label: 'Total GF', value: fmtUf(totalFinancial) }] },
+    { label: 'Flujo operativo bruto', values: flujoOperativoBruto, sign: '=', bold: true, formula: 'Ingresos - Costos - Gastos financieros', refs: [{ label: 'Total', value: fmtUf(totalFlujoBruto) }] },
+    { label: 'IVA crédito', values: ivaCredito, sign: '+', formula: 'SUMA(Egresos con check IVA × 19%)', refs: [{ label: 'Total IVA crédito', value: fmtUf(ivaCredito.reduce((a, b) => a + b, 0)) }] },
+    { label: 'IVA débito', values: ivaDebito.map((v) => -v), sign: '-', formula: 'Ventas escrituradas × 19%', refs: [{ label: 'Total IVA débito', value: fmtUf(ivaDebito.reduce((a, b) => a + b, 0)) }] },
+    { label: 'Flujo antes de impuestos', values: flujoAntesImpuestos, sign: '=', bold: true, formula: 'Flujo operativo bruto + IVA crédito - IVA débito', refs: [{ label: 'Total', value: fmtUf(totalFlujoAntes) }] },
+    { label: 'PPM', values: ppm, sign: '-', formula: '-1% × Ingresos escrituración / (1 + factor_IVA)', refs: [{ label: 'Total PPM', value: fmtUf(ppm.reduce((a, b) => a + b, 0)) }] },
+    { label: 'Impuesto Renta', values: impRenta, sign: '-', formula: `-${getGlobalFinancialParams().pct_impuesto_renta}% × (Escrituras año × Valor prom. × Margen). Pago abril año siguiente`, refs: [{ label: 'Total Renta', value: fmtUf(impRenta.reduce((a, b) => a + b, 0)) }] },
+    { label: 'Flujo después de impuestos', values: flujoDespuesImpuestos, sign: '=', bold: true, formula: 'Flujo antes de impuestos + PPM + Impuesto Renta', refs: [{ label: 'Total', value: fmtUf(totalFlujoDespues) }] },
+    { label: 'Flujo acumulado', values: cumulative, sign: '∑', bold: true, formula: 'ACUMULADO(t) = ACUMULADO(t-1) + Flujo después impuestos(t)', refs: [] },
   ];
-  setHtml('flujo-tabla-tbody', rows.map(([label, values]) => `
-    <tr>
-      <td style="text-align:left;font-weight:800">${escapeHtml(label)}</td>
-      ${values.map((value) => `<td style="text-align:center;color:${toNumber(value) < 0 ? '#ef4444' : '#0f172a'}">${fmtTableAmount(value, { kind: 'income' })}</td>`).join('')}
-    </tr>
-  `).join(''));
+
+  setHtml('flujo-tabla-tbody', rows.map((row) => {
+    const popId = `fpop-flow-${Math.random().toString(36).slice(2, 9)}`;
+    const refsHtml = (row.refs || []).map((r) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:2px 0"><span style="color:#94a3b8">${escapeHtml(String(r.label))}</span><strong>${escapeHtml(String(r.value))}</strong></div>`).join('');
+    const bgRow = row.bold ? 'background:#0f172a' : '';
+    const sign = row.sign ? `<span style="color:#94a3b8;font-weight:600;margin-right:4px">${row.sign}</span>` : '';
+    return `
+      <tr style="${bgRow}">
+        <td style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.bold ? '#22c55e' : '#fff'}">${sign}${escapeHtml(row.label)}</td>
+        <td style="text-align:center;position:relative" class="formula-host">
+          <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #475569;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">ƒx</button>
+          <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;left:0;top:100%;margin-top:4px;background:#fff;color:#0f172a;border:1px solid #cbd5e1;border-radius:8px;padding:10px 12px;min-width:260px;max-width:380px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">
+            <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Fórmula</div>
+            <div style="font-family:'Courier New',monospace;background:#f1f5f9;padding:6px 8px;border-radius:6px;margin-bottom:6px">${escapeHtml(row.formula)}</div>
+            ${refsHtml}
+          </div>
+        </td>
+        ${row.values.map((value) => `<td style="text-align:center;color:${toNumber(value) < 0 ? '#fca5a5' : (row.bold ? '#22c55e' : '#fff')}">${fmtTableAmount(value, { kind: 'income' })}</td>`).join('')}
+      </tr>`;
+  }).join(''));
 }
 
 function getCostFormulaCatalog() {
