@@ -549,6 +549,37 @@ function renderCabidaTables(rows) {
   const commonAreaTotal = getCommonAreaTotal();
   const accessoryTotal = toNumber(proyecto.estacionamientos_cantidad) + toNumber(proyecto.bodegas_cantidad);
 
+  // Tabla fusionada (nueva)
+  const fusedRows = displayRows.map((row) => {
+    const cantidad = toNumber(row.cantidad);
+    const utilPorUnidad = getMunicipalUsefulPerUnit(row.sup_interior, row.sup_terrazas);
+    const vendiblePorUnidad = getSellableAreaPerUnit(row.sup_interior, row.sup_terrazas);
+    const vendibleTotal = vendiblePorUnidad * cantidad;
+    return `
+      <tr>
+        <td>${escapeHtml(row.uso)}</td>
+        <td style="text-align:center">${fmtNumber(row.cantidad)}</td>
+        <td style="text-align:center">${fmtNumber(row.sup_interior, 1)}</td>
+        <td style="text-align:center">${fmtNumber(row.sup_terrazas, 1)}</td>
+        <td style="text-align:center">${fmtNumber(utilPorUnidad, 1)}</td>
+        <td style="text-align:center;color:#2563eb">${fmtNumber(vendiblePorUnidad, 1)}</td>
+        <td style="text-align:center;color:#16a34a;font-weight:700">${fmtNumber(vendibleTotal, 1)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  setHtml('cabida-tabla-tbody', fusedRows);
+  setHtml('cabida-tabla-tfoot', `
+    <td>Total</td>
+    <td style="text-align:center">${fmtNumber(totals.unidades)}</td>
+    <td style="text-align:center">${fmtNumber(totals.unidades ? totals.interior / totals.unidades : 0, 1)}</td>
+    <td style="text-align:center">${fmtNumber(totals.unidades ? totals.terrazas / totals.unidades : 0, 1)}</td>
+    <td style="text-align:center">${fmtNumber(totals.unidades ? totals.util / totals.unidades : 0, 1)}</td>
+    <td style="text-align:center;color:#2563eb">${fmtNumber(totals.unidades ? totals.vendible / totals.unidades : 0, 1)}</td>
+    <td style="text-align:center;color:#16a34a;font-weight:700">${fmtNumber(totals.vendible, 1)}</td>
+  `);
+
+  // Tablas resumen (sin cambios)
   const unitRows = displayRows.map((row) => `
     <tr>
       <td>${escapeHtml(row.uso)}</td>
@@ -559,34 +590,8 @@ function renderCabidaTables(rows) {
     </tr>
   `).join('');
 
-  const areaRows = displayRows.map((row) => {
-    const cantidad = toNumber(row.cantidad);
-    const interior = toNumber(row.sup_interior) * cantidad;
-    const terrazas = toNumber(row.sup_terrazas) * cantidad;
-    const util = getMunicipalUsefulPerUnit(row.sup_interior, row.sup_terrazas) * cantidad;
-    const vendible = getSellableAreaPerUnit(row.sup_interior, row.sup_terrazas) * cantidad;
-
-    return `
-      <tr>
-        <td>${escapeHtml(row.uso)}</td>
-        <td style="text-align:center">${fmtNumber(interior, 1)}</td>
-        <td style="text-align:center">${fmtNumber(terrazas, 1)}</td>
-        <td style="text-align:center">${fmtNumber(util, 1)}</td>
-        <td style="text-align:center;color:#2563eb">${fmtNumber(vendible, 1)}</td>
-      </tr>
-    `;
-  }).join('');
-
   setHtml('res-cabida-tbody', unitRows);
-  setHtml('cabida-tbody', unitRows);
   setHtml('res-cabida-tfoot', `
-    <td>Total</td>
-    <td style="text-align:center">${fmtNumber(totals.unidades)}</td>
-    <td style="text-align:center">${fmtNumber(totals.unidades ? totals.interior / totals.unidades : 0, 1)}</td>
-    <td style="text-align:center">${fmtNumber(totals.unidades ? totals.terrazas / totals.unidades : 0, 1)}</td>
-    <td style="text-align:center">${fmtNumber(totals.unidades ? totals.vendible / totals.unidades : 0, 1)}</td>
-  `);
-  setHtml('cabida-tfoot', `
     <td>Total</td>
     <td style="text-align:center">${fmtNumber(totals.unidades)}</td>
     <td style="text-align:center">${fmtNumber(totals.unidades ? totals.interior / totals.unidades : 0, 1)}</td>
@@ -606,20 +611,10 @@ function renderCabidaTables(rows) {
       </tr>
     `;
   }).join(''));
-
   setHtml('res-sup-tfoot', `
     <td>Total</td>
     <td style="text-align:center">${fmtNumber(totals.util, 1)} m2</td>
     <td style="text-align:center">${fmtNumber(totals.vendible, 1)} m2</td>
-  `);
-
-  setHtml('sup-tbody', areaRows);
-  setHtml('sup-tfoot', `
-    <td>Total</td>
-    <td style="text-align:center">${fmtNumber(totals.interior, 1)}</td>
-    <td style="text-align:center">${fmtNumber(totals.terrazas, 1)}</td>
-    <td style="text-align:center">${fmtNumber(totals.util, 1)}</td>
-    <td style="text-align:center">${fmtNumber(totals.vendible, 1)}</td>
   `);
   setHtml('res-sup-extra', `
     <tr>
@@ -628,16 +623,9 @@ function renderCabidaTables(rows) {
       <td style="text-align:center">-</td>
     </tr>
   `);
-  setHtml('sup-extra', `
-    <tr>
-      <td>M2 comunes totales</td>
-      <td style="text-align:center">-</td>
-      <td style="text-align:center">-</td>
-      <td style="text-align:center">${fmtNumber(commonAreaTotal, 1)}</td>
-      <td style="text-align:center">-</td>
-    </tr>
-  `);
-  setHtml('res-acc-tbody', `
+
+  // Estacionamientos y Bodegas (sin Total)
+  const accRows = `
     <tr>
       <td>Estacionamientos</td>
       <td style="text-align:center">${fmtNumber(proyecto.estacionamientos_cantidad)}</td>
@@ -646,26 +634,18 @@ function renderCabidaTables(rows) {
       <td>Bodegas</td>
       <td style="text-align:center">${fmtNumber(proyecto.bodegas_cantidad)}</td>
     </tr>
-  `);
-  setHtml('cabida-acc-tbody', `
-    <tr>
-      <td>Estacionamientos</td>
-      <td style="text-align:center">${fmtNumber(proyecto.estacionamientos_cantidad)}</td>
-    </tr>
-    <tr>
-      <td>Bodegas</td>
-      <td style="text-align:center">${fmtNumber(proyecto.bodegas_cantidad)}</td>
-    </tr>
-  `);
+  `;
+  setHtml('cabida-acc-tbody', accRows);
+  setHtml('res-acc-tbody', accRows);
   setHtml('res-acc-tfoot', `<td>Total</td><td style="text-align:center">${fmtNumber(accessoryTotal)}</td>`);
-  setHtml('cabida-acc-tfoot', `<td>Total</td><td style="text-align:center">${fmtNumber(accessoryTotal)}</td>`);
+
   setText('cabida-vendible-pct', `${fmtNumber(proyecto.terraza_util_pct, 1)}%`);
   setText('res-cabida-vendible-pct', `${fmtNumber(proyecto.terraza_util_pct, 1)}%`);
-  setText('cabida-common-total', `${fmtNumber(commonAreaTotal, 1)} m2`);
+  setText('cabida-common-total', `${fmtNumber(commonAreaTotal, 1)} m²`);
   setText('res-cabida-common-total', `${fmtNumber(commonAreaTotal, 1)} m2`);
-  setText('cabida-util-total', `${fmtNumber(totals.util, 1)} m2`);
+  setText('cabida-util-total', `${fmtNumber(totals.util, 1)} m²`);
   setText('res-cabida-util-total', `${fmtNumber(totals.util, 1)} m2`);
-  setText('cabida-vendible-total', `${fmtNumber(totals.vendible, 1)} m2`);
+  setText('cabida-vendible-total', `${fmtNumber(totals.vendible, 1)} m²`);
   setText('res-cabida-vendible-total', `${fmtNumber(totals.vendible, 1)} m2`);
 }
 
@@ -681,17 +661,21 @@ function renderCabidaEditor(rows) {
       </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:12px">
-      ${rows.map((row) => `
+      ${rows.map((row, idx) => `
         <div class="card" data-cabida-row>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <label style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase">Tipo</label>
+            <button type="button" onclick="eliminarUso(${idx})" style="background:none;border:1px solid #fecaca;color:#b91c1c;border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;line-height:1.5">× Eliminar</button>
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div style="grid-column:1 / -1">
-              <label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Tipo de departamento</label>
+              <label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Nombre del tipo</label>
               <input class="inp" data-field="uso" value="${escapeHtml(row.uso)}" onchange="onCabidaInputChange()"/>
             </div>
             <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Cantidad</label><input class="inp" type="number" data-field="cantidad" value="${toNumber(row.cantidad)}" onchange="onCabidaInputChange()"/></div>
-            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">M2 interior</label><input class="inp" type="number" step="0.01" data-field="sup_interior" value="${toNumber(row.sup_interior)}" onchange="onCabidaInputChange()"/></div>
-            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">M2 terraza</label><input class="inp" type="number" step="0.01" data-field="sup_terrazas" value="${toNumber(row.sup_terrazas)}" onchange="onCabidaInputChange()"/></div>
-            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">M2 vendible</label><input class="inp" type="text" value="${fmtNumber(getSellableAreaPerUnit(row.sup_interior, row.sup_terrazas), 2)}" disabled/></div>
+            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">M² interior</label><input class="inp" type="number" step="0.01" data-field="sup_interior" value="${toNumber(row.sup_interior)}" onchange="onCabidaInputChange()"/></div>
+            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">M² terraza</label><input class="inp" type="number" step="0.01" data-field="sup_terrazas" value="${toNumber(row.sup_terrazas)}" onchange="onCabidaInputChange()"/></div>
+            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">M² vendible</label><input class="inp" type="text" value="${fmtNumber(getSellableAreaPerUnit(row.sup_interior, row.sup_terrazas), 2)}" disabled/></div>
           </div>
         </div>
       `).join('')}
@@ -1103,8 +1087,6 @@ function renderVentasPricing() {
         <td style="text-align:center;color:#16a34a">${fmtTableAmount(metrics.subtotalPrincipal, { kind: 'income' })}</td>
         <td style="text-align:center">-</td>
         <td style="text-align:center">-</td>
-        <td style="text-align:center">-</td>
-        <td style="text-align:center">-</td>
         <td style="text-align:center;color:#ea580c;font-weight:800">${fmtTableAmount(metrics.total, { kind: 'income' })}</td>
         <td style="text-align:center">${fmtTableAmount(metrics.ticket, { kind: 'income' })}</td>
       </tr>
@@ -1129,8 +1111,6 @@ function renderVentasPricing() {
       <td style="text-align:center;color:#16a34a">${fmtTableAmount(addons.estacionamientos.total, { kind: 'income' })}</td>
       <td style="text-align:center">${fmtNumber(addons.estacionamientos.unidades)}</td>
       <td><input id="ventas-precio-estacionamiento-global" class="inp" type="number" step="0.01" value="${toNumber(accessorySales.precio_estacionamiento)}" onchange="onVentasInputChange()"/></td>
-      <td style="text-align:center">-</td>
-      <td style="text-align:center">-</td>
       <td style="text-align:center;color:#ea580c;font-weight:800">${fmtTableAmount(addons.estacionamientos.total, { kind: 'income' })}</td>
       <td style="text-align:center">${fmtTableAmount(addons.estacionamientos.precio, { kind: 'income' })}</td>
     </tr>
@@ -1142,8 +1122,6 @@ function renderVentasPricing() {
       <td style="text-align:center">-</td>
       <td style="text-align:center">-</td>
       <td style="text-align:center;color:#16a34a">${fmtTableAmount(addons.bodegas.total, { kind: 'income' })}</td>
-      <td style="text-align:center">-</td>
-      <td style="text-align:center">-</td>
       <td style="text-align:center">${fmtNumber(addons.bodegas.unidades)}</td>
       <td><input id="ventas-precio-bodega-global" class="inp" type="number" step="0.01" value="${toNumber(accessorySales.precio_bodega)}" onchange="onVentasInputChange()"/></td>
       <td style="text-align:center;color:#ea580c;font-weight:800">${fmtTableAmount(addons.bodegas.total, { kind: 'income' })}</td>
@@ -1155,7 +1133,7 @@ function renderVentasPricing() {
     <td>${fmtNumber(totalUnidades)}</td>
     <td>${fmtNumber(totalSup, 1)}</td>
     <td>${fmtNumber(totalUnidades ? totalSup / totalUnidades : 0, 1)}</td>
-    <td colspan="7"></td>
+    <td colspan="5"></td>
     <td style="font-weight:800;color:#22c55e">${fmtTableAmount(totalVenta, { kind: 'income', total: true })}</td>
     <td>${fmtTableAmount(totalUnidades ? totalVentaDeptos / totalUnidades : 0, { kind: 'income', total: true })}</td>
   `);
@@ -1165,21 +1143,21 @@ function renderVentasPaymentForms() {
   setHtml('formas-pago-tbody', state.ventasConfig.map((row) => {
     const metrics = getUsoSaleMetrics(row.uso);
     const totalUnidad = metrics.ticket;
-    const montoPromesa = Math.max(0, (totalUnidad * toNumber(row.pie_promesa_pct) / 100) - toNumber(row.reserva_uf));
+    const montoPromesa = totalUnidad * toNumber(row.pie_promesa_pct) / 100;
     const montoCuotas = totalUnidad * toNumber(row.pie_cuotas_pct) / 100;
-    const montoCuoton = totalUnidad * toNumber(row.pie_cuoton_pct) / 100;
+    const mesesCuotas = Math.max(1, toNumber(row.pie_cuoton_pct) || 1);
+    const mesesLabel = mesesCuotas <= 1
+      ? '<span style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;border-radius:99px;padding:2px 8px;font-size:10px;font-weight:700">Sin cuotas</span>'
+      : `<strong>${fmtNumber(mesesCuotas)}</strong> meses`;
 
     return `
       <tr data-ventas-config-row data-uso="${escapeHtml(row.uso)}">
         <td>${escapeHtml(row.uso)}</td>
-        <td><input class="inp" type="number" step="0.01" data-field="reserva_uf" value="${toNumber(row.reserva_uf)}" onchange="onVentasInputChange()"/></td>
         <td><input class="inp" type="number" step="0.01" data-field="pie_promesa_pct" value="${toNumber(row.pie_promesa_pct)}" onchange="onVentasInputChange()"/></td>
         <td style="text-align:center">${fmtTableAmount(montoPromesa, { kind: 'income' })}</td>
         <td><input class="inp" type="number" step="0.01" data-field="pie_cuotas_pct" value="${toNumber(row.pie_cuotas_pct)}" onchange="onVentasInputChange()"/></td>
-        <td style="text-align:center">${fmtTableAmount(montoCuotas, { kind: 'income' })}</td>
-        <td><input class="inp" type="number" step="0.01" data-field="pie_cuoton_pct" value="${toNumber(row.pie_cuoton_pct)}" onchange="onVentasInputChange()"/></td>
-        <td style="text-align:center">${fmtTableAmount(montoCuoton, { kind: 'income' })}</td>
-        <td><input class="inp" type="number" step="0.01" data-field="hipotecario_pct" value="${toNumber(row.hipotecario_pct)}" onchange="onVentasInputChange()"/></td>
+        <td style="text-align:center"><input class="inp" type="number" min="1" step="1" data-field="pie_cuoton_pct" value="${mesesCuotas}" onchange="onVentasInputChange()" style="width:70px;text-align:center"/></td>
+        <td style="text-align:center">${fmtTableAmount(montoCuotas, { kind: 'income' })}<br/><span style="font-size:10px;color:#94a3b8">${mesesLabel}</span></td>
         <td style="text-align:center;color:#16a34a">${fmtTableAmount(totalUnidad, { kind: 'income' })}</td>
       </tr>
     `;
@@ -1194,51 +1172,65 @@ function ganttOptionsHtml(selected) {
 }
 
 function renderVentasSchedules() {
-  const renderScheduleRows = (type, targetId) => {
-    const rows = state.ventasCronograma.filter((row) => row.tipo === type);
-    setHtml(targetId, rows.map((row) => {
-      const metrics = getUsoSaleMetrics(row.uso);
-      const computed = getCronogramaComputed(row);
-      const porcentaje = type === 'ESCRITURACION' ? 0 : toNumber(row.porcentaje);
-      const unidades = type === 'ESCRITURACION'
-        ? state.ventasConfig.reduce((sum, item) => sum + getUsoSaleMetrics(item.uso).unidades, 0)
-        : Math.round(metrics.unidades * porcentaje / 100);
-      const velUn = computed.duracion ? unidades / computed.duracion : 0;
-      const velUf = computed.duracion ? (metrics.total * (porcentaje / 100)) / computed.duracion : 0;
+  // Cronograma de Promesas: fila única global (auto-calculada)
+  const preventaRows = state.ventasCronograma.filter((row) => row.tipo === 'PREVENTA');
+  const totalUnidadesPromesas = preventaRows.reduce((sum, row) => {
+    const metrics = getUsoSaleMetrics(row.uso);
+    return sum + Math.round(metrics.unidades * toNumber(row.porcentaje) / 100);
+  }, 0);
+  const primeraPreventa = preventaRows[0];
+  const computedPreventa = primeraPreventa ? getCronogramaComputed(primeraPreventa) : { inicio: 0, fin: 0, duracion: 0 };
+  const velPromesas = computedPreventa.duracion ? totalUnidadesPromesas / computedPreventa.duracion : 0;
 
-      if (type === 'ESCRITURACION') {
-        return `
-          <tr data-ventas-cronograma-row data-tipo="${escapeHtml(row.tipo)}" data-uso="${escapeHtml(row.uso)}">
-            <td>
-              <select class="inp" data-field="vinculo_gantt" disabled onchange="onVentasInputChange()">${ganttOptionsHtml(row.vinculo_gantt)}</select>
-            </td>
-            <td style="text-align:center">${fmtNumber(computed.inicio)}</td>
-            <td><input class="inp" type="number" data-field="duracion" value="${toNumber(row.duracion)}" disabled onchange="onVentasInputChange()"/></td>
-            <td style="text-align:center;color:#16a34a">${fmtNumber(computed.fin)}</td>
-            <td style="text-align:center">${fmtNumber(velUn, 1)} un/mes</td>
-          </tr>
-        `;
-      }
+  setHtml('preventa-tbody', primeraPreventa ? `
+    <tr>
+      <td style="color:#64748b">${escapeHtml(primeraPreventa.vinculo_gantt || 'Inicio promesas')}</td>
+      <td style="text-align:center;font-weight:700">${fmtNumber(computedPreventa.inicio)}</td>
+      <td style="text-align:center;color:#16a34a;font-weight:700">${fmtNumber(computedPreventa.fin)}</td>
+      <td style="text-align:center">${fmtNumber(totalUnidadesPromesas)} un</td>
+      <td style="text-align:center">${fmtNumber(velPromesas, 1)} un/mes</td>
+    </tr>
+  ` : '<tr><td colspan="5" style="text-align:center;color:#94a3b8">Sin unidades configuradas</td></tr>');
 
-      return `
-        <tr data-ventas-cronograma-row data-tipo="${escapeHtml(row.tipo)}" data-uso="${escapeHtml(row.uso)}">
-          <td>${escapeHtml(row.uso)}</td>
-          <td><select class="inp" data-field="vinculo_gantt" ${type === 'PREVENTA' ? 'disabled' : ''} onchange="onVentasInputChange()">${ganttOptionsHtml(row.vinculo_gantt)}</select></td>
-          <td><input class="inp" type="number" data-field="mes_inicio" value="${toNumber(row.mes_inicio)}" ${type === 'PREVENTA' ? 'disabled' : ''} onchange="onVentasInputChange()"/></td>
-          <td><input class="inp" type="number" data-field="duracion" value="${toNumber(row.duracion)}" ${type === 'PREVENTA' ? 'disabled' : ''} onchange="onVentasInputChange()"/></td>
-          <td style="text-align:center;color:#16a34a">${fmtNumber(computed.fin)}</td>
-          <td><input class="inp" type="number" step="0.01" data-field="porcentaje" value="${toNumber(row.porcentaje)}" onchange="onVentasInputChange()"/></td>
-          <td style="text-align:center">${fmtNumber(unidades)}</td>
-          <td style="text-align:center">${fmtNumber(velUn, 1)}</td>
-          <td style="text-align:center;color:#16a34a">${fmtTableAmount(velUf, { kind: 'income' })}</td>
-        </tr>
-      `;
-    }).join(''));
-  };
+  // Cronograma de Ventas: por tipo (editable)
+  const ventaRows = state.ventasCronograma.filter((row) => row.tipo === 'VENTA');
+  setHtml('venta-tbody', ventaRows.map((row) => {
+    const metrics = getUsoSaleMetrics(row.uso);
+    const computed = getCronogramaComputed(row);
+    const porcentaje = toNumber(row.porcentaje);
+    const unidades = Math.round(metrics.unidades * porcentaje / 100);
+    const velUn = computed.duracion ? unidades / computed.duracion : 0;
+    const velUf = computed.duracion ? (metrics.total * (porcentaje / 100)) / computed.duracion : 0;
+    return `
+      <tr data-ventas-cronograma-row data-tipo="${escapeHtml(row.tipo)}" data-uso="${escapeHtml(row.uso)}">
+        <td>${escapeHtml(row.uso)}</td>
+        <td><select class="inp" data-field="vinculo_gantt" onchange="onVentasInputChange()">${ganttOptionsHtml(row.vinculo_gantt)}</select></td>
+        <td><input class="inp" type="number" data-field="mes_inicio" value="${toNumber(row.mes_inicio)}" onchange="onVentasInputChange()"/></td>
+        <td><input class="inp" type="number" data-field="duracion" value="${toNumber(row.duracion)}" onchange="onVentasInputChange()"/></td>
+        <td style="text-align:center;color:#16a34a">${fmtNumber(computed.fin)}</td>
+        <td><input class="inp" type="number" step="0.01" data-field="porcentaje" value="${toNumber(row.porcentaje)}" onchange="onVentasInputChange()"/></td>
+        <td style="text-align:center">${fmtNumber(unidades)}</td>
+        <td style="text-align:center">${fmtNumber(velUn, 1)}</td>
+        <td style="text-align:center;color:#16a34a">${fmtTableAmount(velUf, { kind: 'income' })}</td>
+      </tr>
+    `;
+  }).join(''));
 
-  renderScheduleRows('PREVENTA', 'preventa-tbody');
-  renderScheduleRows('VENTA', 'venta-tbody');
-  renderScheduleRows('ESCRITURACION', 'escrituracion-tbody');
+  // Cronograma de Escrituración: fila única global (auto-calculada)
+  const escrRow = state.ventasCronograma.find((row) => row.tipo === 'ESCRITURACION');
+  const totalUnidadesEscr = state.ventasConfig.reduce((sum, item) => sum + getUsoSaleMetrics(item.uso).unidades, 0);
+  const computedEscr = escrRow ? getCronogramaComputed(escrRow) : { inicio: 0, fin: 0, duracion: 0 };
+  const velEscr = computedEscr.duracion ? totalUnidadesEscr / computedEscr.duracion : 0;
+
+  setHtml('escrituracion-tbody', escrRow ? `
+    <tr>
+      <td style="color:#64748b">${escapeHtml(escrRow.vinculo_gantt || 'Escrituración')}</td>
+      <td style="text-align:center;font-weight:700">${fmtNumber(computedEscr.inicio)}</td>
+      <td style="text-align:center;color:#16a34a;font-weight:700">${fmtNumber(computedEscr.fin)}</td>
+      <td style="text-align:center">${fmtNumber(totalUnidadesEscr)} un</td>
+      <td style="text-align:center">${fmtNumber(velEscr, 1)} un/mes</td>
+    </tr>
+  ` : '<tr><td colspan="5" style="text-align:center;color:#94a3b8">Sin datos de escrituración</td></tr>');
 }
 
 function drawSpeedometer(value, maxValue) {
@@ -1439,14 +1431,14 @@ function renderVentasCashflow() {
   setHtml('flujo-ventas-header', `<th>Concepto</th>${months.map((month) => `<th>M${fmtNumber(month)}</th>`).join('')}`);
 
   const addons = getAddonSalesMetrics();
-  const reservations = [];
+  const promesas = [];
   const cuotas = [];
   const accesorios = [];
   const escrituras = [];
   const totalVentaAccesorios = addons.estacionamientos.total + addons.bodegas.total;
 
   months.forEach((month) => {
-    let totalReserva = 0;
+    let totalPromesas = 0;
     let totalCuotas = 0;
     let totalEscritura = 0;
 
@@ -1455,11 +1447,12 @@ function renderVentasCashflow() {
       const preventa = getCronogramaForUso('PREVENTA', config.uso);
       const venta = getCronogramaForUso('VENTA', config.uso);
       const escritura = getCronogramaByType('ESCRITURACION')[0];
+      // Hipotecario auto = saldo no cubierto por promesa ni cuotas
+      const hipotecarioAuto = Math.max(0, 100 - toNumber(config.pie_promesa_pct) - toNumber(config.pie_cuotas_pct));
 
       if (preventa) {
         const computed = getCronogramaComputed(preventa);
         if (month >= computed.inicio && month < computed.fin) {
-          totalReserva += toNumber(config.reserva_uf) * (metrics.unidades * toNumber(preventa.porcentaje) / 100) / computed.duracion;
           totalCuotas += (metrics.ticket * toNumber(config.pie_cuotas_pct) / 100) * (metrics.unidades * toNumber(preventa.porcentaje) / 100) / computed.duracion;
         }
       }
@@ -1467,29 +1460,29 @@ function renderVentasCashflow() {
       if (venta) {
         const computed = getCronogramaComputed(venta);
         if (month >= computed.inicio && month < computed.fin) {
-          totalCuotas += (metrics.ticket * toNumber(config.pie_promesa_pct) / 100) * (metrics.unidades * toNumber(venta.porcentaje) / 100) / computed.duracion;
+          totalPromesas += (metrics.ticket * toNumber(config.pie_promesa_pct) / 100) * (metrics.unidades * toNumber(venta.porcentaje) / 100) / computed.duracion;
         }
       }
 
       if (escritura) {
         const computed = getCronogramaComputed(escritura);
         if (month >= computed.inicio && month < computed.fin) {
-          totalEscritura += (metrics.ticket * toNumber(config.hipotecario_pct) / 100) * metrics.unidades / computed.duracion;
+          totalEscritura += (metrics.ticket * hipotecarioAuto / 100) * metrics.unidades / computed.duracion;
         }
       }
     });
 
-    reservations.push(totalReserva);
+    promesas.push(totalPromesas);
     cuotas.push(totalCuotas);
     accesorios.push(months.length ? totalVentaAccesorios / months.length : 0);
     escrituras.push(totalEscritura);
   });
 
   const rows = [
-    { label: 'Reservas y promesas', values: reservations },
+    { label: 'Promesas', values: promesas },
     { label: 'Cuotas pie', values: cuotas },
     { label: 'Ventas estac. y bodegas', values: accesorios },
-    { label: 'Escrituraciones', values: escrituras },
+    { label: 'Escrituraciones (saldo)', values: escrituras },
   ];
 
   setHtml('flujo-ventas-tbody', rows.map((row) => `
@@ -3400,15 +3393,24 @@ function readVentasConfigEditor() {
 }
 
 function readVentasCronogramaEditor() {
-  const rows = Array.from(document.querySelectorAll('[data-ventas-cronograma-row]')).map((row) => ({
-    id: row.dataset.id || '',
-    tipo: row.dataset.tipo,
-    uso: row.dataset.uso,
-    vinculo_gantt: row.querySelector('[data-field="vinculo_gantt"]')?.value || null,
-    mes_inicio: toNumber(row.querySelector('[data-field="mes_inicio"]')?.value),
-    duracion: toNumber(row.querySelector('[data-field="duracion"]')?.value),
-    porcentaje: toNumber(row.querySelector('[data-field="porcentaje"]')?.value),
-  }));
+  // Solo leemos del DOM las filas de VENTA (editables). PREVENTA y ESCRITURACION son auto-calculadas.
+  const rows = Array.from(document.querySelectorAll('[data-ventas-cronograma-row]'))
+    .filter((row) => row.dataset.tipo === 'VENTA')
+    .map((row) => ({
+      id: row.dataset.id || '',
+      tipo: row.dataset.tipo,
+      uso: row.dataset.uso,
+      vinculo_gantt: row.querySelector('[data-field="vinculo_gantt"]')?.value || null,
+      mes_inicio: toNumber(row.querySelector('[data-field="mes_inicio"]')?.value),
+      duracion: toNumber(row.querySelector('[data-field="duracion"]')?.value),
+      porcentaje: toNumber(row.querySelector('[data-field="porcentaje"]')?.value),
+    }));
+
+  // Preservar filas PREVENTA y ESCRITURACION del estado actual
+  state.ventasCronograma
+    .filter((row) => row.tipo === 'PREVENTA' || row.tipo === 'ESCRITURACION')
+    .forEach((row) => rows.push({ ...row }));
+
   rows.push({
     id: getVentasMetaRow('META_PROMESAS')?.id || '',
     tipo: 'META_PROMESAS',
@@ -3747,6 +3749,14 @@ async function guardarCostos() {
   await refreshHealthStatus();
 }
 
+function eliminarUso(index) {
+  const rows = getCabidaRowsFromEditor();
+  if (rows.length <= 1) return;
+  rows.splice(index, 1);
+  renderCabidaEditor(rows);
+  onCabidaInputChange();
+}
+
 function agregarUso(defaultLabel = 'Departamento') {
   const rows = getCabidaRowsFromEditor();
   const baseLabel = String(defaultLabel || 'Departamento').trim() || 'Departamento';
@@ -3822,6 +3832,7 @@ window.allowCostDrop = allowCostDrop;
 window.dropCostRow = dropCostRow;
 window.endCostDrag = endCostDrag;
 window.agregarUso = agregarUso;
+window.eliminarUso = eliminarUso;
 window.agregarHito = agregarHito;
 window.onGanttInputChange = onGanttInputChange;
 window.moveGanttRow = moveGanttRow;
