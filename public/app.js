@@ -903,12 +903,7 @@ function getTotalCommercialUnits() {
 }
 
 function getPreventaUnitsTotal() {
-  return state.ventasCronograma
-    .filter((row) => row.tipo === 'PREVENTA')
-    .reduce((sum, row) => {
-      const metrics = getUsoSaleMetrics(row.uso);
-      return sum + Math.round(metrics.unidades * toNumber(row.porcentaje) / 100);
-    }, 0);
+  return getTotalCommercialUnits();
 }
 
 function getPromiseMilestone() {
@@ -945,8 +940,7 @@ function ensureVentasState() {
 
   const ganttNames = state.gantt.map((row) => row.nombre);
   const defaults = [
-    { type: 'PREVENTA', label: 'Preventas', percentage: 20 },
-    { type: 'VENTA', label: 'Ventas', percentage: 80 },
+    { type: 'PREVENTA', label: 'Promesas', percentage: 100 },
   ];
 
   const nextCronograma = [];
@@ -960,7 +954,7 @@ function ensureVentasState() {
         vinculo_gantt: existing.vinculo_gantt || ganttNames[0] || null,
         mes_inicio: toNumber(existing.mes_inicio),
         duracion: toNumber(existing.duracion),
-        porcentaje: toNumber(existing.porcentaje || item.percentage),
+        porcentaje: item.type === 'PREVENTA' ? 100 : toNumber(existing.porcentaje || item.percentage),
       });
     }
   }
@@ -1047,13 +1041,38 @@ function getAddonSalesMetrics() {
   };
 }
 
+function getTotalSalesMetrics() {
+  const addons = getAddonSalesMetrics();
+  const totalDeptos = state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).total, 0);
+  const totalAccesorios = addons.estacionamientos.total + addons.bodegas.total;
+  const totalUnidades = getTotalCommercialUnits();
+  return {
+    addons,
+    totalDeptos,
+    totalAccesorios,
+    total: totalDeptos + totalAccesorios,
+    totalUnidades,
+    precioPromedio: totalUnidades ? (totalDeptos + totalAccesorios) / totalUnidades : 0,
+  };
+}
+
+function getGlobalPaymentSettings() {
+  const source = state.ventasConfig[0] || {};
+  return {
+    pie_promesa_pct: toNumber(source.pie_promesa_pct),
+    pie_cuotas_pct: toNumber(source.pie_cuotas_pct),
+    pie_cuoton_pct: Math.max(1, toNumber(source.pie_cuoton_pct) || 1),
+  };
+}
+
 function findGanttByName(name) {
   return state.gantt.find((row) => row.nombre === name) || null;
 }
 
 function getCronogramaComputed(item) {
   const ganttRef = findGanttByName(item.vinculo_gantt);
-  const inicio = ganttRef ? toNumber(ganttRef.fin) + toNumber(item.mes_inicio) : toNumber(item.mes_inicio);
+  const base = item.tipo === 'PREVENTA' ? toNumber(ganttRef?.inicio) : toNumber(ganttRef?.fin);
+  const inicio = ganttRef ? base + toNumber(item.mes_inicio) : toNumber(item.mes_inicio);
   const duracion = Math.max(1, toNumber(item.duracion));
   const fin = inicio + duracion;
   return { inicio, duracion, fin };
@@ -1084,8 +1103,7 @@ function renderVentasPricing() {
         <td style="text-align:center">${fmtNumber(metrics.m2PorUnidad, 1)}</td>
         <td><input class="inp" type="number" step="0.01" data-field="precio_uf_m2" value="${toNumber(config.precio_uf_m2)}" onchange="onVentasInputChange()"/></td>
         <td style="text-align:center">${fmtTableAmount(metrics.precioBase, { kind: 'income' })}</td>
-        <td style="text-align:center;color:#16a34a">${fmtTableAmount(metrics.subtotalPrincipal, { kind: 'income' })}</td>
-        <td style="text-align:center">-</td>
+        <td style="text-align:center;color:#16a34a">${fmtTableAmount(metrics.total, { kind: 'income' })}</td>
         <td style="text-align:center">-</td>
         <td style="text-align:center;color:#ea580c;font-weight:800">${fmtTableAmount(metrics.total, { kind: 'income' })}</td>
         <td style="text-align:center">${fmtTableAmount(metrics.ticket, { kind: 'income' })}</td>
@@ -1094,8 +1112,8 @@ function renderVentasPricing() {
   }).join('');
 
   const addons = getAddonSalesMetrics();
-  const totalVentaDeptos = state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).total, 0);
-  const totalVenta = totalVentaDeptos + addons.estacionamientos.total + addons.bodegas.total;
+  const totalVentas = getTotalSalesMetrics();
+  const totalVenta = totalVentas.total;
   const totalUnidades = state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).unidades, 0);
   const totalSup = state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).supVendible, 0);
 
@@ -1108,11 +1126,10 @@ function renderVentasPricing() {
       <td style="text-align:center">-</td>
       <td style="text-align:center">-</td>
       <td style="text-align:center">-</td>
-      <td style="text-align:center;color:#16a34a">${fmtTableAmount(addons.estacionamientos.total, { kind: 'income' })}</td>
-      <td style="text-align:center">${fmtNumber(addons.estacionamientos.unidades)}</td>
-      <td><input id="ventas-precio-estacionamiento-global" class="inp" type="number" step="0.01" value="${toNumber(accessorySales.precio_estacionamiento)}" onchange="onVentasInputChange()"/></td>
+      <td style="text-align:center">-</td>
+      <td><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#64748b;white-space:nowrap">${fmtNumber(addons.estacionamientos.unidades)} un</span><input id="ventas-precio-estacionamiento-global" class="inp" type="number" step="0.01" value="${toNumber(accessorySales.precio_estacionamiento)}" onchange="onVentasInputChange()"/></div></td>
       <td style="text-align:center;color:#ea580c;font-weight:800">${fmtTableAmount(addons.estacionamientos.total, { kind: 'income' })}</td>
-      <td style="text-align:center">${fmtTableAmount(addons.estacionamientos.precio, { kind: 'income' })}</td>
+      <td style="text-align:center">-</td>
     </tr>
     <tr style="background:#f8fafc">
       <td style="font-weight:800">BODEGAS</td>
@@ -1121,11 +1138,10 @@ function renderVentasPricing() {
       <td style="text-align:center">-</td>
       <td style="text-align:center">-</td>
       <td style="text-align:center">-</td>
-      <td style="text-align:center;color:#16a34a">${fmtTableAmount(addons.bodegas.total, { kind: 'income' })}</td>
-      <td style="text-align:center">${fmtNumber(addons.bodegas.unidades)}</td>
-      <td><input id="ventas-precio-bodega-global" class="inp" type="number" step="0.01" value="${toNumber(accessorySales.precio_bodega)}" onchange="onVentasInputChange()"/></td>
+      <td style="text-align:center">-</td>
+      <td><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#64748b;white-space:nowrap">${fmtNumber(addons.bodegas.unidades)} un</span><input id="ventas-precio-bodega-global" class="inp" type="number" step="0.01" value="${toNumber(accessorySales.precio_bodega)}" onchange="onVentasInputChange()"/></div></td>
       <td style="text-align:center;color:#ea580c;font-weight:800">${fmtTableAmount(addons.bodegas.total, { kind: 'income' })}</td>
-      <td style="text-align:center">${fmtTableAmount(addons.bodegas.precio, { kind: 'income' })}</td>
+      <td style="text-align:center">-</td>
     </tr>
   `);
   setHtml('ventas-tfoot', `
@@ -1133,35 +1149,31 @@ function renderVentasPricing() {
     <td>${fmtNumber(totalUnidades)}</td>
     <td>${fmtNumber(totalSup, 1)}</td>
     <td>${fmtNumber(totalUnidades ? totalSup / totalUnidades : 0, 1)}</td>
-    <td colspan="5"></td>
+    <td colspan="4"></td>
     <td style="font-weight:800;color:#22c55e">${fmtTableAmount(totalVenta, { kind: 'income', total: true })}</td>
-    <td>${fmtTableAmount(totalUnidades ? totalVentaDeptos / totalUnidades : 0, { kind: 'income', total: true })}</td>
+    <td>${fmtTableAmount(totalVentas.precioPromedio, { kind: 'income', total: true })}</td>
   `);
 }
 
 function renderVentasPaymentForms() {
-  setHtml('formas-pago-tbody', state.ventasConfig.map((row) => {
-    const metrics = getUsoSaleMetrics(row.uso);
-    const totalUnidad = metrics.ticket;
-    const montoPromesa = totalUnidad * toNumber(row.pie_promesa_pct) / 100;
-    const montoCuotas = totalUnidad * toNumber(row.pie_cuotas_pct) / 100;
-    const mesesCuotas = Math.max(1, toNumber(row.pie_cuoton_pct) || 1);
-    const mesesLabel = mesesCuotas <= 1
-      ? '<span style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;border-radius:99px;padding:2px 8px;font-size:10px;font-weight:700">Sin cuotas</span>'
-      : `<strong>${fmtNumber(mesesCuotas)}</strong> meses`;
+  const settings = getGlobalPaymentSettings();
+  const totals = getTotalSalesMetrics();
+  const montoPromesa = totals.precioPromedio * settings.pie_promesa_pct / 100;
+  const montoCuotas = totals.precioPromedio * settings.pie_cuotas_pct / 100;
+  const mesesLabel = settings.pie_cuoton_pct <= 1
+    ? '<span style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;border-radius:99px;padding:2px 8px;font-size:10px;font-weight:700">Sin cuotas</span>'
+    : `<strong>${fmtNumber(settings.pie_cuoton_pct)}</strong> meses`;
 
-    return `
-      <tr data-ventas-config-row data-uso="${escapeHtml(row.uso)}">
-        <td>${escapeHtml(row.uso)}</td>
-        <td><input class="inp" type="number" step="0.01" data-field="pie_promesa_pct" value="${toNumber(row.pie_promesa_pct)}" onchange="onVentasInputChange()"/></td>
-        <td style="text-align:center">${fmtTableAmount(montoPromesa, { kind: 'income' })}</td>
-        <td><input class="inp" type="number" step="0.01" data-field="pie_cuotas_pct" value="${toNumber(row.pie_cuotas_pct)}" onchange="onVentasInputChange()"/></td>
-        <td style="text-align:center"><input class="inp" type="number" min="1" step="1" data-field="pie_cuoton_pct" value="${mesesCuotas}" onchange="onVentasInputChange()" style="width:70px;text-align:center"/></td>
-        <td style="text-align:center">${fmtTableAmount(montoCuotas, { kind: 'income' })}<br/><span style="font-size:10px;color:#94a3b8">${mesesLabel}</span></td>
-        <td style="text-align:center;color:#16a34a">${fmtTableAmount(totalUnidad, { kind: 'income' })}</td>
-      </tr>
-    `;
-  }).join(''));
+  setHtml('formas-pago-tbody', `
+    <tr data-ventas-payment-global>
+      <td><input class="inp" type="number" step="0.01" data-field="pie_promesa_pct" value="${settings.pie_promesa_pct}" onchange="onVentasInputChange()"/></td>
+      <td style="text-align:center">${fmtTableAmount(montoPromesa, { kind: 'income' })}</td>
+      <td><input class="inp" type="number" step="0.01" data-field="pie_cuotas_pct" value="${settings.pie_cuotas_pct}" onchange="onVentasInputChange()"/></td>
+      <td style="text-align:center"><input class="inp" type="number" min="1" step="1" data-field="pie_cuoton_pct" value="${settings.pie_cuoton_pct}" onchange="onVentasInputChange()" style="width:70px;text-align:center"/></td>
+      <td style="text-align:center">${fmtTableAmount(montoCuotas, { kind: 'income' })}<br/><span style="font-size:10px;color:#94a3b8">${mesesLabel}</span></td>
+      <td style="text-align:center;color:#16a34a">${fmtTableAmount(totals.precioPromedio, { kind: 'income' })}</td>
+    </tr>
+  `);
 }
 
 function ganttOptionsHtml(selected) {
@@ -1191,30 +1203,6 @@ function renderVentasSchedules() {
       <td style="text-align:center">${fmtNumber(velPromesas, 1)} un/mes</td>
     </tr>
   ` : '<tr><td colspan="5" style="text-align:center;color:#94a3b8">Sin unidades configuradas</td></tr>');
-
-  // Cronograma de Ventas: por tipo (editable)
-  const ventaRows = state.ventasCronograma.filter((row) => row.tipo === 'VENTA');
-  setHtml('venta-tbody', ventaRows.map((row) => {
-    const metrics = getUsoSaleMetrics(row.uso);
-    const computed = getCronogramaComputed(row);
-    const porcentaje = toNumber(row.porcentaje);
-    const unidades = Math.round(metrics.unidades * porcentaje / 100);
-    const velUn = computed.duracion ? unidades / computed.duracion : 0;
-    const velUf = computed.duracion ? (metrics.total * (porcentaje / 100)) / computed.duracion : 0;
-    return `
-      <tr data-ventas-cronograma-row data-tipo="${escapeHtml(row.tipo)}" data-uso="${escapeHtml(row.uso)}">
-        <td>${escapeHtml(row.uso)}</td>
-        <td><select class="inp" data-field="vinculo_gantt" onchange="onVentasInputChange()">${ganttOptionsHtml(row.vinculo_gantt)}</select></td>
-        <td><input class="inp" type="number" data-field="mes_inicio" value="${toNumber(row.mes_inicio)}" onchange="onVentasInputChange()"/></td>
-        <td><input class="inp" type="number" data-field="duracion" value="${toNumber(row.duracion)}" onchange="onVentasInputChange()"/></td>
-        <td style="text-align:center;color:#16a34a">${fmtNumber(computed.fin)}</td>
-        <td><input class="inp" type="number" step="0.01" data-field="porcentaje" value="${toNumber(row.porcentaje)}" onchange="onVentasInputChange()"/></td>
-        <td style="text-align:center">${fmtNumber(unidades)}</td>
-        <td style="text-align:center">${fmtNumber(velUn, 1)}</td>
-        <td style="text-align:center;color:#16a34a">${fmtTableAmount(velUf, { kind: 'income' })}</td>
-      </tr>
-    `;
-  }).join(''));
 
   // Cronograma de Escrituración: fila única global (auto-calculada)
   const escrRow = state.ventasCronograma.find((row) => row.tipo === 'ESCRITURACION');
@@ -1264,11 +1252,12 @@ function drawSpeedometer(value, maxValue) {
 function renderVentasSummaryCards() {
   const totalVenta = state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).total, 0);
   const preRows = getCronogramaByType('PREVENTA');
-  const ventaRows = getCronogramaByType('VENTA');
   const escrRow = getCronogramaByType('ESCRITURACION')[0];
 
-  const preventaPct = preRows.reduce((sum, row) => sum + toNumber(row.porcentaje), 0);
-  const ventaPct = ventaRows.reduce((sum, row) => sum + toNumber(row.porcentaje), 0);
+  const promesasPct = preRows.length ? 100 : 0;
+  const ventaRows = [];
+  const preventaPct = promesasPct;
+  const ventaPct = 0;
   const escrituraInicio = escrRow ? getCronogramaComputed(escrRow).inicio : 0;
   const escrituraFin = escrRow ? getCronogramaComputed(escrRow).fin : 0;
   const escrituraDuracion = escrRow ? getCronogramaComputed(escrRow).duracion : 0;
@@ -1305,13 +1294,12 @@ function renderVentasSummaryCards() {
 }
 
 function buildTimelineMonths() {
-  const months = new Set([1]);
-  state.ventasCronograma.forEach((row) => {
-    const computed = getCronogramaComputed(row);
-    months.add(Math.max(1, computed.inicio));
-    months.add(Math.max(1, computed.fin));
-  });
-  return Array.from(months).sort((a, b) => a - b).slice(0, 8);
+  const ranges = state.ventasCronograma
+    .filter((row) => row.tipo === 'PREVENTA' || row.tipo === 'ESCRITURACION')
+    .map((row) => getCronogramaComputed(row));
+  const start = Math.max(1, Math.min(...ranges.map((row) => row.inicio), 1));
+  const end = Math.max(start, ...ranges.map((row) => Math.max(row.inicio, row.fin - 1)));
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
 }
 
 function renderVentasSummaryCards() {
@@ -1320,18 +1308,16 @@ function renderVentasSummaryCards() {
   const totalVentaAccesorios = addons.estacionamientos.total + addons.bodegas.total;
   const totalVenta = totalVentaDeptos + totalVentaAccesorios;
   const preRows = getCronogramaByType('PREVENTA');
-  const ventaRows = getCronogramaByType('VENTA');
   const escrRow = getCronogramaByType('ESCRITURACION')[0];
 
-  const preventaPct = preRows.reduce((sum, row) => sum + toNumber(row.porcentaje), 0);
-  const ventaPct = ventaRows.reduce((sum, row) => sum + toNumber(row.porcentaje), 0);
+  const promesasPct = preRows.length ? 100 : 0;
   const escrituraInicio = escrRow ? getCronogramaComputed(escrRow).inicio : 0;
   const escrituraFin = escrRow ? getCronogramaComputed(escrRow).fin : 0;
   const escrituraDuracion = escrRow ? getCronogramaComputed(escrRow).duracion : 0;
   const totalUnidades = state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).unidades, 0);
   const velEntregas = escrituraDuracion ? totalUnidades / escrituraDuracion : 0;
 
-  const analysisPoints = preRows.concat(ventaRows).map((row) => getCronogramaComputed(row));
+  const analysisPoints = preRows.map((row) => getCronogramaComputed(row));
   const analysisStart = Math.min(
     ...analysisPoints.map((row) => row.inicio),
     escrituraInicio || 999999
@@ -1355,8 +1341,7 @@ function renderVentasSummaryCards() {
   setText('escrit-dur', `Duracion: ${fmtNumber(escrituraDuracion)} meses`);
 
   setHtml('mix-ventas-list', `
-    <div class="etapa-card" style="border-color:#3b82f6"><div style="font-weight:800">Preventa departamentos</div><div style="font-size:12px;color:#64748b">${fmtPct(preventaPct)} del stock deptos · ${fmtUf(totalVentaDeptos * preventaPct / 100)}</div></div>
-    <div class="etapa-card" style="border-color:#22c55e"><div style="font-weight:800">Venta departamentos</div><div style="font-size:12px;color:#64748b">${fmtPct(ventaPct)} del stock deptos · ${fmtUf(totalVentaDeptos * ventaPct / 100)}</div></div>
+    <div class="etapa-card" style="border-color:#3b82f6"><div style="font-weight:800">Promesas departamentos</div><div style="font-size:12px;color:#64748b">${fmtPct(promesasPct)} del stock deptos · ${fmtUf(totalVentaDeptos)}</div></div>
     <div class="etapa-card" style="border-color:#8b5cf6"><div style="font-weight:800">Estac. y bodegas</div><div style="font-size:12px;color:#64748b">${fmtNumber(addons.estacionamientos.unidades)} estac. + ${fmtNumber(addons.bodegas.unidades)} bod. · ${fmtUf(totalVentaAccesorios)}</div></div>
     <div class="etapa-card" style="border-color:#f97316"><div style="font-weight:800">Escrituracion</div><div style="font-size:12px;color:#64748b">Desde Mes ${fmtNumber(escrituraInicio)} hasta ${fmtNumber(escrituraFin)}</div></div>
   `);
@@ -1430,70 +1415,69 @@ function renderVentasCashflow() {
   const months = buildTimelineMonths();
   setHtml('flujo-ventas-header', `<th>Concepto</th>${months.map((month) => `<th>M${fmtNumber(month)}</th>`).join('')}`);
 
-  const addons = getAddonSalesMetrics();
-  const promesas = [];
-  const cuotas = [];
-  const accesorios = [];
-  const escrituras = [];
-  const totalVentaAccesorios = addons.estacionamientos.total + addons.bodegas.total;
+  const totals = getTotalSalesMetrics();
+  const settings = getGlobalPaymentSettings();
+  const promesaPct = Math.min(100, Math.max(0, settings.pie_promesa_pct + settings.pie_cuotas_pct));
+  const escrituraPct = Math.max(0, 100 - promesaPct);
+  const promesasUnidades = [];
+  const escrituracionUnidades = [];
+  const promesasUf = [];
+  const escrituracionUf = [];
+  const acumuladoPromesasUnidades = [];
+  const acumuladoEscriturasUnidades = [];
+  const acumuladoPromesas = [];
+  const acumuladoEscrituras = [];
+  const promesaRow = getCronogramaByType('PREVENTA')[0];
+  const escrituraRow = getCronogramaByType('ESCRITURACION')[0];
+  const promesaComputed = promesaRow ? getCronogramaComputed(promesaRow) : null;
+  const escrituraComputed = escrituraRow ? getCronogramaComputed(escrituraRow) : null;
+  let promesasAcum = 0;
+  let escriturasAcum = 0;
+  let promesasUnidadesAcum = 0;
+  let escriturasUnidadesAcum = 0;
 
   months.forEach((month) => {
-    let totalPromesas = 0;
-    let totalCuotas = 0;
-    let totalEscritura = 0;
+    const promesaActiva = promesaComputed && month >= promesaComputed.inicio && month < promesaComputed.fin;
+    const escrituraActiva = escrituraComputed && month >= escrituraComputed.inicio && month < escrituraComputed.fin;
+    const unidadesPromesaMes = promesaActiva ? totals.totalUnidades / promesaComputed.duracion : 0;
+    const unidadesEscrituraMes = escrituraActiva ? totals.totalUnidades / escrituraComputed.duracion : 0;
+    const ufPromesaMes = promesaActiva ? (totals.total * promesaPct / 100) / promesaComputed.duracion : 0;
+    const ufEscrituraMes = escrituraActiva ? (totals.total * escrituraPct / 100) / escrituraComputed.duracion : 0;
 
-    state.ventasConfig.forEach((config) => {
-      const metrics = getUsoSaleMetrics(config.uso);
-      const preventa = getCronogramaForUso('PREVENTA', config.uso);
-      const venta = getCronogramaForUso('VENTA', config.uso);
-      const escritura = getCronogramaByType('ESCRITURACION')[0];
-      // Hipotecario auto = saldo no cubierto por promesa ni cuotas
-      const hipotecarioAuto = Math.max(0, 100 - toNumber(config.pie_promesa_pct) - toNumber(config.pie_cuotas_pct));
-
-      if (preventa) {
-        const computed = getCronogramaComputed(preventa);
-        if (month >= computed.inicio && month < computed.fin) {
-          totalCuotas += (metrics.ticket * toNumber(config.pie_cuotas_pct) / 100) * (metrics.unidades * toNumber(preventa.porcentaje) / 100) / computed.duracion;
-        }
-      }
-
-      if (venta) {
-        const computed = getCronogramaComputed(venta);
-        if (month >= computed.inicio && month < computed.fin) {
-          totalPromesas += (metrics.ticket * toNumber(config.pie_promesa_pct) / 100) * (metrics.unidades * toNumber(venta.porcentaje) / 100) / computed.duracion;
-        }
-      }
-
-      if (escritura) {
-        const computed = getCronogramaComputed(escritura);
-        if (month >= computed.inicio && month < computed.fin) {
-          totalEscritura += (metrics.ticket * hipotecarioAuto / 100) * metrics.unidades / computed.duracion;
-        }
-      }
-    });
-
-    promesas.push(totalPromesas);
-    cuotas.push(totalCuotas);
-    accesorios.push(months.length ? totalVentaAccesorios / months.length : 0);
-    escrituras.push(totalEscritura);
+    promesasAcum += ufPromesaMes;
+    escriturasAcum += ufEscrituraMes;
+    promesasUnidadesAcum += unidadesPromesaMes;
+    escriturasUnidadesAcum += unidadesEscrituraMes;
+    promesasUnidades.push(unidadesPromesaMes);
+    escrituracionUnidades.push(unidadesEscrituraMes);
+    promesasUf.push(ufPromesaMes);
+    escrituracionUf.push(ufEscrituraMes);
+    acumuladoPromesasUnidades.push(promesasUnidadesAcum);
+    acumuladoEscriturasUnidades.push(escriturasUnidadesAcum);
+    acumuladoPromesas.push(promesasAcum);
+    acumuladoEscrituras.push(escriturasAcum);
   });
 
   const rows = [
-    { label: 'Promesas', values: promesas },
-    { label: 'Cuotas pie', values: cuotas },
-    { label: 'Ventas estac. y bodegas', values: accesorios },
-    { label: 'Escrituraciones (saldo)', values: escrituras },
+    { label: 'Promesas unidades', values: promesasUnidades, kind: 'units' },
+    { label: 'Escrituracion unidades', values: escrituracionUnidades, kind: 'units' },
+    { label: 'Acum. promesas unidades', values: acumuladoPromesasUnidades, kind: 'units' },
+    { label: 'Acum. escrituras unidades', values: acumuladoEscriturasUnidades, kind: 'units' },
+    { label: 'Promesas UF', values: promesasUf, kind: 'income' },
+    { label: 'Escrituracion UF', values: escrituracionUf, kind: 'income' },
+    { label: 'Acum. promesas UF', values: acumuladoPromesas, kind: 'income' },
+    { label: 'Acum. escrituras UF', values: acumuladoEscrituras, kind: 'income' },
   ];
 
   setHtml('flujo-ventas-tbody', rows.map((row) => `
     <tr>
       <td>${row.label}</td>
-      ${row.values.map((value) => `<td>${fmtTableAmount(value, { kind: 'income' })}</td>`).join('')}
+      ${row.values.map((value) => `<td>${row.kind === 'units' ? fmtNumber(value, 1) : fmtTableAmount(value, { kind: 'income' })}</td>`).join('')}
     </tr>
   `).join(''));
 
-  const totals = months.map((_, index) => rows.reduce((sum, row) => sum + row.values[index], 0));
-  setHtml('flujo-ventas-tfoot', `<td>Total</td>${totals.map((value) => `<td>${fmtTableAmount(value, { kind: 'income', total: true })}</td>`).join('')}`);
+  const ingresos = months.map((_, index) => promesasUf[index] + escrituracionUf[index]);
+  setHtml('flujo-ventas-tfoot', `<td>Total ingresos UF</td>${ingresos.map((value) => `<td>${fmtTableAmount(value, { kind: 'income', total: true })}</td>`).join('')}`);
 }
 
 function renderCostStructure() {
@@ -3375,6 +3359,13 @@ function dropGanttRow(event) {
 
 function readVentasConfigEditor() {
   const map = new Map(state.ventasConfig.map((row) => [row.uso, { ...row }]));
+  const paymentInputs = document.querySelector('[data-ventas-payment-global]');
+  const globalPayment = {};
+  if (paymentInputs) {
+    paymentInputs.querySelectorAll('[data-field]').forEach((input) => {
+      globalPayment[input.dataset.field] = toNumber(input.value);
+    });
+  }
   const accessorySales = {
     precio_estacionamiento: toNumber($('ventas-precio-estacionamiento-global')?.value),
     precio_bodega: toNumber($('ventas-precio-bodega-global')?.value),
@@ -3388,25 +3379,19 @@ function readVentasConfigEditor() {
     });
     target.precio_estacionamiento = accessorySales.precio_estacionamiento;
     target.precio_bodega = accessorySales.precio_bodega;
+    if (Object.keys(globalPayment).length) {
+      target.pie_promesa_pct = globalPayment.pie_promesa_pct;
+      target.pie_cuotas_pct = globalPayment.pie_cuotas_pct;
+      target.pie_cuoton_pct = globalPayment.pie_cuoton_pct;
+    }
   });
   return Array.from(map.values());
 }
 
 function readVentasCronogramaEditor() {
-  // Solo leemos del DOM las filas de VENTA (editables). PREVENTA y ESCRITURACION son auto-calculadas.
-  const rows = Array.from(document.querySelectorAll('[data-ventas-cronograma-row]'))
-    .filter((row) => row.dataset.tipo === 'VENTA')
-    .map((row) => ({
-      id: row.dataset.id || '',
-      tipo: row.dataset.tipo,
-      uso: row.dataset.uso,
-      vinculo_gantt: row.querySelector('[data-field="vinculo_gantt"]')?.value || null,
-      mes_inicio: toNumber(row.querySelector('[data-field="mes_inicio"]')?.value),
-      duracion: toNumber(row.querySelector('[data-field="duracion"]')?.value),
-      porcentaje: toNumber(row.querySelector('[data-field="porcentaje"]')?.value),
-    }));
+  const rows = [];
 
-  // Preservar filas PREVENTA y ESCRITURACION del estado actual
+  // PREVENTA y ESCRITURACION se calculan desde la Carta Gantt y las velocidades.
   state.ventasCronograma
     .filter((row) => row.tipo === 'PREVENTA' || row.tipo === 'ESCRITURACION')
     .forEach((row) => rows.push({ ...row }));
@@ -3865,5 +3850,3 @@ document.addEventListener('DOMContentLoaded', async () => {
     setText('proj-dir', error.message);
   }
 });
-
-

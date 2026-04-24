@@ -654,29 +654,24 @@ tbody tr:hover{background:#f3f7fb!important}
     <button class="btn-primary" onclick="guardarVentas()"> Guardar</button>
 </div>
 
-  <!-- 1. Estrategia de Precios -->
+  <!-- 1. Precios -->
   <div class="card" style="margin-bottom:16px">
-    <div class="sec-title"> ESTRATEGIA DE PRECIOS E INGRESOS</div>
-    <div style="font-size:11px;color:#94a3b8;margin-bottom:12px">Define precios por tipo de producto desde la cabida: departamentos, locales comerciales, estacionamientos y bodegas.</div>
+    <div class="sec-title">Precios</div>
     <div class="tbl-scroll">
-      <table id="ventas-precios-table" style="min-width:1000px">
+      <table id="ventas-precios-table" style="min-width:880px">
         <thead><tr>
           <th style="text-align:left">TIPO</th>
-          <th colspan="3" style="background:#1e293b;color:#fff;text-align:center">CABIDA (LECTURA)</th>
-          <th colspan="2" style="background:#92400e;color:#fff;text-align:center">PRECIOS PRINCIPALES</th>
-          <th style="color:#22c55e">VENTA UNIDADES</th>
-          <th colspan="2" style="background:#1e40af;color:#fff;text-align:center">ACCESORIOS</th>
-          <th style="color:#f97316">TOTAL VENTA</th>
-          <th>TICKET</th>
+          <th>UNID.</th>
+          <th>SUP. M2</th>
+          <th>M2/UN</th>
+          <th style="color:#3b82f6">UF/M2</th>
+          <th>PRECIO BASE</th>
+          <th>VENTA</th>
+          <th>ACCESORIOS</th>
+          <th style="color:#f97316">TOTAL</th>
+          <th>PRECIO PROM.</th>
       </tr>
-        <tr>
-          <th></th><th>UNID.</th><th>SUP. M²</th><th>M²/UN</th>
-          <th style="color:#3b82f6">PRECIO / M²</th><th>PRECIO BASE</th>
-          <th style="color:#22c55e">SUBTOTAL</th>
-          <th>CANT.</th><th>PRECIO</th>
-          <th style="color:#f97316;font-weight:800">TOTAL</th>
-          <th>TICKET FINAL</th>
-      </tr></thead>
+        </thead>
         <tbody id="ventas-tbody"></tbody>
         <tfoot><tr class="tfoot-dark" id="ventas-tfoot"></tr></tfoot>
     </table>
@@ -685,11 +680,10 @@ tbody tr:hover{background:#f3f7fb!important}
 
   <!-- 2. Formas de Pago -->
   <div class="card" style="margin-bottom:16px">
-    <div class="sec-title"> FORMAS DE PAGO POR TIPO</div>
+    <div class="sec-title">Forma de Pago</div>
     <div class="tbl-scroll">
-      <table id="formas-pago-table" style="min-width:700px">
+      <table id="formas-pago-table" style="min-width:680px">
         <thead><tr>
-          <th style="text-align:left">TIPO</th>
           <th style="color:#3b82f6">PROMESA (%)</th>
           <th>MONTO PROMESA</th>
           <th style="color:#3b82f6">PIE EN CUOTAS (%)</th>
@@ -700,7 +694,7 @@ tbody tr:hover{background:#f3f7fb!important}
         <tbody id="formas-pago-tbody"></tbody>
     </table>
   </div>
-    <p style="font-size:10px;color:#94a3b8;margin-top:8px">ℹ La promesa y las cuotas forman el Pie aportado directamente por el cliente. El saldo restante se paga al momento de escrituración.</p>
+    <p style="font-size:10px;color:#94a3b8;margin-top:8px">La promesa y las cuotas aplican igual para todos los departamentos. El saldo restante se paga al momento de escrituración.</p>
 </div>
 
   <!-- 3. Fechas y Velocidades -->
@@ -744,28 +738,6 @@ tbody tr:hover{background:#f3f7fb!important}
           <th>VEL. (UN/MES)</th>
       </tr></thead>
         <tbody id="preventa-tbody"></tbody>
-    </table>
-  </div>
-
-    <!-- Cronograma de Ventas -->
-    <div style="margin-bottom:16px">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-        <div style="width:10px;height:10px;border-radius:50%;background:#22c55e"></div>
-        <span style="font-size:12px;font-weight:700;color:#475569">CRONOGRAMA DE VENTAS</span>
-    </div>
-      <table>
-        <thead><tr>
-          <th style="text-align:left">TIPO (VENTA)</th>
-          <th>VÍNCULO EN GANTT</th>
-          <th>INICIO</th>
-          <th>DURACIÓN</th>
-          <th style="color:#22c55e">FIN</th>
-          <th>%</th>
-          <th>UNID</th>
-          <th>VELOCIDAD (UN/MES)</th>
-          <th style="color:#22c55e">VEL. VENTAS</th>
-      </tr></thead>
-        <tbody id="venta-tbody"></tbody>
     </table>
   </div>
 
