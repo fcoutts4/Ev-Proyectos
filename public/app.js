@@ -805,14 +805,14 @@ function renderGanttEditor(rows = state.gantt) {
         <td class="gantt-sticky-left gantt-actions" style="left:0;width:40px">
           <span class="drag-handle" ${lock.drag ? '' : 'data-gantt-drag="1" draggable="true" ondragstart="startGanttDrag(event)" ondragend="endGanttDrag(event)"'} title="${escapeHtml(lock.hint || 'Orden manual')}">${lock.drag ? '&#8226;' : '&#8226;&#8226;&#8226;'}</span>
         </td>
-        <td class="gantt-sticky-left" style="left:40px;width:220px">
+        <td class="gantt-sticky-left" style="left:40px;width:180px">
           <div style="display:grid;grid-template-columns:18px 1fr;gap:8px;align-items:center">
             <input data-field="color" type="color" value="${escapeHtml(row.color || '#3b82f6')}" ${lock.name ? 'disabled' : ''} onchange="onGanttInputChange()"/>
             <input class="inp" data-field="nombre" value="${escapeHtml(row.nombre)}" ${lock.name ? 'disabled' : ''} onchange="onGanttInputChange()"/>
           </div>
         </td>
-        <td class="gantt-sticky-left" style="left:260px;width:150px">
-          <div style="display:grid;grid-template-columns:1fr 56px;gap:4px">
+        <td class="gantt-sticky-left" style="left:220px;width:130px">
+          <div style="display:grid;grid-template-columns:1fr 50px;gap:4px">
             <select class="inp" data-field="dependencia" ${lock.dependency ? 'disabled' : ''} onchange="onGanttInputChange()">
               ${getGanttDependencyOptions(row.nombre).replace(`value="${escapeHtml(row.dependencia || '')}"`, `value="${escapeHtml(row.dependencia || '')}" selected`)}
             </select>
@@ -822,9 +822,9 @@ function renderGanttEditor(rows = state.gantt) {
             </select>
           </div>
         </td>
-        <td class="gantt-sticky-left gantt-cell-tight" style="left:410px;width:62px"><input class="inp" data-field="desfase" type="number" value="${toNumber(row.desfase)}" onchange="onGanttInputChange()"/></td>
-        <td class="gantt-sticky-left gantt-cell-tight" style="left:472px;width:62px"><input class="inp" data-field="inicio" type="number" value="${toNumber(row.inicio)}" ${(row.dependencia || lock.start) ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
-        <td class="gantt-sticky-left gantt-cell-tight" style="left:534px;width:70px"><input class="inp" data-field="duracion" type="number" value="${toNumber(row.duracion)}" ${lock.duration ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
+        <td class="gantt-sticky-left gantt-cell-tight" style="left:350px;width:56px"><input class="inp" data-field="desfase" type="number" value="${toNumber(row.desfase)}" onchange="onGanttInputChange()"/></td>
+        <td class="gantt-sticky-left gantt-cell-tight" style="left:406px;width:56px"><input class="inp" data-field="inicio" type="number" value="${toNumber(row.inicio)}" ${(row.dependencia || lock.start) ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
+        <td class="gantt-sticky-left gantt-cell-tight" style="left:462px;width:62px"><input class="inp" data-field="duracion" type="number" value="${toNumber(row.duracion)}" ${lock.duration ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
         <td>
           <div class="gantt-editor-track" style="width:${meta.timelineWidth}px;--month-width:${GANTT_MONTH_WIDTH}px">
             <div class="gantt-editor-bar" title="Inicio ${fmtNumber(row.inicio)} · Fin ${fmtNumber(row.fin)}" style="left:${left}px;width:${width}px;background:${escapeHtml(row.color || '#3b82f6')}"></div>
@@ -1977,13 +1977,16 @@ function syncSalesDrivenMilestones() {
     return nextRow;
   };
 
+  const finEstudiosMilestone = rows.find((row) => /FIN\s*DE?\s*ESTUDIOS?/i.test(String(row.nombre || '').trim()));
+  const finEstudiosDependency = finEstudiosMilestone?.nombre || 'Fin de estudios';
+
   const promiseRow = ensureMilestone(/^Inicio promesas$/i, (baseRow) => ({
     id: baseRow.id || '',
     nombre: 'Inicio promesas',
     color: baseRow.color || '#2563eb',
-    dependencia: null,
+    dependencia: finEstudiosDependency,
     dependencia_tipo: 'fin',
-    desfase: toNumber(baseRow.desfase),
+    desfase: indexSafeNumber(baseRow.desfase, 0),
     inicio: toNumber(baseRow.inicio),
     duracion: promiseDuration,
     fin: toNumber(baseRow.inicio) + promiseDuration,
@@ -2044,11 +2047,11 @@ function indexSafeNumber(value, fallback) {
 
 function getGanttLockConfig(row) {
   const name = String(row?.nombre || '').trim();
-  if (/^Compra terreno$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: true, hint: 'Se define en Terreno.' };
-  if (/^Construcci[óo]n$/i.test(name)) return { fixed: true, name: true, dependency: true, start: false, duration: true, delete: true, drag: true, hint: 'Duración ligada a Construcción.' };
-  if (/^Inicio promesas$/i.test(name)) return { fixed: true, name: true, dependency: true, start: false, duration: true, delete: true, drag: true, hint: 'Duración ligada a velocidad de promesas en Ventas.' };
-  if (/^Recepci[óo]n municipal$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: true, hint: 'Se define manualmente en Carta Gantt.' };
-  if (/^Escrituraci[óo]n$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: true, hint: 'Inicio ligado a Recepción municipal y duración a Ventas.' };
+  if (/^Compra terreno$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: false, hint: 'Se define en Terreno.' };
+  if (/^Construcci[óo]n$/i.test(name)) return { fixed: true, name: true, dependency: true, start: false, duration: true, delete: true, drag: false, hint: 'Duración ligada a Construcción.' };
+  if (/^Inicio promesas$/i.test(name)) return { fixed: true, name: true, dependency: true, start: false, duration: true, delete: true, drag: false, hint: 'Depende de Fin de estudios y su duración se liga a velocidad de promesas en Ventas.' };
+  if (/^Recepci[óo]n municipal$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Se define manualmente en Carta Gantt.' };
+  if (/^Escrituraci[óo]n$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: false, hint: 'Inicio ligado a Recepción municipal y duración a Ventas.' };
   return { fixed: false, name: false, dependency: false, start: false, duration: false, delete: false, drag: false, hint: '' };
 }
 

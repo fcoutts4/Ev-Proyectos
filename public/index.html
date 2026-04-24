@@ -130,11 +130,12 @@ tbody tr:hover{background:#f8fafc}
 .gantt-quarter-mark span{position:absolute;top:5px;left:8px;font-size:10px;font-weight:700;color:#475569;white-space:nowrap}
 .gantt-quarter-mark strong{display:block;font-size:9px;color:#94a3b8;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
 .gantt-editor-track,.gantt-track{background-image:linear-gradient(90deg, rgba(148,163,184,.18) 1px, transparent 1px);background-size:var(--month-width,54px) 100%}
-.gantt-editor-track{height:24px;background-color:transparent;border:none}
-.gantt-editor-bar{top:3px;height:18px}
-.gantt-track{height:18px;background-color:transparent;border-radius:6px}
-.gantt-bar{top:1px;height:16px}
-.gantt-cell-tight .inp{padding:5px 6px;text-align:center}
+.gantt-editor-track{height:20px;background-color:transparent;border:none}
+.gantt-editor-bar{top:2px;height:14px}
+.gantt-track{height:16px;background-color:transparent;border-radius:6px}
+.gantt-bar{top:1px;height:12px}
+.gantt-cell-tight .inp{padding:4px 5px;text-align:center}
+.gantt-table .inp{padding:5px 8px;min-height:28px}
 .gantt-actions{display:flex;align-items:center;justify-content:center}
 .gantt-delete-btn{width:26px;height:26px;padding:0;justify-content:center;font-size:14px;line-height:1;color:#b91c1c}
 /* BADGES */
@@ -263,7 +264,8 @@ a,.btn-outline,.proj-header a{color:var(--blue)!important}
 thead th{background:var(--bg-soft)!important;color:var(--text-muted)!important;border-bottom:1px solid var(--border-strong)!important}
 tbody td{border-bottom:1px solid var(--border-soft)!important}
 tbody tr:hover{background:#f3f7fb!important}
-.cat-row td,.subcat-row td,.payment-section,.formula-preview,.gantt-editor-track,.dist-bar-wrap{background:var(--bg-soft)!important;border-color:var(--border-strong)!important}
+.cat-row td,.subcat-row td,.payment-section,.formula-preview,.dist-bar-wrap{background:var(--bg-soft)!important;border-color:var(--border-strong)!important}
+.gantt-editor-track,.gantt-track{background-color:transparent!important}
 .inp,select.inp,input.inp,textarea.inp{background:#fff!important;color:var(--text-main)!important;border:1px solid var(--border-strong)!important}
 .inp:focus{border-color:var(--blue)!important;box-shadow:0 0 0 2px rgba(29,78,216,.12)!important}
 .badge-green{background:var(--green-soft)!important}
@@ -852,11 +854,11 @@ tbody tr:hover{background:#f3f7fb!important}
       <thead>
         <tr>
           <th class="gantt-sticky-left gantt-sticky-head" style="left:0;width:40px"></th>
-          <th class="gantt-sticky-left gantt-sticky-head" style="left:40px;width:220px;text-align:left">HITO / PARTIDA</th>
-          <th class="gantt-sticky-left gantt-sticky-head" style="left:260px;width:150px">DEPENDENCIA</th>
-          <th class="gantt-sticky-left gantt-sticky-head" style="left:410px;width:62px">DESFASE</th>
-          <th class="gantt-sticky-left gantt-sticky-head" style="left:472px;width:62px">INICIO</th>
-          <th class="gantt-sticky-left gantt-sticky-head" style="left:534px;width:70px">DURACIÓN</th>
+          <th class="gantt-sticky-left gantt-sticky-head" style="left:40px;width:180px;text-align:left">HITO / PARTIDA</th>
+          <th class="gantt-sticky-left gantt-sticky-head" style="left:220px;width:130px">DEPENDENCIA</th>
+          <th class="gantt-sticky-left gantt-sticky-head" style="left:350px;width:56px">DESFASE</th>
+          <th class="gantt-sticky-left gantt-sticky-head" style="left:406px;width:56px">INICIO</th>
+          <th class="gantt-sticky-left gantt-sticky-head" style="left:462px;width:62px">DURACIÓN</th>
           <th class="gantt-timeline-head"><div id="gantt-timeline-head"></div></th>
           <th class="gantt-sticky-right gantt-sticky-head" style="width:42px">X</th>
       </tr>
