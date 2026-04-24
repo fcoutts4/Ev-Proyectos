@@ -159,11 +159,11 @@ tbody tr:hover{background:#f8fafc}
 .gantt-sticky-head{z-index:8;background:#f8fafc!important}
 .gantt-sticky-foot{z-index:7;background:#0f172a!important}
 .gantt-timeline-head{padding:0!important}
-.gantt-timeline-scale{position:relative;height:42px;background:#f8fafc}
-.gantt-timeline-scale.has-grid{background-image:linear-gradient(90deg, rgba(148,163,184,.2) 1px, transparent 1px);background-size:var(--month-width,54px) 100%}
+.gantt-timeline-scale{position:relative;height:34px;background:#f8fafc}
+.gantt-timeline-scale.has-grid{background-image:linear-gradient(90deg, rgba(148,163,184,.2) 1px, transparent 1px);background-size:var(--month-width,42px) 100%}
 .gantt-quarter-mark{position:absolute;top:0;bottom:0;border-left:1px solid #cbd5e1}
-.gantt-quarter-mark span{position:absolute;top:5px;left:8px;font-size:10px;font-weight:700;color:#475569;white-space:nowrap}
-.gantt-quarter-mark strong{display:block;font-size:9px;color:#94a3b8;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.gantt-quarter-mark span{position:absolute;top:5px;left:3px;width:38px;font-size:8px;font-weight:700;color:#475569;white-space:normal;line-height:1.05;text-align:center}
+.gantt-quarter-mark strong{display:none}
 .gantt-editor-track,.gantt-track{background-image:linear-gradient(90deg, rgba(148,163,184,.18) 1px, transparent 1px);background-size:var(--month-width,54px) 100%}
 .gantt-editor-track{height:20px;background-color:transparent;border:none}
 .gantt-editor-bar{top:2px;height:14px}
@@ -444,12 +444,12 @@ tbody tr:hover{background:#f3f7fb!important}
 </div>
 
   <!-- Cabida + Ventas resumen -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px;margin-bottom:20px">
 
     <!-- Cabida -->
     <div class="card">
       <div class="sec-title"> CABIDA Y SUPERFICIES</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px">
         <!-- Unidades -->
         <div>
           <p style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px">Unidades</p>
@@ -490,7 +490,7 @@ tbody tr:hover{background:#f3f7fb!important}
 
   <div class="card" style="margin-bottom:20px">
       <div class="sec-title"> REQUERIMIENTOS DE CAPITAL</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px">
         <div class="req-kpi">
           <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase">Req. Capital</div>
           <div style="font-size:1.4rem;font-weight:800;color:#0f172a" id="cap-req">149.967 UF</div>
@@ -507,7 +507,7 @@ tbody tr:hover{background:#f3f7fb!important}
           <div style="font-size:10px;color:#94a3b8">Utilidad Neta Real</div>
       </div>
     </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px">
         <div class="card-dark" style="border-radius:8px;padding:14px">
           <div style="font-size:10px;color:#f59e0b;font-weight:700;text-transform:uppercase;margin-bottom:4px">$ MOIC</div>
           <div style="font-size:2rem;font-weight:900;color:#fff" id="cap-moic">1.54x</div>
@@ -721,7 +721,7 @@ tbody tr:hover{background:#f3f7fb!important}
     <div class="tbl-scroll">
       <table id="formas-pago-table" style="min-width:680px">
         <thead><tr>
-          <th style="color:#3b82f6">PROMESA (%)</th>
+          <th style="color:#3b82f6">PIE (%)</th>
           <th>MONTO PROMESA</th>
           <th style="color:#3b82f6">PIE EN CUOTAS (%)</th>
           <th>MESES</th>
@@ -731,7 +731,7 @@ tbody tr:hover{background:#f3f7fb!important}
         <tbody id="formas-pago-tbody"></tbody>
     </table>
   </div>
-    <p style="font-size:10px;color:#94a3b8;margin-top:8px">La promesa y las cuotas aplican igual para todos los departamentos. El saldo restante se paga al momento de escrituración.</p>
+    <p style="font-size:10px;color:#94a3b8;margin-top:8px">El pie y las cuotas aplican igual para todos los departamentos. La promesa corresponde al saldo del pie no pagado en cuotas; el saldo restante se paga al momento de escrituración.</p>
 </div>
 
   <!-- 3. Fechas y Velocidades -->
@@ -850,8 +850,8 @@ tbody tr:hover{background:#f3f7fb!important}
         <div style="font-size:10px;color:#94a3b8;margin-top:2px">Ingresos distribuidos por período según cronograma de promesas y escrituración</div>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('flujo-ventas-scroll',-480)" style="font-size:11px">← Meses</button>
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('flujo-ventas-scroll', 480)" style="font-size:11px">Meses →</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('flujo-ventas-scroll',-480)" style="font-size:11px">← Fechas</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('flujo-ventas-scroll', 480)" style="font-size:11px">Fechas →</button>
       </div>
     </div>
     <div id="flujo-ventas-scroll" class="tbl-scroll" style="border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px">
@@ -880,8 +880,8 @@ tbody tr:hover{background:#f3f7fb!important}
   <div class="card">
     <div style="display:flex;justify-content:flex-end;align-items:center;margin-bottom:12px">
       <div class="planilla-nav">
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('gantt-editor-scroll', -480)">← Meses</button>
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('gantt-editor-scroll', 480)">Meses →</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('gantt-editor-scroll', -480)">← Fechas</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('gantt-editor-scroll', 480)">Fechas →</button>
       </div>
     </div>
     <div id="gantt-editor-scroll" class="tbl-scroll">
@@ -1145,7 +1145,7 @@ tbody tr:hover{background:#f3f7fb!important}
 </div>
 
   <!-- KPIs Flujo -->
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px">
+  <div class="flow-kpi-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:16px">
 
     <!-- Margen -->
     <div class="card-dark" style="border-radius:12px;padding:18px">
@@ -1214,12 +1214,12 @@ tbody tr:hover{background:#f3f7fb!important}
       <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;margin-bottom:8px">⏱ PAYBACK TIME</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div>
-          <div style="font-size:10px;color:#94a3b8">Mes Sin Fin.</div>
-          <div style="font-size:1.3rem;font-weight:900;color:#0f172a" id="flujo-payback-sin">Mes 42</div>
+          <div style="font-size:10px;color:#94a3b8">Sin Fin.</div>
+          <div style="font-size:1.3rem;font-weight:900;color:#0f172a" id="flujo-payback-sin">--</div>
       </div>
         <div>
-          <div style="font-size:10px;color:#94a3b8">Mes Con Fin.</div>
-          <div style="font-size:1.3rem;font-weight:900;color:#3b82f6" id="flujo-payback-con">Mes 43</div>
+          <div style="font-size:10px;color:#94a3b8">Con Fin.</div>
+          <div style="font-size:1.3rem;font-weight:900;color:#3b82f6" id="flujo-payback-con">--</div>
       </div>
     </div>
   </div>
@@ -1236,7 +1236,7 @@ tbody tr:hover{background:#f3f7fb!important}
 </div>
 
   <!-- Gráficos -->
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:16px">
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <div class="sec-title" style="margin-bottom:0">COSTOS VS INGRESOS</div>

@@ -700,7 +700,7 @@ function getGanttDependencyOptions(currentName) {
     .join('');
 }
 
-const GANTT_MONTH_WIDTH = 54;
+const GANTT_MONTH_WIDTH = 42;
 
 function addMonths(date, months) {
   const result = new Date(date.getTime());
@@ -722,29 +722,33 @@ function formatTimelineQuarterLabel(date) {
   return new Intl.DateTimeFormat('es-CL', { month: 'short', year: '2-digit' }).format(date);
 }
 
+function formatTimelineMonthLabel(month) {
+  return formatTimelineQuarterLabel(addMonths(getGanttBaseDate(), Math.max(0, toNumber(month))));
+}
+
 function getGanttTimelineMeta(rows = state.gantt) {
   const normalized = normalizeGanttRows(rows);
   const totalMonths = Math.max(12, ...normalized.map((row) => toNumber(row.fin)));
   const timelineWidth = (totalMonths + 1) * GANTT_MONTH_WIDTH;
   const baseDate = getGanttBaseDate();
-  const quarterMarks = [];
-  for (let month = 0; month <= totalMonths; month += 3) {
-    quarterMarks.push({
+  const monthMarks = [];
+  for (let month = 0; month <= totalMonths; month += 1) {
+    monthMarks.push({
       month,
       left: month * GANTT_MONTH_WIDTH,
       label: formatTimelineQuarterLabel(addMonths(baseDate, month)),
     });
   }
-  return { totalMonths, timelineWidth, quarterMarks };
+  return { totalMonths, timelineWidth, monthMarks };
 }
 
 function renderGanttTimelineScale(containerId, meta) {
   if (!$(containerId)) return;
   setHtml(containerId, `
     <div class="gantt-timeline-scale has-grid" style="width:${meta.timelineWidth}px;--month-width:${GANTT_MONTH_WIDTH}px">
-      ${meta.quarterMarks.map((mark) => `
+      ${meta.monthMarks.map((mark) => `
         <div class="gantt-quarter-mark" style="left:${mark.left}px">
-          <span><strong>M${fmtNumber(mark.month)}</strong>${escapeHtml(mark.label)}</span>
+          <span title="Mes ${fmtNumber(mark.month)}">${escapeHtml(mark.label)}</span>
         </div>
       `).join('')}
     </div>
@@ -846,9 +850,9 @@ function renderGanttPreview() {
   const meta = getGanttTimelineMeta(normalized);
   setHtml('gantt-preview', `
     <div class="gantt-timeline-scale has-grid" style="width:${meta.timelineWidth}px;--month-width:${GANTT_MONTH_WIDTH}px;margin-bottom:8px">
-      ${meta.quarterMarks.map((mark) => `
+      ${meta.monthMarks.map((mark) => `
         <div class="gantt-quarter-mark" style="left:${mark.left}px">
-          <span><strong>M${fmtNumber(mark.month)}</strong>${escapeHtml(mark.label)}</span>
+          <span title="Mes ${fmtNumber(mark.month)}">${escapeHtml(mark.label)}</span>
         </div>
       `).join('')}
     </div>
@@ -1168,8 +1172,11 @@ function renderVentasPricing() {
 function renderVentasPaymentForms() {
   const settings = getGlobalPaymentSettings();
   const totals = getTotalSalesMetrics();
-  const montoPromesa = totals.precioPromedio * settings.pie_promesa_pct / 100;
-  const montoCuotas = totals.precioPromedio * settings.pie_cuotas_pct / 100;
+  const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct));
+  const cuotasSobrePiePct = Math.min(100, Math.max(0, settings.pie_cuotas_pct));
+  const pieUnidad = totals.precioPromedio * piePct / 100;
+  const montoPromesa = pieUnidad * Math.max(0, 100 - cuotasSobrePiePct) / 100;
+  const montoCuotas = pieUnidad * cuotasSobrePiePct / 100;
   const mesesLabel = settings.pie_cuoton_pct <= 1
     ? '<span style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;border-radius:99px;padding:2px 8px;font-size:10px;font-weight:700">Sin cuotas</span>'
     : `<strong>${fmtNumber(settings.pie_cuoton_pct)}</strong> meses`;
@@ -1259,7 +1266,7 @@ function drawSpeedometer(value, maxValue) {
   ctx.stroke();
 }
 
-function renderVentasSummaryCards() {
+function renderVentasSummaryCardsLegacy() {
   const totalVenta = state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).total, 0);
   const preRows = getCronogramaByType('PREVENTA');
   const escrRow = getCronogramaByType('ESCRITURACION')[0];
@@ -1290,26 +1297,41 @@ function renderVentasSummaryCards() {
   setText('vel-global-uf', fmtNumber(velUf));
   setText('vel-global-un', `${fmtNumber(velUn, 1)} un/m`);
   setText('vel-duracion', `${fmtNumber(duration)} meses`);
-  setText('vel-analisis', `Analisis desde Mes ${fmtNumber(analysisStart)} al ${fmtNumber(analysisEnd)}`);
+  setText('vel-analisis', `Analisis desde ${formatTimelineMonthLabel(analysisStart)} a ${formatTimelineMonthLabel(analysisEnd)}`);
   setText('vel-entregas', fmtNumber(velEntregas, 1));
-  setText('escrit-inicio', `Mes ${fmtNumber(escrituraInicio)}`);
-  setText('escrit-fin', `Mes ${fmtNumber(escrituraFin)}`);
+  setText('escrit-inicio', formatTimelineMonthLabel(escrituraInicio));
+  setText('escrit-fin', formatTimelineMonthLabel(escrituraFin));
   setText('escrit-dur', `Duracion: ${fmtNumber(escrituraDuracion)} meses`);
 
   setHtml('mix-ventas-list', `
     <div class="etapa-card" style="border-color:#3b82f6"><div style="font-weight:800">Preventa</div><div style="font-size:12px;color:#64748b">${fmtPct(preventaPct)} del stock · ${fmtUf(totalVenta * preventaPct / 100)}</div></div>
     <div class="etapa-card" style="border-color:#22c55e"><div style="font-weight:800">Venta</div><div style="font-size:12px;color:#64748b">${fmtPct(ventaPct)} del stock · ${fmtUf(totalVenta * ventaPct / 100)}</div></div>
-    <div class="etapa-card" style="border-color:#f97316"><div style="font-weight:800">Escrituracion</div><div style="font-size:12px;color:#64748b">Desde Mes ${fmtNumber(escrituraInicio)} hasta ${fmtNumber(escrituraFin)}</div></div>
+    <div class="etapa-card" style="border-color:#f97316"><div style="font-weight:800">Escrituracion</div><div style="font-size:12px;color:#64748b">Desde ${escapeHtml(formatTimelineMonthLabel(escrituraInicio))} hasta ${escapeHtml(formatTimelineMonthLabel(escrituraFin))}</div></div>
   `);
 }
 
-function buildTimelineMonths() {
+function buildTimelineMonths(extraEnd = 0) {
   const ranges = state.ventasCronograma
     .filter((row) => isVentasCronogramaType(row, 'PREVENTA') || isVentasCronogramaType(row, 'ESCRITURACION'))
     .map((row) => getCronogramaComputed(row));
+  if (!ranges.length) return [0];
   const start = Math.max(1, Math.min(...ranges.map((row) => row.inicio), 1));
-  const end = Math.max(start, ...ranges.map((row) => Math.max(row.inicio, row.fin - 1)));
+  const end = Math.max(start, toNumber(extraEnd), ...ranges.map((row) => Math.max(row.inicio, row.fin - 1)));
   return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+}
+
+function formatVentasCashflowMonth(month) {
+  return formatTimelineMonthLabel(month);
+}
+
+function getScheduledWholeUnits(totalUnits, computed, month) {
+  if (!computed || month < computed.inicio || month >= computed.fin) return 0;
+  const units = Math.max(0, Math.round(toNumber(totalUnits)));
+  const duration = Math.max(1, Math.round(toNumber(computed.duracion)));
+  const elapsed = Math.max(0, month - computed.inicio);
+  const base = Math.floor(units / duration);
+  const remainder = units % duration;
+  return base + (elapsed < remainder ? 1 : 0);
 }
 
 function renderVentasSummaryCards() {
@@ -1344,20 +1366,20 @@ function renderVentasSummaryCards() {
   setText('vel-global-uf', fmtNumber(velUf));
   setText('vel-global-un', `${fmtNumber(velUn, 1)} un/m`);
   setText('vel-duracion', `${fmtNumber(duration)} meses`);
-  setText('vel-analisis', `Analisis desde Mes ${fmtNumber(analysisStart)} al ${fmtNumber(analysisEnd)}`);
+  setText('vel-analisis', `Analisis desde ${formatTimelineMonthLabel(analysisStart)} a ${formatTimelineMonthLabel(analysisEnd)}`);
   setText('vel-entregas', fmtNumber(velEntregas, 1));
-  setText('escrit-inicio', `Mes ${fmtNumber(escrituraInicio)}`);
-  setText('escrit-fin', `Mes ${fmtNumber(escrituraFin)}`);
+  setText('escrit-inicio', formatTimelineMonthLabel(escrituraInicio));
+  setText('escrit-fin', formatTimelineMonthLabel(escrituraFin));
   setText('escrit-dur', `Duracion: ${fmtNumber(escrituraDuracion)} meses`);
 
   setHtml('mix-ventas-list', `
     <div class="etapa-card" style="border-color:#3b82f6"><div style="font-weight:800">Promesas departamentos</div><div style="font-size:12px;color:#64748b">${fmtPct(promesasPct)} del stock deptos · ${fmtUf(totalVentaDeptos)}</div></div>
     <div class="etapa-card" style="border-color:#8b5cf6"><div style="font-weight:800">Estac. y bodegas</div><div style="font-size:12px;color:#64748b">${fmtNumber(addons.estacionamientos.unidades)} estac. + ${fmtNumber(addons.bodegas.unidades)} bod. · ${fmtUf(totalVentaAccesorios)}</div></div>
-    <div class="etapa-card" style="border-color:#f97316"><div style="font-weight:800">Escrituracion</div><div style="font-size:12px;color:#64748b">Desde Mes ${fmtNumber(escrituraInicio)} hasta ${fmtNumber(escrituraFin)}</div></div>
+    <div class="etapa-card" style="border-color:#f97316"><div style="font-weight:800">Escrituracion</div><div style="font-size:12px;color:#64748b">Desde ${escapeHtml(formatTimelineMonthLabel(escrituraInicio))} hasta ${escapeHtml(formatTimelineMonthLabel(escrituraFin))}</div></div>
   `);
 }
 
-function renderVentasCashflow() {
+function renderVentasCashflowLegacy() {
   const months = buildTimelineMonths();
   setHtml('flujo-ventas-header', `<th>Concepto</th>${months.map((month) => `<th>M${fmtNumber(month)}</th>`).join('')}`);
 
@@ -1422,46 +1444,60 @@ function renderVentasCashflow() {
 }
 
 function renderVentasCashflow() {
-  const months = buildTimelineMonths();
-  setHtml('flujo-ventas-header', `<th>Concepto</th>${months.map((month) => `<th>M${fmtNumber(month)}</th>`).join('')}`);
-
   const totals = getTotalSalesMetrics();
   const settings = getGlobalPaymentSettings();
-  const promesaPct = Math.min(100, Math.max(0, settings.pie_promesa_pct + settings.pie_cuotas_pct));
-  const escrituraPct = Math.max(0, 100 - promesaPct);
-  const promesasUnidades = [];
-  const escrituracionUnidades = [];
-  const promesasUf = [];
-  const escrituracionUf = [];
-  const acumuladoPromesasUnidades = [];
-  const acumuladoEscriturasUnidades = [];
-  const acumuladoPromesas = [];
-  const acumuladoEscrituras = [];
+  const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct));
+  const cuotasSobrePiePct = Math.min(100, Math.max(0, settings.pie_cuotas_pct));
+  const promesaSobrePiePct = Math.max(0, 100 - cuotasSobrePiePct);
+  const escrituraPct = Math.max(0, 100 - piePct);
+  const cuotaMonths = Math.max(1, Math.round(toNumber(settings.pie_cuoton_pct) || 1));
   const promesaRow = getCronogramaByType('PREVENTA')[0];
   const escrituraRow = getCronogramaByType('ESCRITURACION')[0];
   const promesaComputed = promesaRow ? getCronogramaComputed(promesaRow) : null;
   const escrituraComputed = escrituraRow ? getCronogramaComputed(escrituraRow) : null;
+  const cuotaEndMonth = promesaComputed ? promesaComputed.fin + cuotaMonths - 2 : 0;
+  const months = buildTimelineMonths(cuotaEndMonth);
+  const monthIndex = new Map(months.map((month, index) => [month, index]));
+  setHtml('flujo-ventas-header', `<th>Concepto</th>${months.map((month) => `<th>${escapeHtml(formatVentasCashflowMonth(month))}</th>`).join('')}`);
+
+  const pieUnidad = totals.precioPromedio * piePct / 100;
+  const montoPromesaUnidad = pieUnidad * promesaSobrePiePct / 100;
+  const montoCuotasUnidad = pieUnidad * cuotasSobrePiePct / 100;
+  const montoEscrituraUnidad = totals.precioPromedio * escrituraPct / 100;
+  const promesasUnidades = months.map(() => 0);
+  const escrituracionUnidades = months.map(() => 0);
+  const promesasUf = months.map(() => 0);
+  const cuotasUf = months.map(() => 0);
+  const escrituracionUf = months.map(() => 0);
+  const acumuladoPromesasUnidades = [];
+  const acumuladoEscriturasUnidades = [];
+  const acumuladoPromesas = [];
+  const acumuladoEscrituras = [];
   let promesasAcum = 0;
   let escriturasAcum = 0;
   let promesasUnidadesAcum = 0;
   let escriturasUnidadesAcum = 0;
 
-  months.forEach((month) => {
-    const promesaActiva = promesaComputed && month >= promesaComputed.inicio && month < promesaComputed.fin;
-    const escrituraActiva = escrituraComputed && month >= escrituraComputed.inicio && month < escrituraComputed.fin;
-    const unidadesPromesaMes = promesaActiva ? totals.totalUnidades / promesaComputed.duracion : 0;
-    const unidadesEscrituraMes = escrituraActiva ? totals.totalUnidades / escrituraComputed.duracion : 0;
-    const ufPromesaMes = promesaActiva ? (totals.total * promesaPct / 100) / promesaComputed.duracion : 0;
-    const ufEscrituraMes = escrituraActiva ? (totals.total * escrituraPct / 100) / escrituraComputed.duracion : 0;
+  months.forEach((month, index) => {
+    const unidadesPromesaMes = getScheduledWholeUnits(totals.totalUnidades, promesaComputed, month);
+    const unidadesEscrituraMes = getScheduledWholeUnits(totals.totalUnidades, escrituraComputed, month);
+    const ufPromesaMes = unidadesPromesaMes * montoPromesaUnidad;
+    const ufEscrituraMes = unidadesEscrituraMes * montoEscrituraUnidad;
+    const cuotaMensual = cuotaMonths ? (unidadesPromesaMes * montoCuotasUnidad) / cuotaMonths : 0;
+
+    for (let offset = 0; offset < cuotaMonths; offset += 1) {
+      const targetIndex = monthIndex.get(month + offset);
+      if (targetIndex !== undefined) cuotasUf[targetIndex] += cuotaMensual;
+    }
 
     promesasAcum += ufPromesaMes;
     escriturasAcum += ufEscrituraMes;
     promesasUnidadesAcum += unidadesPromesaMes;
     escriturasUnidadesAcum += unidadesEscrituraMes;
-    promesasUnidades.push(unidadesPromesaMes);
-    escrituracionUnidades.push(unidadesEscrituraMes);
-    promesasUf.push(ufPromesaMes);
-    escrituracionUf.push(ufEscrituraMes);
+    promesasUnidades[index] = unidadesPromesaMes;
+    escrituracionUnidades[index] = unidadesEscrituraMes;
+    promesasUf[index] = ufPromesaMes;
+    escrituracionUf[index] = ufEscrituraMes;
     acumuladoPromesasUnidades.push(promesasUnidadesAcum);
     acumuladoEscriturasUnidades.push(escriturasUnidadesAcum);
     acumuladoPromesas.push(promesasAcum);
@@ -1474,6 +1510,7 @@ function renderVentasCashflow() {
     { label: 'Acum. promesas unidades', values: acumuladoPromesasUnidades, kind: 'units' },
     { label: 'Acum. escrituras unidades', values: acumuladoEscriturasUnidades, kind: 'units' },
     { label: 'Promesas UF', values: promesasUf, kind: 'income' },
+    { label: 'Cuotas UF', values: cuotasUf, kind: 'income' },
     { label: 'Escrituracion UF', values: escrituracionUf, kind: 'income' },
     { label: 'Acum. promesas UF', values: acumuladoPromesas, kind: 'income' },
     { label: 'Acum. escrituras UF', values: acumuladoEscrituras, kind: 'income' },
@@ -1482,11 +1519,11 @@ function renderVentasCashflow() {
   setHtml('flujo-ventas-tbody', rows.map((row) => `
     <tr>
       <td>${row.label}</td>
-      ${row.values.map((value) => `<td>${row.kind === 'units' ? fmtNumber(value, 1) : fmtTableAmount(value, { kind: 'income' })}</td>`).join('')}
+      ${row.values.map((value) => `<td>${row.kind === 'units' ? fmtNumber(value) : fmtTableAmount(value, { kind: 'income' })}</td>`).join('')}
     </tr>
   `).join(''));
 
-  const ingresos = months.map((_, index) => promesasUf[index] + escrituracionUf[index]);
+  const ingresos = months.map((_, index) => promesasUf[index] + cuotasUf[index] + escrituracionUf[index]);
   setHtml('flujo-ventas-tfoot', `<td>Total ingresos UF</td>${ingresos.map((value) => `<td>${fmtTableAmount(value, { kind: 'income', total: true })}</td>`).join('')}`);
 }
 
@@ -1944,12 +1981,12 @@ function syncTerrainPurchaseMilestone() {
     id: baseRow.id || '',
     nombre: purchaseBlockName,
     color: baseRow.color || '#6366f1',
-    dependencia: null,
+    dependencia: baseRow.dependencia || null,
     dependencia_tipo: baseRow.dependencia_tipo || 'fin',
-    desfase: 0,
-    inicio: 0,
-    duracion: 1,
-    fin: 1,
+    desfase: toNumber(baseRow.desfase),
+    inicio: indexSafeNumber(baseRow.inicio, 0),
+    duracion: Math.max(1, toNumber(baseRow.duracion || 1)),
+    fin: indexSafeNumber(baseRow.inicio, 0) + Math.max(1, toNumber(baseRow.duracion || 1)),
   };
 
   if (index >= 0) currentRows[index] = milestone;
@@ -1987,16 +2024,20 @@ function syncSalesDrivenMilestones() {
     return nextRow;
   };
 
-  const finEstudiosMilestone = rows.find((row) => /FIN\s*DE?\s*ESTUDIOS?/i.test(String(row.nombre || '').trim()));
-  const finEstudiosDependency = finEstudiosMilestone?.nombre || 'Fin de estudios';
+  const terrainMilestone = rows.find((row) => /^Compra terreno$/i.test(String(row.nombre || '').trim()))
+    || getTerrainMilestone()
+    || rows.find((row) => /ADQUISICION DE TERRENO|COMPRA DE TERRENO|TERRENO/i.test(String(row.nombre || '').trim()));
+  const promiseDependency = terrainMilestone?.nombre || 'Compra terreno';
 
   const promiseRow = ensureMilestone(/^Inicio promesas$/i, (baseRow) => ({
     id: baseRow.id || '',
     nombre: 'Inicio promesas',
     color: baseRow.color || '#2563eb',
-    dependencia: finEstudiosDependency,
-    dependencia_tipo: 'fin',
-    desfase: 0,
+    dependencia: (!baseRow.dependencia || /FIN\s*DE?\s*ESTUDIOS?/i.test(String(baseRow.dependencia || '').trim()))
+      ? promiseDependency
+      : baseRow.dependencia,
+    dependencia_tipo: baseRow.dependencia_tipo || 'fin',
+    desfase: toNumber(baseRow.desfase),
     inicio: toNumber(baseRow.inicio),
     duracion: promiseDuration,
     fin: toNumber(baseRow.inicio) + promiseDuration,
@@ -2020,9 +2061,9 @@ function syncSalesDrivenMilestones() {
     id: baseRow.id || '',
     nombre: 'Escrituración',
     color: baseRow.color || '#f97316',
-    dependencia: 'Recepción municipal',
-    dependencia_tipo: 'fin',
-    desfase: 0,
+    dependencia: baseRow.dependencia || 'Recepción municipal',
+    dependencia_tipo: baseRow.dependencia_tipo || 'fin',
+    desfase: toNumber(baseRow.desfase),
     inicio: toNumber(baseRow.inicio),
     duracion: escrituraDuration,
     fin: 0,
@@ -2057,11 +2098,11 @@ function indexSafeNumber(value, fallback) {
 
 function getGanttLockConfig(row) {
   const name = String(row?.nombre || '').trim();
-  if (/^Compra terreno$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: false, hint: 'Se define en Terreno.' };
-  if (/^Construcci[óo]n$/i.test(name)) return { fixed: true, name: true, dependency: true, start: false, duration: true, delete: true, drag: false, hint: 'Duración ligada a Construcción.' };
-  if (/^Inicio promesas$/i.test(name)) return { fixed: true, name: true, dependency: true, start: false, duration: true, delete: true, drag: false, hint: 'Depende de Fin de estudios y su duración se liga a velocidad de promesas en Ventas.' };
-  if (/^Recepci[óo]n municipal$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Se define manualmente en Carta Gantt.' };
-  if (/^Escrituraci[óo]n$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: false, hint: 'Inicio ligado a Recepción municipal y duración a Ventas.' };
+  if (/^Compra terreno$/i.test(name)) return { fixed: true, name: false, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Referencia base editable en Carta Gantt.' };
+  if (/^Construcci[óo]n$/i.test(name)) return { fixed: true, name: false, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Duracion ligada a Construccion; referencia editable.' };
+  if (/^Inicio promesas$/i.test(name)) return { fixed: true, name: false, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Parte por defecto al terminar Compra terreno; duracion ligada a velocidad de promesas.' };
+  if (/^Recepci[óo]n municipal$/i.test(name)) return { fixed: true, name: false, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Referencia editable en Carta Gantt.' };
+  if (/^Escrituraci[óo]n$/i.test(name)) return { fixed: true, name: false, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Inicio por defecto ligado a Recepcion municipal; duracion ligada a Ventas.' };
   return { fixed: false, name: false, dependency: false, start: false, duration: false, delete: false, drag: false, hint: '' };
 }
 
@@ -2649,6 +2690,117 @@ function renderCostosModule() {
   renderCostStructure();
 }
 
+function getProjectMonthlyCosts(includeFinancial = true) {
+  const monthCount = getCostMonthCount();
+  const monthly = createMonthlyArray(monthCount, 0);
+  const context = buildCostContext();
+  ensureCostosState().forEach((category) => {
+    if (!includeFinancial && category.nombre === 'GASTOS FINANCIEROS') return;
+    (category.partidas || []).forEach((partida) => {
+      if (category.nombre === 'GASTOS FINANCIEROS' && /Linea aprobada|Pago de linea/i.test(partida.nombre || '')) return;
+      const total = evaluateCostPartida(partida, context);
+      const distribution = normalizeDistribution(partida.distribucion_mensual, total, partida.plan_pago);
+      distribution.forEach((value, index) => {
+        if (index < monthly.length) monthly[index] += toNumber(value);
+      });
+    });
+  });
+  return monthly;
+}
+
+function getProjectMonthlyIncome(monthCount) {
+  const income = createMonthlyArray(monthCount, 0);
+  const totals = getTotalSalesMetrics();
+  const settings = getGlobalPaymentSettings();
+  const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct));
+  const cuotasSobrePiePct = Math.min(100, Math.max(0, settings.pie_cuotas_pct));
+  const promesaSobrePiePct = Math.max(0, 100 - cuotasSobrePiePct);
+  const escrituraPct = Math.max(0, 100 - piePct);
+  const cuotaMonths = Math.max(1, Math.round(toNumber(settings.pie_cuoton_pct) || 1));
+  const promesaComputed = getCronogramaByType('PREVENTA')[0] ? getCronogramaComputed(getCronogramaByType('PREVENTA')[0]) : null;
+  const escrituraComputed = getCronogramaByType('ESCRITURACION')[0] ? getCronogramaComputed(getCronogramaByType('ESCRITURACION')[0]) : null;
+  const pieUnidad = totals.precioPromedio * piePct / 100;
+  const promesaUnidad = pieUnidad * promesaSobrePiePct / 100;
+  const cuotasUnidad = pieUnidad * cuotasSobrePiePct / 100;
+  const escrituraUnidad = totals.precioPromedio * escrituraPct / 100;
+
+  Array.from({ length: monthCount }, (_, month) => {
+    const unidadesPromesa = getScheduledWholeUnits(totals.totalUnidades, promesaComputed, month);
+    const unidadesEscritura = getScheduledWholeUnits(totals.totalUnidades, escrituraComputed, month);
+    income[month] += unidadesPromesa * promesaUnidad;
+    income[month] += unidadesEscritura * escrituraUnidad;
+    const cuotaMensual = cuotaMonths ? (unidadesPromesa * cuotasUnidad) / cuotaMonths : 0;
+    for (let offset = 0; offset < cuotaMonths; offset += 1) {
+      if (month + offset < income.length) income[month + offset] += cuotaMensual;
+    }
+  });
+  return income;
+}
+
+function cumulativeSeries(values) {
+  return values.reduce((acc, value, index) => {
+    acc.push((acc[index - 1] || 0) + toNumber(value));
+    return acc;
+  }, []);
+}
+
+function renderProjectCashflow() {
+  if (!$('flujo-tabla')) return;
+  const monthCount = getCostMonthCount();
+  const labels = getCostMonthLabels();
+  const income = getProjectMonthlyIncome(monthCount);
+  const costs = getProjectMonthlyCosts(false);
+  const financialCosts = getProjectMonthlyCosts(true).map((value, index) => Math.max(0, value - costs[index]));
+  const net = income.map((value, index) => value - costs[index] - financialCosts[index]);
+  const cumulative = cumulativeSeries(net);
+  const totalIncome = income.reduce((sum, value) => sum + value, 0);
+  const totalCosts = costs.reduce((sum, value) => sum + value, 0);
+  const totalFinancial = financialCosts.reduce((sum, value) => sum + value, 0);
+  const margin = totalIncome - totalCosts - totalFinancial;
+  const capitalNeed = Math.abs(Math.min(0, ...cumulative));
+  const payback = cumulative.findIndex((value) => value >= 0);
+  const roe = capitalNeed ? margin / capitalNeed * 100 : 0;
+
+  setText('flujo-margen-sin', fmtUf(totalIncome - totalCosts));
+  setText('flujo-margen-sin-pct', `${fmtPct(totalIncome ? (totalIncome - totalCosts) / totalIncome * 100 : 0)} s/ventas`);
+  setText('flujo-margen-con', fmtUf(margin));
+  setText('flujo-margen-con-pct', `${fmtPct(totalIncome ? margin / totalIncome * 100 : 0)} s/ventas`);
+  setText('flujo-k-sin', fmtUf(Math.abs(Math.min(0, ...cumulativeSeries(income.map((value, index) => value - costs[index]))))));
+  setText('flujo-k-con', fmtUf(capitalNeed));
+  setText('flujo-roe-sin', fmtPct(totalCosts ? (totalIncome - totalCosts) / totalCosts * 100 : 0));
+  setText('flujo-roe-con', fmtPct(roe));
+  setText('flujo-tir-sin', fmtPct(roe));
+  setText('flujo-tir-con', fmtPct(roe));
+  setText('flujo-payback-sin', payback >= 0 ? formatTimelineMonthLabel(payback) : 'Sin recupero');
+  setText('flujo-payback-con', payback >= 0 ? formatTimelineMonthLabel(payback) : 'Sin recupero');
+  setText('flujo-leverage', `${fmtNumber(capitalNeed && totalIncome ? capitalNeed / totalIncome : 0, 2)}x`);
+
+  setHtml('estructura-proyecto-list', [
+    ['Ventas', totalIncome, '#16a34a'],
+    ['Costos base', totalCosts, '#ef4444'],
+    ['Gastos financieros', totalFinancial, '#f59e0b'],
+    ['Margen neto', margin, '#2563eb'],
+  ].map(([label, value, color]) => {
+    const pct = totalIncome ? toNumber(value) / totalIncome * 100 : 0;
+    return `<div class="dist-row"><div class="dist-label">${escapeHtml(label)}</div><div class="dist-bar-wrap"><div class="dist-bar" style="width:${Math.max(2, Math.min(100, Math.abs(pct)))}%;background:${color}"></div></div><div class="dist-pct">${fmtPct(pct)}</div></div>`;
+  }).join(''));
+
+  setHtml('flujo-tabla-header', `<tr><th style="text-align:left">Concepto</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}</tr>`);
+  const rows = [
+    ['Ingresos ventas', income],
+    ['Egresos base', costs.map((value) => -value)],
+    ['Gastos financieros', financialCosts.map((value) => -value)],
+    ['Flujo neto', net],
+    ['Flujo acumulado', cumulative],
+  ];
+  setHtml('flujo-tabla-tbody', rows.map(([label, values]) => `
+    <tr>
+      <td style="text-align:left;font-weight:800">${escapeHtml(label)}</td>
+      ${values.map((value) => `<td style="text-align:center;color:${toNumber(value) < 0 ? '#ef4444' : '#0f172a'}">${fmtTableAmount(value, { kind: 'income' })}</td>`).join('')}
+    </tr>
+  `).join(''));
+}
+
 function getCostFormulaCatalog() {
   const context = buildCostContext();
   const mesesPreventa = Math.max(0, ...getCronogramaByType('PREVENTA').map((row) => toNumber(row.duracion)));
@@ -3219,6 +3371,7 @@ function renderAll() {
   renderVentasModule();
   renderConstruccion();
   renderCostosModule();
+  renderProjectCashflow();
   renderKpis();
 }
 
@@ -3303,6 +3456,7 @@ function onCabidaInputChange() {
   ensureVentasState();
   renderVentasModule();
   renderCostosModule();
+  renderProjectCashflow();
   scheduleAutosave('cabida');
 }
 
@@ -3313,6 +3467,7 @@ function onTerrenoInputChange() {
   renderGanttEditor(state.gantt);
   renderTerrainModule();
   renderCostosModule();
+  renderProjectCashflow();
   renderKpis();
   scheduleAutosave('terreno');
 }
@@ -3338,6 +3493,7 @@ function updateConstrParams() {
   renderGanttEditor(state.gantt);
   renderConstruccion();
   renderCostosModule();
+  renderProjectCashflow();
   renderKpis();
   scheduleAutosave('construccion');
   scheduleAutosave('gantt');
@@ -3356,6 +3512,7 @@ function onGanttInputChange() {
   renderVentasSummaryCards();
   renderVentasCashflow();
   renderCostosModule();
+  renderProjectCashflow();
   scheduleAutosave('gantt');
 }
 
@@ -3510,6 +3667,7 @@ function onVentasInputChange() {
   renderGanttEditor(state.gantt);
   renderVentasModule();
   renderCostosModule();
+  renderProjectCashflow();
   scheduleAutosave('ventas');
   scheduleAutosave('gantt');
 }
@@ -3522,6 +3680,7 @@ function onVentasVelocityChange() {
   renderVentasSummaryCards();
   renderVentasCashflow();
   renderCostosModule();
+  renderProjectCashflow();
   scheduleAutosave('ventas');
   scheduleAutosave('gantt');
 }
