@@ -122,6 +122,7 @@ async function initDb() {
         vinculo_gantt TEXT,
         mes_inicio INTEGER DEFAULT 0,
         duracion INTEGER DEFAULT 0,
+        velocidad DOUBLE PRECISION DEFAULT 0,
         porcentaje DOUBLE PRECISION DEFAULT 0
       );
 
@@ -216,6 +217,7 @@ async function initDb() {
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS bodegas_sup_terrazas DOUBLE PRECISION DEFAULT 0');
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS updated_by TEXT');
     await query("ALTER TABLE gantt_hitos ADD COLUMN IF NOT EXISTS dependencia_tipo TEXT DEFAULT 'fin'");
+    await query('ALTER TABLE ventas_cronograma ADD COLUMN IF NOT EXISTS velocidad DOUBLE PRECISION DEFAULT 0');
     await query('ALTER TABLE construccion ADD COLUMN IF NOT EXISTS pct_bajo_tierra_sobre_cota_0 DOUBLE PRECISION DEFAULT 0');
     await query('ALTER TABLE costos_partidas ADD COLUMN IF NOT EXISTS plan_pago TEXT');
   })();
@@ -487,8 +489,8 @@ const ventas = {
       for (const row of rows) {
         await client.query(
           `INSERT INTO ventas_cronograma (
-            id, proyecto_id, tipo, uso, vinculo_gantt, mes_inicio, duracion, porcentaje
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+            id, proyecto_id, tipo, uso, vinculo_gantt, mes_inicio, duracion, velocidad, porcentaje
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
           [
             uuidv4(),
             pid,
@@ -497,6 +499,7 @@ const ventas = {
             row.vinculo_gantt || null,
             row.mes_inicio || 0,
             row.duracion || 0,
+            row.velocidad || 0,
             row.porcentaje || 0,
           ]
         );
