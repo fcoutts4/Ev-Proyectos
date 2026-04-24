@@ -1986,7 +1986,7 @@ function syncSalesDrivenMilestones() {
     color: baseRow.color || '#2563eb',
     dependencia: finEstudiosDependency,
     dependencia_tipo: 'fin',
-    desfase: indexSafeNumber(baseRow.desfase, 0),
+    desfase: 0,
     inicio: toNumber(baseRow.inicio),
     duracion: promiseDuration,
     fin: toNumber(baseRow.inicio) + promiseDuration,
@@ -2078,15 +2078,40 @@ function mapLegacyCategoryName(name, partidaName = '') {
 function buildCostContext() {
   const terrainCategory = state.costos.find((category) => category.nombre === 'TERRENO');
   const terrenoBase = (terrainCategory?.partidas || []).reduce((sum, partida) => sum + (partida.es_terreno ? toNumber(partida.total_neto) : 0), 0);
+  const proyecto = normalizeProject(state.proyecto);
   const construccionMetrics = getConstructionMetrics();
+  const accessorySales = getAccessorySalesConfig();
+  const salesMetrics = getTotalSalesMetrics();
+  const totalInterior = state.cabida.reduce((sum, row) => sum + (toNumber(row.sup_interior) * toNumber(row.cantidad)), 0);
+  const totalTerrazas = state.cabida.reduce((sum, row) => sum + (toNumber(row.sup_terrazas) * toNumber(row.cantidad)), 0);
+  const totalUnidades = state.cabida.reduce((sum, row) => sum + toNumber(row.cantidad), 0);
+  const totalTerrenoCalculado = toNumber(proyecto.terreno_m2_neto) * toNumber(proyecto.terreno_precio_uf_m2);
   return {
     meses_construccion: getConstructionDuration(),
     m2_utiles: getUsefulMunicipalAreaTotal(),
     m2_municipales: getUsefulMunicipalAreaTotal(),
+    m2_comunes: getCommonAreaTotal(),
+    m2_interior_total: totalInterior,
+    m2_terrazas_total: totalTerrazas,
     m2_sobre_cota_0: getAboveGradeAreaTotal(),
     m2_subterraneo: construccionMetrics.sup_bajo_tierra,
     m2_losa_total: construccionMetrics.sup_total,
     m2_vendible_deptos: state.cabida.reduce((sum, row) => sum + (getSellableAreaPerUnit(row.sup_interior, row.sup_terrazas) * toNumber(row.cantidad)), 0),
+    unidades_totales: totalUnidades,
+    terreno_m2_bruto: toNumber(proyecto.terreno_m2_bruto),
+    terreno_m2_afectacion: toNumber(proyecto.terreno_m2_afectacion),
+    terreno_m2_neto: toNumber(proyecto.terreno_m2_neto),
+    terreno_precio_uf_m2: toNumber(proyecto.terreno_precio_uf_m2),
+    terreno_total_calculado: totalTerrenoCalculado,
+    construccion_uf_m2_sobre_tierra: toNumber(construccionMetrics.costo_uf_m2_sobre_tierra),
+    construccion_uf_m2_bajo_tierra: toNumber(construccionMetrics.costo_uf_m2_bajo_tierra),
+    construccion_uf_m2_promedio: toNumber(construccionMetrics.uf_prom),
+    precio_promedio_unidad: toNumber(salesMetrics.precioPromedio),
+    precio_estacionamiento: toNumber(accessorySales.precio_estacionamiento),
+    precio_bodega: toNumber(accessorySales.precio_bodega),
+    ventas_totales: toNumber(salesMetrics.total),
+    ventas_totales_deptos: toNumber(salesMetrics.totalDeptos),
+    ventas_totales_accesorios: toNumber(salesMetrics.totalAccesorios),
     total_construccion: construccionMetrics.total_neto,
     total_terreno: terrenoBase,
     ventas_brutas: toNumber(state.calculos.ventas_brutas),
@@ -2616,47 +2641,76 @@ function renderCostosModule() {
 
 function getCostFormulaCatalog() {
   const context = buildCostContext();
-  const mesesPreventa = Math.max(0, ...state.ventasCronograma.filter((row) => row.tipo === 'preventa').map((row) => toNumber(row.duracion)));
-  const mesesVenta = Math.max(0, ...state.ventasCronograma.filter((row) => row.tipo === 'venta').map((row) => toNumber(row.duracion)));
-  const mesesEscrituracion = Math.max(0, ...state.ventasCronograma.filter((row) => row.tipo === 'escrituracion').map((row) => toNumber(row.duracion)));
-  return [
-    { label: 'tiempo construccion', token: '_tiempo_construccion', value: context.meses_construccion },
-    { label: 'meses construccion', token: '_meses_construccion', value: context.meses_construccion },
-    { label: 'meses preventa', token: '_meses_preventa', value: mesesPreventa },
-    { label: 'meses venta', token: '_meses_venta', value: mesesVenta },
-    { label: 'meses escrituracion', token: '_meses_escrituracion', value: mesesEscrituracion },
-    { label: 'm2 utiles', token: '_m2_utiles', value: context.m2_utiles },
-    { label: 'm2 municipales', token: '_m2_municipales', value: context.m2_municipales },
-    { label: 'm2 sobre cota 0', token: '_m2_sobre_cota_0', value: context.m2_sobre_cota_0 },
-    { label: 'm2 subterraneo', token: '_m2_subterraneo', value: context.m2_subterraneo },
-    { label: 'm2 losa total', token: '_m2_losa_total', value: context.m2_losa_total },
-    { label: 'm2 vendible deptos', token: '_m2_vendible_deptos', value: context.m2_vendible_deptos },
-    { label: 'total construccion', token: '_total_construccion', value: context.total_construccion },
-    { label: 'total terreno', token: '_total_terreno', value: context.total_terreno },
-    { label: 'ventas brutas', token: '_ventas_brutas', value: context.ventas_brutas },
+  const mesesPreventa = Math.max(0, ...state.ventasCronograma.filter((row) => row.tipo === 'PREVENTA').map((row) => toNumber(row.duracion)));
+  const mesesVenta = Math.max(0, ...state.ventasCronograma.filter((row) => row.tipo === 'VENTA').map((row) => toNumber(row.duracion)));
+  const mesesEscrituracion = Math.max(0, ...state.ventasCronograma.filter((row) => row.tipo === 'ESCRITURACION').map((row) => toNumber(row.duracion)));
+  const rawCatalog = [
+    { label: 'Meses construccion (alias)', token: '_tiempo_construccion', value: context.meses_construccion, unit: 'mes' },
+    { label: 'Meses construccion', token: '_meses_construccion', value: context.meses_construccion, unit: 'mes' },
+    { label: 'Meses preventa (alias)', token: '_meses_preventa', value: mesesPreventa, unit: 'mes' },
+    { label: 'Meses promesas', token: '_meses_promesas', value: mesesPreventa, unit: 'mes' },
+    { label: 'Meses venta (alias)', token: '_meses_venta', value: mesesVenta, unit: 'mes' },
+    { label: 'Meses escrituracion', token: '_meses_escrituracion', value: mesesEscrituracion, unit: 'mes' },
+    { label: 'm2 utiles', token: '_m2_utiles', value: context.m2_utiles, unit: 'm2' },
+    { label: 'm2 municipales', token: '_m2_municipales', value: context.m2_municipales, unit: 'm2' },
+    { label: 'm2 comunes', token: '_m2_comunes', value: context.m2_comunes, unit: 'm2' },
+    { label: 'm2 interior total', token: '_m2_interior_total', value: context.m2_interior_total, unit: 'm2' },
+    { label: 'm2 terrazas total', token: '_m2_terrazas_total', value: context.m2_terrazas_total, unit: 'm2' },
+    { label: 'm2 sobre cota 0', token: '_m2_sobre_cota_0', value: context.m2_sobre_cota_0, unit: 'm2' },
+    { label: 'm2 subterraneo', token: '_m2_subterraneo', value: context.m2_subterraneo, unit: 'm2' },
+    { label: 'm2 losa total', token: '_m2_losa_total', value: context.m2_losa_total, unit: 'm2' },
+    { label: 'm2 vendible deptos', token: '_m2_vendible_deptos', value: context.m2_vendible_deptos, unit: 'm2' },
+    { label: 'Terreno m2 bruto', token: '_terreno_m2_bruto', value: context.terreno_m2_bruto, unit: 'm2' },
+    { label: 'Terreno m2 afectacion', token: '_terreno_m2_afectacion', value: context.terreno_m2_afectacion, unit: 'm2' },
+    { label: 'Terreno m2 neto', token: '_terreno_m2_neto', value: context.terreno_m2_neto, unit: 'm2' },
+    { label: 'Terreno precio UF/m2', token: '_terreno_precio_uf_m2', value: context.terreno_precio_uf_m2, unit: 'UF/m2' },
+    { label: 'Terreno total calculado', token: '_terreno_total_calculado', value: context.terreno_total_calculado, unit: 'UF' },
+    { label: 'Construccion UF/m2 sobre tierra', token: '_construccion_uf_m2_sobre_tierra', value: context.construccion_uf_m2_sobre_tierra, unit: 'UF/m2' },
+    { label: 'Construccion UF/m2 bajo tierra', token: '_construccion_uf_m2_bajo_tierra', value: context.construccion_uf_m2_bajo_tierra, unit: 'UF/m2' },
+    { label: 'Construccion UF/m2 promedio', token: '_construccion_uf_m2_promedio', value: context.construccion_uf_m2_promedio, unit: 'UF/m2' },
+    { label: 'Unidades totales', token: '_unidades_totales', value: context.unidades_totales, unit: 'un' },
+    { label: 'Precio promedio unidad', token: '_precio_promedio_unidad', value: context.precio_promedio_unidad, unit: 'UF/un' },
+    { label: 'Precio estacionamiento', token: '_precio_estacionamiento', value: context.precio_estacionamiento, unit: 'UF/un' },
+    { label: 'Precio bodega', token: '_precio_bodega', value: context.precio_bodega, unit: 'UF/un' },
+    { label: 'Ventas totales', token: '_ventas_totales', value: context.ventas_totales, unit: 'UF' },
+    { label: 'Ventas deptos', token: '_ventas_totales_deptos', value: context.ventas_totales_deptos, unit: 'UF' },
+    { label: 'Ventas accesorios', token: '_ventas_totales_accesorios', value: context.ventas_totales_accesorios, unit: 'UF' },
+    { label: 'Total construccion', token: '_total_construccion', value: context.total_construccion, unit: 'UF' },
+    { label: 'Total terreno', token: '_total_terreno', value: context.total_terreno, unit: 'UF' },
+    { label: 'Ventas brutas', token: '_ventas_brutas', value: context.ventas_brutas, unit: 'UF' },
     ...COST_CATEGORY_ORDER.map((name) => ({
-      label: `total categoria ${name.toLowerCase()}`,
+      label: `Total categoria ${name.toLowerCase()}`,
       token: `_total_categoria_${String(name).toLowerCase().replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}`,
       value: ((state.costos.find((item) => item.nombre === name)?.partidas || []).reduce((sum, partida) => sum + toNumber(partida.total_neto), 0)),
+      unit: 'UF',
     })),
     ...state.gantt.flatMap((row) => ([
       {
-        label: `inicio ${String(row.nombre || '').toLowerCase()}`,
+        label: `Inicio ${String(row.nombre || '').toLowerCase()}`,
         token: `_inicio_${String(row.nombre || '').toLowerCase().replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}`,
         value: toNumber(row.inicio),
+        unit: 'mes',
       },
       {
-        label: `fin ${String(row.nombre || '').toLowerCase()}`,
+        label: `Fin ${String(row.nombre || '').toLowerCase()}`,
         token: `_fin_${String(row.nombre || '').toLowerCase().replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}`,
         value: toNumber(row.fin),
+        unit: 'mes',
       },
       {
-        label: `duracion ${String(row.nombre || '').toLowerCase()}`,
+        label: `Duracion ${String(row.nombre || '').toLowerCase()}`,
         token: `_duracion_${String(row.nombre || '').toLowerCase().replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}`,
         value: toNumber(row.duracion),
+        unit: 'mes',
       },
     ])),
   ];
+  const uniqueByToken = new Map();
+  rawCatalog.forEach((entry) => {
+    const key = String(entry.token || '').toLowerCase();
+    if (key && !uniqueByToken.has(key)) uniqueByToken.set(key, entry);
+  });
+  return Array.from(uniqueByToken.values());
 }
 
 function splitFormulaTokens(rawValue) {
@@ -2672,6 +2726,13 @@ function findFormulaCatalogEntry(token) {
   ));
 }
 
+function formatFormulaCatalogValue(entry) {
+  const value = toNumber(entry?.value);
+  const unit = String(entry?.unit || '').trim();
+  const decimals = ['m2', 'UF', 'UF/m2', 'UF/un'].includes(unit) ? 2 : 0;
+  return unit ? `${fmtNumber(value, decimals)} ${unit}` : fmtNumber(value, decimals);
+}
+
 function renderFormulaToken(token, isAuto = false) {
   const value = String(token || '').trim();
   if (!value) return '';
@@ -2683,7 +2744,7 @@ function renderFormulaToken(token, isAuto = false) {
 
   const match = findFormulaCatalogEntry(value);
   if (match) {
-    return `<span class="formula-token reference" title="${escapeHtml(`${match.label} = ${fmtNumber(match.value, 2)}`)}">${escapeHtml(value.replace(/^_+/, ''))}</span>`;
+    return `<span class="formula-token reference" title="${escapeHtml(`${match.label} = ${formatFormulaCatalogValue(match)}`)}">${escapeHtml(String(match.label || value).replace(/^_+/, ''))}</span>`;
   }
   if (/^[0-9.,]+$/.test(value)) return `<span class="formula-token number">${escapeHtml(value)}</span>`;
   return `<span class="formula-token">${escapeHtml(value.replace(/^_+/, ''))}</span>`;
@@ -2746,8 +2807,8 @@ function updateCostFormulaModalPreview() {
 }
 
 function renderCostFormulaOptions() {
-  setHtml('cost-formula-refs', getCostFormulaCatalog().map(({ label, token, value }) => (
-    `<option value="${escapeHtml(token)}">${escapeHtml(label)} (${fmtNumber(value, 2)})</option>`
+  setHtml('cost-formula-refs', getCostFormulaCatalog().map((entry) => (
+    `<option value="${escapeHtml(entry.token)}">${escapeHtml(entry.label)} (${escapeHtml(formatFormulaCatalogValue(entry))})</option>`
   )).join(''));
 }
 
@@ -2880,8 +2941,8 @@ function renderCostFormulaSuggestions(input, query = '') {
     return;
   }
 
-  panel.innerHTML = options.map(({ label, token, value }) => (
-    `<button type="button" onmousedown="event.preventDefault(); pickCostFormulaSuggestion(this)" data-token="${escapeHtml(token)}" data-input-id="${escapeHtml(input.id)}">${escapeHtml(token)}<small>${escapeHtml(label)} | ${fmtNumber(value, 2)}</small></button>`
+  panel.innerHTML = options.map((entry) => (
+    `<button type="button" onmousedown="event.preventDefault(); pickCostFormulaSuggestion(this)" data-token="${escapeHtml(entry.token)}" data-input-id="${escapeHtml(input.id)}">${escapeHtml(entry.label)}<small>${escapeHtml(formatFormulaCatalogValue(entry))}</small></button>`
   )).join('');
   panel.style.display = 'block';
 }
