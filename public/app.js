@@ -879,16 +879,20 @@ function getVentasConfigMap() {
   return new Map(state.ventasConfig.map((row) => [row.uso, row]));
 }
 
+function isVentasCronogramaType(row, type) {
+  return String(row?.tipo || '').trim().toUpperCase() === String(type || '').trim().toUpperCase();
+}
+
 function getCronogramaByType(type) {
-  return state.ventasCronograma.filter((row) => row.tipo === type);
+  return state.ventasCronograma.filter((row) => isVentasCronogramaType(row, type));
 }
 
 function getCronogramaForUso(type, uso) {
-  return state.ventasCronograma.find((row) => row.tipo === type && row.uso === uso) || null;
+  return state.ventasCronograma.find((row) => isVentasCronogramaType(row, type) && row.uso === uso) || null;
 }
 
 function getVentasMetaRow(type) {
-  return state.ventasCronograma.find((row) => row.tipo === type) || null;
+  return state.ventasCronograma.find((row) => isVentasCronogramaType(row, type)) || null;
 }
 
 function normalizeVentasVelocity(value, fallback) {
@@ -965,7 +969,7 @@ function ensureVentasState() {
     }
   }
 
-  const escrituracion = state.ventasCronograma.find((row) => row.tipo === 'ESCRITURACION') || {};
+  const escrituracion = getCronogramaByType('ESCRITURACION')[0] || {};
   nextCronograma.push({
     id: escrituracion.id,
     tipo: 'ESCRITURACION',
@@ -1077,7 +1081,7 @@ function findGanttByName(name) {
 
 function getCronogramaComputed(item) {
   const ganttRef = findGanttByName(item.vinculo_gantt);
-  const base = item.tipo === 'PREVENTA' ? toNumber(ganttRef?.inicio) : toNumber(ganttRef?.fin);
+  const base = isVentasCronogramaType(item, 'PREVENTA') ? toNumber(ganttRef?.inicio) : toNumber(ganttRef?.fin);
   const inicio = ganttRef ? base + toNumber(item.mes_inicio) : toNumber(item.mes_inicio);
   const duracion = Math.max(1, toNumber(item.duracion));
   const fin = inicio + duracion;
@@ -1191,7 +1195,7 @@ function ganttOptionsHtml(selected) {
 
 function renderVentasSchedules() {
   // Cronograma de Promesas: fila única global (auto-calculada)
-  const preventaRows = state.ventasCronograma.filter((row) => row.tipo === 'PREVENTA');
+  const preventaRows = getCronogramaByType('PREVENTA');
   const totalUnidadesPromesas = preventaRows.reduce((sum, row) => {
     const metrics = getUsoSaleMetrics(row.uso);
     return sum + Math.round(metrics.unidades * toNumber(row.porcentaje) / 100);
@@ -1211,7 +1215,7 @@ function renderVentasSchedules() {
   ` : '<tr><td colspan="5" style="text-align:center;color:#94a3b8">Sin unidades configuradas</td></tr>');
 
   // Cronograma de Escrituración: fila única global (auto-calculada)
-  const escrRow = state.ventasCronograma.find((row) => row.tipo === 'ESCRITURACION');
+  const escrRow = getCronogramaByType('ESCRITURACION')[0];
   const totalUnidadesEscr = state.ventasConfig.reduce((sum, item) => sum + getUsoSaleMetrics(item.uso).unidades, 0);
   const computedEscr = escrRow ? getCronogramaComputed(escrRow) : { inicio: 0, fin: 0, duracion: 0 };
   const velEscr = computedEscr.duracion ? totalUnidadesEscr / computedEscr.duracion : 0;
@@ -1301,7 +1305,7 @@ function renderVentasSummaryCards() {
 
 function buildTimelineMonths() {
   const ranges = state.ventasCronograma
-    .filter((row) => row.tipo === 'PREVENTA' || row.tipo === 'ESCRITURACION')
+    .filter((row) => isVentasCronogramaType(row, 'PREVENTA') || isVentasCronogramaType(row, 'ESCRITURACION'))
     .map((row) => getCronogramaComputed(row));
   const start = Math.max(1, Math.min(...ranges.map((row) => row.inicio), 1));
   const end = Math.max(start, ...ranges.map((row) => Math.max(row.inicio, row.fin - 1)));
@@ -2026,7 +2030,7 @@ function syncSalesDrivenMilestones() {
 
   state.gantt = normalizeGanttRows(rows);
   state.ventasCronograma = (state.ventasCronograma || []).map((row) => {
-    if (row.tipo === 'PREVENTA') {
+    if (isVentasCronogramaType(row, 'PREVENTA')) {
       return {
         ...row,
         vinculo_gantt: promiseRow.nombre,
@@ -2034,7 +2038,7 @@ function syncSalesDrivenMilestones() {
         duracion: promiseDuration,
       };
     }
-    if (row.tipo === 'ESCRITURACION') {
+    if (isVentasCronogramaType(row, 'ESCRITURACION')) {
       return {
         ...row,
         vinculo_gantt: receptionRow.nombre,
@@ -2647,9 +2651,9 @@ function renderCostosModule() {
 
 function getCostFormulaCatalog() {
   const context = buildCostContext();
-  const mesesPreventa = Math.max(0, ...state.ventasCronograma.filter((row) => row.tipo === 'PREVENTA').map((row) => toNumber(row.duracion)));
-  const mesesVenta = Math.max(0, ...state.ventasCronograma.filter((row) => row.tipo === 'VENTA').map((row) => toNumber(row.duracion)));
-  const mesesEscrituracion = Math.max(0, ...state.ventasCronograma.filter((row) => row.tipo === 'ESCRITURACION').map((row) => toNumber(row.duracion)));
+  const mesesPreventa = Math.max(0, ...getCronogramaByType('PREVENTA').map((row) => toNumber(row.duracion)));
+  const mesesVenta = Math.max(0, ...getCronogramaByType('VENTA').map((row) => toNumber(row.duracion)));
+  const mesesEscrituracion = Math.max(0, ...getCronogramaByType('ESCRITURACION').map((row) => toNumber(row.duracion)));
   const rawCatalog = [
     { label: 'Meses construccion (alias)', token: '_tiempo_construccion', value: context.meses_construccion, unit: 'mes' },
     { label: 'Meses construccion', token: '_meses_construccion', value: context.meses_construccion, unit: 'mes' },
@@ -3466,14 +3470,14 @@ function readVentasCronogramaEditor() {
   const escrituracionInputRaw = String($('ventas-velocidad-escrituracion')?.value || '').trim();
   const promesasVelocidad = promesasInputRaw === ''
     ? normalizeVentasVelocity(currentPromesasVelocidad, 54)
-    : normalizeVentasVelocity(promesasInputRaw, currentPromesasVelocidad || 54);
+    : normalizeVentasVelocity(promesasInputRaw, normalizeVentasVelocity(currentPromesasVelocidad, 54));
   const escrituracionVelocidad = escrituracionInputRaw === ''
     ? normalizeVentasVelocity(currentEscrituracionVelocidad, 20)
-    : normalizeVentasVelocity(escrituracionInputRaw, currentEscrituracionVelocidad || 20);
+    : normalizeVentasVelocity(escrituracionInputRaw, normalizeVentasVelocity(currentEscrituracionVelocidad, 20));
 
   // PREVENTA y ESCRITURACION se calculan desde la Carta Gantt y las velocidades.
   state.ventasCronograma
-    .filter((row) => row.tipo === 'PREVENTA' || row.tipo === 'ESCRITURACION')
+    .filter((row) => isVentasCronogramaType(row, 'PREVENTA') || isVentasCronogramaType(row, 'ESCRITURACION'))
     .forEach((row) => rows.push({ ...row }));
 
   rows.push({
