@@ -262,7 +262,12 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('.formula-host')) {
     document.querySelectorAll('.formula-pop').forEach((el) => { el.style.display = 'none'; });
   }
+  if (!e.target.closest('#gantt-color-popup') && !e.target.closest('.gantt-color-current')) {
+    closeGanttColorPopup();
+  }
 });
+window.addEventListener('resize', closeGanttColorPopup);
+window.addEventListener('scroll', closeGanttColorPopup, true);
 
 // ---- IVA / PPM / Impuesto Renta helpers ----
 function getMonthlyIvaCredito() {
@@ -894,51 +899,66 @@ function getGanttColorSwatches(selectedColor) {
   const selected = normalizeGanttColor(selectedColor);
   return `
     <input type="hidden" data-field="color" value="${selected}"/>
-    <details class="gantt-color-dropdown" ontoggle="onGanttColorDropdownToggle(this)">
-      <summary class="gantt-color-current" style="background:${selected}" title="Elegir color" onclick="onGanttColorSummaryClick(this)"></summary>
-      <div class="gantt-color-dropdown-menu">
-      ${GANTT_PRESET_COLORS.map((color) => `
-        <button
-          type="button"
-          class="gantt-color-swatch ${color === selected ? 'active' : ''}"
-          style="background:${color}"
-          title="${color}"
-          onclick="onGanttSwatchPick(this,'${color}')"
-        ></button>
-      `).join('')}
-      </div>
-    </details>
+    <button
+      type="button"
+      class="gantt-color-current"
+      style="background:${selected}"
+      title="Elegir color"
+      onclick="onGanttColorButtonClick(this, event)"
+    ></button>
   `;
 }
 
-function closeOtherGanttColorDropdowns(currentDropdown) {
-  document.querySelectorAll('.gantt-color-dropdown[open]').forEach((dropdown) => {
-    if (dropdown !== currentDropdown) dropdown.open = false;
-  });
+let activeGanttColorButton = null;
+
+function closeGanttColorPopup() {
+  document.getElementById('gantt-color-popup')?.remove();
+  if (activeGanttColorButton) activeGanttColorButton.setAttribute('aria-expanded', 'false');
+  activeGanttColorButton = null;
 }
 
-function onGanttColorSummaryClick(summaryEl) {
-  const dropdown = summaryEl?.closest('.gantt-color-dropdown');
-  if (!dropdown) return;
-  closeOtherGanttColorDropdowns(dropdown);
+function positionGanttColorPopup(popup, trigger) {
+  if (!popup || !trigger) return;
+  const rect = trigger.getBoundingClientRect();
+  const popupRect = popup.getBoundingClientRect();
+  const margin = 8;
+  const left = Math.min(
+    window.innerWidth - popupRect.width - margin,
+    Math.max(margin, rect.left + (rect.width / 2) - (popupRect.width / 2))
+  );
+  const spaceBelow = window.innerHeight - rect.bottom;
+  const top = spaceBelow >= popupRect.height + margin
+    ? rect.bottom + margin
+    : Math.max(margin, rect.top - popupRect.height - margin);
+  popup.style.left = `${left}px`;
+  popup.style.top = `${top}px`;
 }
 
-function onGanttColorDropdownToggle(details) {
-  if (!details || !details.open) return;
-  closeOtherGanttColorDropdowns(details);
-  const menu = details.querySelector('.gantt-color-dropdown-menu');
-  if (!menu) return;
-  details.classList.remove('open-up', 'open-down');
-  const triggerRect = details.getBoundingClientRect();
-  const menuHeight = Math.max(menu.offsetHeight || 0, 56);
-  const scrollShell = details.closest('.gantt-editor-shell') || details.closest('.tbl-scroll');
-  const scopeRect = scrollShell
-    ? scrollShell.getBoundingClientRect()
-    : { top: 0, bottom: window.innerHeight };
-  const spaceAbove = Math.max(0, triggerRect.top - scopeRect.top);
-  const spaceBelow = Math.max(0, scopeRect.bottom - triggerRect.bottom);
-  const shouldOpenUp = spaceBelow < menuHeight + 12 && spaceAbove > spaceBelow;
-  details.classList.add(shouldOpenUp ? 'open-up' : 'open-down');
+function onGanttColorButtonClick(button, event) {
+  event?.stopPropagation();
+  if (activeGanttColorButton === button && document.getElementById('gantt-color-popup')) {
+    closeGanttColorPopup();
+    return;
+  }
+  closeGanttColorPopup();
+  activeGanttColorButton = button;
+  button.setAttribute('aria-expanded', 'true');
+  const selected = normalizeGanttColor(button.closest('.gantt-name-wrap')?.querySelector('[data-field="color"]')?.value);
+  const popup = document.createElement('div');
+  popup.id = 'gantt-color-popup';
+  popup.className = 'gantt-color-popup';
+  popup.setAttribute('role', 'menu');
+  popup.innerHTML = GANTT_PRESET_COLORS.map((color) => `
+    <button
+      type="button"
+      class="gantt-color-swatch ${color === selected ? 'active' : ''}"
+      style="background:${color}"
+      title="${color}"
+      onclick="onGanttFloatingSwatchPick('${color}', event)"
+    ></button>
+  `).join('');
+  document.body.appendChild(popup);
+  positionGanttColorPopup(popup, button);
 }
 
 function canonicalizeGanttRows(rows = []) {
@@ -1158,23 +1178,16 @@ function renderGanttPreview() {
   });
 }
 
-function onGanttSwatchPick(button, color) {
-  const host = button.closest('.gantt-name-wrap');
+function onGanttFloatingSwatchPick(color, event) {
+  event?.stopPropagation();
+  const host = activeGanttColorButton?.closest('.gantt-name-wrap');
   if (!host) return;
   const colorInput = host.querySelector('[data-field="color"]');
   if (!colorInput) return;
   const selectedColor = normalizeGanttColor(color);
   colorInput.value = selectedColor;
-  host.querySelectorAll('.gantt-color-swatch').forEach((sw) => sw.classList.remove('active'));
-  button.classList.add('active');
-  const dropdown = button.closest('.gantt-color-dropdown');
-  const trigger = dropdown?.querySelector('.gantt-color-current');
-  if (trigger) trigger.style.background = selectedColor;
-  if (dropdown) {
-    dropdown.classList.remove('open-up', 'open-down');
-    dropdown.open = false;
-    dropdown.removeAttribute('open');
-  }
+  activeGanttColorButton.style.background = selectedColor;
+  closeGanttColorPopup();
   onGanttInputChange();
 }
 
@@ -4841,6 +4854,8 @@ window.agregarHito = agregarHito;
 window.onGanttInputChange = onGanttInputChange;
 window.moveGanttRow = moveGanttRow;
 window.removeGanttRow = removeGanttRow;
+window.onGanttColorButtonClick = onGanttColorButtonClick;
+window.onGanttFloatingSwatchPick = onGanttFloatingSwatchPick;
 window.startGanttDrag = startGanttDrag;
 window.allowGanttDrop = allowGanttDrop;
 window.endGanttDrag = endGanttDrag;
