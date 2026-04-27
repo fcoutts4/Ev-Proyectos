@@ -100,6 +100,11 @@
             <option>Contra Escrituraciones</option><option>Fin Proyecto</option><option>Inicio Construccion</option>
         </select>
       </div>
+        <div style="grid-column:1/-1;border-top:1px solid #e2e8f0;padding-top:8px;margin-top:4px">
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">% ALZAMIENTO (pago línea)</div>
+          <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-constr-alzamiento" value="90" min="0" max="100" step="1" oninput="calcularFinanciamiento()"><span style="font-size:11px">%</span></div>
+          <div style="font-size:10px;color:#64748b;margin-top:4px">Pago línea = % alz. × escrituración mes ant. (100% valor)</div>
+        </div>
     </div>
   </div>
 

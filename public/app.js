@@ -421,6 +421,7 @@ function normalizeFinanciamiento(data = {}) {
     linea_construccion_tasa: data.linea_construccion_tasa ?? 3.5,
     linea_construccion_pago_intereses: data.linea_construccion_pago_intereses || 'Anual',
     linea_construccion_pago_capital: data.linea_construccion_pago_capital || 'Contra Escrituraciones',
+    pct_alzamiento: data.pct_alzamiento ?? 90,
     ...data,
   };
 }
@@ -432,8 +433,9 @@ function getConstructionDuration() {
 
 function getConstructionMetrics() {
   const source = normalizeConstruccion(state.construccion);
-  const supSobreTierra = getAboveGradeAreaTotal();
-  const supBajoTierra = supSobreTierra * toNumber(source.pct_bajo_tierra_sobre_cota_0) / 100;
+  const supSobreTierra = source.sup_sobre_tierra > 0 ? source.sup_sobre_tierra : getAboveGradeAreaTotal();
+  const supBajoTierraAuto = supSobreTierra * toNumber(source.pct_bajo_tierra_sobre_cota_0) / 100;
+  const supBajoTierra = source.sup_bajo_tierra > 0 ? source.sup_bajo_tierra : supBajoTierraAuto;
   const totalSt = supSobreTierra * toNumber(source.costo_uf_m2_sobre_tierra);
   const totalBt = supBajoTierra * toNumber(source.costo_uf_m2_bajo_tierra);
   const totalNeto = totalSt + totalBt;
@@ -1965,8 +1967,8 @@ function renderCostStructure() {
 function renderConstruccion() {
   const metrics = getConstructionMetrics();
 
-  setText('constr-sup-st', `${fmtNumber(metrics.sup_sobre_tierra, 1)} m2`);
-  setText('constr-sup-bt', `${fmtNumber(metrics.sup_bajo_tierra, 1)} m2`);
+  if ($('constr-sup-st') && !$('constr-sup-st').matches(':focus')) $('constr-sup-st').value = fmtNumber(metrics.sup_sobre_tierra, 0);
+  if ($('constr-sup-bt') && !$('constr-sup-bt').matches(':focus')) $('constr-sup-bt').value = fmtNumber(metrics.sup_bajo_tierra, 0);
   setText('constr-total-st', fmtTableAmount(metrics.total_st, { kind: 'cost' }));
   setText('constr-total-bt', fmtTableAmount(metrics.total_bt, { kind: 'cost' }));
   setText('constr-sup-total', `${fmtNumber(metrics.sup_total, 1)} m2`);
@@ -2046,6 +2048,7 @@ function renderConstructionFinancing() {
   if ($('fin-constr-pct')) $('fin-constr-pct').value = toNumber(state.financiamiento.linea_construccion_pct);
   if ($('fin-constr-tasa')) $('fin-constr-tasa').value = toNumber(state.financiamiento.linea_construccion_tasa);
   if ($('fin-constr-pago-int')) $('fin-constr-pago-int').value = state.financiamiento.linea_construccion_pago_intereses || 'Anual';
+  if ($('fin-constr-alzamiento')) $('fin-constr-alzamiento').value = toNumber(state.financiamiento.pct_alzamiento ?? 90);
   setText('fin-constr-costo', fmtUf(metrics.total_neto));
   setText('fin-constr-monto', fmtUf(approved));
   setText('fin-constr-plazos', `Plazo estimado: mes ${fmtNumber(start)} a mes ${fmtNumber(start + duration)}`);
@@ -2109,7 +2112,7 @@ function computeConstructionEP() {
     subtotal[m] = sub;
     const ivaB = sub * 0.19;
     ivaBruto[m] = ivaB;
-    const ceecVal = ivaB * ceecPct;
+    const ceecVal = ivaB > 0 ? ivaB * ceecPct : 0;
     ceec[m] = ceecVal;
     const ivaE = ivaB - ceecVal;
     ivaEfectivo[m] = ivaE;
@@ -2177,11 +2180,13 @@ function renderConstructionGF(epData) {
   const timbrePct = cfg.pct_timbres / 100;
 
   const giros = epData ? epData.totalPago.slice() : createMonthlyArray(monthCount, 0);
-  // PAGOS_LINEA: se paga la deuda contra escrituraciones (distribuido en el cronograma de escrituración)
-  const income = getProjectMonthlyIncome(monthCount);
-  // Solo tomar la parte de ingresos que corresponde a escrituraciones (post-promesa)
+  const pctAlzamiento = toNumber(state.financiamiento.pct_alzamiento ?? 90) / 100;
+  // Escrituración income al 100% del valor de la propiedad (para alzamiento)
+  const totalesVentas = getTotalSalesMetrics();
+  const { escrituras: escriturasArr } = getPromesasEscrituracionUnidades(monthCount);
+  const escrituracionIncome100 = escriturasArr.map((u) => u * totalesVentas.precioPromedio);
+
   const pagosLinea = createMonthlyArray(monthCount, 0);
-  // Estrategia simple: cuando hay ingresos de escrituración, amortizar deuda
   const acumulado = createMonthlyArray(monthCount, 0);
   const interesMensual = createMonthlyArray(monthCount, 0);
   const impTimbres = createMonthlyArray(monthCount, 0);
@@ -2190,9 +2195,12 @@ function renderConstructionGF(epData) {
   for (let t = 0; t < monthCount; t += 1) {
     const g = toNumber(giros[t]);
     impTimbres[t] = g * timbrePct;
-    // Amortización: si hay ingreso y deuda, pagar hasta el ingreso
-    const pagoMax = Math.max(0, Math.min(prevAcum + g, toNumber(income[t])));
-    pagosLinea[t] = -pagoMax;
+    // Pago línea = % alzamiento × escrituración 100% del mes anterior
+    const prevEscrit = t > 0 ? toNumber(escrituracionIncome100[t - 1]) : 0;
+    let pago = pctAlzamiento * prevEscrit;
+    const newAcum = prevAcum + g - pago;
+    if (newAcum < 0) pago = Math.max(0, prevAcum + g); // no superar deuda
+    pagosLinea[t] = -pago;
     acumulado[t] = prevAcum + g + pagosLinea[t];
     interesMensual[t] = acumulado[t] * tasaMensual;
     prevAcum = acumulado[t];
@@ -2208,9 +2216,10 @@ function renderConstructionGF(epData) {
   `);
 
   const total = (arr) => arr.reduce((a, b) => a + toNumber(b), 0);
+  const pctAlzPct = toNumber(state.financiamiento.pct_alzamiento ?? 90);
   const rows = [
     { label: 'GIROS (desde EP)', values: giros, formula: 'GIROS(t) = TOTAL_A_PAGO_c_IVA(t)  [conectado a tabla EP]', color: '#22c55e' },
-    { label: 'PAGOS LÍNEA', values: pagosLinea, formula: 'Amortización contra escrituraciones (tope = ingresos del mes)', color: '#334155' },
+    { label: `PAGOS LÍNEA (alzamiento ${pctAlzPct}%)`, values: pagosLinea, formula: `PAGOS_LINEA(t) = ${pctAlzPct}% × Ingreso_Escrituración_100%[t−1]`, color: '#334155' },
     { label: 'ACUMULADO', values: acumulado, formula: 'ACUMULADO(t) = ACUMULADO(t−1) + GIROS(t) + PAGOS_LINEA(t)', bold: true, color: '#0f172a' },
     { label: `INTERÉS (${cfg.tasa_construccion}% anual)`, values: interesMensual, formula: `INTERÉS(t) = ACUMULADO(t) × ${cfg.tasa_construccion}%/12`, color: '#f59e0b' },
     { label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, values: impTimbres, formula: `IMP_TIMBRES(t) = GIROS(t) × ${cfg.pct_timbres}%`, color: '#f59e0b' },
@@ -2440,40 +2449,54 @@ function renderFinancingSourcePlanilla(sourceType) {
     const approved = state.financiamiento.credito_terreno_activo
       ? terrainBase * toNumber(state.financiamiento.credito_terreno_pct) / 100
       : 0;
-    const terrainMonthEnd = Math.min(monthCount - 1, Math.max(1, getConstructionStartMonth()));
+    // Giro: mismo mes de compra de terreno (desde Gantt)
+    const terrainPurchaseMonth = Math.min(monthCount - 1, Math.max(0, toNumber(getTerrainMilestone()?.inicio || 0)));
+    // Pago línea: mismo mes del anticipo de construcción (mes antes del inicio de obra)
+    const anticipoLineaMonth = Math.max(0, Math.min(monthCount - 1, getConstructionStartMonth() - 1));
 
     const giros = createMonthlyArray(monthCount, 0);
-    giros[0] = approved; // Giro total en mes 0 (compra de terreno)
+    giros[terrainPurchaseMonth] = approved;
 
     const pagosLinea = createMonthlyArray(monthCount, 0);
-    pagosLinea[terrainMonthEnd] = -approved; // Pago al inicio de construcción
+    pagosLinea[anticipoLineaMonth] = -approved;
 
     const acumulado = createMonthlyArray(monthCount, 0);
-    const interesMensual = createMonthlyArray(monthCount, 0);
     const impTimbres = createMonthlyArray(monthCount, 0);
     let prevAcum = 0;
+    // Pass 1: acumulado de capital
     for (let t = 0; t < monthCount; t += 1) {
       impTimbres[t] = toNumber(giros[t]) * timbrePct;
       acumulado[t] = prevAcum + toNumber(giros[t]) + toNumber(pagosLinea[t]);
-      interesMensual[t] = acumulado[t] * tasaMensual;
       prevAcum = acumulado[t];
     }
+    // Pass 2: interés anual — se paga en el aniversario del giro (o al cierre anticipado)
+    const interesAnual = createMonthlyArray(monthCount, 0);
+    let accrued = 0;
+    for (let t = 0; t < monthCount; t += 1) {
+      accrued += Math.max(0, acumulado[t]) * tasaMensual;
+      const monthsSinceGiro = t - terrainPurchaseMonth;
+      const isAnniversary = monthsSinceGiro > 0 && monthsSinceGiro % 12 === 0;
+      const isCreditPaidOff = acumulado[t] <= 0 && t > 0 && acumulado[t - 1] > 0;
+      if ((isAnniversary || isCreditPaidOff) && accrued > 0) {
+        interesAnual[t] = accrued;
+        accrued = 0;
+      }
+    }
+    if (accrued > 0) interesAnual[monthCount - 1] += accrued;
 
     setHtml('terreno-fin-planilla-head', `
       <tr>
         <th style="min-width:200px;text-align:left">Concepto</th>
         <th style="width:60px;text-align:center">ƒx</th>
-        <th style="width:110px;text-align:right">Total</th>
         ${labels.map((l) => `<th data-month-col>${escapeHtml(l)}</th>`).join('')}
       </tr>
     `);
 
-    const total = (arr) => arr.reduce((a, b) => a + toNumber(b), 0);
     const rows = [
-      { label: 'GIROS', values: giros, formula: 'GIROS(0) = % línea × Costo terreno (desembolso en compra)', color: '#22c55e' },
-      { label: 'PAGOS LÍNEA', values: pagosLinea, formula: 'Pago de la deuda al inicio de construcción', color: '#334155' },
+      { label: 'GIROS', values: giros, formula: `GIROS = % línea × Costo terreno · desembolso en mes compra`, color: '#22c55e' },
+      { label: 'PAGOS LÍNEA', values: pagosLinea, formula: 'Pago de la deuda en el mes del anticipo de construcción', color: '#334155' },
       { label: 'ACUMULADO', values: acumulado, formula: 'ACUMULADO(t) = ACUMULADO(t−1) + GIROS(t) + PAGOS_LINEA(t)', bold: true, color: '#0f172a' },
-      { label: `INTERÉS (${tasaTerreno}% anual)`, values: interesMensual, formula: `INTERÉS(t) = ACUMULADO(t) × ${tasaTerreno}%/12`, color: '#f59e0b' },
+      { label: `INTERÉS ANUAL (${tasaTerreno}%)`, values: interesAnual, formula: `Acumulado anual de interés · pagado en aniversario del giro o al cierre anticipado`, color: '#f59e0b' },
       { label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, values: impTimbres, formula: `IMP_TIMBRES(t) = GIROS(t) × ${cfg.pct_timbres}%`, color: '#f59e0b' },
     ];
 
@@ -2490,7 +2513,6 @@ function renderFinancingSourcePlanilla(sourceType) {
               <div style="font-family:'Courier New',monospace;background:#1e293b;padding:6px 8px;border-radius:6px">${escapeHtml(r.formula)}</div>
             </div>
           </td>
-          <td style="text-align:right;font-weight:${r.bold ? 800 : 600};color:${r.color}">${fmtUf(total(r.values))}</td>
           ${r.values.map((v) => `<td data-month-cell style="text-align:center;color:#334155;${r.bold ? 'font-weight:700' : ''}">${fmtTableAmount(v, { kind: 'income' })}</td>`).join('')}
         </tr>`;
     }).join(''));
@@ -4216,6 +4238,7 @@ function readConstruccionFinanciamientoFromEditor() {
     linea_construccion_tasa: toNumber($('fin-constr-tasa')?.value),
     linea_construccion_pago_intereses: $('fin-constr-pago-int')?.value || 'Anual',
     linea_construccion_pago_capital: 'Contra Escrituraciones',
+    pct_alzamiento: toNumber($('fin-constr-alzamiento')?.value ?? state.financiamiento.pct_alzamiento ?? 90),
   });
 }
 
@@ -4252,6 +4275,8 @@ function onTerrenoInputChange() {
 function readConstruccionFromEditor() {
   return normalizeConstruccion({
     ...state.construccion,
+    sup_sobre_tierra: toNumber($('constr-sup-st')?.value),
+    sup_bajo_tierra: toNumber($('constr-sup-bt')?.value),
     costo_uf_m2_sobre_tierra: toNumber($('constr-uf-st')?.value),
     pct_bajo_tierra_sobre_cota_0: toNumber($('constr-pct-bt')?.value),
     costo_uf_m2_bajo_tierra: toNumber($('constr-uf-bt')?.value),
