@@ -434,9 +434,8 @@ function getConstructionDuration() {
 
 function getConstructionMetrics() {
   const source = normalizeConstruccion(state.construccion);
-  const supSobreTierra = source.sup_sobre_tierra > 0 ? source.sup_sobre_tierra : getAboveGradeAreaTotal();
-  const supBajoTierraAuto = supSobreTierra * toNumber(source.pct_bajo_tierra_sobre_cota_0) / 100;
-  const supBajoTierra = source.sup_bajo_tierra > 0 ? source.sup_bajo_tierra : supBajoTierraAuto;
+  const supSobreTierra = toNumber(source.sup_sobre_tierra);
+  const supBajoTierra = toNumber(source.sup_bajo_tierra);
   const totalSt = supSobreTierra * toNumber(source.costo_uf_m2_sobre_tierra);
   const totalBt = supBajoTierra * toNumber(source.costo_uf_m2_bajo_tierra);
   const totalNeto = totalSt + totalBt;
@@ -1968,8 +1967,8 @@ function renderCostStructure() {
 function renderConstruccion() {
   const metrics = getConstructionMetrics();
 
-  if ($('constr-sup-st') && !$('constr-sup-st').matches(':focus')) $('constr-sup-st').value = fmtNumber(metrics.sup_sobre_tierra, 0);
-  if ($('constr-sup-bt') && !$('constr-sup-bt').matches(':focus')) $('constr-sup-bt').value = fmtNumber(metrics.sup_bajo_tierra, 0);
+  if ($('constr-sup-st') && !$('constr-sup-st').matches(':focus')) $('constr-sup-st').value = toNumber(state.construccion?.sup_sobre_tierra) || '';
+  if ($('constr-sup-bt') && !$('constr-sup-bt').matches(':focus')) $('constr-sup-bt').value = toNumber(state.construccion?.sup_bajo_tierra) || '';
   setText('constr-total-st', fmtTableAmount(metrics.total_st, { kind: 'cost' }));
   setText('constr-total-bt', fmtTableAmount(metrics.total_bt, { kind: 'cost' }));
   setText('constr-sup-total', `${fmtNumber(metrics.sup_total, 1)} m2`);
@@ -4761,8 +4760,6 @@ async function guardarConstruccion() {
   syncConstructionMilestone(toNumber($('constr-plazo-meses')?.value || state.construccion?.plazo_meses || 1));
   const payload = {
     ...readConstruccionFromEditor(),
-    sup_sobre_tierra: getConstructionMetrics().sup_sobre_tierra,
-    sup_bajo_tierra: getConstructionMetrics().sup_bajo_tierra,
   };
   const financiamiento = readConstruccionFinanciamientoFromEditor();
   setSyncStatus('saving', 'GUARDANDO', 'Actualizando parametros de construccion');
