@@ -275,7 +275,8 @@ tbody tr:hover{background:#f8fafc}
 .gantt-color-current::-webkit-details-marker{display:none}
 .gantt-color-dropdown-menu{
   position:absolute;
-  bottom:calc(100% + 6px);
+  top:calc(100% + 6px);
+  bottom:auto;
   left:0;
   z-index:70;
   display:grid;
@@ -287,6 +288,8 @@ tbody tr:hover{background:#f8fafc}
   background:#fff;
   box-shadow:0 10px 24px rgba(15,23,42,.18);
 }
+.gantt-color-dropdown.open-up .gantt-color-dropdown-menu{top:auto;bottom:calc(100% + 6px)}
+.gantt-color-dropdown.open-down .gantt-color-dropdown-menu{top:calc(100% + 6px);bottom:auto}
 .gantt-color-swatch{width:12px;height:12px;border-radius:999px;border:1px solid rgba(15,23,42,.2);padding:0;cursor:pointer;outline:none}
 .gantt-color-swatch.active{box-shadow:0 0 0 2px #0f172a}
 .gantt-name-input{min-width:0!important}

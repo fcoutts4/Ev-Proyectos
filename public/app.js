@@ -894,7 +894,7 @@ function getGanttColorSwatches(selectedColor) {
   const selected = normalizeGanttColor(selectedColor);
   return `
     <input type="hidden" data-field="color" value="${selected}"/>
-    <details class="gantt-color-dropdown">
+    <details class="gantt-color-dropdown" ontoggle="onGanttColorDropdownToggle(this)">
       <summary class="gantt-color-current" style="background:${selected}" title="Elegir color"></summary>
       <div class="gantt-color-dropdown-menu">
       ${GANTT_PRESET_COLORS.map((color) => `
@@ -909,6 +909,22 @@ function getGanttColorSwatches(selectedColor) {
       </div>
     </details>
   `;
+}
+
+function onGanttColorDropdownToggle(details) {
+  if (!details || !details.open) return;
+  document.querySelectorAll('.gantt-color-dropdown[open]').forEach((dropdown) => {
+    if (dropdown !== details) dropdown.open = false;
+  });
+  const menu = details.querySelector('.gantt-color-dropdown-menu');
+  if (!menu) return;
+  details.classList.remove('open-up', 'open-down');
+  const triggerRect = details.getBoundingClientRect();
+  const menuHeight = Math.max(menu.offsetHeight || 0, 56);
+  const spaceAbove = triggerRect.top;
+  const spaceBelow = window.innerHeight - triggerRect.bottom;
+  const shouldOpenUp = spaceBelow < menuHeight + 12 && spaceAbove > spaceBelow;
+  details.classList.add(shouldOpenUp ? 'open-up' : 'open-down');
 }
 
 function canonicalizeGanttRows(rows = []) {
@@ -1133,11 +1149,18 @@ function onGanttSwatchPick(button, color) {
   if (!host) return;
   const colorInput = host.querySelector('[data-field="color"]');
   if (!colorInput) return;
-  colorInput.value = normalizeGanttColor(color);
+  const selectedColor = normalizeGanttColor(color);
+  colorInput.value = selectedColor;
   host.querySelectorAll('.gantt-color-swatch').forEach((sw) => sw.classList.remove('active'));
   button.classList.add('active');
   const dropdown = button.closest('.gantt-color-dropdown');
-  if (dropdown) dropdown.open = false;
+  const trigger = dropdown?.querySelector('.gantt-color-current');
+  if (trigger) trigger.style.background = selectedColor;
+  if (dropdown) {
+    dropdown.classList.remove('open-up', 'open-down');
+    dropdown.open = false;
+    dropdown.removeAttribute('open');
+  }
   onGanttInputChange();
 }
 
