@@ -346,6 +346,10 @@ tbody tr:hover{background:#f3f7fb!important}
 .gf-param-panel .inp{font-weight:700}
 #kpi-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))!important}
 .flow-kpi-grid{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))!important}
+.ventas-crono-table{width:100%;table-layout:fixed}
+.ventas-crono-table col.col-link{width:32%}
+.ventas-crono-table col.col-num{width:16%}
+.ventas-crono-table col.col-vel{width:20%}
 
 /* Tablas uniformes en toda la app: fondo claro, sin franjas de color por seccion */
 table:not(.gantt-table){background:#f8fafc;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden}
@@ -861,7 +865,14 @@ tfoot td{line-height:1.25}
         <div style="width:10px;height:10px;border-radius:50%;background:#3b82f6"></div>
         <span style="font-size:12px;font-weight:700;color:#475569">CRONOGRAMA DE PROMESAS</span>
     </div>
-      <table>
+      <table class="ventas-crono-table">
+        <colgroup>
+          <col class="col-link">
+          <col class="col-num">
+          <col class="col-num">
+          <col class="col-num">
+          <col class="col-vel">
+        </colgroup>
         <thead><tr>
           <th style="text-align:left">VÍNCULO EN GANTT</th>
           <th>INICIO (MES)</th>
@@ -879,13 +890,20 @@ tfoot td{line-height:1.25}
         <div style="width:10px;height:10px;border-radius:50%;background:#f97316"></div>
         <span style="font-size:12px;font-weight:700;color:#475569">CRONOGRAMA DE ESCRITURACIÓN</span>
     </div>
-      <table>
+      <table class="ventas-crono-table">
+        <colgroup>
+          <col class="col-link">
+          <col class="col-num">
+          <col class="col-num">
+          <col class="col-num">
+          <col class="col-vel">
+        </colgroup>
         <thead><tr>
           <th style="text-align:left">VÍNCULO EN GANTT</th>
           <th>INICIO (MES)</th>
           <th style="color:#22c55e">FIN (AUTO)</th>
           <th>TOTAL UNIDADES</th>
-          <th>VEL. ESCRITURACIÓN (UN/MES)</th>
+          <th>VEL. (UN/MES)</th>
       </tr></thead>
         <tbody id="escrituracion-tbody"></tbody>
     </table>
