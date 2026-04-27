@@ -1475,6 +1475,8 @@ function renderVentasSummaryCardsLegacy() {
   const escrituraDuracion = escrRow ? getCronogramaComputed(escrRow).duracion : 0;
   const totalUnidades = state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).unidades, 0);
   const velEntregas = escrituraDuracion ? totalUnidades / escrituraDuracion : 0;
+  const promesaDuracion = preRows.length ? getCronogramaComputed(preRows[0]).duracion : 0;
+  const velPromesas = promesaDuracion ? totalUnidades / promesaDuracion : 0;
 
   const analysisStart = Math.min(
     ...preRows.concat(ventaRows).map((row) => getCronogramaComputed(row).inicio),
@@ -1494,6 +1496,7 @@ function renderVentasSummaryCardsLegacy() {
   setText('vel-duracion', `${fmtNumber(duration)} meses`);
   setText('vel-analisis', `Analisis desde ${formatTimelineMonthLabel(analysisStart)} a ${formatTimelineMonthLabel(analysisEnd)}`);
   setText('vel-entregas', fmtNumber(velEntregas, 1));
+  setText('vel-promesas-mini', `Vel. promesas: ${fmtNumber(velPromesas, 1)} un/mes`);
   setText('escrit-inicio', formatTimelineMonthLabel(escrituraInicio));
   setText('escrit-fin', formatTimelineMonthLabel(escrituraFin));
   setText('escrit-dur', `Duracion: ${fmtNumber(escrituraDuracion)} meses`);
@@ -1592,6 +1595,8 @@ function renderVentasSummaryCards() {
   const escrituraDuracion = escrRow ? getCronogramaComputed(escrRow).duracion : 0;
   const totalUnidades = state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).unidades, 0);
   const velEntregas = escrituraDuracion ? totalUnidades / escrituraDuracion : 0;
+  const promesaDuracion = preRows.length ? getCronogramaComputed(preRows[0]).duracion : 0;
+  const velPromesas = promesaDuracion ? totalUnidades / promesaDuracion : 0;
 
   const analysisPoints = preRows.map((row) => getCronogramaComputed(row));
   const analysisStart = Math.min(
@@ -1612,6 +1617,7 @@ function renderVentasSummaryCards() {
   setText('vel-duracion', `${fmtNumber(duration)} meses`);
   setText('vel-analisis', `Analisis desde ${formatTimelineMonthLabel(analysisStart)} a ${formatTimelineMonthLabel(analysisEnd)}`);
   setText('vel-entregas', fmtNumber(velEntregas, 1));
+  setText('vel-promesas-mini', `Vel. promesas: ${fmtNumber(velPromesas, 1)} un/mes`);
   setText('escrit-inicio', formatTimelineMonthLabel(escrituraInicio));
   setText('escrit-fin', formatTimelineMonthLabel(escrituraFin));
   setText('escrit-dur', `Duracion: ${fmtNumber(escrituraDuracion)} meses`);
