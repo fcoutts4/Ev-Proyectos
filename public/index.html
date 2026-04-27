@@ -185,7 +185,10 @@ tbody tr:hover{background:#f8fafc}
 #tab-gantt .gantt-sticky-left{z-index:45;background:#fff!important;overflow:visible;box-shadow:8px 0 12px -14px rgba(15,23,42,.45)}
 #tab-gantt .gantt-sticky-head{z-index:55;background:#f8fafc!important}
 #tab-gantt .gantt-sticky-right{z-index:56}
-#tab-gantt .gantt-timeline-head{position:relative;overflow:hidden;z-index:1}
+/* clip-path:inset(0) crea un clipping context real en celdas de tabla, a diferencia de overflow:hidden */
+#tab-gantt .gantt-timeline-head{position:relative;overflow:hidden;clip-path:inset(0);z-index:1}
+/* El contenedor de scroll no debe renderizar nada fuera de sus bordes */
+#tab-gantt .gantt-editor-shell{contain:paint}
 #tab-gantt .gantt-timeline-scale.has-grid{background-image:none}
 #tab-gantt .gantt-quarter-mark{border-left:none}
 #tab-gantt .gantt-editor-track,#tab-gantt .gantt-track{background-image:none}
