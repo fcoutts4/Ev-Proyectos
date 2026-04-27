@@ -994,7 +994,7 @@ function renderGanttEditor(rows = state.gantt) {
   renderGanttTimelineScale('gantt-timeline-head', meta, monthWidth);
 
   setHtml('gantt-tbody', normalized.map((row, index) => {
-    const left = toNumber(row.inicio) * monthWidth;
+    const left = (toNumber(row.inicio) * monthWidth) + (monthWidth / 2);
     const width = Math.max(1, toNumber(row.duracion)) * monthWidth;
     const lock = getGanttLockConfig(row);
     return `
@@ -1054,7 +1054,7 @@ function renderGanttPreview() {
       </div>
     </div>
     ${normalized.map((hito) => {
-      const left = toNumber(hito.inicio) * monthWidth;
+      const left = (toNumber(hito.inicio) * monthWidth) + (monthWidth / 2);
       const width = Math.max(1, toNumber(hito.duracion)) * monthWidth;
       return `
       <div class="gantt-row">
