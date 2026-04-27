@@ -2366,7 +2366,9 @@ function renderFinancingSourcePlanilla(sourceType) {
           <input class="inp cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}">
         </td>
         <td style="text-align:center">
-          <button class="btn-outline btn-formula" type="button" onclick="openCostFormulaModal('GASTOS FINANCIEROS', ${partida._costIndex})">Ver fórmula</button>
+          <div class="formula-chip-cell is-clickable" onclick="openCostFormulaModal('GASTOS FINANCIEROS', ${partida._costIndex})" title="Click para editar la fórmula">
+            ${renderFormulaChipsForCell(partida, false)}
+          </div>
         </td>
         <td><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><button class="btn-outline" type="button" onclick="openPaymentPlanModal('GASTOS FINANCIEROS', ${partida._costIndex})">${escapeHtml(summarizePaymentPlan(partida.plan_pago))}</button><div style="font-size:10px;color:${Math.abs(getPaymentPlanAssignedPct(partida.plan_pago) - 100) < 0.01 ? '#16a34a' : '#b45309'};white-space:nowrap">${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))}</div></div></td>
         <td data-month-cell style="text-align:center;color:#22c55e;font-weight:800">${fmtTableAmount(total, { kind: 'cost' })}</td>
@@ -3163,8 +3165,10 @@ function renderCostPlanilla() {
           <td style="text-align:center">${rowReadOnly ? '' : `<span class="row-tools"><button class="btn-outline btn-delete-inline" type="button" title="Eliminar subpartida" onclick="removeCostPartida('${escapeHtml(categoria.nombre)}', ${index})">&times;</button><span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span></span>`}</td>
           <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${rowReadOnly ? 'disabled' : ''}/></td>
           <td style="text-align:center">
-            <input class="inp cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}" ${rowReadOnly ? 'disabled' : ''}/>
-            <button class="btn-outline btn-formula" type="button" onclick="openCostFormulaModal('${escapeHtml(categoria.nombre)}', ${index})">Ver fórmula</button>
+            <div class="formula-chip-cell ${rowReadOnly ? 'is-readonly' : 'is-clickable'}" ${rowReadOnly ? '' : `onclick="openCostFormulaModal('${escapeHtml(categoria.nombre)}', ${index})"`} title="${rowReadOnly ? 'Fórmula automática' : 'Click para editar la fórmula'}">
+              ${renderFormulaChipsForCell(partida, rowReadOnly)}
+            </div>
+            <input type="hidden" class="cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}"/>
           </td>
           <td>${planEditable ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><button class="btn-outline" type="button" onclick="openPaymentPlanModal('${escapeHtml(categoria.nombre)}', ${index})">${escapeHtml(summarizePaymentPlan(partida.plan_pago))}</button><div style="font-size:10px;color:${Math.abs(getPaymentPlanAssignedPct(partida.plan_pago) - 100) < 0.01 ? '#16a34a' : '#b45309'};white-space:nowrap">${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))}</div></div>` : '<span class="badge badge-yellow">AUTO</span>'}</td>
           <td style="text-align:center;color:#22c55e;font-weight:800">${fmtTableAmount(total, { kind: 'cost' })}</td>
@@ -3483,6 +3487,16 @@ function renderFormulaToken(token, isAuto = false) {
   return `<span class="formula-token">${escapeHtml(value.replace(/^_+/, ''))}</span>`;
 }
 
+function renderFormulaChipsForCell(partida, isReadOnly = false) {
+  const rawValue = getPartidaFormulaText(partida);
+  const value = String(rawValue || '').trim();
+  if (!value) return '<span class="formula-chip-empty">Sin fórmula · click para editar</span>';
+  const isAuto = !!partida?.auto_origen && !partida?.editable_source;
+  const tokens = splitFormulaTokens(value);
+  const chips = tokens.map((token) => renderFormulaToken(token, isAuto || isReadOnly)).join('');
+  return `<div class="formula-chip-row">${chips}</div>`;
+}
+
 function renderCostFormulaPreviewContent(rawValue, formulaType = 'expr', isAuto = false) {
   const value = String(rawValue || '').trim();
   const tokens = splitFormulaTokens(value);
@@ -3604,24 +3618,23 @@ function openCostFormulaModal(categoryName, index) {
   const input = $('cost-formula-modal-input');
   const title = $('cost-formula-title');
   const subtitle = $('cost-formula-subtitle');
-  const saveBtn = $('cost-formula-save-btn');
-  if (!input || !title || !subtitle || !saveBtn) return;
+  if (!input || !title || !subtitle) return;
 
   const formulaText = getPartidaFormulaText(partida);
   input.value = formulaText;
   const readOnlyAuto = !!partida.auto_origen && !partida.editable_source;
   input.dataset.auto = readOnlyAuto ? '1' : '';
   input.disabled = readOnlyAuto;
-  title.textContent = `Ver fórmula · ${partida.nombre || 'Subpartida'}`;
+  title.textContent = `Fórmula · ${partida.nombre || 'Subpartida'}`;
   subtitle.textContent = readOnlyAuto
-    ? 'Fórmula calculada automáticamente para esta subpartida.'
-    : 'Edita la fórmula sin ocupar espacio en la tabla principal.';
-  saveBtn.style.display = readOnlyAuto ? 'none' : 'inline-flex';
+    ? 'Fórmula calculada automáticamente.'
+    : 'Edita la fórmula. Los cambios se guardan automáticamente.';
   updateCostFormulaModalPreview();
   $('cost-formula-modal').style.display = 'flex';
 }
 
 function closeCostFormulaModal() {
+  const wasActive = state.costosUi.activeFormulaCategory != null;
   state.costosUi.activeFormulaCategory = null;
   state.costosUi.activeFormulaIndex = null;
   const input = $('cost-formula-modal-input');
@@ -3631,6 +3644,9 @@ function closeCostFormulaModal() {
     delete input.dataset.auto;
   }
   $('cost-formula-modal').style.display = 'none';
+  if (wasActive && typeof renderCostosModule === 'function') {
+    renderCostosModule();
+  }
 }
 
 function saveCostFormulaModal() {
