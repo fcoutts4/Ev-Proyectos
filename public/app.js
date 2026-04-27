@@ -1258,7 +1258,24 @@ function getCronogramaComputed(item) {
   const ganttRef = findGanttByName(item.vinculo_gantt);
   const base = isVentasCronogramaType(item, 'PREVENTA') ? toNumber(ganttRef?.inicio) : toNumber(ganttRef?.fin);
   const inicio = ganttRef ? base + toNumber(item.mes_inicio) : toNumber(item.mes_inicio);
-  const duracion = Math.max(1, toNumber(item.duracion));
+
+  // Duración calculada automáticamente basada en velocidad
+  let duracion = Math.max(1, toNumber(item.duracion));
+  const totals = getTotalSalesMetrics();
+  const velocitySettings = getVentasVelocitySettings();
+
+  if (isVentasCronogramaType(item, 'PREVENTA')) {
+    const velocidadPromesas = toNumber(velocitySettings.promesas);
+    if (velocidadPromesas > 0) {
+      duracion = Math.ceil(totals.totalUnidades / velocidadPromesas);
+    }
+  } else if (isVentasCronogramaType(item, 'ESCRITURACION')) {
+    const velocidadEscrituras = toNumber(velocitySettings.escrituracion);
+    if (velocidadEscrituras > 0) {
+      duracion = Math.ceil(totals.totalUnidades / velocidadEscrituras);
+    }
+  }
+
   const fin = inicio + duracion;
   return { inicio, duracion, fin };
 }
