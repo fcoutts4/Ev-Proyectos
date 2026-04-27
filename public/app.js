@@ -1551,9 +1551,15 @@ function getPromesasEscrituracionUnidades(monthCountOrMonths) {
   // Usar velocidad definida por usuario (ej: 20/mes)
   const velocitySettings = getVentasVelocitySettings();
   const escrituraVelocidadDefinida = toNumber(velocitySettings.escrituracion);
+  const promesaVelocidadDefinida = toNumber(velocitySettings.promesas);
+  const totalUnidadesNum = Math.max(0, Math.round(toNumber(totals.totalUnidades)));
 
   months.forEach((m, index) => {
-    const pUn = getScheduledWholeUnits(totals.totalUnidades, promesaComputed, m);
+    // Para promesas: velocidad constante hasta agotar totalUnidades
+    let pUn = 0;
+    if (promesaComputed && m >= promesaComputed.inicio && promesasAcum < totalUnidadesNum) {
+      pUn = Math.min(Math.round(promesaVelocidadDefinida), totalUnidadesNum - promesasAcum);
+    }
     // Para escrituras: usar velocidad definida desde el inicio (sin fin fijo)
     // Las escrituras continúan mientras haya promesas acumuladas disponibles
     let eUnRaw = 0;
