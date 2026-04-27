@@ -1046,7 +1046,7 @@ function renderGanttPreview() {
     <div class="gantt-timeline-scale has-grid" style="width:${meta.timelineWidth}px;--month-width:${monthWidth}px;margin-bottom:8px">
       ${meta.monthMarks.map((mark) => `
         <div class="gantt-quarter-mark" style="left:${mark.left}px">
-          <span title="Mes ${fmtNumber(mark.month)}">${escapeHtml(mark.label)}</span>
+          <span title="Mes ${fmtNumber(mark.month)}">${mark.showLabel ? escapeHtml(mark.label) : ''}</span>
         </div>
       `).join('')}
     </div>
