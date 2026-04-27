@@ -149,6 +149,66 @@ tbody tr:hover{background:#f8fafc}
 .formula-suggest small{display:block;color:#94a3b8;font-size:10px;margin-top:2px}
 .chart-shell{position:relative;width:100%;height:clamp(240px,36vh,420px);overflow:hidden}
 .chart-shell canvas{display:block !important;width:100% !important;height:100% !important;max-height:100% !important}
+
+/* ===== LAYOUT RESUMEN + GANTT ===== */
+.sheet-layout{max-width:1380px;margin:0 auto;width:100%}
+.sheet-layout .card{border-radius:10px}
+.section-block{display:grid;gap:14px}
+.resumen-gantt-card .sec-title,
+.gantt-editor-card .sec-title{margin-bottom:10px}
+
+/* Tablas compactas y legibles */
+#tab-resumen table,
+#tab-gantt table{table-layout:fixed}
+#tab-resumen table thead th,
+#tab-gantt table thead th{font-size:11px;line-height:1.2}
+#tab-resumen table tbody td,
+#tab-gantt table tbody td{font-size:12px;line-height:1.25;padding:8px 10px}
+#tab-resumen table th:not(:first-child),
+#tab-resumen table td:not(:first-child){text-align:right}
+.res-table-scroll{overflow:auto;max-width:100%;border-radius:8px}
+.res-table-scroll table{min-width:560px}
+.res-table-scroll thead th{position:sticky;top:0;z-index:2}
+
+/* Gantt profesional y adaptable */
+#tab-gantt .gantt-editor-shell{overflow:auto;max-width:100%;border:1px solid var(--border-strong);border-radius:10px}
+#tab-gantt .gantt-table{min-width:max-content;background:#fff}
+#tab-gantt .gantt-table thead th{position:sticky;top:0;z-index:9}
+#tab-gantt .gantt-table tbody td{height:56px;vertical-align:middle}
+#tab-gantt .gantt-table th,#tab-gantt .gantt-table td{text-align:center}
+#tab-gantt .gantt-table th:nth-child(2),#tab-gantt .gantt-table td:nth-child(2){text-align:left}
+#tab-gantt .gantt-table th:nth-child(4),#tab-gantt .gantt-table td:nth-child(4),
+#tab-gantt .gantt-table th:nth-child(5),#tab-gantt .gantt-table td:nth-child(5),
+#tab-gantt .gantt-table th:nth-child(6),#tab-gantt .gantt-table td:nth-child(6){text-align:right}
+#tab-gantt .gantt-cell-tight .inp{text-align:right}
+.gantt-timeline-scale{height:36px}
+.gantt-quarter-mark span{font-size:10px;font-weight:700;white-space:nowrap;width:auto;left:4px}
+.gantt-editor-track{height:22px}
+.gantt-editor-bar{top:3px;height:16px;border-radius:5px}
+.gantt-track{height:18px}
+.gantt-bar{top:2px;height:14px;border-radius:5px}
+
+/* Resumen ejecutivo: menos saturación y mejor jerarquía */
+#tab-resumen .resumen-banner{margin-bottom:16px}
+#tab-resumen #kpi-grid{gap:10px;margin-bottom:16px}
+#tab-resumen .resumen-main-grid{display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:16px}
+#tab-resumen .resumen-secondary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px}
+
+@media (max-width: 1440px){
+  .sheet-layout{max-width:1260px}
+}
+@media (max-width: 1366px){
+  .sheet-layout{max-width:1200px}
+  #tab-resumen table thead th,
+  #tab-gantt table thead th{font-size:10px}
+  #tab-resumen table tbody td,
+  #tab-gantt table tbody td{font-size:11px;padding:7px 8px}
+}
+@media (max-width: 900px){
+  .sheet-layout{max-width:100%}
+  #tab-resumen .resumen-secondary-grid{grid-template-columns:1fr}
+  .res-table-scroll table{min-width:520px}
+}
 /* DISTRIBUCIÓN DE COSTOS */
 .dist-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
 .dist-label{font-size:11px;text-align:right;min-width:130px;color:#64748b}
@@ -519,9 +579,10 @@ tfoot td{line-height:1.25}
 <main id="main-content" tabindex="-1" style="max-width:1600px;margin:0 auto;padding:20px 24px">
 
 <div id="tab-resumen" class="tab-pane active">
+<div class="sheet-layout">
 
   <!-- Banner -->
-  <div class="card-dark" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;border-radius:12px">
+  <div class="card-dark resumen-banner" style="display:flex;justify-content:space-between;align-items:center;border-radius:12px">
     <div style="display:flex;align-items:center;gap:14px">
       <div style="width:42px;height:42px;background:#22c55e;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px"></div>
       <div>
@@ -533,7 +594,7 @@ tfoot td{line-height:1.25}
 </div>
 
   <!-- KPIs -->
-  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px" id="kpi-grid">
+  <div style="display:grid;grid-template-columns:repeat(5,1fr)" id="kpi-grid">
     <div class="kpi-card kpi-green">
       <div class="kpi-label">Ventas Totales</div>
       <div class="kpi-value" style="color:#16a34a" id="kpi-ventas">647.950 UF</div>
@@ -561,10 +622,10 @@ tfoot td{line-height:1.25}
 </div>
 
   <!-- Gantt Preview + Cabida + Ventas -->
-  <div style="display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:20px">
+  <div class="resumen-main-grid">
 
     <!-- Gantt -->
-    <div class="card">
+    <div class="card resumen-gantt-card">
       <div class="sec-title"> CARTA GANTT
         <span style="margin-left:auto;font-weight:400;font-size:10px;text-transform:none;color:#94a3b8">Pasa el cursor sobre el gráfico para ver el detalle</span>
     </div>
@@ -575,7 +636,7 @@ tfoot td{line-height:1.25}
 </div>
 
   <!-- Cabida + Ventas resumen -->
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px;margin-bottom:20px">
+  <div class="resumen-secondary-grid">
 
     <!-- Cabida -->
     <div class="card">
@@ -584,22 +645,22 @@ tfoot td{line-height:1.25}
         <!-- Unidades -->
         <div>
           <p style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px">Unidades</p>
-          <table>
+          <div class="res-table-scroll"><table>
             <thead><tr><th style="text-align:left">Tipo</th><th>Cant.</th><th>Interior/Un</th><th>Terraza/Un</th><th style="color:#3b82f6">Vendible/Un</th></tr></thead>
             <tbody id="res-cabida-tbody"></tbody>
             <tfoot><tr class="tfoot-green" id="res-cabida-tfoot"></tr></tfoot>
-        </table>
+          </table></div>
           <div style="font-size:10px;color:#64748b;margin-top:6px">Vendible considera <strong id="res-cabida-vendible-pct">50,0%</strong> de terraza.</div>
       </div>
         <!-- Superficies -->
         <div>
           <p style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px">Superficies</p>
-          <table>
+          <div class="res-table-scroll"><table>
             <thead><tr><th style="text-align:left">Tipo</th><th>M2 útiles</th><th style="color:#3b82f6">M2 vendibles</th></tr></thead>
             <tbody id="res-sup-tbody"></tbody>
             <tfoot><tr class="tfoot-dark" id="res-sup-tfoot"></tr></tfoot>
             <tbody id="res-sup-extra"></tbody>
-        </table>
+          </table></div>
           <div style="display:flex;gap:16px;font-size:10px;color:#64748b;margin-top:6px">
             <div>M2 útiles totales: <strong id="res-cabida-util-total">0 m2</strong></div>
             <div>M2 comunes totales: <strong id="res-cabida-common-total">0 m2</strong></div>
@@ -608,17 +669,18 @@ tfoot td{line-height:1.25}
       </div>
         <div>
           <p style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px">Estacionamientos y Bodegas</p>
-          <table>
+          <div class="res-table-scroll"><table>
             <thead><tr><th style="text-align:left">Concepto</th><th>Cantidad</th></tr></thead>
             <tbody id="res-acc-tbody"></tbody>
             <tfoot><tr class="tfoot-green" id="res-acc-tfoot"></tr></tfoot>
-        </table>
+          </table></div>
       </div>
     </div>
   </div>
 
 </div>
 
+</div>
 </div><!-- end tab resumen -->
 
 <div id="tab-cabida" class="tab-pane">
@@ -977,6 +1039,7 @@ tfoot td{line-height:1.25}
 </div><!-- end tab ventas -->
 
 <div id="tab-gantt" class="tab-pane">
+<div class="sheet-layout">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
     <div>
       <div style="font-size:16px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:8px"> Cronograma del Proyecto</div>
@@ -988,29 +1051,30 @@ tfoot td{line-height:1.25}
   </div>
 </div>
 
-  <div class="card">
+  <div class="card gantt-editor-card">
     <div style="display:flex;justify-content:flex-end;align-items:center;margin-bottom:12px">
       <div class="planilla-nav">
         <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('gantt-editor-scroll', -480)">← Fechas</button>
         <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('gantt-editor-scroll', 480)">Fechas →</button>
       </div>
     </div>
-    <div id="gantt-editor-scroll" class="tbl-scroll">
+    <div id="gantt-editor-scroll" class="tbl-scroll gantt-editor-shell">
     <table class="gantt-table">
       <thead>
         <tr>
-          <th class="gantt-sticky-left gantt-sticky-head" style="left:0;width:40px"></th>
-          <th class="gantt-sticky-left gantt-sticky-head" style="left:40px;width:180px;text-align:left">HITO / PARTIDA</th>
-          <th class="gantt-sticky-left gantt-sticky-head" style="left:220px;width:130px">DEPENDENCIA</th>
-          <th class="gantt-sticky-left gantt-sticky-head" style="left:350px;width:56px">DESFASE</th>
-          <th class="gantt-sticky-left gantt-sticky-head" style="left:406px;width:56px">INICIO</th>
-          <th class="gantt-sticky-left gantt-sticky-head" style="left:462px;width:62px">DURACIÓN</th>
+          <th class="gantt-sticky-left gantt-sticky-head" style="left:0;width:34px"></th>
+          <th class="gantt-sticky-left gantt-sticky-head" style="left:34px;width:170px;text-align:left">HITO / PARTIDA</th>
+          <th class="gantt-sticky-left gantt-sticky-head" style="left:204px;width:132px">DEPENDENCIA</th>
+          <th class="gantt-sticky-left gantt-sticky-head" style="left:336px;width:72px">DESFASE</th>
+          <th class="gantt-sticky-left gantt-sticky-head" style="left:408px;width:72px">INICIO</th>
+          <th class="gantt-sticky-left gantt-sticky-head" style="left:480px;width:78px">DURACIÓN</th>
           <th class="gantt-timeline-head"><div id="gantt-timeline-head"></div></th>
           <th class="gantt-sticky-right gantt-sticky-head" style="width:42px">X</th>
       </tr>
     </thead>
       <tbody id="gantt-tbody"></tbody>
   </table>
+</div>
 </div>
 </div>
 </div><!-- end tab gantt -->

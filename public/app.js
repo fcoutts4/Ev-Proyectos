@@ -856,7 +856,12 @@ function getGanttDependencyOptions(currentName) {
     .join('');
 }
 
-const GANTT_MONTH_WIDTH = 42;
+function getGanttMonthWidth() {
+  const viewport = window.innerWidth || 1440;
+  if (viewport <= 1366) return 34;
+  if (viewport <= 1680) return 38;
+  return 42;
+}
 
 function addMonths(date, months) {
   const result = new Date(date.getTime());
@@ -875,33 +880,37 @@ function getGanttBaseDate() {
 }
 
 function formatTimelineQuarterLabel(date) {
-  return new Intl.DateTimeFormat('es-CL', { month: 'short', year: '2-digit' }).format(date);
+  return new Intl.DateTimeFormat('es-CL', { month: 'short', year: '2-digit' })
+    .format(date)
+    .replace(/\./g, '')
+    .replace(/\s+/g, '-')
+    .toLowerCase();
 }
 
 function formatTimelineMonthLabel(month) {
   return formatTimelineQuarterLabel(addMonths(getGanttBaseDate(), Math.max(0, toNumber(month))));
 }
 
-function getGanttTimelineMeta(rows = state.gantt) {
+function getGanttTimelineMeta(rows = state.gantt, monthWidth = getGanttMonthWidth()) {
   const normalized = normalizeGanttRows(rows);
   const totalMonths = Math.max(12, ...normalized.map((row) => toNumber(row.fin)));
-  const timelineWidth = (totalMonths + 1) * GANTT_MONTH_WIDTH;
+  const timelineWidth = (totalMonths + 1) * monthWidth;
   const baseDate = getGanttBaseDate();
   const monthMarks = [];
   for (let month = 0; month <= totalMonths; month += 1) {
     monthMarks.push({
       month,
-      left: month * GANTT_MONTH_WIDTH,
+      left: month * monthWidth,
       label: formatTimelineQuarterLabel(addMonths(baseDate, month)),
     });
   }
   return { totalMonths, timelineWidth, monthMarks };
 }
 
-function renderGanttTimelineScale(containerId, meta) {
+function renderGanttTimelineScale(containerId, meta, monthWidth = getGanttMonthWidth()) {
   if (!$(containerId)) return;
   setHtml(containerId, `
-    <div class="gantt-timeline-scale has-grid" style="width:${meta.timelineWidth}px;--month-width:${GANTT_MONTH_WIDTH}px">
+    <div class="gantt-timeline-scale has-grid" style="width:${meta.timelineWidth}px;--month-width:${monthWidth}px">
       ${meta.monthMarks.map((mark) => `
         <div class="gantt-quarter-mark" style="left:${mark.left}px">
           <span title="Mes ${fmtNumber(mark.month)}">${escapeHtml(mark.label)}</span>
@@ -953,25 +962,26 @@ function readGanttEditor() {
 function renderGanttEditor(rows = state.gantt) {
   const normalized = normalizeGanttRows(rows);
   state.gantt = normalized;
-  const meta = getGanttTimelineMeta(normalized);
-  renderGanttTimelineScale('gantt-timeline-head', meta);
+  const monthWidth = getGanttMonthWidth();
+  const meta = getGanttTimelineMeta(normalized, monthWidth);
+  renderGanttTimelineScale('gantt-timeline-head', meta, monthWidth);
 
   setHtml('gantt-tbody', normalized.map((row, index) => {
-    const left = toNumber(row.inicio) * GANTT_MONTH_WIDTH;
-    const width = Math.max(1, toNumber(row.duracion)) * GANTT_MONTH_WIDTH;
+    const left = toNumber(row.inicio) * monthWidth;
+    const width = Math.max(1, toNumber(row.duracion)) * monthWidth;
     const lock = getGanttLockConfig(row);
     return `
       <tr data-gantt-row data-id="${escapeHtml(row.id || '')}" data-index="${index}" ondragover="allowGanttDrop(event)" ondrop="dropGanttRow(event)">
-        <td class="gantt-sticky-left gantt-actions" style="left:0;width:40px">
+        <td class="gantt-sticky-left gantt-actions" style="left:0;width:34px">
           <span class="drag-handle" ${lock.drag ? '' : 'data-gantt-drag="1" draggable="true" ondragstart="startGanttDrag(event)" ondragend="endGanttDrag(event)"'} title="${escapeHtml(lock.hint || 'Orden manual')}">${lock.drag ? '&#8226;' : '&#8226;&#8226;&#8226;'}</span>
         </td>
-        <td class="gantt-sticky-left" style="left:40px;width:180px">
+        <td class="gantt-sticky-left" style="left:34px;width:170px">
           <div style="display:grid;grid-template-columns:18px 1fr;gap:8px;align-items:center">
             <input data-field="color" type="color" value="${escapeHtml(row.color || '#3b82f6')}" ${lock.name ? 'disabled' : ''} onchange="onGanttInputChange()"/>
             <input class="inp" data-field="nombre" value="${escapeHtml(row.nombre)}" ${lock.name ? 'disabled' : ''} onchange="onGanttInputChange()"/>
           </div>
         </td>
-        <td class="gantt-sticky-left" style="left:220px;width:130px">
+        <td class="gantt-sticky-left" style="left:204px;width:132px">
           <div style="display:grid;grid-template-columns:1fr 50px;gap:4px">
             <select class="inp" data-field="dependencia" ${lock.dependency ? 'disabled' : ''} onchange="onGanttInputChange()">
               ${getGanttDependencyOptions(row.nombre).replace(`value="${escapeHtml(row.dependencia || '')}"`, `value="${escapeHtml(row.dependencia || '')}" selected`)}
@@ -982,11 +992,11 @@ function renderGanttEditor(rows = state.gantt) {
             </select>
           </div>
         </td>
-        <td class="gantt-sticky-left gantt-cell-tight" style="left:350px;width:56px"><input class="inp" data-field="desfase" type="number" value="${toNumber(row.desfase)}" onchange="onGanttInputChange()"/></td>
-        <td class="gantt-sticky-left gantt-cell-tight" style="left:406px;width:56px"><input class="inp" data-field="inicio" type="number" value="${toNumber(row.inicio)}" ${(row.dependencia || lock.start) ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
-        <td class="gantt-sticky-left gantt-cell-tight" style="left:462px;width:62px"><input class="inp" data-field="duracion" type="number" value="${toNumber(row.duracion)}" ${lock.duration ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
+        <td class="gantt-sticky-left gantt-cell-tight" style="left:336px;width:72px"><input class="inp" data-field="desfase" type="number" value="${toNumber(row.desfase)}" onchange="onGanttInputChange()"/></td>
+        <td class="gantt-sticky-left gantt-cell-tight" style="left:408px;width:72px"><input class="inp" data-field="inicio" type="number" value="${toNumber(row.inicio)}" ${(row.dependencia || lock.start) ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
+        <td class="gantt-sticky-left gantt-cell-tight" style="left:480px;width:78px"><input class="inp" data-field="duracion" type="number" value="${toNumber(row.duracion)}" ${lock.duration ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
         <td>
-          <div class="gantt-editor-track" style="width:${meta.timelineWidth}px;--month-width:${GANTT_MONTH_WIDTH}px">
+          <div class="gantt-editor-track" style="width:${meta.timelineWidth}px;--month-width:${monthWidth}px">
             <div class="gantt-editor-bar" title="Inicio ${fmtNumber(row.inicio)} · Fin ${fmtNumber(row.fin)}" style="left:${left}px;width:${width}px;background:${escapeHtml(row.color || '#3b82f6')}"></div>
           </div>
         </td>
@@ -1003,9 +1013,10 @@ function renderGanttEditor(rows = state.gantt) {
 
 function renderGanttPreview() {
   const normalized = normalizeGanttRows(state.gantt);
-  const meta = getGanttTimelineMeta(normalized);
+  const monthWidth = getGanttMonthWidth();
+  const meta = getGanttTimelineMeta(normalized, monthWidth);
   setHtml('gantt-preview', `
-    <div class="gantt-timeline-scale has-grid" style="width:${meta.timelineWidth}px;--month-width:${GANTT_MONTH_WIDTH}px;margin-bottom:8px">
+    <div class="gantt-timeline-scale has-grid" style="width:${meta.timelineWidth}px;--month-width:${monthWidth}px;margin-bottom:8px">
       ${meta.monthMarks.map((mark) => `
         <div class="gantt-quarter-mark" style="left:${mark.left}px">
           <span title="Mes ${fmtNumber(mark.month)}">${escapeHtml(mark.label)}</span>
@@ -1013,12 +1024,12 @@ function renderGanttPreview() {
       `).join('')}
     </div>
     ${normalized.map((hito) => {
-      const left = toNumber(hito.inicio) * GANTT_MONTH_WIDTH;
-      const width = Math.max(1, toNumber(hito.duracion)) * GANTT_MONTH_WIDTH;
+      const left = toNumber(hito.inicio) * monthWidth;
+      const width = Math.max(1, toNumber(hito.duracion)) * monthWidth;
       return `
       <div class="gantt-row">
         <div class="gantt-label">${escapeHtml(hito.nombre)}</div>
-        <div class="gantt-track" style="width:${meta.timelineWidth}px;--month-width:${GANTT_MONTH_WIDTH}px">
+        <div class="gantt-track" style="width:${meta.timelineWidth}px;--month-width:${monthWidth}px">
           <div class="gantt-bar" title="Inicio ${fmtNumber(hito.inicio)} · Fin ${fmtNumber(hito.fin)}" style="left:${left}px;width:${width}px;background:${escapeHtml(hito.color || '#3b82f6')}"></div>
         </div>
       </div>
