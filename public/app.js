@@ -1271,9 +1271,15 @@ function getCronogramaComputed(item) {
       duracion = Math.ceil(totals.totalUnidades / velocidadPromesas);
     }
   } else if (isVentasCronogramaType(item, 'ESCRITURACION')) {
-    // Escrituraciones: misma duración que promesas (limitadas por acumulado de promesas)
-    if (velocidadPromesas > 0) {
-      duracion = Math.ceil(totals.totalUnidades / velocidadPromesas);
+    // Escrituraciones: velocidad efectiva = min(promesas, escrituración)
+    // Limitadas por acumulado de promesas, pero no por una duración fija
+    const velocidadEscrituras = toNumber(velocitySettings.escrituracion);
+    const velocidadEfectiva = Math.min(
+      velocidadPromesas > 0 ? velocidadPromesas : Infinity,
+      velocidadEscrituras > 0 ? velocidadEscrituras : Infinity
+    );
+    if (velocidadEfectiva > 0 && velocidadEfectiva !== Infinity) {
+      duracion = Math.ceil(totals.totalUnidades / velocidadEfectiva);
     }
   }
 
@@ -1548,9 +1554,10 @@ function getPromesasEscrituracionUnidades(monthCountOrMonths) {
 
   months.forEach((m, index) => {
     const pUn = getScheduledWholeUnits(totals.totalUnidades, promesaComputed, m);
-    // Para escrituras: usar velocidad definida si estamos en período de escrituración
+    // Para escrituras: usar velocidad definida desde el inicio (sin fin fijo)
+    // Las escrituras continúan mientras haya promesas acumuladas disponibles
     let eUnRaw = 0;
-    if (escrituraComputed && m >= escrituraComputed.inicio && m < escrituraComputed.fin) {
+    if (escrituraComputed && m >= escrituraComputed.inicio) {
       eUnRaw = Math.round(escrituraVelocidadDefinida);
     }
 
