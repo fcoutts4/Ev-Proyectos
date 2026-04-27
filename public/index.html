@@ -11,14 +11,15 @@
 *{box-sizing:border-box}
 body{font-family:'Inter',system-ui,sans-serif;background:#f1f5f9;color:#1e293b}
 /* NAV */
-.topnav{position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid #e2e8f0;height:52px;display:flex;align-items:center;padding:0 24px;justify-content:space-between}
+.topnav{position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid #e2e8f0;min-height:60px;display:flex;align-items:center;padding:8px 24px;justify-content:space-between;gap:14px}
 .logo-box{width:28px;height:28px;background:#0f172a;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:12px}
 /* PROJECT HEADER */
-.proj-header{position:sticky;top:52px;z-index:40;background:#fff;border-bottom:1px solid #e2e8f0;padding:0 24px}
-.proj-top-row{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:52px;padding:6px 0}
-.proj-title-wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.proj-name{font-size:22px;font-weight:800;color:#0f172a;margin:0;line-height:1.1}
-.proj-sync-wrap{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.proj-header{position:sticky;top:60px;z-index:40;background:#fff;border-bottom:1px solid #e2e8f0;padding:0 24px}
+.topnav-left{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.topnav-project{font-size:24px;font-weight:800;color:#0f172a;line-height:1;white-space:nowrap}
+.topnav-right{display:flex;align-items:center;gap:12px;min-width:0}
+.topnav-sync{display:flex;align-items:center;gap:10px;min-width:0}
+.topnav-sync-detail{font-size:11px;color:#64748b;white-space:nowrap}
 /* TABS */
 .tab-nav{display:flex;gap:0;overflow-x:auto;white-space:nowrap}
 .tab-nav::-webkit-scrollbar{display:none}
@@ -439,10 +440,9 @@ tfoot td{line-height:1.25}
 .chart-shell{border-radius:var(--radius-md)}
 [aria-live]{min-height:1em}
 @media (max-width: 900px){
-  .topnav{padding:0 12px!important}
+  .topnav{padding:6px 12px!important}
   .proj-header{padding-left:12px!important;padding-right:12px!important}
-  .proj-top-row{min-height:46px;padding:4px 0}
-  .proj-name{font-size:18px}
+  .topnav-project{font-size:18px}
   main{padding:12px!important}
   .card,.card-dark,.kpi-card,.req-kpi{padding:14px!important}
   .flow-kpi-grid{grid-template-columns:1fr!important}
@@ -450,8 +450,8 @@ tfoot td{line-height:1.25}
   .planilla-header{align-items:flex-start!important}
 }
 @media (max-width: 640px){
-  .sync-meta{gap:4px}
-  .sync-text{display:block}
+  .topnav{flex-wrap:nowrap;overflow-x:auto}
+  .topnav-sync-detail{display:none}
   .kpi-value{font-size:1.28rem!important}
   .sec-title{font-size:10px!important;letter-spacing:.06em}
   .tab-btn{padding:10px 9px!important}
@@ -463,7 +463,7 @@ tfoot td{line-height:1.25}
 /* Más legibilidad cuando la pantalla es angosta */
 @media (max-width: 1366px){
   body{font-size:15px}
-  .topnav{height:56px;padding:0 16px}
+  .topnav{min-height:56px;padding:6px 16px}
   .proj-header{top:56px;padding:0 16px}
   main{padding:16px!important}
   .card,.card-dark,.kpi-card,.req-kpi{padding:16px!important;border-radius:10px!important}
@@ -488,27 +488,24 @@ tfoot td{line-height:1.25}
 
 <!-- TOP NAV -->
 <nav class="topnav">
-  <div style="display:flex;align-items:center;gap:10px">
+  <div class="topnav-left">
     <div class="logo-box">B</div>
     <span style="font-weight:900;font-size:13px;letter-spacing:.05em;color:#0f172a">BRICSA</span>
-</div>
+    <h1 id="proj-title" class="topnav-project">Edificio Residencial Tipo</h1>
+  </div>
+  <div class="topnav-right">
+    <div class="topnav-sync">
+      <span id="sync-badge" style="display:inline-flex;align-items:center;font-size:11px;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:6px 12px">
+        <span id="sync-label">Sincronizado</span>
+      </span>
+      <span id="sync-detail" class="topnav-sync-detail">Última sincronización: sin registro</span>
+    </div>
+    <div id="project-controls-slot"></div>
+  </div>
 </nav>
 
 <!-- PROJECT HEADER -->
 <div class="proj-header">
-  <div class="proj-top-row">
-    <div class="proj-title-wrap">
-      <h1 id="proj-title" class="proj-name">Edificio Residencial Tipo</h1>
-    </div>
-    <div class="proj-sync-wrap">
-      <span id="sync-badge" style="display:inline-flex;align-items:center;font-size:11px;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:6px 12px">
-        <span id="sync-label">Sincronizado</span>
-      </span>
-      <div class="sync-meta">
-        <span id="sync-detail" class="sync-text">Última sincronización: sin registro</span>
-      </div>
-  </div>
-</div>
   <div class="tab-nav" id="tabBar">
     <button class="tab-btn active" onclick="showTab('resumen',this)">Resumen Ejecutivo</button>
     <button class="tab-btn" onclick="showTab('cabida',this)">Cabida Proyecto</button>

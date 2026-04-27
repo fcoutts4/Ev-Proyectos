@@ -608,7 +608,24 @@ async function refreshHealthStatus() {
 }
 
 function ensureProjectControls() {
-  // Header minimalista: controles de proyecto ocultos por requerimiento de UI.
+  if ($('project-selector')) return;
+
+  const controlsSlot = $('project-controls-slot');
+  if (!controlsSlot) return;
+
+  const controls = document.createElement('div');
+  controls.style.display = 'flex';
+  controls.style.alignItems = 'center';
+  controls.style.gap = '8px';
+  controls.innerHTML = `
+    <select id="project-selector" class="inp" style="min-width:220px;max-width:320px"></select>
+  `;
+
+  controlsSlot.appendChild(controls);
+
+  $('project-selector').addEventListener('change', (event) => {
+    loadProject(event.target.value);
+  });
 }
 
 function ensureActionButtons() {
