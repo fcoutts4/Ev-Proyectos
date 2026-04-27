@@ -1065,7 +1065,9 @@ function renderGanttEditor(rows = state.gantt) {
   Array.from(document.querySelectorAll('#gantt-tbody .gantt-editor-bar')).forEach((bar, index) => {
     const row = normalized[index];
     if (!row) return;
-    bar.title = getGanttRangeLabel(row.inicio, row.duracion);
+    const range = getGanttRangeLabel(row.inicio, row.duracion);
+    bar.title = range;
+    bar.dataset.range = range;
   });
   renderGanttPreview();
 }
@@ -1101,7 +1103,9 @@ function renderGanttPreview() {
   Array.from(document.querySelectorAll('#gantt-preview .gantt-bar')).forEach((bar, index) => {
     const row = normalized[index];
     if (!row) return;
-    bar.title = getGanttRangeLabel(row.inicio, row.duracion);
+    const range = getGanttRangeLabel(row.inicio, row.duracion);
+    bar.title = range;
+    bar.dataset.range = range;
   });
 }
 
