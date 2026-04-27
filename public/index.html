@@ -270,7 +270,7 @@ tbody tr:hover{background:#f8fafc}
 .gantt-cell-tight .inp{padding:4px 5px;text-align:center}
 .gantt-table .inp{padding:5px 8px;min-height:28px}
 .gantt-name-wrap{display:grid;grid-template-columns:24px minmax(0,1fr);gap:6px;align-items:center;position:relative;overflow:visible}
-.gantt-color-current{width:18px;height:18px;border-radius:999px;border:1px solid rgba(15,23,42,.25);cursor:pointer;padding:0;appearance:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.28)}
+.gantt-color-current{display:block;width:18px!important;min-width:18px!important;height:18px!important;min-height:18px!important;border-radius:999px;border:1px solid rgba(15,23,42,.25);cursor:pointer;padding:0!important;appearance:none;line-height:0;box-sizing:border-box;box-shadow:inset 0 0 0 1px rgba(255,255,255,.28)}
 .gantt-color-popup{
   position:fixed;
   z-index:300;
@@ -283,7 +283,7 @@ tbody tr:hover{background:#f8fafc}
   background:#fff;
   box-shadow:0 10px 24px rgba(15,23,42,.18);
 }
-.gantt-color-swatch{width:12px;height:12px;border-radius:999px;border:1px solid rgba(15,23,42,.2);padding:0;cursor:pointer;outline:none}
+.gantt-color-swatch{display:block;width:12px!important;min-width:12px!important;height:12px!important;min-height:12px!important;border-radius:999px;border:1px solid rgba(15,23,42,.2);padding:0!important;cursor:pointer;outline:none;line-height:0;box-sizing:border-box}
 .gantt-color-swatch.active{box-shadow:0 0 0 2px #0f172a}
 .gantt-name-input{min-width:0!important}
 .gantt-actions{display:flex;align-items:center;justify-content:center}
