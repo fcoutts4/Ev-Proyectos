@@ -1043,12 +1043,15 @@ function renderGanttPreview() {
   const monthWidth = getGanttMonthWidth();
   const meta = getGanttTimelineMeta(normalized, monthWidth);
   setHtml('gantt-preview', `
-    <div class="gantt-timeline-scale has-grid" style="width:${meta.timelineWidth}px;--month-width:${monthWidth}px;margin-bottom:8px">
-      ${meta.monthMarks.map((mark) => `
-        <div class="gantt-quarter-mark" style="left:${mark.left}px">
-          <span title="Mes ${fmtNumber(mark.month)}">${mark.showLabel ? escapeHtml(mark.label) : ''}</span>
-        </div>
-      `).join('')}
+    <div class="gantt-preview-head">
+      <div class="gantt-preview-label-spacer"></div>
+      <div class="gantt-timeline-scale has-grid" style="width:${meta.timelineWidth}px;--month-width:${monthWidth}px;margin-bottom:8px">
+        ${meta.monthMarks.map((mark) => `
+          <div class="gantt-quarter-mark" style="left:${mark.left}px">
+            <span title="Mes ${fmtNumber(mark.month)}">${mark.showLabel ? escapeHtml(mark.label) : ''}</span>
+          </div>
+        `).join('')}
+      </div>
     </div>
     ${normalized.map((hito) => {
       const left = toNumber(hito.inicio) * monthWidth;
