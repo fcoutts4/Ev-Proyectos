@@ -220,10 +220,10 @@ tbody tr:hover{background:#f8fafc}
 .gantt-row{display:flex;align-items:center;height:26px;border-bottom:1px solid #f1f5f9}
 .gantt-label{width:170px;flex-shrink:0;font-size:11px;color:#475569;padding-right:8px;text-align:right}
 .gantt-track{flex:1;position:relative;height:16px}
-.gantt-bar{position:absolute;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff}
+.gantt-bar{position:absolute;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff;cursor:default}
 .gantt-editor-track{position:relative;height:16px;background:#f8fafc;border-radius:5px;overflow:hidden}
-.gantt-editor-bar{position:absolute;top:0;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:700;cursor:grab;user-select:none;touch-action:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
-.gantt-editor-bar:active{cursor:grabbing}
+.gantt-editor-bar{position:absolute;top:0;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:9px;font-weight:700;cursor:default;user-select:none;touch-action:none;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+.gantt-editor-bar:active{cursor:default}
 .gantt-editor-bar.dragging{opacity:.92;box-shadow:0 0 0 2px rgba(15,23,42,.15)}
 .gantt-row-dragging{opacity:.45}
 .gantt-table{border-collapse:separate;border-spacing:0;table-layout:fixed;min-width:max-content}
