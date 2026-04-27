@@ -1062,7 +1062,7 @@ function renderGanttEditor(rows = state.gantt) {
             </select>
           </div>
         </td>
-        <td class="gantt-sticky-left gantt-cell-tight" style="left:336px;width:72px"><input class="inp" data-field="desfase" type="number" value="${toNumber(row.desfase)}" onchange="onGanttInputChange()"/></td>
+        <td class="gantt-sticky-left gantt-cell-tight" style="left:336px;width:72px"><input class="inp" data-field="desfase" type="number" value="${toNumber(row.desfase)}" ${lock.start ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
         <td class="gantt-sticky-left gantt-cell-tight" style="left:408px;width:72px"><input class="inp" data-field="inicio" type="number" value="${toNumber(row.inicio)}" ${(row.dependencia || lock.start) ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
         <td class="gantt-sticky-left gantt-cell-tight" style="left:480px;width:78px"><input class="inp" data-field="duracion" type="number" value="${toNumber(row.duracion)}" ${lock.duration ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
         <td>
@@ -4819,6 +4819,10 @@ function getGanttLockConfig(row) {
 }
 
 function getGanttLockConfig(row) {
+  const name = String(row?.nombre || '').trim();
+  if (/^Compra terreno$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: true, hint: 'Solo color editable.' };
+  if (/^Inicio promesas$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: true, hint: 'Solo color editable.' };
+  if (/^Postventa$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: true, hint: 'Solo color editable.' };
   return { fixed: false, name: false, dependency: false, start: false, duration: false, delete: false, drag: false, hint: '' };
 }
 
