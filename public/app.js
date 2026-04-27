@@ -895,7 +895,7 @@ function getGanttColorSwatches(selectedColor) {
   return `
     <input type="hidden" data-field="color" value="${selected}"/>
     <details class="gantt-color-dropdown" ontoggle="onGanttColorDropdownToggle(this)">
-      <summary class="gantt-color-current" style="background:${selected}" title="Elegir color"></summary>
+      <summary class="gantt-color-current" style="background:${selected}" title="Elegir color" onclick="onGanttColorSummaryClick(this)"></summary>
       <div class="gantt-color-dropdown-menu">
       ${GANTT_PRESET_COLORS.map((color) => `
         <button
@@ -911,11 +911,21 @@ function getGanttColorSwatches(selectedColor) {
   `;
 }
 
+function closeOtherGanttColorDropdowns(currentDropdown) {
+  document.querySelectorAll('.gantt-color-dropdown[open]').forEach((dropdown) => {
+    if (dropdown !== currentDropdown) dropdown.open = false;
+  });
+}
+
+function onGanttColorSummaryClick(summaryEl) {
+  const dropdown = summaryEl?.closest('.gantt-color-dropdown');
+  if (!dropdown) return;
+  closeOtherGanttColorDropdowns(dropdown);
+}
+
 function onGanttColorDropdownToggle(details) {
   if (!details || !details.open) return;
-  document.querySelectorAll('.gantt-color-dropdown[open]').forEach((dropdown) => {
-    if (dropdown !== details) dropdown.open = false;
-  });
+  closeOtherGanttColorDropdowns(details);
   const menu = details.querySelector('.gantt-color-dropdown-menu');
   if (!menu) return;
   details.classList.remove('open-up', 'open-down');
