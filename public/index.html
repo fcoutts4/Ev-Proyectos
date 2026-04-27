@@ -234,7 +234,7 @@ tbody tr:hover{background:#f8fafc}
 .gantt-editor-bar.dragging{opacity:.92;box-shadow:0 0 0 2px rgba(15,23,42,.15)}
 .gantt-row-dragging{opacity:.45}
 .gantt-table{border-collapse:separate;border-spacing:0;table-layout:fixed;min-width:max-content}
-.gantt-table th,.gantt-table td{background:#fff}
+.gantt-table th,.gantt-table td{background:#fff;overflow:visible}
 .gantt-sticky-left{position:sticky;z-index:30;background:#fff;overflow:visible;box-shadow:8px 0 10px -12px rgba(15,23,42,.35)}
 .gantt-sticky-right{position:sticky;right:0;z-index:31;background:#fff;overflow:hidden;box-shadow:-10px 0 14px -14px rgba(15,23,42,.45)}
 .gantt-sticky-head{z-index:40;background:#f8fafc!important}
@@ -268,26 +268,26 @@ tbody tr:hover{background:#f8fafc}
 }
 .gantt-cell-tight .inp{padding:4px 5px;text-align:center}
 .gantt-table .inp{padding:5px 8px;min-height:28px}
-.gantt-name-wrap{display:grid;grid-template-columns:24px minmax(0,1fr);gap:6px;align-items:center;position:relative}
+.gantt-name-wrap{display:grid;grid-template-columns:24px minmax(0,1fr);gap:6px;align-items:center;position:relative;overflow:visible}
 .gantt-color-dropdown{position:relative}
 .gantt-color-dropdown[open]{z-index:95}
 .gantt-color-current{list-style:none;width:18px;height:18px;border-radius:999px;border:1px solid rgba(15,23,42,.25);cursor:pointer}
 .gantt-color-current::-webkit-details-marker{display:none}
 .gantt-color-dropdown-menu{
   position:absolute;
-  top:calc(100% + 6px);
+  bottom:calc(100% + 6px);
   left:0;
   z-index:70;
   display:grid;
-  grid-template-columns:repeat(5,14px);
-  gap:6px;
-  padding:8px;
+  grid-template-columns:repeat(5,12px);
+  gap:5px;
+  padding:6px;
   border:1px solid #cbd5e1;
   border-radius:8px;
   background:#fff;
   box-shadow:0 10px 24px rgba(15,23,42,.18);
 }
-.gantt-color-swatch{width:14px;height:14px;border-radius:999px;border:1px solid rgba(15,23,42,.2);padding:0;cursor:pointer;outline:none}
+.gantt-color-swatch{width:12px;height:12px;border-radius:999px;border:1px solid rgba(15,23,42,.2);padding:0;cursor:pointer;outline:none}
 .gantt-color-swatch.active{box-shadow:0 0 0 2px #0f172a}
 .gantt-name-input{min-width:0!important}
 .gantt-actions{display:flex;align-items:center;justify-content:center}
