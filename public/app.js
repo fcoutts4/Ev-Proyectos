@@ -921,8 +921,12 @@ function onGanttColorDropdownToggle(details) {
   details.classList.remove('open-up', 'open-down');
   const triggerRect = details.getBoundingClientRect();
   const menuHeight = Math.max(menu.offsetHeight || 0, 56);
-  const spaceAbove = triggerRect.top;
-  const spaceBelow = window.innerHeight - triggerRect.bottom;
+  const scrollShell = details.closest('.gantt-editor-shell') || details.closest('.tbl-scroll');
+  const scopeRect = scrollShell
+    ? scrollShell.getBoundingClientRect()
+    : { top: 0, bottom: window.innerHeight };
+  const spaceAbove = Math.max(0, triggerRect.top - scopeRect.top);
+  const spaceBelow = Math.max(0, scopeRect.bottom - triggerRect.bottom);
   const shouldOpenUp = spaceBelow < menuHeight + 12 && spaceAbove > spaceBelow;
   details.classList.add(shouldOpenUp ? 'open-up' : 'open-down');
 }

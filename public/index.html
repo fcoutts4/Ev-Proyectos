@@ -266,6 +266,22 @@ tbody tr:hover{background:#f8fafc}
   z-index:50;
   box-shadow:0 8px 18px rgba(15,23,42,.28);
 }
+.gantt-editor-bar[data-range]:hover::after{
+  content:attr(data-range);
+  position:absolute;
+  bottom:calc(100% + 6px);
+  left:50%;
+  transform:translateX(-50%);
+  background:#0f172a;
+  color:#fff;
+  font-size:10px;
+  line-height:1.2;
+  padding:4px 8px;
+  border-radius:6px;
+  white-space:nowrap;
+  z-index:50;
+  box-shadow:0 8px 18px rgba(15,23,42,.28);
+}
 .gantt-cell-tight .inp{padding:4px 5px;text-align:center}
 .gantt-table .inp{padding:5px 8px;min-height:28px}
 .gantt-name-wrap{display:grid;grid-template-columns:24px minmax(0,1fr);gap:6px;align-items:center;position:relative;overflow:visible}
