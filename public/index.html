@@ -17,7 +17,6 @@ body{font-family:'Inter',system-ui,sans-serif;background:#f1f5f9;color:#1e293b}
 .proj-header{position:sticky;top:52px;z-index:40;background:#fff;border-bottom:1px solid #e2e8f0;padding:0 24px}
 .proj-top-row{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:52px;padding:6px 0}
 .proj-title-wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.proj-back-link{font-size:12px;color:#64748b;text-decoration:none}
 .proj-name{font-size:22px;font-weight:800;color:#0f172a;margin:0;line-height:1.1}
 .proj-sync-wrap{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 /* TABS */
@@ -452,7 +451,7 @@ tfoot td{line-height:1.25}
 }
 @media (max-width: 640px){
   .sync-meta{gap:4px}
-  .sync-text{display:block;width:100%}
+  .sync-text{display:block}
   .kpi-value{font-size:1.28rem!important}
   .sec-title{font-size:10px!important;letter-spacing:.06em}
   .tab-btn{padding:10px 9px!important}
@@ -499,7 +498,6 @@ tfoot td{line-height:1.25}
 <div class="proj-header">
   <div class="proj-top-row">
     <div class="proj-title-wrap">
-      <a href="#" class="proj-back-link">← Volver al Dashboard</a>
       <h1 id="proj-title" class="proj-name">Edificio Residencial Tipo</h1>
     </div>
     <div class="proj-sync-wrap">
@@ -508,8 +506,6 @@ tfoot td{line-height:1.25}
       </span>
       <div class="sync-meta">
         <span id="sync-detail" class="sync-text">Última sincronización: sin registro</span>
-        <span id="sync-last-modifier" class="sync-text">Última modificación por: sin registro</span>
-        <span id="proj-dir" class="sync-text">Dirección en Las Condes, Las Condes</span>
       </div>
   </div>
 </div>

@@ -510,8 +510,7 @@ function renderSyncStatus() {
   const badge = $('sync-badge');
   const label = $('sync-label');
   const detail = $('sync-detail');
-  const modifier = $('sync-last-modifier');
-  if (!badge || !label || !detail || !modifier) return;
+  if (!badge || !label || !detail) return;
 
   const variantsOld = {
     loading: { color: '#475569', bg: '#f8fafc', border: '#cbd5e1', icon: '☁' },
@@ -533,7 +532,6 @@ function renderSyncStatus() {
   badge.style.borderColor = variant.border;
   label.textContent = variant.label;
   detail.textContent = getSyncDetailText();
-  modifier.textContent = `Ultima modificacion por: ${getLastModifierName()}`;
 }
 
 function scheduleAutosave(scope, delay = 900) {
@@ -610,37 +608,7 @@ async function refreshHealthStatus() {
 }
 
 function ensureProjectControls() {
-  if ($('project-selector')) return;
-
-  const topRow = document.querySelector('.proj-header > div');
-  if (!topRow) return;
-
-  const controls = document.createElement('div');
-  controls.style.display = 'flex';
-  controls.style.alignItems = 'center';
-  controls.style.gap = '8px';
-  controls.innerHTML = `
-    <select id="project-selector" class="inp" style="min-width:240px"></select>
-    <button id="project-create-btn" type="button" class="btn-outline">+ Proyecto</button>
-  `;
-
-  topRow.appendChild(controls);
-
-  $('project-selector').addEventListener('change', (event) => {
-    loadProject(event.target.value);
-  });
-
-  $('project-create-btn').addEventListener('click', async () => {
-    const nombre = window.prompt('Nombre del proyecto nuevo');
-    if (!nombre) return;
-
-    const direccion = window.prompt('Direccion del proyecto', '') || '';
-    await api('/api/proyectos', {
-      method: 'POST',
-      body: JSON.stringify({ nombre, direccion, tipo: 'Residencial' }),
-    });
-    await loadProjects();
-  });
+  // Header minimalista: controles de proyecto ocultos por requerimiento de UI.
 }
 
 function ensureActionButtons() {
