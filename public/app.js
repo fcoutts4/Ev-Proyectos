@@ -890,6 +890,24 @@ function getGanttColorOptions(selectedColor) {
   `).join('');
 }
 
+function getGanttColorSwatches(selectedColor) {
+  const selected = normalizeGanttColor(selectedColor);
+  return `
+    <input type="hidden" data-field="color" value="${selected}"/>
+    <div class="gantt-color-swatch-list">
+      ${GANTT_PRESET_COLORS.map((color) => `
+        <button
+          type="button"
+          class="gantt-color-swatch ${color === selected ? 'active' : ''}"
+          style="background:${color}"
+          title="${color}"
+          onclick="onGanttSwatchPick(this,'${color}')"
+        ></button>
+      `).join('')}
+    </div>
+  `;
+}
+
 function canonicalizeGanttRows(rows = []) {
   return rows.map((row) => ({
     ...row,
@@ -1029,9 +1047,7 @@ function renderGanttEditor(rows = state.gantt) {
         </td>
         <td class="gantt-sticky-left" style="left:34px;width:170px">
           <div class="gantt-name-wrap">
-            <select class="inp gantt-color-select" data-field="color" title="Color del hito" style="background:${escapeHtml(row.color || '#2563eb')};border-color:#94a3b8" ${lock.name ? 'disabled' : ''} onchange="onGanttInputChange()">
-              ${getGanttColorOptions(row.color)}
-            </select>
+            ${getGanttColorSwatches(row.color)}
             <input class="inp gantt-name-input" data-field="nombre" value="${escapeHtml(row.nombre)}" ${lock.name ? 'disabled' : ''} onchange="onGanttInputChange()"/>
           </div>
         </td>
@@ -1107,6 +1123,17 @@ function renderGanttPreview() {
     bar.title = range;
     bar.dataset.range = range;
   });
+}
+
+function onGanttSwatchPick(button, color) {
+  const host = button.closest('.gantt-name-wrap');
+  if (!host) return;
+  const colorInput = host.querySelector('[data-field="color"]');
+  if (!colorInput) return;
+  colorInput.value = normalizeGanttColor(color);
+  host.querySelectorAll('.gantt-color-swatch').forEach((sw) => sw.classList.remove('active'));
+  button.classList.add('active');
+  onGanttInputChange();
 }
 
 function isAccessoryUso(uso) {
@@ -4788,6 +4815,10 @@ function getGanttLockConfig(row) {
   if (/^Postventa$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre bloqueado para mantener referencias estables.' };
   if (/^Recepci[Ã³o]n municipal$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre bloqueado para mantener referencias estables.' };
   if (/^Escrituraci[Ã³o]n$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Nombre bloqueado para mantener referencias estables.' };
+  return { fixed: false, name: false, dependency: false, start: false, duration: false, delete: false, drag: false, hint: '' };
+}
+
+function getGanttLockConfig(row) {
   return { fixed: false, name: false, dependency: false, start: false, duration: false, delete: false, drag: false, hint: '' };
 }
 
