@@ -316,6 +316,104 @@ tbody tr:hover{background:#f3f7fb!important}
 .toggle input:checked + .toggle-slider{background:var(--green)!important}
 ::-webkit-scrollbar-thumb{background:#94a3b8!important}
 
+/* ===== AJUSTES SOLICITADOS COMITE ===== */
+.resumen-gantt-scroll{width:100%;max-width:100%;overflow-x:auto;overflow-y:hidden;padding-bottom:4px}
+#gantt-preview{width:max-content;min-width:100%}
+#gantt-preview .gantt-row{width:max-content;min-width:100%}
+#gantt-preview .gantt-track{flex:0 0 auto}
+#gantt-preview .gantt-timeline-scale{margin-left:170px}
+.gantt-cell-tight .inp{min-width:52px;padding-left:4px!important;padding-right:4px!important}
+.cost-hidden-formula{display:block!important;min-width:220px;width:100%;margin-bottom:6px;text-align:left}
+.cost-hidden-formula[disabled]{background:#f8fafc!important;color:#64748b!important}
+.formula-inline-input,.flow-formula-input{min-width:260px;font-family:"Courier New",monospace;font-size:11px}
+.formula-inline-input{background:#fff!important}
+.flow-planilla{background:#fff;border:1px solid var(--border-strong);border-top:none;border-radius:0 0 10px 10px;overflow:auto}
+.flow-planilla table{min-width:1400px}
+.flow-planilla thead th{position:sticky;top:0;z-index:2}
+.flow-category-row td{background:var(--bg-soft)!important;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#334155!important;border-bottom:2px solid var(--border-strong)!important;padding:7px 8px}
+.flow-category-title{display:flex;align-items:center;gap:8px}
+.flow-value-cost,.amount-cost,#costos-total-neto,#costos-total-bruto,#planilla-table tbody tr.partida-row td:nth-child(5),#planilla-table tbody tr.partida-row td:nth-child(n+7),#planilla-table tbody tr.cat-row .cat-total-cell strong,#planilla-table tfoot td:nth-child(n+2),#constr-total-st,#constr-total-bt,#constr-total-neto,#constr-total-bruto{color:var(--red)!important}
+.flow-value-negative,.amount-negative{color:var(--red)!important}
+.gf-param-panel{background:#f8fafc;border:1px solid var(--border-strong);border-radius:10px;padding:12px;margin-bottom:12px}
+.gf-param-panel .inp{font-weight:700}
+#kpi-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))!important}
+.flow-kpi-grid{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))!important}
+
+/* ===== UI/UX Y ACCESIBILIDAD TRANSVERSAL ===== */
+:root{
+  --radius-sm:6px;
+  --radius-md:8px;
+  --radius-lg:10px;
+  --space-1:4px;
+  --space-2:8px;
+  --space-3:12px;
+  --space-4:16px;
+  --space-5:20px;
+  --focus-ring:0 0 0 3px rgba(29,78,216,.24);
+}
+html{scroll-behavior:smooth}
+body{min-width:320px;line-height:1.45;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+main{width:min(100%,1600px)}
+.skip-link{position:fixed;left:16px;top:12px;z-index:200;transform:translateY(-160%);background:#fff;color:var(--blue)!important;border:2px solid var(--blue);border-radius:var(--radius-md);padding:10px 14px;font-size:13px;font-weight:800;text-decoration:none;box-shadow:0 12px 24px rgba(15,23,42,.18)}
+.skip-link:focus{transform:translateY(0);outline:none}
+:focus{outline:none}
+:focus-visible{outline:3px solid rgba(29,78,216,.55);outline-offset:2px;box-shadow:var(--focus-ring)!important}
+button,.btn-primary,.btn-outline,.btn-dark,.tab-btn,.inp,select,textarea,input[type="number"],input[type="month"]{min-height:36px}
+button,.btn-primary,.btn-outline,.btn-dark,.tab-btn{touch-action:manipulation}
+button:disabled,.btn-outline:disabled,.inp:disabled,select:disabled{opacity:.62!important;cursor:not-allowed!important}
+.card,.card-dark,.kpi-card,.req-kpi,.payment-section,.modal-card{border-radius:var(--radius-lg)!important}
+.card,.kpi-card,.req-kpi{box-shadow:0 1px 2px rgba(15,23,42,.05)}
+.card-dark{box-shadow:0 1px 2px rgba(15,23,42,.16)}
+.sec-title{min-height:24px;line-height:1.25}
+.kpi-card{min-height:108px;display:flex;flex-direction:column;justify-content:center}
+.kpi-value{overflow-wrap:anywhere}
+.kpi-sub,.sync-text{line-height:1.35}
+.tab-nav{scrollbar-gutter:stable;gap:2px}
+.tab-btn{border-radius:var(--radius-sm) var(--radius-sm) 0 0;min-width:max-content}
+.tab-btn[aria-selected="true"]{background:#fff}
+.tab-pane{scroll-margin-top:132px}
+.tab-pane.active{animation:uiFadeIn .12s ease-out}
+@keyframes uiFadeIn{from{opacity:.72;transform:translateY(2px)}to{opacity:1;transform:none}}
+table{font-variant-numeric:tabular-nums}
+thead th{line-height:1.2}
+tbody td{line-height:1.35}
+tbody tr:nth-child(even):not(.cat-row):not(.subcat-row):not(.flow-category-row){background:rgba(248,250,252,.54)}
+tfoot td{line-height:1.25}
+.tbl-scroll,.flow-planilla,.resumen-gantt-scroll{scrollbar-gutter:stable;overscroll-behavior-inline:contain}
+.tbl-scroll:focus-visible,.flow-planilla:focus-visible,.resumen-gantt-scroll:focus-visible{outline:3px solid rgba(29,78,216,.45);outline-offset:3px;box-shadow:none!important}
+.tbl-scroll table,.flow-planilla table{border-collapse:separate;border-spacing:0}
+.tbl-scroll thead th,.flow-planilla thead th{position:sticky;top:0;z-index:3}
+.planilla-header{gap:12px;flex-wrap:wrap}
+.planilla-nav{flex-wrap:wrap;justify-content:flex-end}
+.formula-inline-input,.flow-formula-input,.cost-hidden-formula{min-height:34px;line-height:1.3}
+.formula-inline-input:focus-visible,.flow-formula-input:focus-visible,.cost-hidden-formula:focus-visible{background:#fff!important}
+.amount-cost,.amount-negative{font-weight:800}
+.badge{min-height:22px;line-height:1.2}
+.dist-row{min-height:24px}
+.dist-label{line-height:1.2;overflow-wrap:anywhere}
+.modal-backdrop[style*="flex"] .modal-card{outline:1px solid rgba(15,23,42,.08)}
+.chart-shell{border-radius:var(--radius-md)}
+[aria-live]{min-height:1em}
+@media (max-width: 900px){
+  .topnav{padding:0 12px!important}
+  .proj-header{padding-left:12px!important;padding-right:12px!important}
+  main{padding:12px!important}
+  .card,.card-dark,.kpi-card,.req-kpi{padding:14px!important}
+  .flow-kpi-grid{grid-template-columns:1fr!important}
+  .payment-plan-grid-head{display:none}
+  .planilla-header{align-items:flex-start!important}
+}
+@media (max-width: 640px){
+  .sync-meta{gap:4px}
+  .sync-text{display:block;width:100%}
+  .kpi-value{font-size:1.28rem!important}
+  .sec-title{font-size:10px!important;letter-spacing:.06em}
+  .tab-btn{padding:10px 9px!important}
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}
+}
+
 /* Más legibilidad cuando la pantalla es angosta */
 @media (max-width: 1366px){
   body{font-size:15px}
@@ -340,6 +438,7 @@ tbody tr:hover{background:#f3f7fb!important}
 </style>
 </head>
 <body>
+<a class="skip-link" href="#main-content">Saltar al contenido principal</a>
 
 <!-- TOP NAV -->
 <nav class="topnav">
@@ -380,7 +479,7 @@ tbody tr:hover{background:#f3f7fb!important}
 </div>
 
 <!-- MAIN -->
-<main style="max-width:1600px;margin:0 auto;padding:20px 24px">
+<main id="main-content" tabindex="-1" style="max-width:1600px;margin:0 auto;padding:20px 24px">
 
 <div id="tab-resumen" class="tab-pane active">
 
@@ -397,7 +496,7 @@ tbody tr:hover{background:#f3f7fb!important}
 </div>
 
   <!-- KPIs -->
-  <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:20px" id="kpi-grid">
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px" id="kpi-grid">
     <div class="kpi-card kpi-green">
       <div class="kpi-label">Ventas Totales</div>
       <div class="kpi-value" style="color:#16a34a" id="kpi-ventas">647.950 UF</div>
@@ -417,13 +516,8 @@ tbody tr:hover{background:#f3f7fb!important}
       <div class="kpi-value" style="color:#ea580c" id="kpi-tir-fin">18.8%</div>
       <div class="kpi-sub">Anual</div>
   </div>
-    <div class="kpi-card kpi-gray">
-      <div class="kpi-label">ROE</div>
-      <div class="kpi-value" style="color:#0f172a" id="kpi-roe">56.0%</div>
-      <div class="kpi-sub">S/Capital Aportado</div>
-  </div>
     <div class="kpi-card kpi-amber">
-      <div class="kpi-label">Capital Máximo</div>
+      <div class="kpi-label">Aporte máximo</div>
       <div class="kpi-value" style="color:#b45309" id="kpi-cap">145.655 UF</div>
       <div class="kpi-sub" id="kpi-cap-sub">En Mes 40</div>
   </div>
@@ -437,8 +531,8 @@ tbody tr:hover{background:#f3f7fb!important}
       <div class="sec-title"> CARTA GANTT
         <span style="margin-left:auto;font-weight:400;font-size:10px;text-transform:none;color:#94a3b8">Pasa el cursor sobre el gráfico para ver el detalle</span>
     </div>
-      <div style="overflow-x:auto">
-        <div id="gantt-preview" style="min-width:800px"></div>
+      <div class="resumen-gantt-scroll">
+        <div id="gantt-preview"></div>
     </div>
   </div>
 </div>
@@ -487,41 +581,6 @@ tbody tr:hover{background:#f3f7fb!important}
   </div>
 
 </div>
-
-  <div class="card" style="margin-bottom:20px">
-      <div class="sec-title"> REQUERIMIENTOS DE CAPITAL</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px">
-        <div class="req-kpi">
-          <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase">Req. Capital</div>
-          <div style="font-size:1.4rem;font-weight:800;color:#0f172a" id="cap-req">149.967 UF</div>
-          <div style="font-size:10px;color:#94a3b8">Máxima exposición real</div>
-      </div>
-        <div class="req-kpi">
-          <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase">Buffer</div>
-          <div style="font-size:1.4rem;font-weight:800;color:#0f172a">2.000 UF</div>
-          <div style="font-size:10px;color:#94a3b8">Caja Mínima Protegida</div>
-      </div>
-        <div class="req-kpi">
-          <div style="font-size:10px;color:#64748b;font-weight:700;text-transform:uppercase">Margen Inv.</div>
-          <div style="font-size:1.4rem;font-weight:800;color:#22c55e" id="cap-margen">81.569 UF</div>
-          <div style="font-size:10px;color:#94a3b8">Utilidad Neta Real</div>
-      </div>
-    </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:16px">
-        <div class="card-dark" style="border-radius:8px;padding:14px">
-          <div style="font-size:10px;color:#f59e0b;font-weight:700;text-transform:uppercase;margin-bottom:4px">$ MOIC</div>
-          <div style="font-size:2rem;font-weight:900;color:#fff" id="cap-moic">1.54x</div>
-          <div style="font-size:10px;color:#94a3b8">Múltiplo Retorno</div>
-      </div>
-        <div class="card-dark" style="border-radius:8px;padding:14px">
-          <div style="font-size:10px;color:#22c55e;font-weight:700;text-transform:uppercase;margin-bottom:4px">% TIR INV.</div>
-          <div style="font-size:2rem;font-weight:900;color:#fff" id="cap-tir-inv">16.8%</div>
-          <div style="font-size:10px;color:#94a3b8">Tasa Interna Retorno</div>
-      </div>
-      </div>
-      <!-- Curva J mini -->
-      <canvas id="curvaJ-resumen" height="100"></canvas>
-  </div>
 
 </div><!-- end tab resumen -->
 
@@ -987,7 +1046,7 @@ tbody tr:hover{background:#f3f7fb!important}
             <input type="number" class="inp" id="anticipo-slider" min="0" max="50" step="0.1" value="15" oninput="updateConstrParams()">
             <span style="font-weight:800;font-size:14px" id="anticipo-label">15%</span>
           </div>
-          <div style="font-size:10px;color:#166534;margin-top:6px" id="anticipo-meta">15% del contrato | descuento proporcional en EDPP</div>
+          <div style="font-size:10px;color:#166534;margin-top:6px" id="anticipo-meta">15% del contrato | pago único inicial, sin devolución ni descuento posterior</div>
           <div style="font-size:11px;font-weight:700;color:#15803d;margin-top:4px" id="anticipo-monto">0 UF</div>
       </div>
         <div style="background:#fef2f2;border-radius:8px;padding:12px">
@@ -1039,11 +1098,11 @@ tbody tr:hover{background:#f3f7fb!important}
   <div class="card" style="margin-bottom:16px;background:#f8fafc">
     <div class="sec-title" style="margin-bottom:8px">⚙ PARÁMETROS FINANCIEROS GLOBALES</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
-      <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">Tasa interés terreno (anual %)</label><input type="number" step="0.01" class="inp" id="cfg-tasa-terreno" onchange="onConfigParamChange()"/></div>
-      <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">Tasa interés construcción (anual %)</label><input type="number" step="0.01" class="inp" id="cfg-tasa-construccion" onchange="onConfigParamChange()"/></div>
-      <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">% Impuesto timbres</label><input type="number" step="0.01" class="inp" id="cfg-pct-timbres" onchange="onConfigParamChange()"/></div>
-      <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">% CEEC (beneficio IVA)</label><input type="number" step="0.01" class="inp" id="cfg-pct-ceec" onchange="onConfigParamChange()"/></div>
-      <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">% Impuesto renta</label><input type="number" step="0.01" class="inp" id="cfg-pct-renta" onchange="onConfigParamChange()"/></div>
+      <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">Tasa interés terreno (anual %)</label><input type="number" step="0.01" class="inp" id="cfg-tasa-terreno" oninput="onConfigParamChange()"/></div>
+      <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">Tasa interés construcción (anual %)</label><input type="number" step="0.01" class="inp" id="cfg-tasa-construccion" oninput="onConfigParamChange(); syncGfParamMirror()"/></div>
+      <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">% Impuesto timbres</label><input type="number" step="0.01" class="inp" id="cfg-pct-timbres" oninput="onConfigParamChange(); syncGfParamMirror()"/></div>
+      <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">% CEEC (beneficio IVA)</label><input type="number" step="0.01" class="inp" id="cfg-pct-ceec" oninput="onConfigParamChange()"/></div>
+      <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">% Impuesto renta</label><input type="number" step="0.01" class="inp" id="cfg-pct-renta" oninput="onConfigParamChange()"/></div>
     </div>
     <div style="font-size:10px;color:#94a3b8;margin-top:8px">Estos parámetros alimentan todas las tablas financieras (Terreno, Construcción, Flujo de Caja).</div>
   </div>
@@ -1079,6 +1138,25 @@ tbody tr:hover{background:#f3f7fb!important}
       <div class="planilla-nav">
         <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-fin-planilla-scroll', -480)">← Meses</button>
         <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-fin-planilla-scroll', 480)">Meses →</button>
+      </div>
+    </div>
+    <div class="gf-param-panel">
+      <div class="sec-title" style="margin-bottom:10px">PARÁMETROS GASTOS FINANCIEROS</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
+        <div>
+          <label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">Tasa_interes_construccion</label>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="number" step="0.01" class="inp" id="gf-tasa-construccion" oninput="syncGfConstructionParams()">
+            <span style="font-size:11px;color:#64748b">anual %</span>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">%Timbres</label>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="number" step="0.01" class="inp" id="gf-pct-timbres" oninput="syncGfConstructionParams()">
+            <span style="font-size:11px;color:#64748b">%</span>
+          </div>
+        </div>
       </div>
     </div>
     <div id="constr-fin-planilla-scroll" class="tbl-scroll">
@@ -1199,36 +1277,6 @@ tbody tr:hover{background:#f3f7fb!important}
     </div>
   </div>
 
-    <!-- Capital Necesario -->
-    <div class="card" style="border:1px solid #e2e8f0">
-      <div style="font-size:10px;font-weight:700;color:#f59e0b;text-transform:uppercase;margin-bottom:8px"> CAPITAL NECESARIO (MÁX. EXPOSICIÓN)</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div>
-          <div style="font-size:10px;color:#94a3b8">K SIN FIN.</div>
-          <div style="font-size:1.3rem;font-weight:900;color:#0f172a" id="flujo-k-sin">421.210 UF</div>
-      </div>
-        <div>
-          <div style="font-size:10px;color:#94a3b8">K CON FIN.</div>
-          <div style="font-size:1.3rem;font-weight:900;color:#3b82f6" id="flujo-k-con">145.655 UF</div>
-      </div>
-    </div>
-  </div>
-
-    <!-- ROE -->
-    <div class="card" style="border:1px solid #e2e8f0">
-      <div style="font-size:10px;font-weight:700;color:#7c3aed;text-transform:uppercase;margin-bottom:8px">% ROE (RETORNO SOBRE CAPITAL)</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div>
-          <div style="font-size:10px;color:#94a3b8">ROE SIN FIN.</div>
-          <div style="font-size:1.3rem;font-weight:900;color:#0f172a" id="flujo-roe-sin">23.9%</div>
-      </div>
-        <div>
-          <div style="font-size:10px;color:#94a3b8">ROE CON FIN.</div>
-          <div style="font-size:1.3rem;font-weight:900;color:#7c3aed" id="flujo-roe-con">56.0%</div>
-      </div>
-    </div>
-  </div>
-
     <!-- TIR -->
     <div class="card" style="border:1px solid #fecaca">
       <div style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;margin-bottom:8px"> TIR ANUAL</div>
@@ -1243,56 +1291,17 @@ tbody tr:hover{background:#f3f7fb!important}
       </div>
     </div>
   </div>
-
-    <!-- Payback -->
-    <div class="card" style="border:1px solid #bbf7d0">
-      <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;margin-bottom:8px">⏱ PAYBACK TIME</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div>
-          <div style="font-size:10px;color:#94a3b8">Sin Fin.</div>
-          <div style="font-size:1.3rem;font-weight:900;color:#0f172a" id="flujo-payback-sin">--</div>
-      </div>
-        <div>
-          <div style="font-size:10px;color:#94a3b8">Con Fin.</div>
-          <div style="font-size:1.3rem;font-weight:900;color:#3b82f6" id="flujo-payback-con">--</div>
-      </div>
-    </div>
-  </div>
-
-    <!-- Leverage -->
-    <div class="card" style="border:1px solid #e2e8f0">
-      <div style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;margin-bottom:8px"> LEVERAGE MÁXIMO</div>
-      <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Deuda Máxima / Ingresos Totales</div>
-      <div style="display:flex;align-items:baseline;gap:4px">
-        <div style="font-size:2rem;font-weight:900;color:#7c3aed" id="flujo-leverage">0.46x</div>
-        <div style="font-size:11px;color:#94a3b8">VECES</div>
-    </div>
-  </div>
-</div>
-
-  <!-- Gráficos -->
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-bottom:16px">
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div class="sec-title" style="margin-bottom:0">COSTOS VS INGRESOS</div>
-        <button class="btn-outline" style="font-size:10px">Ver Mensual</button>
-    </div>
-      <canvas id="costosVsIngresos-chart" height="180"></canvas>
-  </div>
-    <div class="card">
-      <div class="sec-title">EVOLUCIÓN DE DEUDA (LEVERAGE)</div>
-      <canvas id="leverage-chart" height="180"></canvas>
-  </div>
-    <div class="card">
-      <div class="sec-title">ESTRUCTURA DEL PROYECTO</div>
-      <div id="estructura-proyecto-list" style="font-size:11px"></div>
-  </div>
 </div>
 
   <!-- Tabla Flujo de Caja Completo -->
-  <div class="card-dark" style="border-radius:12px">
-    <div class="sec-title" style="color:#fff;margin-bottom:14px"> FLUJO DE CAJA COMPLETO</div>
-    <div class="tbl-scroll">
+  <div style="margin-bottom:16px">
+    <div class="planilla-header">
+      <div>
+        <div style="font-size:13px;font-weight:900;color:#fff;letter-spacing:.08em;text-transform:uppercase">FLUJO DE CAJA COMPLETO</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:2px">Fórmulas visibles y editables; secciones colapsables igual que la planilla de costos.</div>
+      </div>
+    </div>
+    <div class="flow-planilla">
       <table style="min-width:1400px" id="flujo-tabla">
         <thead id="flujo-tabla-header"></thead>
         <tbody id="flujo-tabla-tbody"></tbody>
@@ -1538,5 +1547,668 @@ tbody tr:hover{background:#f3f7fb!important}
 </div>
 
 <script src="/app.js"></script>
+<script>
+(function () {
+  const STORAGE_KEY = 'evproyectos.formulaOverrides.v1';
+  const patchState = {
+    flowCollapsed: {},
+    formulaOverrides: { flow: {}, ep: {}, gf: {} },
+  };
+
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '{}');
+    if (stored && typeof stored === 'object') {
+      patchState.formulaOverrides.flow = stored.flow || {};
+      patchState.formulaOverrides.ep = stored.ep || {};
+      patchState.formulaOverrides.gf = stored.gf || {};
+    }
+  } catch (error) {
+    void error;
+    // Local storage is optional; the app keeps working without it.
+  }
+
+  window.__bricsaFormulaPatch = patchState;
+
+  function persistFormulaOverrides() {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(patchState.formulaOverrides));
+    } catch (error) {
+      void error;
+      // Ignore storage errors in private/incognito contexts.
+    }
+  }
+
+  function normToken(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_|_$/g, '');
+  }
+
+  function addSeries(target, label, values, key) {
+    const arr = Array.isArray(values) ? values : [];
+    target[label] = arr;
+    target[normToken(label)] = arr;
+    if (key) target[key] = arr;
+    if (key) target[normToken(key)] = arr;
+  }
+
+  function getFormula(scope, key, fallback) {
+    const scopeOverrides = patchState.formulaOverrides[scope] || {};
+    const saved = scopeOverrides[key];
+    return saved === undefined ? fallback : saved;
+  }
+
+  function setFormula(scope, key, value) {
+    if (!patchState.formulaOverrides[scope]) patchState.formulaOverrides[scope] = {};
+    patchState.formulaOverrides[scope][key] = String(value || '');
+    persistFormulaOverrides();
+  }
+
+  function formulaInput(scope, key, value, compact) {
+    return `<input class="inp ${compact ? 'formula-inline-input' : 'flow-formula-input'}" data-formula-scope="${escapeHtml(scope)}" data-formula-key="${escapeHtml(key)}" value="${escapeHtml(value)}">`;
+  }
+
+  function evalFormulaValue(rawFormula, context) {
+    let expr = String(rawFormula || '').trim();
+    if (!expr) return null;
+    expr = expr
+      .replace(/[−–—]/g, '-')
+      .replace(/×/g, '*')
+      .replace(/÷/g, '/')
+      .replace(/,/g, '.');
+
+    expr = expr.replace(/\[([^\]]+)\]/g, (_, token) => {
+      const key = normToken(token);
+      return Object.prototype.hasOwnProperty.call(context, key) ? String(toNumber(context[key])) : '0';
+    });
+
+    expr = expr.replace(/\b[A-Za-z_][A-Za-z0-9_]*\b/g, (token) => {
+      const key = normToken(token);
+      return Object.prototype.hasOwnProperty.call(context, key) ? String(toNumber(context[key])) : token;
+    });
+
+    if (/[^0-9+\-*/().\s]/.test(expr)) return null;
+    try {
+      const result = Function('"use strict";return (' + expr + ');')();
+      return Number.isFinite(result) ? result : null;
+    } catch (error) {
+      void error;
+      return null;
+    }
+  }
+
+  function buildFormulaContext(series, scalars, index, extra) {
+    const context = {};
+    Object.entries(series || {}).forEach(([label, values]) => {
+      if (!Array.isArray(values)) return;
+      context[normToken(label)] = toNumber(values[index]);
+    });
+    Object.entries(scalars || {}).forEach(([label, value]) => {
+      context[normToken(label)] = toNumber(value);
+    });
+    Object.entries(extra || {}).forEach(([label, value]) => {
+      context[normToken(label)] = toNumber(value);
+    });
+    context.mes = index + 1;
+    return context;
+  }
+
+  function evaluateSeries(rawFormula, series, scalars, fallback, extraFactory) {
+    const source = Array.isArray(fallback) ? fallback : [];
+    return source.map((fallbackValue, index) => {
+      const context = buildFormulaContext(series, scalars, index, extraFactory ? extraFactory(index) : {});
+      const value = evalFormulaValue(rawFormula, context);
+      return value === null ? toNumber(fallbackValue) : value;
+    });
+  }
+
+  function formatAmount(value, mode, total) {
+    const number = toNumber(value);
+    const className = mode === 'cost' || number < 0 ? (mode === 'cost' ? 'amount-cost' : 'amount-negative') : '';
+    const display = mode === 'cost' ? -Math.abs(number) : number;
+    const text = total ? `${fmtNumber(display)} UF` : fmtNumber(display);
+    return `<span class="${className}">${text}</span>`;
+  }
+
+  function total(values) {
+    return (values || []).reduce((sum, value) => sum + toNumber(value), 0);
+  }
+
+  function syncGfParamMirror() {
+    const cfg = getGlobalFinancialParams();
+    const tasa = document.getElementById('gf-tasa-construccion');
+    const timbres = document.getElementById('gf-pct-timbres');
+    if (tasa && document.activeElement !== tasa) tasa.value = cfg.tasa_construccion;
+    if (timbres && document.activeElement !== timbres) timbres.value = cfg.pct_timbres;
+  }
+  window.syncGfParamMirror = syncGfParamMirror;
+
+  window.syncGfConstructionParams = function syncGfConstructionParams() {
+    const tasa = document.getElementById('gf-tasa-construccion');
+    const timbres = document.getElementById('gf-pct-timbres');
+    const cfgTasa = document.getElementById('cfg-tasa-construccion');
+    const cfgTimbres = document.getElementById('cfg-pct-timbres');
+    if (tasa && cfgTasa) cfgTasa.value = tasa.value;
+    if (timbres && cfgTimbres) cfgTimbres.value = timbres.value;
+    if (typeof onConfigParamChange === 'function') onConfigParamChange();
+    syncGfParamMirror();
+  };
+
+  if (typeof buildConstructionSCurve === 'function') {
+    buildConstructionSCurve = function patchedBuildConstructionSCurve(metrics, meses) {
+      const width = Math.max(0.08, toNumber(metrics.ancho_curva || 0.5));
+      const peak = Math.min(0.92, Math.max(0.08, toNumber(metrics.peak_gasto || 0.5)));
+      const anticipoPct = Math.max(0, toNumber(metrics.anticipo_pct)) / 100;
+      const retencionPct = Math.max(0, toNumber(metrics.retencion_pct)) / 100;
+      const weights = Array.from({ length: meses }, (_, index) => {
+        const x = meses === 1 ? 1 : index / (meses - 1);
+        const gaussian = Math.exp(-((x - peak) ** 2) / (2 * (width ** 2)));
+        const rampIn = Math.min(1, (index + 1) / Math.max(1, Math.round(meses * 0.28)));
+        const rampOut = Math.min(1, (meses - index) / Math.max(1, Math.round(meses * 0.22)));
+        return Math.max(0.001, gaussian * rampIn * rampOut);
+      });
+      const weightTotal = weights.reduce((sum, value) => sum + value, 0) || 1;
+      const monthlyCosts = weights.map((weight) => (metrics.total_neto * weight) / weightTotal);
+      const monthlyAnticipoRecovery = monthlyCosts.map(() => 0);
+      const monthlyRetention = monthlyCosts.map((value) => Math.max(0, value) * retencionPct);
+      const monthlyEdppNet = monthlyCosts.map((value, index) => Math.max(0, value - monthlyRetention[index]));
+      const cumulativeCosts = monthlyCosts.reduce((acc, value, index) => {
+        acc.push((acc[index - 1] || 0) + value);
+        return acc;
+      }, []);
+      const cumulativePct = cumulativeCosts.map((value) => value / Math.max(1, metrics.total_neto) * 100);
+      return {
+        monthlyCosts,
+        monthlyAnticipoRecovery,
+        monthlyRetention,
+        monthlyEdppNet,
+        cumulativeCosts,
+        cumulativePct,
+        anticipoAmount: metrics.total_neto * anticipoPct,
+        retentionAmount: monthlyRetention.reduce((sum, value) => sum + value, 0),
+      };
+    };
+    window.buildConstructionSCurve = buildConstructionSCurve;
+  }
+
+  function renderFormulaTableHeader(targetId, labels) {
+    setHtml(targetId, `
+      <tr>
+        <th style="min-width:200px;text-align:left">Concepto</th>
+        <th style="min-width:300px;text-align:left">Formula editable</th>
+        <th style="width:110px;text-align:right">Total</th>
+        ${labels.map((label) => `<th data-month-col>${escapeHtml(label)}</th>`).join('')}
+      </tr>
+    `);
+  }
+
+  if (typeof renderConstructionEP === 'function') {
+    renderConstructionEP = function patchedRenderConstructionEP() {
+      if (!$('constr-ep-head')) return null;
+      const labels = getCostMonthLabels();
+      const data = computeConstructionEP();
+      const cfg = getGlobalFinancialParams();
+      const monthCount = labels.length;
+      const series = {};
+      const scalars = { CEEC: cfg.pct_ceec };
+
+      addSeries(series, 'EDPP bruto fuente', data.ep, 'edpp_bruto_fuente');
+      addSeries(series, 'Anticipo unico fuente', data.anticipo, 'anticipo_unico_fuente');
+      addSeries(series, 'Retenciones fuente', data.retenciones, 'retenciones_fuente');
+
+      const rows = [];
+      function pushRow(config) {
+        const formula = getFormula('ep', config.key, config.formula);
+        const values = evaluateSeries(formula, series, scalars, config.fallback);
+        addSeries(series, config.label, values, config.key);
+        rows.push(Object.assign({}, config, { formula, values }));
+        return values;
+      }
+
+      pushRow({ key: 'ep_bruto', label: 'EP (EDPP bruto)', fallback: data.ep, formula: '[EDPP bruto fuente]', mode: 'cost' });
+      pushRow({ key: 'anticipo', label: 'Anticipo', fallback: data.anticipo, formula: '[Anticipo unico fuente]', mode: 'cost' });
+      pushRow({ key: 'retenciones', label: 'Retenciones', fallback: data.retenciones, formula: '[Retenciones fuente]', mode: 'signed' });
+      pushRow({ key: 'subtotal', label: 'Subtotal neto', fallback: data.subtotal, formula: '[EP (EDPP bruto)] + [Anticipo] + [Retenciones]', mode: 'cost', bold: true });
+      pushRow({ key: 'iva_bruto', label: 'IVA bruto (19%)', fallback: data.ivaBruto, formula: '[Subtotal neto] * 0.19', mode: 'cost' });
+      pushRow({ key: 'ceec', label: `CEEC (${cfg.pct_ceec}%)`, fallback: data.ceec, formula: '[IVA bruto (19%)] * [CEEC] / 100', mode: 'signed' });
+      pushRow({ key: 'iva_efectivo', label: 'IVA efectivo', fallback: data.ivaEfectivo, formula: '[IVA bruto (19%)] - [CEEC]', mode: 'cost' });
+      const totalPago = pushRow({ key: 'total_pago', label: 'TOTAL A PAGO (c/IVA)', fallback: data.totalPago, formula: '[Subtotal neto] + [IVA efectivo]', mode: 'cost', bold: true });
+
+      renderFormulaTableHeader('constr-ep-head', labels);
+      setHtml('constr-ep-tbody', rows.map((row) => `
+        <tr style="${row.bold ? 'background:#f0fdf4' : ''}">
+          <td style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.bold ? '#166534' : '#334155'}">${escapeHtml(row.label)}</td>
+          <td>${formulaInput('ep', row.key, row.formula, true)}</td>
+          <td style="text-align:right;font-weight:${row.bold ? 800 : 600}">${formatAmount(total(row.values), row.mode, true)}</td>
+          ${row.values.map((value) => `<td data-month-cell style="text-align:center;${row.bold ? 'font-weight:700' : ''}">${formatAmount(value, row.mode)}</td>`).join('')}
+        </tr>
+      `).join(''));
+      setHtml('constr-ep-tfoot', '');
+      return Object.assign({}, data, { totalPago, subtotal: series.subtotal || data.subtotal, ivaEfectivo: series.iva_efectivo || data.ivaEfectivo });
+    };
+    window.renderConstructionEP = renderConstructionEP;
+  }
+
+  if (typeof renderConstructionGF === 'function') {
+    renderConstructionGF = function patchedRenderConstructionGF(epData) {
+      if (!$('constr-fin-planilla-head')) return;
+      const labels = getCostMonthLabels();
+      const monthCount = getCostMonthCount();
+      const cfg = getGlobalFinancialParams();
+      const income = getProjectMonthlyIncome(monthCount);
+      const giros = epData ? epData.totalPago.slice() : createMonthlyArray(monthCount, 0);
+      const pagosLineaDefault = createMonthlyArray(monthCount, 0);
+      const acumuladoDefault = createMonthlyArray(monthCount, 0);
+      let prevAcumDefault = 0;
+      for (let t = 0; t < monthCount; t += 1) {
+        const g = toNumber(giros[t]);
+        const pagoMax = Math.max(0, Math.min(prevAcumDefault + g, toNumber(income[t])));
+        pagosLineaDefault[t] = -pagoMax;
+        acumuladoDefault[t] = prevAcumDefault + g + pagosLineaDefault[t];
+        prevAcumDefault = acumuladoDefault[t];
+      }
+
+      const series = {};
+      const scalars = {
+        Tasa_interes_construccion: cfg.tasa_construccion,
+        Timbres: cfg.pct_timbres,
+      };
+      const rows = [];
+      addSeries(series, 'GIROS fuente', giros, 'giros_fuente');
+      addSeries(series, 'PAGOS LINEA fuente', pagosLineaDefault, 'pagos_linea_fuente');
+
+      function pushRow(config) {
+        const formula = getFormula('gf', config.key, config.formula);
+        const values = evaluateSeries(formula, series, scalars, config.fallback, config.extraFactory);
+        addSeries(series, config.label, values, config.key);
+        rows.push(Object.assign({}, config, { formula, values }));
+        return values;
+      }
+
+      pushRow({ key: 'giros', label: 'GIROS (desde EP)', fallback: giros, formula: '[GIROS fuente]', mode: 'signed' });
+      pushRow({ key: 'pagos_linea', label: 'PAGOS LINEA', fallback: pagosLineaDefault, formula: '[PAGOS LINEA fuente]', mode: 'signed' });
+
+      const acumFormula = getFormula('gf', 'acumulado', '[Acumulado anterior] + [GIROS (desde EP)] + [PAGOS LINEA]');
+      const acumulado = [];
+      acumuladoDefault.forEach((fallbackValue, index) => {
+        const context = buildFormulaContext(series, scalars, index, { 'Acumulado anterior': acumulado[index - 1] || 0 });
+        const value = evalFormulaValue(acumFormula, context);
+        acumulado.push(value === null ? fallbackValue : value);
+      });
+      addSeries(series, 'ACUMULADO', acumulado, 'acumulado');
+      rows.push({ key: 'acumulado', label: 'ACUMULADO', formula: acumFormula, values: acumulado, mode: 'signed', bold: true });
+
+      const interesDefault = acumulado.map((value) => value * (cfg.tasa_construccion / 100) / 12);
+      pushRow({ key: 'interes', label: `INTERES (${cfg.tasa_construccion}% anual)`, fallback: interesDefault, formula: '[ACUMULADO] * [Tasa_interes_construccion] / 12 / 100', mode: 'cost' });
+      const timbresDefault = giros.map((value) => value * (cfg.pct_timbres / 100));
+      pushRow({ key: 'timbres', label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, fallback: timbresDefault, formula: '[GIROS (desde EP)] * [Timbres] / 100', mode: 'cost' });
+
+      renderFormulaTableHeader('constr-fin-planilla-head', labels);
+      setHtml('constr-fin-planilla-tbody', rows.map((row) => `
+        <tr style="${row.bold ? 'background:#f8fafc' : ''}">
+          <td style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.bold ? '#0f172a' : '#334155'}">${escapeHtml(row.label)}</td>
+          <td>${formulaInput('gf', row.key, row.formula, true)}</td>
+          <td style="text-align:right;font-weight:${row.bold ? 800 : 600}">${formatAmount(total(row.values), row.mode, true)}</td>
+          ${row.values.map((value) => `<td data-month-cell style="text-align:center;${row.bold ? 'font-weight:700' : ''}">${formatAmount(value, row.mode)}</td>`).join('')}
+        </tr>
+      `).join(''));
+      setHtml('constr-fin-planilla-tfoot', '');
+      syncGfParamMirror();
+    };
+    window.renderConstructionGF = renderConstructionGF;
+  }
+
+  if (typeof renderProjectCashflow === 'function') {
+    renderProjectCashflow = function patchedRenderProjectCashflow() {
+      if (!$('flujo-tabla')) return;
+      const monthCount = getCostMonthCount();
+      const labels = getCostMonthLabels();
+      const incomeSource = getProjectMonthlyIncome(monthCount);
+      const costsSource = getProjectMonthlyCosts(false);
+      const financialSource = getProjectMonthlyCosts(true).map((value, index) => Math.max(0, value - costsSource[index]));
+      const ivaCreditoSource = getMonthlyIvaCredito();
+      const ivaDebitoSource = getMonthlyIvaDebito(incomeSource);
+
+      const sourceSeries = {};
+      const series = {};
+      addSeries(sourceSeries, 'Ventas por mes', incomeSource, 'ventas_por_mes');
+      addSeries(sourceSeries, 'Costos proyecto', costsSource, 'costos_proyecto');
+      addSeries(sourceSeries, 'Gastos financieros fuente', financialSource, 'gastos_financieros_fuente');
+      addSeries(sourceSeries, 'IVA credito fuente', ivaCreditoSource, 'iva_credito_fuente');
+      addSeries(sourceSeries, 'IVA debito fuente', ivaDebitoSource, 'iva_debito_fuente');
+
+      const rows = [];
+      function allSeries() {
+        return Object.assign({}, sourceSeries, series);
+      }
+      function pushRow(config) {
+        const formula = getFormula('flow', config.key, config.formula);
+        const values = evaluateSeries(formula, allSeries(), {}, config.fallback);
+        addSeries(series, config.label, values, config.key);
+        rows.push(Object.assign({}, config, { formula, values }));
+        return values;
+      }
+
+      const ingresos = pushRow({ key: 'ingresos', category: 'Ingresos', label: 'Ingresos (Ventas)', fallback: incomeSource, formula: '[Ventas por mes]', mode: 'signed' });
+      const costosBase = pushRow({ key: 'costos_base', category: 'Costos', label: 'Costos base', fallback: costsSource.map((value) => -value), formula: '-[Costos proyecto]', mode: 'signed' });
+      const gastosFin = pushRow({ key: 'gastos_financieros', category: 'Costos', label: 'Gastos financieros', fallback: financialSource.map((value) => -value), formula: '-[Gastos financieros fuente]', mode: 'signed' });
+      const flujoOperativo = pushRow({ key: 'flujo_operativo', category: 'Costos', label: 'Flujo operativo bruto', fallback: ingresos.map((value, index) => value + costosBase[index] + gastosFin[index]), formula: '[Ingresos (Ventas)] + [Costos base] + [Gastos financieros]', mode: 'signed', bold: true });
+      pushRow({ key: 'iva_credito', category: 'IVA', label: 'IVA credito', fallback: ivaCreditoSource, formula: '[IVA credito fuente]', mode: 'signed' });
+      pushRow({ key: 'iva_debito', category: 'IVA', label: 'IVA debito', fallback: ivaDebitoSource.map((value) => -value), formula: '-[IVA debito fuente]', mode: 'signed' });
+      const flujoAntes = pushRow({ key: 'flujo_antes_impuestos', category: 'IVA', label: 'Flujo antes de impuestos', fallback: flujoOperativo.map((value, index) => value + toNumber(series.iva_credito[index]) + toNumber(series.iva_debito[index])), formula: '[Flujo operativo bruto] + [IVA credito] + [IVA debito]', mode: 'signed', bold: true });
+      const ppmSource = getMonthlyPPM(incomeSource);
+      const rentaSource = getMonthlyImpuestoRenta(flujoAntes, incomeSource);
+      addSeries(sourceSeries, 'PPM fuente', ppmSource, 'ppm_fuente');
+      addSeries(sourceSeries, 'Impuesto renta fuente', rentaSource, 'impuesto_renta_fuente');
+      pushRow({ key: 'ppm', category: 'Impuestos', label: 'PPM', fallback: ppmSource, formula: '[PPM fuente]', mode: 'signed' });
+      pushRow({ key: 'impuesto_renta', category: 'Impuestos', label: 'Impuesto Renta', fallback: rentaSource, formula: '[Impuesto renta fuente]', mode: 'signed' });
+      const flujoDespues = pushRow({ key: 'flujo_despues_impuestos', category: 'Impuestos', label: 'Flujo despues de impuestos', fallback: flujoAntes.map((value, index) => value + toNumber(series.ppm[index]) + toNumber(series.impuesto_renta[index])), formula: '[Flujo antes de impuestos] + [PPM] + [Impuesto Renta]', mode: 'signed', bold: true });
+
+      const cumulativeFallback = cumulativeSeries(flujoDespues);
+      const cumulativeFormula = getFormula('flow', 'flujo_acumulado', '[Flujo acumulado anterior] + [Flujo despues de impuestos]');
+      const cumulative = [];
+      cumulativeFallback.forEach((fallbackValue, index) => {
+        const context = buildFormulaContext(Object.assign({}, sourceSeries, series), {}, index, { 'Flujo acumulado anterior': cumulative[index - 1] || 0 });
+        const value = evalFormulaValue(cumulativeFormula, context);
+        cumulative.push(value === null ? fallbackValue : value);
+      });
+      addSeries(series, 'Flujo acumulado', cumulative, 'flujo_acumulado');
+      rows.push({ key: 'flujo_acumulado', category: 'Resultado', label: 'Flujo acumulado', fallback: cumulativeFallback, formula: cumulativeFormula, values: cumulative, mode: 'signed', bold: true });
+
+      const totalIncome = total(ingresos);
+      const totalFlujoBruto = total(flujoOperativo);
+      const margin = total(flujoDespues);
+      const capitalNeed = Math.abs(cumulative.reduce((min, value) => Math.min(min, toNumber(value)), 0));
+      const cumulativeBruto = cumulativeSeries(flujoOperativo);
+      const capitalNeedSin = Math.abs(cumulativeBruto.reduce((min, value) => Math.min(min, toNumber(value)), 0));
+      const tirNetaAnual = irrAnualFromMensual(flujoDespues);
+      const tirBrutaAnual = irrAnualFromMensual(flujoOperativo);
+
+      setText('flujo-margen-sin', fmtUf(totalFlujoBruto));
+      setText('flujo-margen-sin-pct', `${fmtPct(totalIncome ? totalFlujoBruto / totalIncome * 100 : 0)} s/ventas`);
+      setText('flujo-margen-con', fmtUf(margin));
+      setText('flujo-margen-con-pct', `${fmtPct(totalIncome ? margin / totalIncome * 100 : 0)} s/ventas`);
+      setText('flujo-k-sin', fmtUf(capitalNeedSin));
+      setText('flujo-k-con', fmtUf(capitalNeed));
+      setText('flujo-tir-sin', fmtPct(tirBrutaAnual * 100));
+      setText('flujo-tir-con', fmtPct(tirNetaAnual * 100));
+
+      setHtml('flujo-tabla-header', `<tr><th style="text-align:left;min-width:220px">Concepto</th><th style="text-align:left;min-width:320px">Formula editable</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}</tr>`);
+
+      const categories = ['Ingresos', 'Costos', 'IVA', 'Impuestos', 'Resultado'];
+      const body = categories.map((category) => {
+        const categoryRows = rows.filter((row) => row.category === category);
+        if (!categoryRows.length) return '';
+        const isCollapsed = !!patchState.flowCollapsed[category];
+        const categoryTotal = categoryRows.reduce((sum, row) => sum + total(row.values), 0);
+        return `
+          <tr class="flow-category-row">
+            <td colspan="${2 + labels.length}">
+              <div class="flow-category-title">
+                <button class="btn-outline btn-plus" type="button" onclick="toggleFlowCategory('${escapeHtml(category)}')">${isCollapsed ? '+' : '-'}</button>
+                <span>${escapeHtml(category)}</span>
+                <span style="margin-left:auto">${formatAmount(categoryTotal, category === 'Costos' ? 'cost' : 'signed', true)}</span>
+              </div>
+            </td>
+          </tr>
+          ${isCollapsed ? '' : categoryRows.map((row) => `
+            <tr data-flow-row="${escapeHtml(row.key)}">
+              <td style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.bold ? '#0f172a' : '#334155'}">${escapeHtml(row.label)}</td>
+              <td>${formulaInput('flow', row.key, row.formula, false)}</td>
+              ${row.values.map((value) => `<td data-flow-value style="text-align:center;${row.bold ? 'font-weight:700' : ''}">${formatAmount(value, row.mode)}</td>`).join('')}
+            </tr>
+          `).join('')}
+        `;
+      }).join('');
+      setHtml('flujo-tabla-tbody', body);
+    };
+    window.renderProjectCashflow = renderProjectCashflow;
+  }
+
+  window.toggleFlowCategory = function toggleFlowCategory(category) {
+    patchState.flowCollapsed[category] = !patchState.flowCollapsed[category];
+    renderProjectCashflow();
+  };
+
+  function enhanceCostFormulaInputs() {
+    const header = document.querySelector('#planilla-head th:nth-child(3)');
+    if (header) header.textContent = 'Formula editable';
+    document.querySelectorAll('#planilla-table .btn-formula').forEach((button) => {
+      button.textContent = 'Ampliar';
+    });
+    document.querySelectorAll('#planilla-table .cost-hidden-formula').forEach((input) => {
+      input.placeholder = 'Formula o monto manual';
+      input.title = input.disabled ? 'Formula automatica vinculada' : 'Edita y presiona Enter o sal del campo para recalcular';
+    });
+  }
+
+  if (typeof renderCostosModule === 'function') {
+    const originalRenderCostosModule = renderCostosModule;
+    renderCostosModule = function patchedRenderCostosModule() {
+      originalRenderCostosModule();
+      enhanceCostFormulaInputs();
+    };
+    window.renderCostosModule = renderCostosModule;
+  }
+
+  if (typeof renderConstruccion === 'function') {
+    const originalRenderConstruccion = renderConstruccion;
+    renderConstruccion = function patchedRenderConstruccion() {
+      originalRenderConstruccion();
+      const metrics = getConstructionMetrics();
+      const anticipoPct = Math.max(0, toNumber(metrics.anticipo_pct)) / 100;
+      setText('anticipo-meta', `${fmtNumber(metrics.anticipo_pct)}% del contrato | pago unico inicial, sin devolucion ni descuento posterior`);
+      setText('anticipo-monto', fmtUf(metrics.total_neto * anticipoPct));
+      syncGfParamMirror();
+    };
+    window.renderConstruccion = renderConstruccion;
+  }
+
+  document.addEventListener('change', (event) => {
+    const formulaTarget = event.target.closest('[data-formula-scope][data-formula-key]');
+    if (formulaTarget) {
+      const scope = formulaTarget.dataset.formulaScope;
+      const key = formulaTarget.dataset.formulaKey;
+      setFormula(scope, key, formulaTarget.value);
+      if (scope === 'flow') renderProjectCashflow();
+      if (scope === 'ep' || scope === 'gf') renderConstruccion();
+      return;
+    }
+
+    if (event.target.matches('#planilla-table .cost-hidden-formula')) {
+      readCostosEditor();
+      renderCostosModule();
+      renderProjectCashflow();
+      if (typeof scheduleAutosave === 'function') scheduleAutosave('costos');
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    if (event.target.matches('[data-formula-scope][data-formula-key], #planilla-table .cost-hidden-formula')) {
+      event.preventDefault();
+      event.target.blur();
+    }
+  });
+
+  function nearestSectionLabel(element) {
+    const card = element.closest('.card,.card-dark,[class*="planilla"],.payment-section,.modal-card') || element.parentElement;
+    const title = card ? card.querySelector('.sec-title,[style*="text-transform:uppercase"],h1,h2,h3') : null;
+    const text = title && title.textContent ? title.textContent.trim() : '';
+    return text || 'Seccion de datos';
+  }
+
+  function hasAccessibleName(element) {
+    if (!element) return true;
+    if (element.getAttribute('aria-label') || element.getAttribute('aria-labelledby') || element.title) return true;
+    const escapeCss = window.CSS && CSS.escape ? CSS.escape : (value) => String(value).replace(/"/g, '\\"');
+    if (element.id && document.querySelector(`label[for="${escapeCss(element.id)}"]`)) return true;
+    return false;
+  }
+
+  function deriveInputLabel(input) {
+    const closestLabel = input.closest('label');
+    const explicit = closestLabel && closestLabel.textContent ? closestLabel.textContent.trim() : '';
+    if (explicit) return explicit;
+    const parent = input.parentElement;
+    const previousElement = parent ? parent.previousElementSibling : null;
+    const previous = previousElement && previousElement.textContent ? previousElement.textContent.trim() : '';
+    if (previous && previous.length <= 90) return previous;
+    const field = input.dataset.field || input.dataset.formulaKey || input.id || input.name || input.placeholder;
+    return String(field || 'Campo editable').replace(/[-_]+/g, ' ');
+  }
+
+  function enhanceTabsAccessibility() {
+    const tabBar = document.getElementById('tabBar');
+    if (!tabBar) return;
+    tabBar.setAttribute('role', 'tablist');
+    tabBar.setAttribute('aria-label', 'Secciones de evaluacion del proyecto');
+
+    const buttons = Array.from(tabBar.querySelectorAll('.tab-btn'));
+    buttons.forEach((button, index) => {
+      const clickHandler = button.getAttribute('onclick') || '';
+      const match = clickHandler.match(/showTab\('([^']+)'/);
+      const tabId = match ? match[1] : `tab-${index + 1}`;
+      const pane = document.getElementById(`tab-${tabId}`);
+      if (!button.id) button.id = `tab-btn-${tabId}`;
+      button.setAttribute('role', 'tab');
+      button.setAttribute('aria-controls', `tab-${tabId}`);
+      button.setAttribute('aria-selected', button.classList.contains('active') ? 'true' : 'false');
+      button.setAttribute('tabindex', button.classList.contains('active') ? '0' : '-1');
+      if (pane) {
+        pane.setAttribute('role', 'tabpanel');
+        pane.setAttribute('aria-labelledby', button.id);
+        if (pane.classList.contains('active')) pane.removeAttribute('hidden');
+        else pane.setAttribute('hidden', '');
+      }
+    });
+  }
+
+  function enhanceTablesAccessibility() {
+    document.querySelectorAll('table').forEach((table, tableIndex) => {
+      table.setAttribute('role', 'table');
+      if (!table.getAttribute('aria-label')) {
+        table.setAttribute('aria-label', nearestSectionLabel(table));
+      }
+      table.querySelectorAll('thead th').forEach((th) => th.setAttribute('scope', 'col'));
+      table.querySelectorAll('tbody tr:not(.cat-row):not(.subcat-row):not(.flow-category-row) td:first-child').forEach((cell) => {
+        if (!cell.querySelector('input,select,button') && cell.textContent.trim()) cell.setAttribute('scope', 'row');
+      });
+      if (!table.id) table.id = `data-table-${tableIndex + 1}`;
+    });
+  }
+
+  function enhanceScrollRegions() {
+    document.querySelectorAll('.tbl-scroll,.flow-planilla,.resumen-gantt-scroll').forEach((region, index) => {
+      region.setAttribute('tabindex', '0');
+      region.setAttribute('role', 'region');
+      if (!region.getAttribute('aria-label')) region.setAttribute('aria-label', `${nearestSectionLabel(region)} con desplazamiento horizontal`);
+      if (!region.id) region.id = `scroll-region-${index + 1}`;
+    });
+  }
+
+  function enhanceButtonsAccessibility() {
+    document.querySelectorAll('button').forEach((button) => {
+      const text = button.textContent.trim();
+      if (!hasAccessibleName(button) || /^[+\-·×←→]*$/.test(text)) {
+        const title = button.title ? button.title.trim() : '';
+        const onclick = button.getAttribute('onclick') || '';
+        let label = title || text || 'Accion';
+        if (/toggleCostCategoryCollapse/.test(onclick) || /toggleFlowCategory/.test(onclick)) label = `${text === '+' ? 'Desplegar' : 'Colapsar'} seccion`;
+        if (/scroll/.test(onclick)) label = text.includes('←') ? 'Desplazar tabla hacia meses anteriores' : 'Desplazar tabla hacia meses posteriores';
+        if (/print/.test(onclick)) label = 'Imprimir reporte';
+        if (/remove|eliminar/i.test(onclick) || text === '×') label = title || 'Eliminar';
+        button.setAttribute('aria-label', label);
+      }
+      if (button.disabled) button.setAttribute('aria-disabled', 'true');
+      const onclick = button.getAttribute('onclick') || '';
+      if (/toggleCostCategoryCollapse/.test(onclick) || /toggleFlowCategory/.test(onclick)) {
+        button.setAttribute('aria-expanded', button.textContent.trim() === '-' ? 'true' : 'false');
+      }
+    });
+  }
+
+  function enhanceInputsAccessibility() {
+    document.querySelectorAll('input,select,textarea').forEach((input) => {
+      if (!hasAccessibleName(input)) input.setAttribute('aria-label', deriveInputLabel(input));
+      if (input.matches('[data-formula-scope][data-formula-key], .cost-hidden-formula')) {
+        input.setAttribute('aria-label', `Formula editable ${deriveInputLabel(input)}`);
+        input.setAttribute('autocomplete', 'off');
+        input.setAttribute('spellcheck', 'false');
+      }
+    });
+  }
+
+  function enhanceLandmarksAndDialogs() {
+    const topnav = document.querySelector('.topnav');
+    if (topnav) topnav.setAttribute('aria-label', 'Marca BRICSA');
+    const main = document.getElementById('main-content');
+    if (main) main.setAttribute('aria-label', 'Contenido principal de evaluacion de proyecto');
+    const syncBadge = document.getElementById('sync-badge');
+    if (syncBadge) {
+      syncBadge.setAttribute('role', 'status');
+      syncBadge.setAttribute('aria-live', 'polite');
+    }
+    const formulaModal = document.getElementById('cost-formula-modal');
+    if (formulaModal) {
+      formulaModal.setAttribute('role', 'dialog');
+      formulaModal.setAttribute('aria-modal', 'true');
+      formulaModal.setAttribute('aria-labelledby', 'cost-formula-title');
+      formulaModal.setAttribute('aria-describedby', 'cost-formula-subtitle');
+    }
+    document.querySelectorAll('.modal-backdrop').forEach((modal) => {
+      if (!modal.getAttribute('role')) modal.setAttribute('role', 'dialog');
+      modal.setAttribute('aria-modal', 'true');
+    });
+  }
+
+  function enhanceAppAccessibility() {
+    enhanceTabsAccessibility();
+    enhanceTablesAccessibility();
+    enhanceScrollRegions();
+    enhanceButtonsAccessibility();
+    enhanceInputsAccessibility();
+    enhanceLandmarksAndDialogs();
+  }
+
+  const originalShowTabForA11y = window.showTab || showTab;
+  showTab = function accessibleShowTab(tabId, button) {
+    originalShowTabForA11y(tabId, button);
+    window.requestAnimationFrame(enhanceAppAccessibility);
+  };
+  window.showTab = showTab;
+
+  const tabBar = document.getElementById('tabBar');
+  if (tabBar) {
+    tabBar.addEventListener('keydown', (event) => {
+      const keys = ['ArrowRight', 'ArrowLeft', 'Home', 'End'];
+      if (!keys.includes(event.key)) return;
+      const buttons = Array.from(tabBar.querySelectorAll('.tab-btn'));
+      const currentIndex = Math.max(0, buttons.indexOf(document.activeElement));
+      let nextIndex = currentIndex;
+      if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % buttons.length;
+      if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + buttons.length) % buttons.length;
+      if (event.key === 'Home') nextIndex = 0;
+      if (event.key === 'End') nextIndex = buttons.length - 1;
+      event.preventDefault();
+      buttons[nextIndex].focus();
+      buttons[nextIndex].click();
+    });
+  }
+
+  let accessibilityTimer = null;
+  const scheduleAccessibilityEnhancement = () => {
+    window.clearTimeout(accessibilityTimer);
+    accessibilityTimer = window.setTimeout(enhanceAppAccessibility, 80);
+  };
+  const observer = new MutationObserver(scheduleAccessibilityEnhancement);
+  observer.observe(document.body, { childList: true, subtree: true });
+  document.addEventListener('DOMContentLoaded', enhanceAppAccessibility);
+  window.requestAnimationFrame(enhanceAppAccessibility);
+})();
+</script>
 </body>
 </html>
