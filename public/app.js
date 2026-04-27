@@ -1478,14 +1478,18 @@ function renderVentasSummaryCardsLegacy() {
   const promesaDuracion = preRows.length ? getCronogramaComputed(preRows[0]).duracion : 0;
   const velPromesas = promesaDuracion ? totalUnidades / promesaDuracion : 0;
 
-  const analysisStart = Math.min(
-    ...preRows.concat(ventaRows).map((row) => getCronogramaComputed(row).inicio),
-    escrituraInicio || 999999
-  );
-  const analysisEnd = Math.max(
-    ...preRows.concat(ventaRows).map((row) => getCronogramaComputed(row).fin),
-    escrituraFin || 0
-  );
+  const analysisStart = escrituraDuracion > 0
+    ? escrituraInicio
+    : Math.min(
+      ...preRows.concat(ventaRows).map((row) => getCronogramaComputed(row).inicio),
+      escrituraInicio || 999999
+    );
+  const analysisEnd = escrituraDuracion > 0
+    ? escrituraFin
+    : Math.max(
+      ...preRows.concat(ventaRows).map((row) => getCronogramaComputed(row).fin),
+      escrituraFin || 0
+    );
   const duration = analysisEnd > analysisStart ? analysisEnd - analysisStart : 1;
   const velUf = totalVenta / duration;
   const velUn = totalUnidades / duration;
@@ -1599,14 +1603,18 @@ function renderVentasSummaryCards() {
   const velPromesas = promesaDuracion ? totalUnidades / promesaDuracion : 0;
 
   const analysisPoints = preRows.map((row) => getCronogramaComputed(row));
-  const analysisStart = Math.min(
-    ...analysisPoints.map((row) => row.inicio),
-    escrituraInicio || 999999
-  );
-  const analysisEnd = Math.max(
-    ...analysisPoints.map((row) => row.fin),
-    escrituraFin || 0
-  );
+  const analysisStart = escrituraDuracion > 0
+    ? escrituraInicio
+    : Math.min(
+      ...analysisPoints.map((row) => row.inicio),
+      escrituraInicio || 999999
+    );
+  const analysisEnd = escrituraDuracion > 0
+    ? escrituraFin
+    : Math.max(
+      ...analysisPoints.map((row) => row.fin),
+      escrituraFin || 0
+    );
   const duration = analysisEnd > analysisStart ? analysisEnd - analysisStart : 1;
   const velUf = totalVenta / duration;
   const velUn = totalUnidades / duration;
