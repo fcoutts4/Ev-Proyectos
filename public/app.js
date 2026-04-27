@@ -3559,10 +3559,10 @@ function updateCostFormulaModalPreview() {
       if (rawValue && !isAuto) {
         const context = buildCostContext();
         const result = evaluateExpressionFormula(rawValue, context);
-        resultEl.textContent = `= ${fmtNumber(result)}`;
+        resultEl.textContent = `= UF ${fmtNumber(result)}`;
         resultEl.style.color = '#0f172a';
       } else {
-        resultEl.textContent = '=';
+        resultEl.textContent = '= UF';
         resultEl.style.color = '#0f172a';
       }
     } catch (e) {

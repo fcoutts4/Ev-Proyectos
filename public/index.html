@@ -87,6 +87,8 @@ tbody tr:hover{background:#f8fafc}
 .formula-chip-row{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px}
 .formula-chip-row .formula-token{min-height:22px;padding:2px 7px;font-size:10px;border-radius:6px}
 .formula-chip-empty{font-size:10px;color:#94a3b8;font-style:italic}
+.formula-chip-editor{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:36px;padding:8px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px}
+.formula-chip-editor:empty::before{content:'Escribe abajo para construir la fórmula';color:#94a3b8;font-size:11px;font-style:italic}
 .formula-preview{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc}
 .formula-preview-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .formula-preview-title{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#64748b}
@@ -1540,13 +1542,13 @@ tfoot td{line-height:1.25}
       <button class="btn-outline btn-plus" type="button" onclick="closeCostFormulaModal()">×</button>
     </div>
     <div class="modal-body">
-      <div id="cost-formula-modal-preview" class="formula-preview" style="margin-bottom:14px"></div>
       <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:14px">
         <div style="font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:6px">RESULTADO</div>
-        <div id="cost-formula-modal-result" style="font-size:20px;font-weight:900;color:#0f172a">=</div>
+        <div id="cost-formula-modal-result" style="font-size:20px;font-weight:900;color:#0f172a">= UF</div>
       </div>
       <div class="formula-cell">
         <div style="font-size:10px;color:#94a3b8;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Editar fórmula</div>
+        <div id="cost-formula-modal-preview" class="formula-chip-editor" style="margin-bottom:8px"></div>
         <input id="cost-formula-modal-input" class="inp" placeholder="Ej: 2500 * _meses_construccion + 3000 * _meses_preventa" oninput="handleCostFormulaInput(this); updateCostFormulaModalPreview(); autosaveCostFormulaModal()" onfocus="handleCostFormulaInput(this); updateCostFormulaModalPreview()" onblur="hideCostFormulaSuggestionsLater()"/>
         <div class="formula-suggest"></div>
       </div>
