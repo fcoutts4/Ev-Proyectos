@@ -1084,12 +1084,25 @@ function readGanttEditor() {
   return normalizeGanttRows(rows);
 }
 
+function setupGanttTimelineClip() {
+  const shell = document.getElementById('gantt-editor-scroll');
+  if (!shell || shell._ganttClipBound) return;
+  shell._ganttClipBound = true;
+  function applyClip() {
+    const th = shell.querySelector('.gantt-timeline-head');
+    if (th) th.style.clipPath = shell.scrollLeft > 0 ? `inset(0 0 0 ${shell.scrollLeft}px)` : '';
+  }
+  shell.addEventListener('scroll', applyClip, { passive: true });
+  applyClip();
+}
+
 function renderGanttEditor(rows = state.gantt) {
   const normalized = normalizeGanttRows(rows);
   state.gantt = normalized;
   const monthWidth = getGanttMonthWidth();
   const meta = getGanttTimelineMeta(normalized, monthWidth);
   renderGanttTimelineScale('gantt-timeline-head', meta, monthWidth);
+  setupGanttTimelineClip();
 
   setHtml('gantt-tbody', normalized.map((row, index) => {
     const left = (toNumber(row.inicio) * monthWidth) + (monthWidth / 2);
@@ -2131,9 +2144,9 @@ function renderConstructionEP() {
 
   setHtml('constr-ep-head', `
     <tr>
-      <th style="min-width:200px;text-align:left">Concepto</th>
+      <th class="finance-concept-col" style="min-width:200px;text-align:left">Concepto</th>
       <th style="width:60px;text-align:center">ƒx</th>
-      <th style="width:110px;text-align:right">Total</th>
+      <th class="finance-total-col" style="width:110px;text-align:right">Total</th>
       ${labels.map((l) => `<th data-month-col>${escapeHtml(l)}</th>`).join('')}
     </tr>
   `);
@@ -2154,8 +2167,8 @@ function renderConstructionEP() {
     const popId = `fpop-ep-${Math.random().toString(36).slice(2, 8)}`;
     const bg = r.bold ? 'background:#f0fdf4' : '';
     return `
-      <tr style="${bg}">
-        <td style="text-align:left;font-weight:${r.bold ? 800 : 600};color:${r.bold ? '#166534' : '#334155'}">${escapeHtml(r.label)}</td>
+      <tr class="${r.bold ? 'finance-total-row' : ''}" style="${bg}">
+        <td class="finance-concept-col" style="text-align:left;font-weight:${r.bold ? 800 : 600};color:${r.bold ? '#166534' : '#334155'}">${escapeHtml(r.label)}</td>
         <td style="text-align:center;position:relative" class="formula-host">
           <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #cbd5e1;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">ƒx</button>
           <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;left:0;top:100%;margin-top:4px;background:#0f172a;color:#fff;border-radius:8px;padding:10px 12px;min-width:260px;max-width:360px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">
@@ -2163,7 +2176,7 @@ function renderConstructionEP() {
             <div style="font-family:'Courier New',monospace;background:#1e293b;padding:6px 8px;border-radius:6px">${escapeHtml(r.formula)}</div>
           </div>
         </td>
-        <td style="text-align:right;font-weight:${r.bold ? 800 : 600};color:${r.color || '#334155'}">${fmtUf(total(r.values))}</td>
+        <td class="finance-total-col" style="text-align:right;font-weight:${r.bold ? 800 : 600};color:${r.color || '#334155'}">${fmtUf(total(r.values))}</td>
         ${r.values.map((v) => `<td data-month-cell style="text-align:center;color:${r.color === '#22c55e' ? '#16a34a' : '#334155'};${r.bold ? 'font-weight:700' : ''}">${fmtTableAmount(v, { kind: 'income' })}</td>`).join('')}
       </tr>`;
   }).join(''));
@@ -2209,18 +2222,16 @@ function renderConstructionGF(epData) {
 
   setHtml('constr-fin-planilla-head', `
     <tr>
-      <th style="min-width:200px;text-align:left">Concepto</th>
+      <th class="finance-concept-col" style="min-width:200px;text-align:left">Concepto</th>
       <th style="width:60px;text-align:center">ƒx</th>
-      <th style="width:110px;text-align:right">Total</th>
+      <th class="finance-total-col" style="width:110px;text-align:right">Total</th>
       ${labels.map((l) => `<th data-month-col>${escapeHtml(l)}</th>`).join('')}
     </tr>
   `);
 
   const total = (arr) => arr.reduce((a, b) => a + toNumber(b), 0);
-  const pctAlzPct = toNumber(state.financiamiento.pct_alzamiento ?? 90);
   const rows = [
     { label: 'GIROS (desde EP)', values: giros, formula: 'GIROS(t) = TOTAL_A_PAGO_c_IVA(t)  [conectado a tabla EP]', color: '#22c55e' },
-    { label: `PAGOS LÍNEA (alzamiento ${pctAlzPct}%)`, values: pagosLinea, formula: `PAGOS_LINEA(t) = ${pctAlzPct}% × Ingreso_Escrituración_100%[t−1]`, color: '#334155' },
     { label: 'ACUMULADO', values: acumulado, formula: 'ACUMULADO(t) = ACUMULADO(t−1) + GIROS(t) + PAGOS_LINEA(t)', bold: true, color: '#0f172a' },
     { label: `INTERÉS (${cfg.tasa_construccion}% anual)`, values: interesMensual, formula: `INTERÉS(t) = ACUMULADO(t) × ${cfg.tasa_construccion}%/12`, color: '#f59e0b' },
     { label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, values: impTimbres, formula: `IMP_TIMBRES(t) = GIROS(t) × ${cfg.pct_timbres}%`, color: '#f59e0b' },
@@ -2230,8 +2241,8 @@ function renderConstructionGF(epData) {
     const popId = `fpop-gf-${Math.random().toString(36).slice(2, 8)}`;
     const bg = r.bold ? 'background:#f8fafc' : '';
     return `
-      <tr style="${bg}">
-        <td style="text-align:left;font-weight:${r.bold ? 800 : 600};color:${r.color}">${escapeHtml(r.label)}</td>
+      <tr class="${r.bold ? 'finance-total-row' : ''}" style="${bg}">
+        <td class="finance-concept-col" style="text-align:left;font-weight:${r.bold ? 800 : 600};color:${r.color}">${escapeHtml(r.label)}</td>
         <td style="text-align:center;position:relative" class="formula-host">
           <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #cbd5e1;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">ƒx</button>
           <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;left:0;top:100%;margin-top:4px;background:#0f172a;color:#fff;border-radius:8px;padding:10px 12px;min-width:260px;max-width:360px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">
@@ -2239,7 +2250,7 @@ function renderConstructionGF(epData) {
             <div style="font-family:'Courier New',monospace;background:#1e293b;padding:6px 8px;border-radius:6px">${escapeHtml(r.formula)}</div>
           </div>
         </td>
-        <td style="text-align:right;font-weight:${r.bold ? 800 : 600};color:${r.color}">${fmtUf(total(r.values))}</td>
+        <td class="finance-total-col" style="text-align:right;font-weight:${r.bold ? 800 : 600};color:${r.color}">${fmtUf(total(r.values))}</td>
         ${r.values.map((v) => `<td data-month-cell style="text-align:center;color:#334155;${r.bold ? 'font-weight:700' : ''}">${fmtTableAmount(v, { kind: 'income' })}</td>`).join('')}
       </tr>`;
   }).join(''));
@@ -2487,7 +2498,7 @@ function renderFinancingSourcePlanilla(sourceType) {
 
     setHtml('terreno-fin-planilla-head', `
       <tr>
-        <th style="min-width:200px;text-align:left">Concepto</th>
+        <th class="finance-concept-col" style="min-width:200px;text-align:left">Concepto</th>
         <th style="width:60px;text-align:center">ƒx</th>
         ${labels.map((l) => `<th data-month-col>${escapeHtml(l)}</th>`).join('')}
       </tr>
@@ -2495,7 +2506,6 @@ function renderFinancingSourcePlanilla(sourceType) {
 
     const rows = [
       { label: 'GIROS', values: giros, formula: `GIROS = % línea × Costo terreno · desembolso en mes compra`, color: '#22c55e' },
-      { label: 'PAGOS LÍNEA', values: pagosLinea, formula: 'Pago de la deuda en el mes del anticipo de construcción', color: '#334155' },
       { label: 'ACUMULADO', values: acumulado, formula: 'ACUMULADO(t) = ACUMULADO(t−1) + GIROS(t) + PAGOS_LINEA(t)', bold: true, color: '#0f172a' },
       { label: `INTERÉS ANUAL (${tasaTerreno}%)`, values: interesAnual, formula: `Acumulado anual de interés · pagado en aniversario del giro o al cierre anticipado`, color: '#f59e0b' },
       { label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, values: impTimbres, formula: `IMP_TIMBRES(t) = GIROS(t) × ${cfg.pct_timbres}%`, color: '#f59e0b' },
@@ -2505,8 +2515,8 @@ function renderFinancingSourcePlanilla(sourceType) {
       const popId = `fpop-tf-${Math.random().toString(36).slice(2, 8)}`;
       const bg = r.bold ? 'background:#f8fafc' : '';
       return `
-        <tr style="${bg}">
-          <td style="text-align:left;font-weight:${r.bold ? 800 : 600};color:${r.color}">${escapeHtml(r.label)}</td>
+        <tr class="${r.bold ? 'finance-total-row' : ''}" style="${bg}">
+          <td class="finance-concept-col" style="text-align:left;font-weight:${r.bold ? 800 : 600};color:${r.color}">${escapeHtml(r.label)}</td>
           <td style="text-align:center;position:relative" class="formula-host">
             <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #cbd5e1;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">ƒx</button>
             <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;left:0;top:100%;margin-top:4px;background:#0f172a;color:#fff;border-radius:8px;padding:10px 12px;min-width:260px;max-width:360px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">

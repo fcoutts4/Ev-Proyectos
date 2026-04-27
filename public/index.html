@@ -185,9 +185,8 @@ tbody tr:hover{background:#f8fafc}
 #tab-gantt .gantt-sticky-left{z-index:45;background:#fff!important;overflow:visible;box-shadow:8px 0 12px -14px rgba(15,23,42,.45)}
 #tab-gantt .gantt-sticky-head{z-index:55;background:#f8fafc!important}
 #tab-gantt .gantt-sticky-right{z-index:56}
-/* clip-path:inset(0) crea un clipping context real en celdas de tabla, a diferencia de overflow:hidden */
-#tab-gantt .gantt-timeline-head{position:relative;overflow:hidden;clip-path:inset(0);z-index:1}
-/* El contenedor de scroll no debe renderizar nada fuera de sus bordes */
+/* clip-path se actualiza dinámicamente via JS según scrollLeft */
+#tab-gantt .gantt-timeline-head{position:relative;overflow:hidden;z-index:1}
 #tab-gantt .gantt-editor-shell{contain:paint}
 #tab-gantt .gantt-timeline-scale.has-grid{background-image:none}
 #tab-gantt .gantt-quarter-mark{border-left:none}
@@ -565,6 +564,48 @@ tfoot td{line-height:1.25}
 .tbl-scroll:focus-visible,.flow-planilla:focus-visible,.resumen-gantt-scroll:focus-visible{outline:3px solid rgba(29,78,216,.45);outline-offset:3px;box-shadow:none!important}
 .tbl-scroll table,.flow-planilla table{border-collapse:separate;border-spacing:0}
 .tbl-scroll thead th,.flow-planilla thead th{position:sticky;top:0;z-index:3}
+.finance-date-scroll{position:relative;border:1px solid var(--border-strong);border-radius:10px;overflow:auto;background:#fff}
+.finance-date-table{border:none!important;border-radius:0!important}
+.finance-date-table th:first-child,
+.finance-date-table td:first-child{
+  position:sticky;
+  left:0;
+  width:220px;
+  min-width:210px;
+  max-width:260px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  z-index:7;
+  background:#fff!important;
+  box-shadow:10px 0 16px -16px rgba(15,23,42,.45),1px 0 0 var(--border-strong);
+}
+.finance-date-table thead th:first-child{
+  z-index:10;
+  background:#eef3f8!important;
+}
+.finance-date-table tbody tr:nth-child(even):not(.finance-total-row) td:first-child{background:#f8fafc!important}
+.finance-date-table th[data-month-col],
+.finance-date-table td[data-month-cell]{min-width:86px;white-space:nowrap}
+#constr-ep-table th:nth-child(3),
+#constr-ep-table td:nth-child(3),
+#constr-fin-planilla-table th:nth-child(3),
+#constr-fin-planilla-table td:nth-child(3){
+  background:#f6f9fc!important;
+  box-shadow:inset 1px 0 0 var(--border-soft),inset -1px 0 0 var(--border-soft);
+}
+.finance-date-table .finance-total-row td{
+  background:#f4f8fc!important;
+  border-top:1px solid #cbd5e1!important;
+  border-bottom:1px solid #cbd5e1!important;
+  font-weight:600!important;
+}
+.finance-date-table .finance-total-row td:first-child{font-weight:800!important;color:#0b2545!important}
+.finance-date-table .formula-inline-input{min-width:260px}
+.cat-total-cell{background:#f6f9fc!important;border-left:1px solid var(--border-soft)!important;font-weight:600!important}
+.cat-total-cell strong{display:inline-flex;align-items:center;justify-content:center;min-height:22px;padding:2px 7px;border:1px solid #d7e0ea;border-radius:999px;background:#fff!important;font-size:10px;font-weight:700!important;color:#0b2545!important}
+table:not(.gantt-table) .tfoot-dark td,
+.tfoot-dark td{background:#f6f9fc!important;color:#0b2545!important;border-top:1px solid var(--border-strong)!important;font-weight:700!important}
 .planilla-header{gap:12px;flex-wrap:wrap}
 .planilla-nav{flex-wrap:wrap;justify-content:flex-end}
 .formula-inline-input,.flow-formula-input,.cost-hidden-formula{min-height:34px;line-height:1.3}
@@ -908,8 +949,8 @@ tfoot td{line-height:1.25}
         <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('terreno-fin-planilla-scroll', 480)">Meses →</button>
       </div>
     </div>
-    <div id="terreno-fin-planilla-scroll" class="tbl-scroll">
-      <table id="terreno-fin-planilla-table" style="min-width:1200px">
+    <div id="terreno-fin-planilla-scroll" class="tbl-scroll finance-date-scroll">
+      <table id="terreno-fin-planilla-table" class="finance-date-table" style="min-width:1200px">
         <thead id="terreno-fin-planilla-head"></thead>
         <tbody id="terreno-fin-planilla-tbody"></tbody>
         <tfoot id="terreno-fin-planilla-tfoot"></tfoot>
@@ -1317,8 +1358,8 @@ tfoot td{line-height:1.25}
         <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-ep-scroll', 480)">Meses →</button>
       </div>
     </div>
-    <div id="constr-ep-scroll" class="tbl-scroll">
-      <table id="constr-ep-table" style="min-width:1200px">
+    <div id="constr-ep-scroll" class="tbl-scroll finance-date-scroll">
+      <table id="constr-ep-table" class="finance-date-table" style="min-width:1200px">
         <thead id="constr-ep-head"></thead>
         <tbody id="constr-ep-tbody"></tbody>
         <tfoot id="constr-ep-tfoot"></tfoot>
@@ -1331,7 +1372,7 @@ tfoot td{line-height:1.25}
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div>
         <div class="sec-title" style="margin-bottom:4px">💰 GASTOS FINANCIEROS CONSTRUCCIÓN</div>
-        <div style="font-size:11px;color:#94a3b8">GIROS conectado dinámicamente al TOTAL_A_PAGO de Estados de Pago. ACUMULADO = ACUMULADO(t-1) + GIROS + PAGOS_LINEA.</div>
+        <div style="font-size:11px;color:#94a3b8">GIROS conectado dinámicamente al TOTAL_A_PAGO de Estados de Pago. El acumulado mantiene los pagos de línea en el cálculo interno.</div>
       </div>
       <div class="planilla-nav">
         <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-fin-planilla-scroll', -480)">← Meses</button>
@@ -1357,8 +1398,8 @@ tfoot td{line-height:1.25}
         </div>
       </div>
     </div>
-    <div id="constr-fin-planilla-scroll" class="tbl-scroll">
-      <table id="constr-fin-planilla-table" style="min-width:1200px">
+    <div id="constr-fin-planilla-scroll" class="tbl-scroll finance-date-scroll">
+      <table id="constr-fin-planilla-table" class="finance-date-table" style="min-width:1200px">
         <thead id="constr-fin-planilla-head"></thead>
         <tbody id="constr-fin-planilla-tbody"></tbody>
         <tfoot id="constr-fin-planilla-tfoot"></tfoot>
@@ -1939,9 +1980,9 @@ tfoot td{line-height:1.25}
   function renderFormulaTableHeader(targetId, labels) {
     setHtml(targetId, `
       <tr>
-        <th style="min-width:200px;text-align:left">Concepto</th>
+        <th class="finance-concept-col" style="min-width:200px;text-align:left">Concepto</th>
         <th style="min-width:300px;text-align:left">Formula editable</th>
-        <th style="width:110px;text-align:right">Total</th>
+        <th class="finance-total-col" style="width:110px;text-align:right">Total</th>
         ${labels.map((label) => `<th data-month-col>${escapeHtml(label)}</th>`).join('')}
       </tr>
     `);
@@ -1981,10 +2022,10 @@ tfoot td{line-height:1.25}
 
       renderFormulaTableHeader('constr-ep-head', labels);
       setHtml('constr-ep-tbody', rows.map((row) => `
-        <tr style="${row.bold ? 'background:#f0fdf4' : ''}">
-          <td style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.bold ? '#166534' : '#334155'}">${escapeHtml(row.label)}</td>
+        <tr class="${row.bold ? 'finance-total-row' : ''}">
+          <td class="finance-concept-col" style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.bold ? '#166534' : '#334155'}">${escapeHtml(row.label)}</td>
           <td>${formulaInput('ep', row.key, row.formula, true)}</td>
-          <td style="text-align:right;font-weight:${row.bold ? 800 : 600}">${formatAmount(total(row.values), row.mode, true)}</td>
+          <td class="finance-total-col" style="text-align:right;font-weight:${row.bold ? 800 : 600}">${formatAmount(total(row.values), row.mode, true)}</td>
           ${row.values.map((value) => `<td data-month-cell style="text-align:center;${row.bold ? 'font-weight:700' : ''}">${formatAmount(value, row.mode)}</td>`).join('')}
         </tr>
       `).join(''));
@@ -2031,7 +2072,10 @@ tfoot td{line-height:1.25}
       }
 
       pushRow({ key: 'giros', label: 'GIROS (desde EP)', fallback: giros, formula: '[GIROS fuente]', mode: 'signed' });
-      pushRow({ key: 'pagos_linea', label: 'PAGOS LINEA', fallback: pagosLineaDefault, formula: '[PAGOS LINEA fuente]', mode: 'signed' });
+
+      const pagosLineaFormula = getFormula('gf', 'pagos_linea', '[PAGOS LINEA fuente]');
+      const pagosLinea = evaluateSeries(pagosLineaFormula, series, scalars, pagosLineaDefault);
+      addSeries(series, 'PAGOS LINEA', pagosLinea, 'pagos_linea');
 
       const acumFormula = getFormula('gf', 'acumulado', '[Acumulado anterior] + [GIROS (desde EP)] + [PAGOS LINEA]');
       const acumulado = [];
@@ -2050,10 +2094,10 @@ tfoot td{line-height:1.25}
 
       renderFormulaTableHeader('constr-fin-planilla-head', labels);
       setHtml('constr-fin-planilla-tbody', rows.map((row) => `
-        <tr style="${row.bold ? 'background:#f8fafc' : ''}">
-          <td style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.bold ? '#0f172a' : '#334155'}">${escapeHtml(row.label)}</td>
+        <tr class="${row.bold ? 'finance-total-row' : ''}">
+          <td class="finance-concept-col" style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.bold ? '#0f172a' : '#334155'}">${escapeHtml(row.label)}</td>
           <td>${formulaInput('gf', row.key, row.formula, true)}</td>
-          <td style="text-align:right;font-weight:${row.bold ? 800 : 600}">${formatAmount(total(row.values), row.mode, true)}</td>
+          <td class="finance-total-col" style="text-align:right;font-weight:${row.bold ? 800 : 600}">${formatAmount(total(row.values), row.mode, true)}</td>
           ${row.values.map((value) => `<td data-month-cell style="text-align:center;${row.bold ? 'font-weight:700' : ''}">${formatAmount(value, row.mode)}</td>`).join('')}
         </tr>
       `).join(''));
