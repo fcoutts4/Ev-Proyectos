@@ -1263,16 +1263,17 @@ function getCronogramaComputed(item) {
   let duracion = Math.max(1, toNumber(item.duracion));
   const totals = getTotalSalesMetrics();
   const velocitySettings = getVentasVelocitySettings();
+  const velocidadPromesas = toNumber(velocitySettings.promesas);
 
   if (isVentasCronogramaType(item, 'PREVENTA')) {
-    const velocidadPromesas = toNumber(velocitySettings.promesas);
+    // Promesas: totalUnidades / velocidad_promesas
     if (velocidadPromesas > 0) {
       duracion = Math.ceil(totals.totalUnidades / velocidadPromesas);
     }
   } else if (isVentasCronogramaType(item, 'ESCRITURACION')) {
-    const velocidadEscrituras = toNumber(velocitySettings.escrituracion);
-    if (velocidadEscrituras > 0) {
-      duracion = Math.ceil(totals.totalUnidades / velocidadEscrituras);
+    // Escrituraciones: misma duración que promesas (limitadas por acumulado de promesas)
+    if (velocidadPromesas > 0) {
+      duracion = Math.ceil(totals.totalUnidades / velocidadPromesas);
     }
   }
 
