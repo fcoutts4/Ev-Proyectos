@@ -856,6 +856,30 @@ function getGanttDependencyOptions(currentName) {
     .join('');
 }
 
+const GANTT_CANONICAL_NAME_RULES = [
+  { canonical: 'Compra terreno', pattern: /^(Compra terreno|Adquisicion de Terreno|Adquisición de Terreno|Compra de Terreno)$/i },
+  { canonical: 'Construcción', pattern: /^Construcci[óo]n$/i },
+  { canonical: 'Inicio promesas', pattern: /^Inicio promesas$/i },
+  { canonical: 'Postventa', pattern: /^Postventa$/i },
+  { canonical: 'Recepción municipal', pattern: /^Recepci[óo]n municipal$/i },
+  { canonical: 'Escrituración', pattern: /^Escrituraci[óo]n$/i },
+];
+
+function canonicalizeGanttName(name) {
+  const raw = String(name || '').trim();
+  if (!raw) return raw;
+  const rule = GANTT_CANONICAL_NAME_RULES.find((item) => item.pattern.test(raw));
+  return rule ? rule.canonical : raw;
+}
+
+function canonicalizeGanttRows(rows = []) {
+  return rows.map((row) => ({
+    ...row,
+    nombre: canonicalizeGanttName(row.nombre),
+    dependencia: row.dependencia ? canonicalizeGanttName(row.dependencia) : row.dependencia,
+  }));
+}
+
 function getGanttMonthWidth() {
   const viewport = window.innerWidth || 1440;
   if (viewport <= 1366) return 34;
@@ -898,10 +922,12 @@ function getGanttTimelineMeta(rows = state.gantt, monthWidth = getGanttMonthWidt
   const baseDate = getGanttBaseDate();
   const monthMarks = [];
   for (let month = 0; month <= totalMonths; month += 1) {
+    const showLabel = month % 2 === 0 || month === totalMonths;
     monthMarks.push({
       month,
       left: month * monthWidth,
       label: formatTimelineQuarterLabel(addMonths(baseDate, month)),
+      showLabel,
     });
   }
   return { totalMonths, timelineWidth, monthMarks };
@@ -913,7 +939,7 @@ function renderGanttTimelineScale(containerId, meta, monthWidth = getGanttMonthW
     <div class="gantt-timeline-scale has-grid" style="width:${meta.timelineWidth}px;--month-width:${monthWidth}px">
       ${meta.monthMarks.map((mark) => `
         <div class="gantt-quarter-mark" style="left:${mark.left}px">
-          <span title="Mes ${fmtNumber(mark.month)}">${escapeHtml(mark.label)}</span>
+          <span title="Mes ${fmtNumber(mark.month)}">${mark.showLabel ? escapeHtml(mark.label) : ''}</span>
         </div>
       `).join('')}
     </div>
@@ -921,8 +947,9 @@ function renderGanttTimelineScale(containerId, meta, monthWidth = getGanttMonthW
 }
 
 function normalizeGanttRows(rows) {
-  const byName = new Map(rows.map((row) => [row.nombre, row]));
-  return rows.map((row) => {
+  const canonicalRows = canonicalizeGanttRows(rows);
+  const byName = new Map(canonicalRows.map((row) => [row.nombre, row]));
+  return canonicalRows.map((row) => {
     const dependencia = row.dependencia || '';
     const dependenciaTipo = row.dependencia_tipo || 'fin';
     const dependenciaRow = dependencia ? byName.get(dependencia) : null;
@@ -4707,6 +4734,18 @@ window.endGanttDrag = endGanttDrag;
 window.dropGanttRow = dropGanttRow;
 window.onVentasInputChange = onVentasInputChange;
 window.onVentasVelocityChange = onVentasVelocityChange;
+
+// Override tardío: bloquea nombres de hitos base para no romper referencias.
+function getGanttLockConfig(row) {
+  const name = String(row?.nombre || '').trim();
+  if (/^Compra terreno$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre bloqueado para mantener referencias estables.' };
+  if (/^Construcci[Ã³o]n$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Nombre bloqueado para mantener referencias estables.' };
+  if (/^Inicio promesas$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Nombre bloqueado para mantener referencias estables.' };
+  if (/^Postventa$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre bloqueado para mantener referencias estables.' };
+  if (/^Recepci[Ã³o]n municipal$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre bloqueado para mantener referencias estables.' };
+  if (/^Escrituraci[Ã³o]n$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Nombre bloqueado para mantener referencias estables.' };
+  return { fixed: false, name: false, dependency: false, start: false, duration: false, delete: false, drag: false, hint: '' };
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
   ensureProjectControls();
