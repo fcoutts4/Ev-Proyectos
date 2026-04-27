@@ -91,6 +91,27 @@
         </div>
       </div>
     </div>
+
+      <!-- % Promesas para iniciar construcción -->
+      <div style="border-top:1px solid #e2e8f0;margin-top:14px;padding-top:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:12px;font-weight:700;color:#475569">INICIO DE OBRA</span>
+          <span class="badge badge-blue" style="font-size:10px">ACTIVA GANTT AUTOMÁTICO</span>
+      </div>
+        <div style="display:flex;align-items:center;gap:12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px">
+          <div style="flex:1">
+            <div style="font-size:10px;color:#0369a1;font-weight:700;margin-bottom:4px">% MÍNIMO DE PROMESAS PARA INICIAR OBRA</div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="range" id="constr-pct-inicio-slider" min="0" max="100" step="5" value="25" oninput="$('constr-pct-inicio').value=this.value; updateConstrParams()" style="flex:1">
+              <input type="number" class="inp" id="constr-pct-inicio" value="25" min="0" max="100" step="1" oninput="$('constr-pct-inicio-slider').value=this.value; updateConstrParams()" style="width:60px;text-align:center">
+              <span style="font-size:11px;color:#0369a1">%</span>
+          </div>
+        </div>
+          <div style="font-size:10px;color:#64748b;border-left:1px solid #bae6fd;padding-left:12px;min-width:160px">
+            La Carta Gantt activa la Construcción<br>automáticamente cuando se alcanza<br>este % de promesas acumuladas.
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 

@@ -406,6 +406,7 @@ function normalizeConstruccion(data = {}) {
     retencion_pct: data.retencion_pct ?? 0,
     ancho_curva: data.ancho_curva ?? 0.5,
     peak_gasto: data.peak_gasto ?? 0.5,
+    pct_inicio_construccion: data.pct_inicio_construccion ?? 25,
   };
 }
 
@@ -1988,6 +1989,7 @@ function renderConstruccion() {
   if ($('constr-plazo-meses')) $('constr-plazo-meses').value = toNumber(metrics.plazo_meses);
   if ($('anticipo-slider')) $('anticipo-slider').value = toNumber(metrics.anticipo_pct);
   if ($('retencion-slider')) $('retencion-slider').value = toNumber(metrics.retencion_pct);
+  if ($('constr-pct-inicio')) $('constr-pct-inicio').value = toNumber(metrics.pct_inicio_construccion ?? 25);
 
   const meses = Math.max(1, metrics.plazo_meses);
   const distribution = buildConstructionSCurve(metrics, meses);
@@ -2652,6 +2654,25 @@ function syncConstructionMilestone(duration = toNumber(state.construccion?.plazo
   state.gantt = normalizeGanttRows(rows);
 }
 
+function getEstudiosMilestone() {
+  return state.gantt.find((row) => /^Estudios$/i.test(String(row.nombre || '').trim()))
+    || state.gantt.find((row) => /^(Estudios previos|Estudios y permisos|Estudios\/Permisos|Estudios\/permisos)$/i.test(String(row.nombre || '').trim()))
+    || null;
+}
+
+function getConstructionStartFromPreventa() {
+  const pctReq = toNumber(state.construccion?.pct_inicio_construccion ?? 25) / 100;
+  const totalUnits = Math.max(1, getTotalCommercialUnits());
+  const threshold = totalUnits * pctReq;
+  const velocity = getVentasVelocitySettings();
+  const velocidadPromesas = Math.max(0.01, toNumber(velocity.promesas));
+  const promesaRow = state.gantt.find((r) => /^Inicio promesas$/i.test(String(r.nombre || '').trim()));
+  const inicioPromesas = toNumber(promesaRow?.inicio ?? 0);
+  if (threshold <= 0) return inicioPromesas;
+  const monthsNeeded = Math.ceil(threshold / velocidadPromesas);
+  return inicioPromesas + monthsNeeded;
+}
+
 function getTerrainMilestone() {
   return state.gantt.find((row) => String(row.nombre || '').trim().toLowerCase() === 'compra terreno')
     || state.gantt.find((row) => /ADQUISICION DE TERRENO|COMPRA DE TERRENO|TERRENO/i.test(row.nombre || ''))
@@ -2739,21 +2760,25 @@ function syncSalesDrivenMilestones() {
   const terrainMilestone = rows.find((row) => /^Compra terreno$/i.test(String(row.nombre || '').trim()))
     || getTerrainMilestone()
     || rows.find((row) => /ADQUISICION DE TERRENO|COMPRA DE TERRENO|TERRENO/i.test(String(row.nombre || '').trim()));
-  const promiseDependency = terrainMilestone?.nombre || 'Compra terreno';
+  const estudiosMilestone = rows.find((row) => /^(Estudios|Estudios previos|Estudios y permisos)$/i.test(String(row.nombre || '').trim()));
+  // Inicio promesas = Fin Estudios + 1 mes. Si no hay Estudios, depende de Compra terreno.
+  const promiseDependency = estudiosMilestone?.nombre || terrainMilestone?.nombre || 'Compra terreno';
+  const promiseDesfase = estudiosMilestone ? 1 : 0;
 
   const promiseRow = ensureMilestone(/^Inicio promesas$/i, (baseRow) => ({
     id: baseRow.id || '',
     nombre: 'Inicio promesas',
     color: baseRow.color || '#2563eb',
-    dependencia: (!baseRow.dependencia || /FIN\s*DE?\s*ESTUDIOS?/i.test(String(baseRow.dependencia || '').trim()))
-      ? promiseDependency
-      : baseRow.dependencia,
-    dependencia_tipo: baseRow.dependencia_tipo || 'fin',
-    desfase: toNumber(baseRow.desfase),
+    dependencia: promiseDependency,
+    dependencia_tipo: 'fin',
+    desfase: promiseDesfase,
     inicio: toNumber(baseRow.inicio),
     duracion: promiseDuration,
     fin: toNumber(baseRow.inicio) + promiseDuration,
   }));
+
+  // Actualizar gantt temporalmente para que getConstructionStartFromPreventa use inicio_promesas correcto
+  state.gantt = normalizeGanttRows(rows);
 
   const constructionRow = getConstructionMilestone() || rows.find((row) => /CONSTRUCCI[ÓO]N/i.test(String(row.nombre || '').trim()));
   const defaultReceptionStart = constructionRow ? toNumber(constructionRow.fin) : 1;
@@ -2780,6 +2805,19 @@ function syncSalesDrivenMilestones() {
     duracion: escrituraDuration,
     fin: 0,
   }));
+
+  // Construcción: inicio determinado por % de promesas acumuladas
+  const constrStart = getConstructionStartFromPreventa();
+  const constrIdx = rows.findIndex((r) => /CONSTRUCCI[ÓO]N/i.test(String(r.nombre || '').trim()));
+  if (constrIdx >= 0) {
+    rows[constrIdx] = {
+      ...rows[constrIdx],
+      dependencia: null,
+      desfase: 0,
+      inicio: constrStart,
+      fin: constrStart + Math.max(1, toNumber(rows[constrIdx].duracion)),
+    };
+  }
 
   state.gantt = normalizeGanttRows(rows);
   state.ventasCronograma = (state.ventasCronograma || []).map((row) => {
@@ -4285,6 +4323,7 @@ function readConstruccionFromEditor() {
     retencion_pct: toNumber($('retencion-slider')?.value),
     ancho_curva: state.construccion?.ancho_curva ?? 0.5,
     peak_gasto: state.construccion?.peak_gasto ?? 0.5,
+    pct_inicio_construccion: toNumber($('constr-pct-inicio')?.value ?? state.construccion?.pct_inicio_construccion ?? 25),
   });
 }
 
@@ -4292,6 +4331,7 @@ function updateConstrParams() {
   state.construccion = readConstruccionFromEditor();
   state.financiamiento = readConstruccionFinanciamientoFromEditor();
   syncConstructionMilestone(state.construccion.plazo_meses);
+  syncSalesDrivenMilestones();
   renderGanttEditor(state.gantt);
   renderConstruccion();
   renderCostosModule();
@@ -4903,7 +4943,8 @@ function getGanttLockConfig(row) {
 function getGanttLockConfig(row) {
   const name = String(row?.nombre || '').trim();
   if (/^Compra terreno$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: true, hint: 'Solo color editable.' };
-  if (/^Inicio promesas$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: true, hint: 'Solo color editable.' };
+  if (/^Inicio promesas$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: true, hint: 'Automático: Fin Estudios + 1 mes. Solo color editable.' };
+  if (/^Construcci[óo]n$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: false, delete: true, drag: true, hint: 'Inicio automático: según % preventa definido en Construcción. Duración editable.' };
   if (/^Postventa$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: true, hint: 'Solo color editable.' };
   return { fixed: false, name: false, dependency: false, start: false, duration: false, delete: false, drag: false, hint: '' };
 }
