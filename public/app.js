@@ -915,6 +915,12 @@ function formatTimelineMonthLabel(month) {
   return formatTimelineQuarterLabel(addMonths(getGanttBaseDate(), Math.max(0, toNumber(month))));
 }
 
+function getGanttRangeLabel(startMonth, durationMonths) {
+  const start = Math.max(0, toNumber(startMonth));
+  const end = Math.max(start, start + Math.max(0, toNumber(durationMonths)));
+  return `Entre ${formatTimelineMonthLabel(start)} y ${formatTimelineMonthLabel(end)}`;
+}
+
 function getGanttTimelineMeta(rows = state.gantt, monthWidth = getGanttMonthWidth()) {
   const normalized = normalizeGanttRows(rows);
   const totalMonths = Math.max(12, ...normalized.map((row) => toNumber(row.fin)));
@@ -1035,6 +1041,11 @@ function renderGanttEditor(rows = state.gantt) {
       </tr>
     `;
   }).join(''));
+  Array.from(document.querySelectorAll('#gantt-tbody .gantt-editor-bar')).forEach((bar, index) => {
+    const row = normalized[index];
+    if (!row) return;
+    bar.title = getGanttRangeLabel(row.inicio, row.duracion);
+  });
   renderGanttPreview();
 }
 
@@ -1066,6 +1077,11 @@ function renderGanttPreview() {
     `;
     }).join('')}
   `);
+  Array.from(document.querySelectorAll('#gantt-preview .gantt-bar')).forEach((bar, index) => {
+    const row = normalized[index];
+    if (!row) return;
+    bar.title = getGanttRangeLabel(row.inicio, row.duracion);
+  });
 }
 
 function isAccessoryUso(uso) {
