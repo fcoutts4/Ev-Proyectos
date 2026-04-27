@@ -182,7 +182,7 @@ tbody tr:hover{background:#f8fafc}
 #tab-gantt .gantt-table th:nth-child(5),#tab-gantt .gantt-table td:nth-child(5),
 #tab-gantt .gantt-table th:nth-child(6),#tab-gantt .gantt-table td:nth-child(6){text-align:right}
 #tab-gantt .gantt-cell-tight .inp{text-align:right}
-#tab-gantt .gantt-sticky-left{z-index:45;background:#fff!important;box-shadow:8px 0 12px -14px rgba(15,23,42,.45)}
+#tab-gantt .gantt-sticky-left{z-index:45;background:#fff!important;overflow:visible;box-shadow:8px 0 12px -14px rgba(15,23,42,.45)}
 #tab-gantt .gantt-sticky-head{z-index:55;background:#f8fafc!important}
 #tab-gantt .gantt-sticky-right{z-index:56}
 #tab-gantt .gantt-timeline-head{position:relative;overflow:hidden;z-index:1}
@@ -235,7 +235,7 @@ tbody tr:hover{background:#f8fafc}
 .gantt-row-dragging{opacity:.45}
 .gantt-table{border-collapse:separate;border-spacing:0;table-layout:fixed;min-width:max-content}
 .gantt-table th,.gantt-table td{background:#fff}
-.gantt-sticky-left{position:sticky;z-index:30;background:#fff;overflow:hidden;box-shadow:8px 0 10px -12px rgba(15,23,42,.35)}
+.gantt-sticky-left{position:sticky;z-index:30;background:#fff;overflow:visible;box-shadow:8px 0 10px -12px rgba(15,23,42,.35)}
 .gantt-sticky-right{position:sticky;right:0;z-index:31;background:#fff;overflow:hidden;box-shadow:-10px 0 14px -14px rgba(15,23,42,.45)}
 .gantt-sticky-head{z-index:40;background:#f8fafc!important}
 .gantt-sticky-foot{z-index:7;background:#0f172a!important}
@@ -268,8 +268,9 @@ tbody tr:hover{background:#f8fafc}
 }
 .gantt-cell-tight .inp{padding:4px 5px;text-align:center}
 .gantt-table .inp{padding:5px 8px;min-height:28px}
-.gantt-name-wrap{display:grid;grid-template-columns:24px minmax(0,1fr);gap:6px;align-items:center}
+.gantt-name-wrap{display:grid;grid-template-columns:24px minmax(0,1fr);gap:6px;align-items:center;position:relative}
 .gantt-color-dropdown{position:relative}
+.gantt-color-dropdown[open]{z-index:95}
 .gantt-color-current{list-style:none;width:18px;height:18px;border-radius:999px;border:1px solid rgba(15,23,42,.25);cursor:pointer}
 .gantt-color-current::-webkit-details-marker{display:none}
 .gantt-color-dropdown-menu{
