@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Read(//c/Program Files/**)",
-      "Read(//c//**)"
+      "Read(//c//**)",
+      "Bash(node -c public/app.js)",
+      "Bash(npm start *)"
     ]
   }
 }

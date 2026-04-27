@@ -289,11 +289,10 @@ function getMonthlyIvaDebito(monthlyIncome) {
   const settings = getGlobalPaymentSettings();
   const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct));
   const escrituraPct = Math.max(0, 100 - piePct);
-  const escrituraRow = getCronogramaByType('ESCRITURACION')[0];
-  const escrituraComputed = escrituraRow ? getCronogramaComputed(escrituraRow) : null;
   const escrituraUnidad = totals.precioPromedio * escrituraPct / 100;
+  const { escrituras } = getPromesasEscrituracionUnidades(monthCount);
   Array.from({ length: monthCount }, (_, m) => {
-    const unidades = getScheduledWholeUnits(totals.totalUnidades, escrituraComputed, m);
+    const unidades = escrituras[m];
     monthly[m] = unidades * escrituraUnidad * 0.19;
   });
   return monthly;
@@ -307,11 +306,10 @@ function getMonthlyPPM(monthlyIncome) {
   const settings = getGlobalPaymentSettings();
   const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct));
   const escrituraPct = Math.max(0, 100 - piePct);
-  const escrituraRow = getCronogramaByType('ESCRITURACION')[0];
-  const escrituraComputed = escrituraRow ? getCronogramaComputed(escrituraRow) : null;
   const escrituraUnidad = totals.precioPromedio * escrituraPct / 100;
+  const { escrituras } = getPromesasEscrituracionUnidades(monthCount);
   Array.from({ length: monthCount }, (_, m) => {
-    const unidades = getScheduledWholeUnits(totals.totalUnidades, escrituraComputed, m);
+    const unidades = escrituras[m];
     const ingresoEscr = unidades * escrituraUnidad;
     // factor IVA: IN = (Ventas + 0.19*Terreno)/1.19
     monthly[m] = -0.01 * (ingresoEscr / 1.19);
@@ -1507,6 +1505,38 @@ function getScheduledWholeUnits(totalUnits, computed, month) {
   return base + (elapsed < remainder ? 1 : 0);
 }
 
+function getPromesasEscrituracionUnidades(monthCountOrMonths) {
+  // Retorna arrays de promesas y escrituras capeados
+  // Las escrituras nunca pueden exceder el acumulado de promesas acumuladas
+  // Acepta monthCount (número) o array de meses
+  const totals = getTotalSalesMetrics();
+  const promesaRows = getCronogramaByType('PREVENTA');
+  const escrituraRow = getCronogramaByType('ESCRITURACION')[0];
+  const promesaComputed = promesaRows.length ? getCronogramaComputed(promesaRows[0]) : null;
+  const escrituraComputed = escrituraRow ? getCronogramaComputed(escrituraRow) : null;
+
+  const isArrayInput = Array.isArray(monthCountOrMonths);
+  const months = isArrayInput ? monthCountOrMonths : Array.from({ length: monthCountOrMonths }, (_, i) => i);
+
+  const promesasUnidades = months.map(() => 0);
+  const escriturasUnidades = months.map(() => 0);
+  let promesasAcum = 0;
+  let escriturasAcum = 0;
+
+  months.forEach((m, index) => {
+    const pUn = getScheduledWholeUnits(totals.totalUnidades, promesaComputed, m);
+    const eUnRaw = getScheduledWholeUnits(totals.totalUnidades, escrituraComputed, m);
+    promesasAcum += pUn;
+    const maxPossible = Math.max(0, promesasAcum - escriturasAcum);
+    const eUn = Math.min(eUnRaw, maxPossible);
+    escriturasAcum += eUn;
+    promesasUnidades[index] = pUn;
+    escriturasUnidades[index] = eUn;
+  });
+
+  return { promesas: promesasUnidades, escrituras: escriturasUnidades };
+}
+
 function renderVentasSummaryCards() {
   const addons = getAddonSalesMetrics();
   const totalVentaDeptos = state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).total, 0);
@@ -1637,6 +1667,7 @@ function renderVentasCashflow() {
   const montoPromesaUnidad = pieUnidad * promesaSobrePiePct / 100;
   const montoCuotasUnidad = pieUnidad * cuotasSobrePiePct / 100;
   const montoEscrituraUnidad = totals.precioPromedio * escrituraPct / 100;
+  const { promesas: promesasUnidadesArr, escrituras: escrituracionUnidadesArr } = getPromesasEscrituracionUnidades(months);
   const promesasUnidades = months.map(() => 0);
   const escrituracionUnidades = months.map(() => 0);
   const promesasUf = months.map(() => 0);
@@ -1652,8 +1683,8 @@ function renderVentasCashflow() {
   let escriturasUnidadesAcum = 0;
 
   months.forEach((month, index) => {
-    const unidadesPromesaMes = getScheduledWholeUnits(totals.totalUnidades, promesaComputed, month);
-    const unidadesEscrituraMes = getScheduledWholeUnits(totals.totalUnidades, escrituraComputed, month);
+    const unidadesPromesaMes = promesasUnidadesArr[index];
+    const unidadesEscrituraMes = escrituracionUnidadesArr[index];
     const ufPromesaMes = unidadesPromesaMes * montoPromesaUnidad;
     const ufEscrituraMes = unidadesEscrituraMes * montoEscrituraUnidad;
     const cuotaMensual = cuotaMonths ? (unidadesPromesaMes * montoCuotasUnidad) / cuotaMonths : 0;
@@ -3174,10 +3205,11 @@ function getProjectMonthlyIncome(monthCount) {
   const promesaUnidad = pieUnidad * promesaSobrePiePct / 100;
   const cuotasUnidad = pieUnidad * cuotasSobrePiePct / 100;
   const escrituraUnidad = totals.precioPromedio * escrituraPct / 100;
+  const { promesas: promesasArr, escrituras: escriturasArr } = getPromesasEscrituracionUnidades(monthCount);
 
   Array.from({ length: monthCount }, (_, month) => {
-    const unidadesPromesa = getScheduledWholeUnits(totals.totalUnidades, promesaComputed, month);
-    const unidadesEscritura = getScheduledWholeUnits(totals.totalUnidades, escrituraComputed, month);
+    const unidadesPromesa = promesasArr[month];
+    const unidadesEscritura = escriturasArr[month];
     income[month] += unidadesPromesa * promesaUnidad;
     income[month] += unidadesEscritura * escrituraUnidad;
     const cuotaMensual = cuotaMonths ? (unidadesPromesa * cuotasUnidad) / cuotaMonths : 0;
@@ -3455,6 +3487,7 @@ function updateCostFormulaPreview(input) {
 function updateCostFormulaModalPreview() {
   const input = $('cost-formula-modal-input');
   const preview = $('cost-formula-modal-preview');
+  const resultEl = $('cost-formula-modal-result');
   if (!input || !preview) return;
   const isAuto = !!input.dataset.auto;
   const rawValue = input.value || '';
@@ -3464,6 +3497,24 @@ function updateCostFormulaModalPreview() {
     isAuto ? 'expr' : parsed.formula_tipo,
     isAuto
   );
+
+  // Calcular resultado
+  if (resultEl) {
+    try {
+      if (rawValue && !isAuto) {
+        const context = buildCostContext();
+        const result = evaluateExpressionFormula(rawValue, context);
+        resultEl.textContent = `= ${fmtNumber(result)}`;
+        resultEl.style.color = '#0f172a';
+      } else {
+        resultEl.textContent = '=';
+        resultEl.style.color = '#0f172a';
+      }
+    } catch (e) {
+      resultEl.textContent = '= Error';
+      resultEl.style.color = '#dc2626';
+    }
+  }
 }
 
 function renderCostFormulaOptions() {

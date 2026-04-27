@@ -1533,11 +1533,15 @@ tfoot td{line-height:1.25}
       <button class="btn-outline btn-plus" type="button" onclick="closeCostFormulaModal()">×</button>
     </div>
     <div class="modal-body">
+      <div id="cost-formula-modal-preview" class="formula-preview" style="margin-bottom:16px"></div>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:12px">
+        <div style="font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:6px">RESULTADO</div>
+        <div id="cost-formula-modal-result" style="font-size:18px;font-weight:900;color:#0f172a">=</div>
+      </div>
       <div class="formula-cell">
         <input id="cost-formula-modal-input" class="inp" placeholder="Ej: 2500 * _meses_construccion + 3000 * _meses_preventa" oninput="handleCostFormulaInput(this); updateCostFormulaModalPreview()" onfocus="handleCostFormulaInput(this); updateCostFormulaModalPreview()" onblur="hideCostFormulaSuggestionsLater()"/>
         <div class="formula-suggest"></div>
       </div>
-      <div id="cost-formula-modal-preview" class="formula-preview" style="margin-top:12px"></div>
       <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:18px">
         <button class="btn-outline" type="button" onclick="closeCostFormulaModal()">Cerrar</button>
         <button id="cost-formula-save-btn" class="btn-primary" type="button" onclick="saveCostFormulaModal()">Guardar fórmula</button>
