@@ -14,7 +14,12 @@ body{font-family:'Inter',system-ui,sans-serif;background:#f1f5f9;color:#1e293b}
 .topnav{position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid #e2e8f0;height:52px;display:flex;align-items:center;padding:0 24px;justify-content:space-between}
 .logo-box{width:28px;height:28px;background:#0f172a;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:12px}
 /* PROJECT HEADER */
-.proj-header{position:sticky;top:52px;z-index:40;background:#fff;border-bottom:1px solid #e2e8f0;padding:12px 24px 0}
+.proj-header{position:sticky;top:52px;z-index:40;background:#fff;border-bottom:1px solid #e2e8f0;padding:0 24px}
+.proj-top-row{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:52px;padding:6px 0}
+.proj-title-wrap{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.proj-back-link{font-size:12px;color:#64748b;text-decoration:none}
+.proj-name{font-size:22px;font-weight:800;color:#0f172a;margin:0;line-height:1.1}
+.proj-sync-wrap{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 /* TABS */
 .tab-nav{display:flex;gap:0;overflow-x:auto;white-space:nowrap}
 .tab-nav::-webkit-scrollbar{display:none}
@@ -437,6 +442,8 @@ tfoot td{line-height:1.25}
 @media (max-width: 900px){
   .topnav{padding:0 12px!important}
   .proj-header{padding-left:12px!important;padding-right:12px!important}
+  .proj-top-row{min-height:46px;padding:4px 0}
+  .proj-name{font-size:18px}
   main{padding:12px!important}
   .card,.card-dark,.kpi-card,.req-kpi{padding:14px!important}
   .flow-kpi-grid{grid-template-columns:1fr!important}
@@ -458,7 +465,7 @@ tfoot td{line-height:1.25}
 @media (max-width: 1366px){
   body{font-size:15px}
   .topnav{height:56px;padding:0 16px}
-  .proj-header{top:56px;padding:10px 16px 0}
+  .proj-header{top:56px;padding:0 16px}
   main{padding:16px!important}
   .card,.card-dark,.kpi-card,.req-kpi{padding:16px!important;border-radius:10px!important}
   .tab-btn{padding:12px 12px;font-size:12px}
@@ -490,12 +497,12 @@ tfoot td{line-height:1.25}
 
 <!-- PROJECT HEADER -->
 <div class="proj-header">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
-    <div>
-      <a href="#" style="font-size:12px;color:#64748b;text-decoration:none">← Volver al Dashboard</a>
-      <h1 id="proj-title" style="font-size:22px;font-weight:800;color:#0f172a;margin:4px 0 0">Edificio Residencial Tipo</h1>
-  </div>
-    <div style="display:flex;align-items:center;gap:10px;margin-top:4px;flex-wrap:wrap">
+  <div class="proj-top-row">
+    <div class="proj-title-wrap">
+      <a href="#" class="proj-back-link">← Volver al Dashboard</a>
+      <h1 id="proj-title" class="proj-name">Edificio Residencial Tipo</h1>
+    </div>
+    <div class="proj-sync-wrap">
       <span id="sync-badge" style="display:inline-flex;align-items:center;font-size:11px;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:6px 12px">
         <span id="sync-label">Sincronizado</span>
       </span>
