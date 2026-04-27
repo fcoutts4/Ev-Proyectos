@@ -865,11 +865,29 @@ const GANTT_CANONICAL_NAME_RULES = [
   { canonical: 'Escrituración', pattern: /^Escrituraci[óo]n$/i },
 ];
 
+const GANTT_PRESET_COLORS = [
+  '#2563eb', '#22c55e', '#f97316', '#a855f7', '#0ea5e9',
+  '#e11d48', '#14b8a6', '#f59e0b', '#8b5cf6', '#64748b',
+];
+
 function canonicalizeGanttName(name) {
   const raw = String(name || '').trim();
   if (!raw) return raw;
   const rule = GANTT_CANONICAL_NAME_RULES.find((item) => item.pattern.test(raw));
   return rule ? rule.canonical : raw;
+}
+
+function normalizeGanttColor(color) {
+  const raw = String(color || '').trim().toLowerCase();
+  if (GANTT_PRESET_COLORS.includes(raw)) return raw;
+  return GANTT_PRESET_COLORS[0];
+}
+
+function getGanttColorOptions(selectedColor) {
+  const selected = normalizeGanttColor(selectedColor);
+  return GANTT_PRESET_COLORS.map((color, index) => `
+    <option value="${color}" ${color === selected ? 'selected' : ''}>Color ${index + 1}</option>
+  `).join('');
 }
 
 function canonicalizeGanttRows(rows = []) {
@@ -967,6 +985,7 @@ function normalizeGanttRows(rows) {
     const fin = inicio + duracion;
     return {
       ...row,
+      color: normalizeGanttColor(row.color),
       dependencia,
       dependencia_tipo: dependenciaTipo,
       desfase: toNumber(row.desfase),
@@ -1009,9 +1028,11 @@ function renderGanttEditor(rows = state.gantt) {
           <span class="drag-handle" ${lock.drag ? '' : 'data-gantt-drag="1" draggable="true" ondragstart="startGanttDrag(event)" ondragend="endGanttDrag(event)"'} title="${escapeHtml(lock.hint || 'Orden manual')}">${lock.drag ? '&#8226;' : '&#8226;&#8226;&#8226;'}</span>
         </td>
         <td class="gantt-sticky-left" style="left:34px;width:170px">
-          <div style="display:grid;grid-template-columns:18px 1fr;gap:8px;align-items:center">
-            <input data-field="color" type="color" value="${escapeHtml(row.color || '#3b82f6')}" ${lock.name ? 'disabled' : ''} onchange="onGanttInputChange()"/>
-            <input class="inp" data-field="nombre" value="${escapeHtml(row.nombre)}" ${lock.name ? 'disabled' : ''} onchange="onGanttInputChange()"/>
+          <div class="gantt-name-wrap">
+            <select class="inp gantt-color-select" data-field="color" title="Color del hito" style="background:${escapeHtml(row.color || '#2563eb')};border-color:#94a3b8" ${lock.name ? 'disabled' : ''} onchange="onGanttInputChange()">
+              ${getGanttColorOptions(row.color)}
+            </select>
+            <input class="inp gantt-name-input" data-field="nombre" value="${escapeHtml(row.nombre)}" ${lock.name ? 'disabled' : ''} onchange="onGanttInputChange()"/>
           </div>
         </td>
         <td class="gantt-sticky-left" style="left:204px;width:132px">
