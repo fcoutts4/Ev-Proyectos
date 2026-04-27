@@ -1863,6 +1863,7 @@ function renderTerrainModule() {
   if ($('fin-terreno-pct')) $('fin-terreno-pct').value = toNumber(state.financiamiento.credito_terreno_pct);
   if ($('fin-terreno-tasa')) $('fin-terreno-tasa').value = toNumber(state.financiamiento.credito_terreno_tasa);
   if ($('fin-terreno-pago-int')) $('fin-terreno-pago-int').value = state.financiamiento.credito_terreno_pago_intereses || 'Semestral';
+  if ($('cfg-tasa-terreno')) $('cfg-tasa-terreno').value = toNumber(state.financiamiento.credito_terreno_tasa);
   setText('fin-terreno-costo', fmtUf(terrainBase));
   setText('fin-terreno-monto', fmtUf(approved));
   setText('fin-terreno-plazos', `Bloque Compra terreno en gantt | horizonte base ${fmtNumber(terrainTermMonths)} mes(es) hasta construcción`);
@@ -2268,7 +2269,8 @@ function renderFinancingSourcePlanilla(sourceType) {
     const labels = getCostMonthLabels();
     const monthCount = getCostMonthCount();
     const cfg = getGlobalFinancialParams();
-    const tasaMensual = (cfg.tasa_terreno / 100) / 12;
+    const tasaTerreno = toNumber(state.financiamiento.credito_terreno_tasa);
+    const tasaMensual = (tasaTerreno / 100) / 12;
     const timbrePct = cfg.pct_timbres / 100;
 
     const terrainBase = getTerrainBaseCost();
@@ -2308,7 +2310,7 @@ function renderFinancingSourcePlanilla(sourceType) {
       { label: 'GIROS', values: giros, formula: 'GIROS(0) = % línea × Costo terreno (desembolso en compra)', color: '#22c55e' },
       { label: 'PAGOS LÍNEA', values: pagosLinea, formula: 'Pago de la deuda al inicio de construcción', color: '#dc2626' },
       { label: 'ACUMULADO', values: acumulado, formula: 'ACUMULADO(t) = ACUMULADO(t−1) + GIROS(t) + PAGOS_LINEA(t)', bold: true, color: '#0f172a' },
-      { label: `INTERÉS (${cfg.tasa_terreno}% anual)`, values: interesMensual, formula: `INTERÉS(t) = ACUMULADO(t) × ${cfg.tasa_terreno}%/12`, color: '#f59e0b' },
+      { label: `INTERÉS (${tasaTerreno}% anual)`, values: interesMensual, formula: `INTERÉS(t) = ACUMULADO(t) × ${tasaTerreno}%/12`, color: '#f59e0b' },
       { label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, values: impTimbres, formula: `IMP_TIMBRES(t) = GIROS(t) × ${cfg.pct_timbres}%`, color: '#f59e0b' },
     ];
 
@@ -4019,6 +4021,7 @@ function readTerrenoProjectSettingsFromEditor() {
   const terrenoM2Neto = Math.max(0, terrenoM2Bruto - terrenoM2Afectacion);
   const terrenoPrecioUfM2 = toNumber($('terreno-precio-uf-m2')?.value);
   const terrenoPrecioTotal = terrenoM2Neto * terrenoPrecioUfM2;
+  const tasaInteresTerreno = toNumber($('fin-terreno-tasa')?.value || state.proyecto?.tasa_interes_terreno);
   return {
     ...state.proyecto,
     compra_terreno_fecha: fromMonthInputValue($('terreno-fecha-compra')?.value || ''),
@@ -4028,6 +4031,7 @@ function readTerrenoProjectSettingsFromEditor() {
     terreno_m2_neto: terrenoM2Neto,
     terreno_precio_uf_m2: terrenoPrecioUfM2,
     terreno_precio_total: terrenoPrecioTotal,
+    tasa_interes_terreno: tasaInteresTerreno,
   };
 }
 
@@ -4069,6 +4073,10 @@ function onCabidaInputChange() {
 function onTerrenoInputChange() {
   state.proyecto = normalizeProject(readTerrenoProjectSettingsFromEditor());
   state.financiamiento = readTerrenoFinanciamientoFromEditor();
+  state.proyecto = normalizeProject({
+    ...state.proyecto,
+    tasa_interes_terreno: toNumber(state.financiamiento.credito_terreno_tasa),
+  });
   syncTerrainPurchaseMilestone();
   renderGanttEditor(state.gantt);
   renderTerrainModule();
