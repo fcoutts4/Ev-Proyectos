@@ -156,6 +156,7 @@ tbody tr:hover{background:#f8fafc}
 .section-block{display:grid;gap:14px}
 .resumen-gantt-card .sec-title,
 .gantt-editor-card .sec-title{margin-bottom:10px}
+.resumen-gantt-card{min-width:0;overflow:hidden}
 
 /* Tablas compactas y legibles */
 #tab-resumen table,
@@ -390,8 +391,21 @@ tbody tr:hover{background:#f3f7fb!important}
 ::-webkit-scrollbar-thumb{background:#94a3b8!important}
 
 /* ===== AJUSTES SOLICITADOS COMITE ===== */
-.resumen-gantt-scroll{width:100%;max-width:100%;overflow-x:auto;overflow-y:hidden;padding-bottom:4px}
-#gantt-preview{width:max-content;min-width:100%}
+.resumen-gantt-scroll{
+  width:100%;
+  max-width:100%;
+  overflow-x:auto;
+  overflow-y:hidden;
+  padding-bottom:4px;
+  border-radius:8px;
+  contain:layout paint;
+}
+#gantt-preview{
+  display:inline-block;
+  min-width:100%;
+  max-width:none;
+  vertical-align:top;
+}
 #gantt-preview .gantt-row{width:max-content;min-width:100%}
 #gantt-preview .gantt-track{flex:0 0 auto}
 #gantt-preview .gantt-timeline-scale{margin-left:170px}
