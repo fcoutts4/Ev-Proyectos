@@ -348,6 +348,15 @@ tbody tr:hover{background:#f3f7fb!important}
 #kpi-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))!important}
 .flow-kpi-grid{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))!important}
 
+/* Cabida: tabla uniforme, sin franja verde ni colores cruzados */
+#tab-cabida table{background:#f8fafc;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden}
+#tab-cabida thead th{background:#eef3f8!important;color:#0b2545!important;border-bottom:1px solid var(--border-strong)!important}
+#tab-cabida tbody td,#tab-cabida tfoot td{background:#f8fafc!important;color:#0b2545!important;border-bottom:1px solid var(--border-soft)!important}
+#tab-cabida tbody tr:hover td{background:#eef3f8!important}
+#tab-cabida tfoot tr,#tab-cabida .tfoot-green td,#tab-cabida .tfoot-dark td{background:#eef3f8!important;color:#0b2545!important;border-top:2px solid var(--border-strong)!important;font-weight:800}
+#tab-cabida td[style*="color"],#tab-cabida th[style*="color"],#tab-cabida strong{color:#0b2545!important}
+#tab-cabida .tbl-scroll{border-radius:8px}
+
 /* ===== UI/UX Y ACCESIBILIDAD TRANSVERSAL ===== */
 :root{
   --radius-sm:6px;
