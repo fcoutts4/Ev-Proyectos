@@ -1284,6 +1284,11 @@ tfoot td{line-height:1.25}
           <option>Anual</option><option>Mensual</option><option>Semestral</option><option>Contra Escrituraciones</option>
         </select>
       </div>
+      <div style="grid-column:1/-1;border-top:1px solid #e2e8f0;padding-top:8px;margin-top:4px">
+        <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">% Alzamiento (pago línea)</div>
+        <div style="display:flex;align-items:center;gap:4px"><input type="number" class="inp" id="fin-constr-alzamiento" value="90" min="0" max="100" step="1" oninput="updateConstrParams()"><span style="font-size:11px">%</span></div>
+        <div style="font-size:10px;color:#64748b;margin-top:4px">Pago línea = % alz. × escrituración mes ant. (100% valor)</div>
+      </div>
     </div>
   </div>
 </div>
@@ -1292,13 +1297,12 @@ tfoot td{line-height:1.25}
   <div class="card" style="margin-bottom:16px;background:#f8fafc">
     <div class="sec-title" style="margin-bottom:8px">⚙ PARÁMETROS FINANCIEROS GLOBALES</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
-      <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">Tasa interés terreno (anual %)</label><input type="number" step="0.01" class="inp" id="cfg-tasa-terreno" oninput="onConfigParamChange()"/></div>
-      <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">Tasa interés construcción (anual %)</label><input type="number" step="0.01" class="inp" id="cfg-tasa-construccion" oninput="onConfigParamChange(); syncGfParamMirror()"/></div>
       <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">% Impuesto timbres</label><input type="number" step="0.01" class="inp" id="cfg-pct-timbres" oninput="onConfigParamChange(); syncGfParamMirror()"/></div>
       <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">% CEEC (beneficio IVA)</label><input type="number" step="0.01" class="inp" id="cfg-pct-ceec" oninput="onConfigParamChange()"/></div>
-      <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">% Impuesto renta</label><input type="number" step="0.01" class="inp" id="cfg-pct-renta" oninput="onConfigParamChange()"/></div>
     </div>
-    <div style="font-size:10px;color:#94a3b8;margin-top:8px">Estos parámetros alimentan todas las tablas financieras (Terreno, Construcción, Flujo de Caja).</div>
+    <div style="font-size:10px;color:#94a3b8;margin-top:8px">Las tasas de interés se definen en cada bloque de financiamiento. El impuesto a la renta se configura en Flujo de Caja.</div>
+    <!-- Hidden inputs to keep data binding working -->
+    <input type="hidden" id="cfg-tasa-terreno"/><input type="hidden" id="cfg-tasa-construccion"/><input type="hidden" id="cfg-pct-renta"/>
   </div>
 
   <!-- TABLA 1: Estados de Pago (EP) -->
