@@ -268,8 +268,24 @@ tbody tr:hover{background:#f8fafc}
 }
 .gantt-cell-tight .inp{padding:4px 5px;text-align:center}
 .gantt-table .inp{padding:5px 8px;min-height:28px}
-.gantt-name-wrap{display:grid;grid-template-columns:38px minmax(0,1fr);gap:6px;align-items:center}
-.gantt-color-swatch-list{display:grid;grid-template-columns:repeat(2,14px);gap:4px;justify-content:center}
+.gantt-name-wrap{display:grid;grid-template-columns:24px minmax(0,1fr);gap:6px;align-items:center}
+.gantt-color-dropdown{position:relative}
+.gantt-color-current{list-style:none;width:18px;height:18px;border-radius:999px;border:1px solid rgba(15,23,42,.25);cursor:pointer}
+.gantt-color-current::-webkit-details-marker{display:none}
+.gantt-color-dropdown-menu{
+  position:absolute;
+  top:calc(100% + 6px);
+  left:0;
+  z-index:70;
+  display:grid;
+  grid-template-columns:repeat(5,14px);
+  gap:6px;
+  padding:8px;
+  border:1px solid #cbd5e1;
+  border-radius:8px;
+  background:#fff;
+  box-shadow:0 10px 24px rgba(15,23,42,.18);
+}
 .gantt-color-swatch{width:14px;height:14px;border-radius:999px;border:1px solid rgba(15,23,42,.2);padding:0;cursor:pointer;outline:none}
 .gantt-color-swatch.active{box-shadow:0 0 0 2px #0f172a}
 .gantt-name-input{min-width:0!important}

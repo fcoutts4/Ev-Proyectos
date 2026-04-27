@@ -894,7 +894,9 @@ function getGanttColorSwatches(selectedColor) {
   const selected = normalizeGanttColor(selectedColor);
   return `
     <input type="hidden" data-field="color" value="${selected}"/>
-    <div class="gantt-color-swatch-list">
+    <details class="gantt-color-dropdown">
+      <summary class="gantt-color-current" style="background:${selected}" title="Elegir color"></summary>
+      <div class="gantt-color-dropdown-menu">
       ${GANTT_PRESET_COLORS.map((color) => `
         <button
           type="button"
@@ -904,7 +906,8 @@ function getGanttColorSwatches(selectedColor) {
           onclick="onGanttSwatchPick(this,'${color}')"
         ></button>
       `).join('')}
-    </div>
+      </div>
+    </details>
   `;
 }
 
@@ -1133,6 +1136,8 @@ function onGanttSwatchPick(button, color) {
   colorInput.value = normalizeGanttColor(color);
   host.querySelectorAll('.gantt-color-swatch').forEach((sw) => sw.classList.remove('active'));
   button.classList.add('active');
+  const dropdown = button.closest('.gantt-color-dropdown');
+  if (dropdown) dropdown.open = false;
   onGanttInputChange();
 }
 
