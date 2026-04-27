@@ -341,8 +341,7 @@ tbody tr:hover{background:#f3f7fb!important}
 .flow-planilla thead th{position:sticky;top:0;z-index:2}
 .flow-category-row td{background:var(--bg-soft)!important;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#334155!important;border-bottom:2px solid var(--border-strong)!important;padding:7px 8px}
 .flow-category-title{display:flex;align-items:center;gap:8px}
-.flow-value-cost,.amount-cost,#costos-total-neto,#costos-total-bruto,#planilla-table tbody tr.partida-row td:nth-child(5),#planilla-table tbody tr.partida-row td:nth-child(n+7),#planilla-table tbody tr.cat-row .cat-total-cell strong,#planilla-table tfoot td:nth-child(n+2),#constr-total-st,#constr-total-bt,#constr-total-neto,#constr-total-bruto{color:var(--red)!important}
-.flow-value-negative,.amount-negative{color:var(--red)!important}
+.flow-value-cost,.amount-cost,.flow-value-negative,.amount-negative{color:#334155!important}
 .gf-param-panel{background:#f8fafc;border:1px solid var(--border-strong);border-radius:10px;padding:12px;margin-bottom:12px}
 .gf-param-panel .inp{font-weight:700}
 #kpi-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))!important}
@@ -365,7 +364,16 @@ table:not(.gantt-table) strong{color:#0b2545!important}
 .tbl-scroll{border-radius:8px}
 .cat-row td,.subcat-row td,.flow-category-row td{background:#eef3f8!important;color:#0b2545!important}
 .cat-total-cell,.cat-total-cell strong{background:#eef3f8!important;color:#0b2545!important}
-.amount-cost,.amount-negative,#costos-total-neto,#costos-total-bruto,#planilla-table tbody tr.partida-row td:nth-child(5),#planilla-table tbody tr.partida-row td:nth-child(n+7),#planilla-table tbody tr.cat-row .cat-total-cell strong,#planilla-table tfoot td:nth-child(n+2),#constr-total-st,#constr-total-bt,#constr-total-neto,#constr-total-bruto{color:var(--red)!important}
+.amount-cost,.amount-negative{color:#334155!important}
+
+/* Menos negrita en celdas numéricas; énfasis reservado a totales/resultados */
+table tbody td[style*="font-weight:700"],
+table tbody td[style*="font-weight:800"],
+table tbody td[style*="font-weight:900"]{font-weight:600!important}
+table tfoot td,
+.cat-total-cell strong,
+#planilla-table tfoot td,
+#flujo-tabla tbody tr[data-flow-row="flujo_acumulado"] td{font-weight:700!important}
 
 /* ===== UI/UX Y ACCESIBILIDAD TRANSVERSAL ===== */
 :root{
@@ -415,7 +423,7 @@ tfoot td{line-height:1.25}
 .planilla-nav{flex-wrap:wrap;justify-content:flex-end}
 .formula-inline-input,.flow-formula-input,.cost-hidden-formula{min-height:34px;line-height:1.3}
 .formula-inline-input:focus-visible,.flow-formula-input:focus-visible,.cost-hidden-formula:focus-visible{background:#fff!important}
-.amount-cost,.amount-negative{font-weight:800}
+.amount-cost,.amount-negative{font-weight:600}
 .badge{min-height:22px;line-height:1.2}
 .dist-row{min-height:24px}
 .dist-label{line-height:1.2;overflow-wrap:anywhere}

@@ -1997,7 +1997,7 @@ function renderConstructionEP() {
           </div>
         </td>
         <td style="text-align:right;font-weight:${r.bold ? 800 : 600};color:${r.color || '#334155'}">${fmtUf(total(r.values))}</td>
-        ${r.values.map((v) => `<td data-month-cell style="text-align:center;color:${toNumber(v) < 0 ? '#dc2626' : (r.color === '#22c55e' ? '#16a34a' : '#334155')};${r.bold ? 'font-weight:700' : ''}">${fmtTableAmount(v, { kind: 'income' })}</td>`).join('')}
+        ${r.values.map((v) => `<td data-month-cell style="text-align:center;color:${r.color === '#22c55e' ? '#16a34a' : '#334155'};${r.bold ? 'font-weight:700' : ''}">${fmtTableAmount(v, { kind: 'income' })}</td>`).join('')}
       </tr>`;
   }).join(''));
 
@@ -2047,7 +2047,7 @@ function renderConstructionGF(epData) {
   const total = (arr) => arr.reduce((a, b) => a + toNumber(b), 0);
   const rows = [
     { label: 'GIROS (desde EP)', values: giros, formula: 'GIROS(t) = TOTAL_A_PAGO_c_IVA(t)  [conectado a tabla EP]', color: '#22c55e' },
-    { label: 'PAGOS LÍNEA', values: pagosLinea, formula: 'Amortización contra escrituraciones (tope = ingresos del mes)', color: '#dc2626' },
+    { label: 'PAGOS LÍNEA', values: pagosLinea, formula: 'Amortización contra escrituraciones (tope = ingresos del mes)', color: '#334155' },
     { label: 'ACUMULADO', values: acumulado, formula: 'ACUMULADO(t) = ACUMULADO(t−1) + GIROS(t) + PAGOS_LINEA(t)', bold: true, color: '#0f172a' },
     { label: `INTERÉS (${cfg.tasa_construccion}% anual)`, values: interesMensual, formula: `INTERÉS(t) = ACUMULADO(t) × ${cfg.tasa_construccion}%/12`, color: '#f59e0b' },
     { label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, values: impTimbres, formula: `IMP_TIMBRES(t) = GIROS(t) × ${cfg.pct_timbres}%`, color: '#f59e0b' },
@@ -2067,7 +2067,7 @@ function renderConstructionGF(epData) {
           </div>
         </td>
         <td style="text-align:right;font-weight:${r.bold ? 800 : 600};color:${r.color}">${fmtUf(total(r.values))}</td>
-        ${r.values.map((v) => `<td data-month-cell style="text-align:center;color:${toNumber(v) < 0 ? '#dc2626' : '#334155'};${r.bold ? 'font-weight:700' : ''}">${fmtTableAmount(v, { kind: 'income' })}</td>`).join('')}
+        ${r.values.map((v) => `<td data-month-cell style="text-align:center;color:#334155;${r.bold ? 'font-weight:700' : ''}">${fmtTableAmount(v, { kind: 'income' })}</td>`).join('')}
       </tr>`;
   }).join(''));
 
@@ -2308,7 +2308,7 @@ function renderFinancingSourcePlanilla(sourceType) {
     const total = (arr) => arr.reduce((a, b) => a + toNumber(b), 0);
     const rows = [
       { label: 'GIROS', values: giros, formula: 'GIROS(0) = % línea × Costo terreno (desembolso en compra)', color: '#22c55e' },
-      { label: 'PAGOS LÍNEA', values: pagosLinea, formula: 'Pago de la deuda al inicio de construcción', color: '#dc2626' },
+      { label: 'PAGOS LÍNEA', values: pagosLinea, formula: 'Pago de la deuda al inicio de construcción', color: '#334155' },
       { label: 'ACUMULADO', values: acumulado, formula: 'ACUMULADO(t) = ACUMULADO(t−1) + GIROS(t) + PAGOS_LINEA(t)', bold: true, color: '#0f172a' },
       { label: `INTERÉS (${tasaTerreno}% anual)`, values: interesMensual, formula: `INTERÉS(t) = ACUMULADO(t) × ${tasaTerreno}%/12`, color: '#f59e0b' },
       { label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, values: impTimbres, formula: `IMP_TIMBRES(t) = GIROS(t) × ${cfg.pct_timbres}%`, color: '#f59e0b' },
@@ -2328,7 +2328,7 @@ function renderFinancingSourcePlanilla(sourceType) {
             </div>
           </td>
           <td style="text-align:right;font-weight:${r.bold ? 800 : 600};color:${r.color}">${fmtUf(total(r.values))}</td>
-          ${r.values.map((v) => `<td data-month-cell style="text-align:center;color:${toNumber(v) < 0 ? '#dc2626' : '#334155'};${r.bold ? 'font-weight:700' : ''}">${fmtTableAmount(v, { kind: 'income' })}</td>`).join('')}
+          ${r.values.map((v) => `<td data-month-cell style="text-align:center;color:#334155;${r.bold ? 'font-weight:700' : ''}">${fmtTableAmount(v, { kind: 'income' })}</td>`).join('')}
         </tr>`;
     }).join(''));
 
@@ -3373,7 +3373,7 @@ function renderProjectCashflow() {
             ${refsHtml}
           </div>
         </td>
-        ${row.values.map((value) => `<td style="text-align:center;color:${toNumber(value) < 0 ? '#fca5a5' : (row.bold ? '#22c55e' : '#fff')}">${fmtTableAmount(value, { kind: 'income' })}</td>`).join('')}
+        ${row.values.map((value) => `<td style="text-align:center;color:${row.bold ? '#22c55e' : '#fff'}">${fmtTableAmount(value, { kind: 'income' })}</td>`).join('')}
       </tr>`;
   }).join(''));
 }
@@ -3569,7 +3569,7 @@ function updateCostFormulaModalPreview() {
       }
     } catch (e) {
       resultEl.textContent = '= Error';
-      resultEl.style.color = '#dc2626';
+      resultEl.style.color = '#475569';
     }
   }
 }
