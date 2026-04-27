@@ -1508,6 +1508,7 @@ function getScheduledWholeUnits(totalUnits, computed, month) {
 function getPromesasEscrituracionUnidades(monthCountOrMonths) {
   // Retorna arrays de promesas y escrituras capeados
   // Las escrituras nunca pueden exceder el acumulado de promesas acumuladas
+  // Escrituras usa velocidad constante del cronograma, no distribución proporcional
   // Acepta monthCount (número) o array de meses
   const totals = getTotalSalesMetrics();
   const promesaRows = getCronogramaByType('PREVENTA');
@@ -1523,9 +1524,19 @@ function getPromesasEscrituracionUnidades(monthCountOrMonths) {
   let promesasAcum = 0;
   let escriturasAcum = 0;
 
+  // Calcular velocidad constante de escrituración (base)
+  const escrituraVelocidad = escrituraComputed && escrituraComputed.duracion > 0
+    ? totals.totalUnidades / escrituraComputed.duracion
+    : 0;
+
   months.forEach((m, index) => {
     const pUn = getScheduledWholeUnits(totals.totalUnidades, promesaComputed, m);
-    const eUnRaw = getScheduledWholeUnits(totals.totalUnidades, escrituraComputed, m);
+    // Para escrituras: velocidad constante si estamos en el período de escrituración
+    let eUnRaw = 0;
+    if (escrituraComputed && m >= escrituraComputed.inicio && m < escrituraComputed.fin) {
+      eUnRaw = Math.round(escrituraVelocidad);
+    }
+
     promesasAcum += pUn;
     const maxPossible = Math.max(0, promesasAcum - escriturasAcum);
     const eUn = Math.min(eUnRaw, maxPossible);
