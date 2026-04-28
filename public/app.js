@@ -2982,12 +2982,12 @@ function indexSafeNumber(value, fallback) {
 
 function getGanttLockConfig(row) {
   const name = String(row?.nombre || '').trim();
-  // Solo se bloquea el borrado; fechas, dependencias y duración son siempre editables.
-  if (/^Compra terreno$/i.test(name)) return { fixed: true, name: false, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'No se puede eliminar esta fila (referencia clave).' };
-  if (/^Construcci[óo]n$/i.test(name)) return { fixed: true, name: false, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'No se puede eliminar esta fila (referencia clave).' };
-  if (/^(Promesas|Inicio promesas)$/i.test(name)) return { fixed: true, name: false, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'No se puede eliminar esta fila (referencia clave).' };
-  if (/^Recepci[óo]n municipal$/i.test(name)) return { fixed: true, name: false, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'No se puede eliminar esta fila (referencia clave).' };
-  if (/^Escrituraci[óo]n$/i.test(name)) return { fixed: true, name: false, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'No se puede eliminar esta fila (referencia clave).' };
+  // Filas clave: nombre y borrado bloqueados; dependencia, fechas y duración editables.
+  if (/^Compra terreno$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
+  if (/^Construcci[óo]n$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
+  if (/^(Promesas|Inicio promesas)$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
+  if (/^Recepci[óo]n municipal$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
+  if (/^Escrituraci[óo]n$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
   return { fixed: false, name: false, dependency: false, start: false, duration: false, delete: false, drag: false, hint: '' };
 }
 
