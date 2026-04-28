@@ -2772,6 +2772,12 @@ function syncConstructionMilestone(duration = toNumber(state.construccion?.plazo
     rows[index].nombre = 'Construcción';
     rows[index].duracion = targetDuration;
     rows[index].fin = toNumber(rows[index].inicio) + targetDuration;
+    // Limpiar dependencia si apunta a una fila que ya no existe
+    const depRef = rows[index].dependencia;
+    if (depRef && !rows.some((r, i) => i !== index && String(r.nombre || '').trim() === depRef)) {
+      rows[index].dependencia = '';
+      rows[index].desfase = 0;
+    }
   } else {
     rows.push({
       id: '',
@@ -2984,7 +2990,7 @@ function getGanttLockConfig(row) {
   const name = String(row?.nombre || '').trim();
   // Filas clave: nombre y borrado bloqueados; dependencia, fechas y duración editables.
   if (/^Compra terreno$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
-  if (/^Construcci[óo]n$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
+  if (/^Construcci[óo]n$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Nombre protegido. Duración viene de la hoja de Construcción.' };
   if (/^(Promesas|Inicio promesas)$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
   if (/^Recepci[óo]n municipal$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
   if (/^Escrituraci[óo]n$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
