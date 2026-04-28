@@ -82,6 +82,23 @@ function setHtml(id, value) {
   if (el) el.innerHTML = value;
 }
 
+function makeClientId(prefix = 'tmp') {
+  if (window.crypto?.randomUUID) return `${prefix}-${window.crypto.randomUUID()}`;
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function renderFinanceFixedColumn(prefix, rows = [], options = {}) {
+  setHtml(`${prefix}-fixed-head`, `<tr><th style="text-align:left">Concepto</th></tr>`);
+  setHtml(`${prefix}-fixed-tbody`, rows.map((row) => `
+    <tr class="${row.bold ? 'finance-total-row' : ''}">
+      <td style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.color || '#334155'};background:${row.bg || (row.bold ? '#f4f8fc' : '#fff')}!important">${escapeHtml(row.label || '')}</td>
+    </tr>
+  `).join(''));
+  setHtml(`${prefix}-fixed-tfoot`, options.footerLabel ? `
+    <tr class="tfoot-dark"><td>${escapeHtml(options.footerLabel)}</td></tr>
+  ` : '');
+}
+
 const AUTOSAVE_SCOPE_LABELS = {
   proyecto: 'proyecto',
   cabida: 'cabida',
@@ -2224,7 +2241,6 @@ function renderConstructionEP() {
 
   setHtml('constr-ep-head', `
     <tr>
-      <th class="finance-concept-col finance-sticky-left finance-sticky-head" style="left:0;width:220px;min-width:220px;max-width:260px;text-align:left">Concepto</th>
       <th style="width:60px;text-align:center">ƒx</th>
       <th class="finance-total-col" style="width:110px;text-align:right">Total</th>
       ${labels.map((l) => `<th data-month-col>${escapeHtml(l)}</th>`).join('')}
@@ -2248,7 +2264,6 @@ function renderConstructionEP() {
     const bg = r.bold ? 'background:#f0fdf4' : '';
     return `
       <tr class="${r.bold ? 'finance-total-row' : ''}" style="${bg}">
-        <td class="finance-concept-col finance-sticky-left" style="left:0;width:220px;min-width:220px;max-width:260px;text-align:left;font-weight:${r.bold ? 800 : 600};color:${r.bold ? '#166534' : '#334155'}">${escapeHtml(r.label)}</td>
         <td style="text-align:center;position:relative" class="formula-host">
           <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #cbd5e1;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">ƒx</button>
           <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;left:0;top:100%;margin-top:4px;background:#0f172a;color:#fff;border-radius:8px;padding:10px 12px;min-width:260px;max-width:360px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">
@@ -2261,6 +2276,12 @@ function renderConstructionEP() {
       </tr>`;
   }).join(''));
 
+  renderFinanceFixedColumn('constr-ep', rows.map((r) => ({
+    label: r.label,
+    bold: r.bold,
+    color: r.bold ? '#166534' : '#334155',
+    bg: r.bold ? '#f0fdf4' : '#fff',
+  })));
   setHtml('constr-ep-tfoot', '');
   return data;
 }
@@ -2302,7 +2323,6 @@ function renderConstructionGF(epData) {
 
   setHtml('constr-fin-planilla-head', `
     <tr>
-      <th class="finance-concept-col finance-sticky-left finance-sticky-head" style="left:0;width:220px;min-width:220px;max-width:260px;text-align:left">Concepto</th>
       <th style="width:60px;text-align:center">ƒx</th>
       <th class="finance-total-col" style="width:110px;text-align:right">Total</th>
       ${labels.map((l) => `<th data-month-col>${escapeHtml(l)}</th>`).join('')}
@@ -2322,7 +2342,6 @@ function renderConstructionGF(epData) {
     const bg = r.bold ? 'background:#f8fafc' : '';
     return `
       <tr class="${r.bold ? 'finance-total-row' : ''}" style="${bg}">
-        <td class="finance-concept-col finance-sticky-left" style="left:0;width:220px;min-width:220px;max-width:260px;text-align:left;font-weight:${r.bold ? 800 : 600};color:${r.color}">${escapeHtml(r.label)}</td>
         <td style="text-align:center;position:relative" class="formula-host">
           <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #cbd5e1;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">ƒx</button>
           <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;left:0;top:100%;margin-top:4px;background:#0f172a;color:#fff;border-radius:8px;padding:10px 12px;min-width:260px;max-width:360px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">
@@ -2335,6 +2354,12 @@ function renderConstructionGF(epData) {
       </tr>`;
   }).join(''));
 
+  renderFinanceFixedColumn('constr-fin-planilla', rows.map((r) => ({
+    label: r.label,
+    bold: r.bold,
+    color: r.color,
+    bg: r.bold ? '#f8fafc' : '#fff',
+  })));
   setHtml('constr-fin-planilla-tfoot', '');
 }
 
@@ -2580,7 +2605,6 @@ function renderFinancingSourcePlanilla(sourceType) {
 
     setHtml('terreno-fin-planilla-head', `
       <tr>
-        <th class="finance-concept-col finance-sticky-left finance-sticky-head" style="left:0;width:220px;min-width:220px;max-width:260px;text-align:left">Concepto</th>
         <th style="width:60px;text-align:center">ƒx</th>
         ${labels.map((l) => `<th data-month-col>${escapeHtml(l)}</th>`).join('')}
       </tr>
@@ -2598,7 +2622,6 @@ function renderFinancingSourcePlanilla(sourceType) {
       const bg = r.bold ? 'background:#f8fafc' : '';
       return `
         <tr class="${r.bold ? 'finance-total-row' : ''}" style="${bg}">
-          <td class="finance-concept-col finance-sticky-left" style="left:0;width:220px;min-width:220px;max-width:260px;background:${r.bold ? '#f8fafc' : '#fff'};text-align:left;font-weight:${r.bold ? 800 : 600};color:${r.color}">${escapeHtml(r.label)}</td>
           <td style="text-align:center;position:relative" class="formula-host">
             <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #cbd5e1;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">ƒx</button>
             <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;left:0;top:100%;margin-top:4px;background:#0f172a;color:#fff;border-radius:8px;padding:10px 12px;min-width:260px;max-width:360px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">
@@ -2610,6 +2633,12 @@ function renderFinancingSourcePlanilla(sourceType) {
         </tr>`;
     }).join(''));
 
+    renderFinanceFixedColumn('terreno-fin-planilla', rows.map((r) => ({
+      label: r.label,
+      bold: r.bold,
+      color: r.color,
+      bg: r.bold ? '#f8fafc' : '#fff',
+    })));
     setHtml('terreno-fin-planilla-tfoot', '');
     return;
   }
@@ -2955,6 +2984,7 @@ function getPartidaFormulaText(partida) {
 }
 
 function mapLegacyCategoryName(name, partidaName = '') {
+  if (COST_CATEGORY_ORDER.includes(name)) return name;
   const source = `${name} ${partidaName}`.toUpperCase();
   if (source.includes('TERRENO')) return 'TERRENO';
   if (source.includes('CONSTRUCCION')) return 'CONSTRUCCION';
@@ -3281,11 +3311,18 @@ function buildFinancialCostRows(manualRows = []) {
 function ensureCostosState() {
   const byCategory = new Map(COST_CATEGORY_ORDER.map((name) => [name, { id: '', nombre: name, partidas: [] }]));
   (state.costos || []).forEach((category) => {
+    const normalizedCategoryName = COST_CATEGORY_ORDER.includes(category.nombre)
+      ? category.nombre
+      : null;
+    if (normalizedCategoryName && category.id && byCategory.get(normalizedCategoryName)) {
+      byCategory.get(normalizedCategoryName).id = category.id;
+    }
     (category.partidas || []).forEach((partida) => {
       const target = mapLegacyCategoryName(category.nombre, partida.nombre);
       const current = byCategory.get(target);
       current.partidas.push({
         ...partida,
+        id: partida.id || makeClientId('cost'),
         plan_pago: partida.plan_pago || '',
         distribucion_mensual: Array.isArray(partida.distribucion_mensual) ? partida.distribucion_mensual : [],
       });
@@ -3474,7 +3511,7 @@ function renderCostPlanilla() {
       distribucion.forEach((value, monthIndex) => { categoryMonthlyTotals[monthIndex] += value; });
 
       categoryRows.push(`
-        <tr class="partida-row" data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" ${rowReadOnly ? 'data-auto="1" data-readonly="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
+        <tr class="partida-row" data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" data-cost-id="${escapeHtml(partida.id || '')}" ${rowReadOnly ? 'data-auto="1" data-readonly="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
           <td style="text-align:center">${rowReadOnly ? '' : `<span class="row-tools"><button class="btn-outline btn-delete-inline" type="button" title="Eliminar subpartida" onclick="removeCostPartida('${escapeHtml(categoria.nombre)}', ${index})">&times;</button><span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span></span>`}</td>
           <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${rowReadOnly ? 'disabled' : ''}/></td>
           <td style="text-align:center">
@@ -3908,7 +3945,8 @@ function setCostFlowMode(mode) {
 function scrollTableById(containerId, offset) {
   const container = $(containerId);
   if (!container) return;
-  container.scrollBy({ left: offset, behavior: 'smooth' });
+  const scroller = container.querySelector?.('.finance-split-scroll') || container;
+  scroller.scrollBy({ left: offset, behavior: 'smooth' });
 }
 
 function scrollCostPlanilla(offset) {
@@ -4786,7 +4824,9 @@ function readCostosEditor() {
     if (row.dataset.auto === '1' || row.dataset.readonly === '1') return;
     const category = categoryMap.get(row.dataset.category);
     const index = toNumber(row.dataset.index);
-    const target = category?.partidas?.[index];
+    const target = row.dataset.costId
+      ? category?.partidas?.find((partida) => String(partida.id || '') === row.dataset.costId)
+      : category?.partidas?.[index];
     if (!target) return;
 
     const formula = parseFormulaInput(row.querySelector('[data-field="formula"]')?.value);
@@ -4822,11 +4862,11 @@ function agregarPartidaLinea(categoryName) {
   ensureCostosState();
   let category = state.costos.find((item) => item.nombre === categoryName);
   if (!category) {
-    category = { id: '', nombre: categoryName, partidas: [] };
+    category = { id: makeClientId('cat'), nombre: categoryName, partidas: [] };
     state.costos.push(category);
   }
   category.partidas.push({
-    id: '',
+    id: makeClientId('cost'),
     nombre: 'Nueva subpartida',
     formula_tipo: 'expr',
     formula_valor: 0,
