@@ -1351,6 +1351,37 @@ function getVentasVelocitySettings() {
   };
 }
 
+function calculateEscrituraDurationWithPromiseCap(escrituraStart, promiseStart = 0) {
+  const totalUnits = Math.max(0, Math.round(toNumber(getTotalSalesMetrics().totalUnidades)));
+  if (!totalUnits) return 1;
+  const velocity = getVentasVelocitySettings();
+  const promesaMonthly = Math.max(1, Math.round(toNumber(velocity.promesas)));
+  const escrituraMonthly = Math.max(1, Math.round(toNumber(velocity.escrituracion)));
+  const startEscritura = Math.max(0, Math.round(toNumber(escrituraStart)));
+  const startPromesas = Math.max(0, Math.round(toNumber(promiseStart)));
+  const maxMonth = startEscritura + totalUnits + Math.ceil(totalUnits / promesaMonthly) + 240;
+  let promesasAcum = 0;
+  let escriturasAcum = 0;
+  let lastEscrituraMonth = startEscritura;
+
+  for (let month = 0; month <= maxMonth; month += 1) {
+    if (month >= startPromesas && promesasAcum < totalUnits) {
+      promesasAcum += Math.min(promesaMonthly, totalUnits - promesasAcum);
+    }
+    if (month >= startEscritura && escriturasAcum < totalUnits) {
+      const disponible = Math.max(0, promesasAcum - escriturasAcum);
+      const escriturasMes = Math.min(escrituraMonthly, disponible, totalUnits - escriturasAcum);
+      if (escriturasMes > 0) {
+        escriturasAcum += escriturasMes;
+        lastEscrituraMonth = month;
+      }
+      if (escriturasAcum >= totalUnits) break;
+    }
+  }
+
+  return Math.max(1, lastEscrituraMonth - startEscritura + 1);
+}
+
 function getTotalCommercialUnits() {
   return state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).unidades, 0);
 }
@@ -1541,14 +1572,9 @@ function getCronogramaComputed(item) {
   } else if (isVentasCronogramaType(item, 'ESCRITURACION')) {
     // Escrituraciones: velocidad efectiva = min(promesas, escrituración)
     // Limitadas por acumulado de promesas, pero no por una duración fija
-    const velocidadEscrituras = toNumber(velocitySettings.escrituracion);
-    const velocidadEfectiva = Math.min(
-      velocidadPromesas > 0 ? velocidadPromesas : Infinity,
-      velocidadEscrituras > 0 ? velocidadEscrituras : Infinity
-    );
-    if (velocidadEfectiva > 0 && velocidadEfectiva !== Infinity) {
-      duracion = Math.ceil(totals.totalUnidades / velocidadEfectiva);
-    }
+    const promesaRow = getCronogramaByType('PREVENTA')[0];
+    const promesaComputed = promesaRow ? getCronogramaComputed(promesaRow) : null;
+    duracion = calculateEscrituraDurationWithPromiseCap(inicio, promesaComputed?.inicio || 0);
   }
 
   const fin = inicio + duracion - 1;
@@ -2887,10 +2913,8 @@ function syncTerrainPurchaseMilestone() {
 function syncSalesDrivenMilestones() {
   const velocity = getVentasVelocitySettings();
   const preventaUnits = Math.max(0, getPreventaUnitsTotal());
-  const totalUnits = Math.max(0, getTotalCommercialUnits());
   const promiseDuration = Math.max(1, Math.ceil(preventaUnits / Math.max(1, velocity.promesas)));
-  const escrituraVelocity = Math.min(Math.max(1, velocity.promesas), Math.max(1, velocity.escrituracion));
-  const escrituraDuration = Math.max(1, Math.ceil(totalUnits / escrituraVelocity));
+  let escrituraDuration = 1;
   const rows = Array.isArray(state.gantt) ? state.gantt.map((row) => ({ ...row })) : [];
 
   const ensureMilestone = (matcher, buildRow) => {
@@ -2940,7 +2964,7 @@ function syncSalesDrivenMilestones() {
     fin: 0,
   }));
 
-  ensureMilestone(/^Escrituración$/i, (baseRow) => ({
+  const escrituraRow = ensureMilestone(/^Escrituración$/i, (baseRow) => ({
     id: baseRow.id || '',
     nombre: 'Escrituración',
     color: baseRow.color || '#f97316',
@@ -2951,6 +2975,13 @@ function syncSalesDrivenMilestones() {
     duracion: escrituraDuration,
     fin: 0,
   }));
+
+  state.gantt = normalizeGanttRows(rows);
+  const normalizedPromise = state.gantt.find((row) => /^(Promesas|Inicio promesas)$/i.test(String(row.nombre || '').trim())) || promiseRow;
+  const normalizedEscritura = state.gantt.find((row) => /^Escrituraci[óo]n$/i.test(String(row.nombre || '').trim())) || escrituraRow;
+  escrituraDuration = calculateEscrituraDurationWithPromiseCap(normalizedEscritura.inicio, normalizedPromise.inicio);
+  const escrituraIndex = rows.findIndex((row) => /^Escrituraci[óo]n$/i.test(String(row.nombre || '').trim()));
+  if (escrituraIndex >= 0) rows[escrituraIndex].duracion = escrituraDuration;
 
   // Construcción: si el usuario NO definió dependencia manual, se usa el cálculo
   // automático desde % de promesas acumuladas. Si SÍ tiene dependencia manual,
