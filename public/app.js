@@ -1351,35 +1351,47 @@ function getVentasVelocitySettings() {
   };
 }
 
+function buildVentasUnitFlowForMonths(months, promiseStart = 0, escrituraStart = 0) {
+  const totalUnits = Math.max(0, Math.round(toNumber(getTotalSalesMetrics().totalUnidades)));
+  const velocity = getVentasVelocitySettings();
+  const promesaMonthly = Math.max(1, Math.round(toNumber(velocity.promesas)));
+  const escrituraMonthly = Math.max(1, Math.round(toNumber(velocity.escrituracion)));
+  const startPromesas = Math.max(0, Math.round(toNumber(promiseStart)));
+  const startEscritura = Math.max(0, Math.round(toNumber(escrituraStart)));
+  const promesas = months.map(() => 0);
+  const escrituras = months.map(() => 0);
+  let promesasAcum = 0;
+  let escriturasAcum = 0;
+
+  months.forEach((month, index) => {
+    if (month >= startPromesas && promesasAcum < totalUnits) {
+      const promesasMes = Math.min(promesaMonthly, totalUnits - promesasAcum);
+      promesasAcum += promesasMes;
+      promesas[index] = promesasMes;
+    }
+    if (month >= startEscritura && escriturasAcum < totalUnits) {
+      const disponible = Math.max(0, promesasAcum - escriturasAcum);
+      const escriturasMes = Math.min(escrituraMonthly, disponible, totalUnits - escriturasAcum);
+      escriturasAcum += escriturasMes;
+      escrituras[index] = escriturasMes;
+    }
+  });
+
+  return { promesas, escrituras };
+}
+
 function calculateEscrituraDurationWithPromiseCap(escrituraStart, promiseStart = 0) {
   const totalUnits = Math.max(0, Math.round(toNumber(getTotalSalesMetrics().totalUnidades)));
   if (!totalUnits) return 1;
   const velocity = getVentasVelocitySettings();
   const promesaMonthly = Math.max(1, Math.round(toNumber(velocity.promesas)));
-  const escrituraMonthly = Math.max(1, Math.round(toNumber(velocity.escrituracion)));
   const startEscritura = Math.max(0, Math.round(toNumber(escrituraStart)));
-  const startPromesas = Math.max(0, Math.round(toNumber(promiseStart)));
   const maxMonth = startEscritura + totalUnits + Math.ceil(totalUnits / promesaMonthly) + 240;
-  let promesasAcum = 0;
-  let escriturasAcum = 0;
-  let lastEscrituraMonth = startEscritura;
-
-  for (let month = 0; month <= maxMonth; month += 1) {
-    if (month >= startPromesas && promesasAcum < totalUnits) {
-      promesasAcum += Math.min(promesaMonthly, totalUnits - promesasAcum);
-    }
-    if (month >= startEscritura && escriturasAcum < totalUnits) {
-      const disponible = Math.max(0, promesasAcum - escriturasAcum);
-      const escriturasMes = Math.min(escrituraMonthly, disponible, totalUnits - escriturasAcum);
-      if (escriturasMes > 0) {
-        escriturasAcum += escriturasMes;
-        lastEscrituraMonth = month;
-      }
-      if (escriturasAcum >= totalUnits) break;
-    }
-  }
-
-  return Math.max(1, lastEscrituraMonth - startEscritura + 1);
+  const months = Array.from({ length: maxMonth + 1 }, (_, index) => index);
+  const { escrituras } = buildVentasUnitFlowForMonths(months, promiseStart, startEscritura);
+  const lastIndex = escrituras.reduce((last, value, index) => (toNumber(value) > 0 ? index : last), -1);
+  const lastMonth = lastIndex >= 0 ? months[lastIndex] : startEscritura;
+  return Math.max(1, lastMonth - startEscritura + 1);
 }
 
 function getTotalCommercialUnits() {
@@ -1835,7 +1847,6 @@ function getPromesasEscrituracionUnidades(monthCountOrMonths) {
   // Las escrituras nunca pueden exceder el acumulado de promesas acumuladas
   // Escrituras usa velocidad definida por usuario (ej: 20/mes exacto)
   // Acepta monthCount (número) o array de meses
-  const totals = getTotalSalesMetrics();
   const promesaRows = getCronogramaByType('PREVENTA');
   const escrituraRow = getCronogramaByType('ESCRITURACION')[0];
   const promesaComputed = promesaRows.length ? getCronogramaComputed(promesaRows[0]) : null;
@@ -1843,40 +1854,15 @@ function getPromesasEscrituracionUnidades(monthCountOrMonths) {
 
   const isArrayInput = Array.isArray(monthCountOrMonths);
   const months = isArrayInput ? monthCountOrMonths : Array.from({ length: monthCountOrMonths }, (_, i) => i);
+  const emptyFlow = { promesas: months.map(() => 0), escrituras: months.map(() => 0) };
 
-  const promesasUnidades = months.map(() => 0);
-  const escriturasUnidades = months.map(() => 0);
-  let promesasAcum = 0;
-  let escriturasAcum = 0;
+  if (!promesaComputed || !escrituraComputed) return emptyFlow;
 
-  // Usar velocidad definida por usuario (ej: 20/mes)
-  const velocitySettings = getVentasVelocitySettings();
-  const escrituraVelocidadDefinida = toNumber(velocitySettings.escrituracion);
-  const promesaVelocidadDefinida = toNumber(velocitySettings.promesas);
-  const totalUnidadesNum = Math.max(0, Math.round(toNumber(totals.totalUnidades)));
-
-  months.forEach((m, index) => {
-    // Para promesas: velocidad constante hasta agotar totalUnidades
-    let pUn = 0;
-    if (promesaComputed && m >= promesaComputed.inicio && promesasAcum < totalUnidadesNum) {
-      pUn = Math.min(Math.round(promesaVelocidadDefinida), totalUnidadesNum - promesasAcum);
-    }
-    // Para escrituras: usar velocidad definida desde el inicio (sin fin fijo)
-    // Las escrituras continúan mientras haya promesas acumuladas disponibles
-    let eUnRaw = 0;
-    if (escrituraComputed && m >= escrituraComputed.inicio) {
-      eUnRaw = Math.round(escrituraVelocidadDefinida);
-    }
-
-    promesasAcum += pUn;
-    const maxPossible = Math.max(0, promesasAcum - escriturasAcum);
-    const eUn = Math.min(eUnRaw, maxPossible);
-    escriturasAcum += eUn;
-    promesasUnidades[index] = pUn;
-    escriturasUnidades[index] = eUn;
-  });
-
-  return { promesas: promesasUnidades, escrituras: escriturasUnidades };
+  return buildVentasUnitFlowForMonths(
+    months,
+    promesaComputed.inicio,
+    escrituraComputed.inicio
+  );
 }
 
 function renderVentasSummaryCards() {
