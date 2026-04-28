@@ -1103,7 +1103,7 @@ table:not(.gantt-table) .tfoot-dark td,
           <input class="inp" id="ventas-velocidad-promesas" type="number" min="1" step="1" oninput="onVentasVelocityChange()">
           <span style="font-size:11px;color:#64748b">un/mes</span>
         </div>
-        <div style="font-size:10px;color:#64748b;margin-top:6px">Controla la duración del bloque <strong>Inicio promesas</strong> en Carta Gantt.</div>
+        <div style="font-size:10px;color:#64748b;margin-top:6px">Controla la duración del bloque <strong>Promesas</strong> en Carta Gantt.</div>
       </div>
       <div style="background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:12px">
         <div style="font-size:10px;font-weight:700;color:#c2410c;text-transform:uppercase;margin-bottom:6px">Velocidad de escrituración</div>
@@ -1320,11 +1320,7 @@ table:not(.gantt-table) .tfoot-dark td,
             <td style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-bt">48.615 UF</td>
         </tr>
       </tbody>
-        <!-- hidden binding inputs -->
-        <input type="hidden" id="constr-pct-bt" value="45">
-        <span id="constr-ratio-bt" style="display:none"></span>
-        <span id="constr-ratio-bt-m2" style="display:none"></span>
-        <tfoot>
+      <tfoot>
           <tr style="background:#f0fdf4;border-top:2px solid #86efac">
             <td style="font-weight:700;color:#15803d;font-size:11px;text-transform:uppercase;padding:8px 10px">Neto</td>
             <td style="text-align:center;font-weight:700;color:#374151;font-size:12px" id="constr-sup-total">—</td>
@@ -1338,6 +1334,10 @@ table:not(.gantt-table) .tfoot-dark td,
         </tr>
       </tfoot>
     </table>
+    <!-- hidden binding inputs (must be outside <table> to be valid HTML) -->
+    <input type="hidden" id="constr-pct-bt" value="45">
+    <span id="constr-ratio-bt" style="display:none"></span>
+    <span id="constr-ratio-bt-m2" style="display:none"></span>
   </div>
 
     <!-- Plazos y Pagos -->
@@ -1891,7 +1891,8 @@ table:not(.gantt-table) .tfoot-dark td,
         <div class="formula-suggest"></div>
       </div>
       <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:18px">
-        <button class="btn-outline" type="button" onclick="closeCostFormulaModal()">Cerrar</button>
+        <button class="btn-outline" type="button" onclick="closeCostFormulaModal()">Cancelar</button>
+        <button class="btn-primary" type="button" onclick="saveCostFormulaModal()">Guardar</button>
       </div>
     </div>
   </div>
@@ -2202,7 +2203,16 @@ table:not(.gantt-table) .tfoot-dark td,
         return values;
       }
 
-      pushRow({ key: 'giros', label: 'GIROS (desde EP)', fallback: giros, formula: '[GIROS fuente]', mode: 'signed' });
+      // Buscar índices GASTOS FINANCIEROS para botones Plan de pago
+      const gfCatGF = (typeof ensureCostosState === 'function' ? ensureCostosState() : []).find((item) => item.nombre === 'GASTOS FINANCIEROS');
+      const gfPartidasGF = gfCatGF?.partidas || [];
+      const gfGirosIdx = gfPartidasGF.findIndex((p) => /Construccion.*Linea aprobada/i.test(p.nombre || ''));
+      const gfPagoLineaIdx = gfPartidasGF.findIndex((p) => /Construccion.*Pago de linea/i.test(p.nombre || ''));
+      const mkPlanBtn = (idx, lbl) => idx >= 0
+        ? `<button type="button" title="Plan de pago: ${lbl}" onclick="openPaymentPlanModal('GASTOS FINANCIEROS',${idx})" style="font-size:9px;padding:1px 5px;background:#eff6ff;border:1px solid #93c5fd;color:#1d4ed8;border-radius:3px;cursor:pointer;flex-shrink:0">plan</button>`
+        : '';
+
+      pushRow({ key: 'giros', label: 'GIROS (desde EP)', fallback: giros, formula: '[GIROS fuente]', mode: 'signed', actionHtml: mkPlanBtn(gfGirosIdx, 'Giro línea construcción') });
 
       const pagosLineaFormula = getFormula('gf', 'pagos_linea', '[PAGOS LINEA fuente]');
       const pagosLinea = evaluateSeries(pagosLineaFormula, series, scalars, pagosLineaDefault);
@@ -2222,6 +2232,8 @@ table:not(.gantt-table) .tfoot-dark td,
       pushRow({ key: 'interes', label: `INTERES (${cfg.tasa_construccion}% anual)`, fallback: interesDefault, formula: '[ACUMULADO] * [Tasa_interes_construccion] / 12 / 100', mode: 'cost' });
       const timbresDefault = giros.map((value) => value * (cfg.pct_timbres / 100));
       pushRow({ key: 'timbres', label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, fallback: timbresDefault, formula: '[GIROS (desde EP)] * [Timbres] / 100', mode: 'cost' });
+      // Fila de pago de línea con botón plan de pago
+      rows.push({ key: 'pagos_linea', label: 'PAGOS LÍNEA', formula: pagosLineaFormula, values: pagosLinea, mode: 'signed', color: '#ef4444', actionHtml: mkPlanBtn(gfPagoLineaIdx, 'Pago de línea construcción') });
 
       renderFormulaTableHeader('constr-fin-planilla-head', labels);
       setHtml('constr-fin-planilla-tbody', rows.map((row) => `
@@ -2234,8 +2246,9 @@ table:not(.gantt-table) .tfoot-dark td,
       renderFinanceFixedColumn('constr-fin-planilla', rows.map((row) => ({
         label: row.label,
         bold: row.bold,
-        color: row.bold ? '#0f172a' : '#334155',
+        color: row.bold ? '#0f172a' : (row.color || '#334155'),
         bg: row.bold ? '#f8fafc' : '#fff',
+        actionHtml: row.actionHtml || '',
       })));
       setHtml('constr-fin-planilla-tfoot', '');
       syncGfParamMirror();

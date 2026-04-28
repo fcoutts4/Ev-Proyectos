@@ -91,7 +91,10 @@ function renderFinanceFixedColumn(prefix, rows = [], options = {}) {
   setHtml(`${prefix}-fixed-head`, `<tr><th style="text-align:left">Concepto</th></tr>`);
   setHtml(`${prefix}-fixed-tbody`, rows.map((row) => `
     <tr class="${row.bold ? 'finance-total-row' : ''}">
-      <td style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.color || '#334155'};background:${row.bg || (row.bold ? '#f4f8fc' : '#fff')}!important">${escapeHtml(row.label || '')}</td>
+      <td style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.color || '#334155'};background:${row.bg || (row.bold ? '#f4f8fc' : '#fff')}!important;display:flex;align-items:center;justify-content:space-between;gap:4px">
+        <span>${escapeHtml(row.label || '')}</span>
+        ${row.actionHtml || ''}
+      </td>
     </tr>
   `).join(''));
   setHtml(`${prefix}-fixed-tfoot`, options.footerLabel ? `
@@ -963,7 +966,7 @@ function getGanttDependencyOptions(currentName) {
 const GANTT_CANONICAL_NAME_RULES = [
   { canonical: 'Compra terreno', pattern: /^(Compra terreno|Adquisicion de Terreno|Adquisición de Terreno|Compra de Terreno)$/i },
   { canonical: 'Construcción', pattern: /^Construcci[óo]n$/i },
-  { canonical: 'Inicio promesas', pattern: /^Inicio promesas$/i },
+  { canonical: 'Promesas', pattern: /^(Promesas|Inicio promesas)$/i },
   { canonical: 'Postventa', pattern: /^Postventa$/i },
   { canonical: 'Recepción municipal', pattern: /^Recepci[óo]n municipal$/i },
   { canonical: 'Escrituración', pattern: /^Escrituraci[óo]n$/i },
@@ -1669,7 +1672,7 @@ function renderVentasSchedules() {
 
   setHtml('preventa-tbody', primeraPreventa ? `
     <tr>
-      <td style="color:#64748b">${escapeHtml(primeraPreventa.vinculo_gantt || 'Inicio promesas')}</td>
+      <td style="color:#64748b">${escapeHtml(primeraPreventa.vinculo_gantt || 'Promesas')}</td>
       <td style="text-align:center;font-weight:700">${fmtNumber(computedPreventa.inicio)}</td>
       <td style="text-align:center;color:#16a34a;font-weight:700">${fmtNumber(computedPreventa.fin)}</td>
       <td style="text-align:center">${fmtNumber(totalUnidadesPromesas)} un</td>
@@ -2610,11 +2613,21 @@ function renderFinancingSourcePlanilla(sourceType) {
       </tr>
     `);
 
+    // Buscar índices en GASTOS FINANCIEROS para habilitar Plan de pago en GIROS y PAGO LINEA
+    const gfCategory = ensureCostosState().find((item) => item.nombre === 'GASTOS FINANCIEROS');
+    const gfPartidas = gfCategory?.partidas || [];
+    const gfLineaIdx = gfPartidas.findIndex((p) => /Terreno.*Linea aprobada/i.test(p.nombre || ''));
+    const gfPagoIdx = gfPartidas.findIndex((p) => /Terreno.*Pago de linea/i.test(p.nombre || ''));
+    const makeGfPlanBtn = (idx, label) => idx >= 0
+      ? `<button type="button" title="Plan de pago: ${label}" onclick="openPaymentPlanModal('GASTOS FINANCIEROS',${idx})" style="font-size:9px;padding:1px 5px;background:#eff6ff;border:1px solid #93c5fd;color:#1d4ed8;border-radius:3px;cursor:pointer;flex-shrink:0">plan</button>`
+      : '';
+
     const rows = [
-      { label: 'GIROS', values: giros, formula: `GIROS = % línea × Costo terreno · desembolso en mes compra`, color: '#22c55e' },
+      { label: 'GIROS', values: giros, formula: `GIROS = % línea × Costo terreno · desembolso en mes compra`, color: '#22c55e', actionHtml: makeGfPlanBtn(gfLineaIdx, 'Giro línea terreno') },
       { label: 'ACUMULADO', values: acumulado, formula: 'ACUMULADO(t) = ACUMULADO(t−1) + GIROS(t) + PAGOS_LINEA(t)', bold: true, color: '#0f172a' },
       { label: `INTERÉS ANUAL (${tasaTerreno}%)`, values: interesAnual, formula: `Acumulado anual de interés · pagado en aniversario del giro o al cierre anticipado`, color: '#f59e0b' },
       { label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, values: impTimbres, formula: `IMP_TIMBRES(t) = GIROS(t) × ${cfg.pct_timbres}%`, color: '#f59e0b' },
+      { label: 'PAGO LÍNEA', values: pagosLinea, formula: `PAGO_LÍNEA(t) = pago al vencimiento del plazo de la línea de terreno`, color: '#ef4444', actionHtml: makeGfPlanBtn(gfPagoIdx, 'Pago de línea terreno') },
     ];
 
     setHtml('terreno-fin-planilla-tbody', rows.map((r) => {
@@ -2638,6 +2651,7 @@ function renderFinancingSourcePlanilla(sourceType) {
       bold: r.bold,
       color: r.color,
       bg: r.bold ? '#f8fafc' : '#fff',
+      actionHtml: r.actionHtml || '',
     })));
     setHtml('terreno-fin-planilla-tfoot', '');
     return;
@@ -2786,7 +2800,7 @@ function getConstructionStartFromPreventa() {
   const threshold = totalUnits * pctReq;
   const velocity = getVentasVelocitySettings();
   const velocidadPromesas = Math.max(0.01, toNumber(velocity.promesas));
-  const promesaRow = state.gantt.find((r) => /^Inicio promesas$/i.test(String(r.nombre || '').trim()));
+  const promesaRow = state.gantt.find((r) => /^(Promesas|Inicio promesas)$/i.test(String(r.nombre || '').trim()));
   const inicioPromesas = toNumber(promesaRow?.inicio ?? 0);
   if (threshold <= 0) return inicioPromesas;
   const monthsNeeded = Math.ceil(threshold / velocidadPromesas);
@@ -2881,13 +2895,13 @@ function syncSalesDrivenMilestones() {
     || getTerrainMilestone()
     || rows.find((row) => /ADQUISICION DE TERRENO|COMPRA DE TERRENO|TERRENO/i.test(String(row.nombre || '').trim()));
   const estudiosMilestone = rows.find((row) => /^(Estudios|Estudios previos|Estudios y permisos)$/i.test(String(row.nombre || '').trim()));
-  // Inicio promesas = Fin Estudios + 1 mes. Si no hay Estudios, depende de Compra terreno.
+  // Promesas = Fin Estudios + 1 mes. Si no hay Estudios, depende de Compra terreno.
   const promiseDependency = estudiosMilestone?.nombre || terrainMilestone?.nombre || 'Compra terreno';
   const promiseDesfase = estudiosMilestone ? 1 : 0;
 
-  const promiseRow = ensureMilestone(/^Inicio promesas$/i, (baseRow) => ({
+  const promiseRow = ensureMilestone(/^(Promesas|Inicio promesas)$/i, (baseRow) => ({
     id: baseRow.id || '',
-    nombre: 'Inicio promesas',
+    nombre: 'Promesas',
     color: baseRow.color || '#2563eb',
     dependencia: promiseDependency,
     dependencia_tipo: 'fin',
@@ -2968,11 +2982,12 @@ function indexSafeNumber(value, fallback) {
 
 function getGanttLockConfig(row) {
   const name = String(row?.nombre || '').trim();
-  if (/^Compra terreno$/i.test(name)) return { fixed: true, name: false, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Referencia base editable en Carta Gantt.' };
-  if (/^Construcci[óo]n$/i.test(name)) return { fixed: true, name: false, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Duracion ligada a Construccion; referencia editable.' };
-  if (/^Inicio promesas$/i.test(name)) return { fixed: true, name: false, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Parte por defecto al terminar Compra terreno; duracion ligada a velocidad de promesas.' };
-  if (/^Recepci[óo]n municipal$/i.test(name)) return { fixed: true, name: false, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Referencia editable en Carta Gantt.' };
-  if (/^Escrituraci[óo]n$/i.test(name)) return { fixed: true, name: false, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Inicio por defecto ligado a Recepcion municipal; duracion ligada a Ventas.' };
+  // Solo se bloquea el borrado; fechas, dependencias y duración son siempre editables.
+  if (/^Compra terreno$/i.test(name)) return { fixed: true, name: false, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'No se puede eliminar esta fila (referencia clave).' };
+  if (/^Construcci[óo]n$/i.test(name)) return { fixed: true, name: false, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'No se puede eliminar esta fila (referencia clave).' };
+  if (/^(Promesas|Inicio promesas)$/i.test(name)) return { fixed: true, name: false, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'No se puede eliminar esta fila (referencia clave).' };
+  if (/^Recepci[óo]n municipal$/i.test(name)) return { fixed: true, name: false, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'No se puede eliminar esta fila (referencia clave).' };
+  if (/^Escrituraci[óo]n$/i.test(name)) return { fixed: true, name: false, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'No se puede eliminar esta fila (referencia clave).' };
   return { fixed: false, name: false, dependency: false, start: false, duration: false, delete: false, drag: false, hint: '' };
 }
 
@@ -3462,7 +3477,21 @@ function renderCostPlanilla() {
     </tr>
   `);
 
+  // TERRENO, CONSTRUCCIÓN y GASTOS FINANCIEROS se gestionan en sus propias pestañas
+  // y no se muestran en la planilla de costos general.
+  // Sin embargo, sus total_neto SÍ se actualizan para que las fórmulas cruzadas funcionen.
+  const HIDDEN_CATEGORIES = new Set(['TERRENO', 'CONSTRUCCIÓN', 'CONSTRUCCION', 'GASTOS FINANCIEROS']);
+  categorias.forEach((categoria) => {
+    if (!HIDDEN_CATEGORIES.has(String(categoria.nombre || '').toUpperCase().trim())) return;
+    (categoria.partidas || []).forEach((partida) => {
+      const t = evaluateCostPartida(partida, context);
+      partida.total_neto = t;
+      partida.distribucion_mensual = normalizeDistribution(partida.distribucion_mensual, t, partida.plan_pago);
+    });
+  });
+
   setHtml('planilla-tbody', categorias.map((categoria) => {
+    if (HIDDEN_CATEGORIES.has(String(categoria.nombre || '').toUpperCase().trim())) return '';
     const isCollapsed = Object.prototype.hasOwnProperty.call(collapsedState, categoria.nombre)
       ? !!collapsedState[categoria.nombre]
       : true;
@@ -3765,12 +3794,24 @@ function getCostFormulaCatalog() {
     { label: 'Total construccion', token: '_total_construccion', value: context.total_construccion, unit: 'UF' },
     { label: 'Total terreno', token: '_total_terreno', value: context.total_terreno, unit: 'UF' },
     { label: 'Ventas brutas', token: '_ventas_brutas', value: context.ventas_brutas, unit: 'UF' },
+    // Ingresos por tipo de venta (para calcular comisiones, gastos comerciales, etc.)
+    { label: 'Ingresos promesas total', token: '_ingresos_promesas_total', value: (() => { const totals = getTotalSalesMetrics(); const settings = getGlobalPaymentSettings(); const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct)); const cuotasSobrePiePct = Math.min(100, Math.max(0, settings.pie_cuotas_pct)); const promesaSobrePiePct = Math.max(0, 100 - cuotasSobrePiePct); const unidades = state.cabida.reduce((s, r) => s + toNumber(r.cantidad), 0); const promesaUnidad = totals.precioPromedio * piePct / 100 * promesaSobrePiePct / 100; return unidades * promesaUnidad; })(), unit: 'UF' },
+    { label: 'Ingresos escrituracion total', token: '_ingresos_escrituracion_total', value: (() => { const totals = getTotalSalesMetrics(); const settings = getGlobalPaymentSettings(); const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct)); const escrituraPct = Math.max(0, 100 - piePct); const unidades = state.cabida.reduce((s, r) => s + toNumber(r.cantidad), 0); return unidades * totals.precioPromedio * escrituraPct / 100; })(), unit: 'UF' },
+    { label: 'Pct pie promesa', token: '_pct_pie_promesa', value: toNumber(getGlobalPaymentSettings().pie_promesa_pct), unit: '%' },
+    { label: 'Pct escrituracion', token: '_pct_escrituracion', value: Math.max(0, 100 - toNumber(getGlobalPaymentSettings().pie_promesa_pct)), unit: '%' },
     ...COST_CATEGORY_ORDER.map((name) => ({
       label: `Total categoria ${name.toLowerCase()}`,
       token: `_total_categoria_${String(name).toLowerCase().replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}`,
       value: ((state.costos.find((item) => item.nombre === name)?.partidas || []).reduce((sum, partida) => sum + toNumber(partida.total_neto), 0)),
       unit: 'UF',
     })),
+    // Referencias cruzadas a subpartidas individuales: _total_partida_<nombre_normalizado>
+    ...state.costos.flatMap((cat) => (cat.partidas || []).map((p) => ({
+      label: `Total partida ${String(p.nombre || '').toLowerCase()}`,
+      token: `_total_partida_${String(p.nombre || '').toLowerCase().replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}`,
+      value: toNumber(p.total_neto),
+      unit: 'UF',
+    }))),
     ...state.gantt.flatMap((row) => ([
       {
         label: `Inicio ${String(row.nombre || '').toLowerCase()}`,
@@ -5197,8 +5238,6 @@ async function guardarCostos({ silent = false } = {}) {
     body: JSON.stringify(payload),
   });
   await finishSave({ silent });
-  return;
-    setSyncStatus('ok', 'GUARDADO', `Última sync ${new Date().toLocaleTimeString()}`);
 }
 
 function eliminarUso(index) {
@@ -5300,26 +5339,7 @@ window.dropGanttRow = dropGanttRow;
 window.onVentasInputChange = onVentasInputChange;
 window.onVentasVelocityChange = onVentasVelocityChange;
 
-// Override tardío: bloquea nombres de hitos base para no romper referencias.
-function getGanttLockConfig(row) {
-  const name = String(row?.nombre || '').trim();
-  if (/^Compra terreno$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre bloqueado para mantener referencias estables.' };
-  if (/^Construcci[Ã³o]n$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Nombre bloqueado para mantener referencias estables.' };
-  if (/^Inicio promesas$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Nombre bloqueado para mantener referencias estables.' };
-  if (/^Postventa$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre bloqueado para mantener referencias estables.' };
-  if (/^Recepci[Ã³o]n municipal$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre bloqueado para mantener referencias estables.' };
-  if (/^Escrituraci[Ã³o]n$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Nombre bloqueado para mantener referencias estables.' };
-  return { fixed: false, name: false, dependency: false, start: false, duration: false, delete: false, drag: false, hint: '' };
-}
-
-function getGanttLockConfig(row) {
-  const name = String(row?.nombre || '').trim();
-  if (/^Compra terreno$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: true, hint: 'Solo color editable.' };
-  if (/^Inicio promesas$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: true, hint: 'Automático: Fin Estudios + 1 mes. Solo color editable.' };
-  if (/^Construcci[óo]n$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: false, delete: true, drag: true, hint: 'Inicio automático: según % preventa definido en Construcción. Duración editable.' };
-  if (/^Postventa$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: true, hint: 'Solo color editable.' };
-  return { fixed: false, name: false, dependency: false, start: false, duration: false, delete: false, drag: false, hint: '' };
-}
+// getGanttLockConfig is defined once above (line ~2969). No duplicate needed here.
 
 document.addEventListener('DOMContentLoaded', async () => {
   ensureProjectControls();
