@@ -565,26 +565,30 @@ tfoot td{line-height:1.25}
 .tbl-scroll table,.flow-planilla table{border-collapse:separate;border-spacing:0}
 .tbl-scroll thead th,.flow-planilla thead th{position:sticky;top:0;z-index:3}
 .finance-date-scroll{position:relative;border:1px solid var(--border-strong);border-radius:10px;overflow:auto;background:#fff}
-.finance-date-table{border:none!important;border-radius:0!important}
+.finance-date-table{border:none!important;border-radius:0!important;border-collapse:separate!important;border-spacing:0!important}
 .finance-date-table th:first-child,
-.finance-date-table td:first-child{
-  position:sticky;
-  left:0;
+.finance-date-table td:first-child,
+.finance-date-table .finance-concept-col{
+  position:sticky!important;
+  left:0!important;
   width:220px;
-  min-width:210px;
+  min-width:200px;
   max-width:260px;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
-  z-index:7;
+  z-index:7!important;
   background:#fff!important;
   box-shadow:10px 0 16px -16px rgba(15,23,42,.45),1px 0 0 var(--border-strong);
 }
-.finance-date-table thead th:first-child{
-  z-index:10;
+.finance-date-table thead th:first-child,
+.finance-date-table thead .finance-concept-col{
+  z-index:10!important;
   background:#eef3f8!important;
 }
-.finance-date-table tbody tr:nth-child(even):not(.finance-total-row) td:first-child{background:#f8fafc!important}
+.finance-date-table tbody tr:nth-child(even):not(.finance-total-row) td:first-child,
+.finance-date-table tbody tr:nth-child(even):not(.finance-total-row) .finance-concept-col{background:#f8fafc!important}
+.finance-date-table .finance-total-row .finance-concept-col{background:#f4f8fc!important}
 .finance-date-table th[data-month-col],
 .finance-date-table td[data-month-cell]{min-width:86px;white-space:nowrap}
 #constr-ep-table th:nth-child(3),
@@ -1983,7 +1987,7 @@ table:not(.gantt-table) .tfoot-dark td,
   function renderFormulaTableHeader(targetId, labels) {
     setHtml(targetId, `
       <tr>
-        <th class="finance-concept-col" style="min-width:200px;text-align:left">Concepto</th>
+        <th class="finance-concept-col" style="position:sticky;left:0;z-index:10;background:#eef3f8;min-width:200px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:1px 0 0 #e2e8f0">Concepto</th>
         <th style="min-width:300px;text-align:left">Formula editable</th>
         <th class="finance-total-col" style="width:110px;text-align:right">Total</th>
         ${labels.map((label) => `<th data-month-col>${escapeHtml(label)}</th>`).join('')}
@@ -2026,7 +2030,7 @@ table:not(.gantt-table) .tfoot-dark td,
       renderFormulaTableHeader('constr-ep-head', labels);
       setHtml('constr-ep-tbody', rows.map((row) => `
         <tr class="${row.bold ? 'finance-total-row' : ''}">
-          <td class="finance-concept-col" style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.bold ? '#166534' : '#334155'}">${escapeHtml(row.label)}</td>
+          <td class="finance-concept-col" style="position:sticky;left:0;z-index:5;background:${row.bold ? '#f0fdf4' : '#fff'};text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.bold ? '#166534' : '#334155'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;box-shadow:1px 0 0 #e2e8f0">${escapeHtml(row.label)}</td>
           <td>${formulaInput('ep', row.key, row.formula, true)}</td>
           <td class="finance-total-col" style="text-align:right;font-weight:${row.bold ? 800 : 600}">${formatAmount(total(row.values), row.mode, true)}</td>
           ${row.values.map((value) => `<td data-month-cell style="text-align:center;${row.bold ? 'font-weight:700' : ''}">${formatAmount(value, row.mode)}</td>`).join('')}
@@ -2098,7 +2102,7 @@ table:not(.gantt-table) .tfoot-dark td,
       renderFormulaTableHeader('constr-fin-planilla-head', labels);
       setHtml('constr-fin-planilla-tbody', rows.map((row) => `
         <tr class="${row.bold ? 'finance-total-row' : ''}">
-          <td class="finance-concept-col" style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.bold ? '#0f172a' : '#334155'}">${escapeHtml(row.label)}</td>
+          <td class="finance-concept-col" style="position:sticky;left:0;z-index:5;background:${row.bold ? '#f8fafc' : '#fff'};text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.bold ? '#0f172a' : '#334155'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;box-shadow:1px 0 0 #e2e8f0">${escapeHtml(row.label)}</td>
           <td>${formulaInput('gf', row.key, row.formula, true)}</td>
           <td class="finance-total-col" style="text-align:right;font-weight:${row.bold ? 800 : 600}">${formatAmount(total(row.values), row.mode, true)}</td>
           ${row.values.map((value) => `<td data-month-cell style="text-align:center;${row.bold ? 'font-weight:700' : ''}">${formatAmount(value, row.mode)}</td>`).join('')}
