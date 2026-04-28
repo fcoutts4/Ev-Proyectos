@@ -4,7 +4,11 @@
       "Read(//c/Program Files/**)",
       "Read(//c//**)",
       "Bash(node -c public/app.js)",
-      "Bash(npm start *)"
+      "Bash(npm start *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(node -e ' *)"
     ]
   }
 }

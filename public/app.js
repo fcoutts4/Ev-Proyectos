@@ -1150,8 +1150,12 @@ function normalizeGanttRows(rows) {
     const dependencia = row.dependencia || '';
     const dependenciaTipo = row.dependencia_tipo || 'fin';
     const dependenciaRow = dependencia ? byName.get(dependencia) : null;
+    // Tipo 'fin': la fila dependiente arranca el MES SIGUIENTE al término (fin + 1).
+    // Tipo 'inicio': arranca al inicio del mismo mes que la dep.
     const inicioBase = dependenciaRow
-      ? toNumber(dependenciaTipo === 'inicio' ? dependenciaRow.inicio : dependenciaRow.fin)
+      ? (dependenciaTipo === 'inicio'
+          ? toNumber(dependenciaRow.inicio)
+          : toNumber(dependenciaRow.fin) + 1)
       : toNumber(row.inicio);
     const inicio = dependenciaRow ? inicioBase + toNumber(row.desfase) : toNumber(row.inicio);
     const duracion = Math.max(0, toNumber(row.duracion));
@@ -2901,9 +2905,10 @@ function syncSalesDrivenMilestones() {
     || getTerrainMilestone()
     || rows.find((row) => /ADQUISICION DE TERRENO|COMPRA DE TERRENO|TERRENO/i.test(String(row.nombre || '').trim()));
   const estudiosMilestone = rows.find((row) => /^(Estudios|Estudios previos|Estudios y permisos)$/i.test(String(row.nombre || '').trim()));
-  // Promesas = Fin Estudios + 1 mes. Si no hay Estudios, depende de Compra terreno.
+  // Promesas = Mes siguiente a Estudios. Si no hay Estudios, depende de Compra terreno.
+  // El +1 ahora viene automático de normalizeGanttRows (tipo 'fin'), así que desfase=0.
   const promiseDependency = estudiosMilestone?.nombre || terrainMilestone?.nombre || 'Compra terreno';
-  const promiseDesfase = estudiosMilestone ? 1 : 0;
+  const promiseDesfase = 0;
 
   const promiseRow = ensureMilestone(/^(Promesas|Inicio promesas)$/i, (baseRow) => ({
     id: baseRow.id || '',
