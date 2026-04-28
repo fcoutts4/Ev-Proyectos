@@ -574,7 +574,7 @@ async function runAutosave(scope) {
   state.autosave.inFlight[scope] = true;
   state.autosave.queued[scope] = false;
   try {
-    await handler();
+    await handler({ silent: true });
   } catch (error) {
     console.error(error);
     setSyncStatus('error', 'SIN CONEXION', error.message);
@@ -1105,7 +1105,7 @@ function renderGanttEditor(rows = state.gantt) {
   setupGanttTimelineClip();
 
   setHtml('gantt-tbody', normalized.map((row, index) => {
-    const left = (toNumber(row.inicio) * monthWidth) + (monthWidth / 2);
+    const left = toNumber(row.inicio) * monthWidth;
     const width = Math.max(1, toNumber(row.duracion)) * monthWidth;
     const lock = getGanttLockConfig(row);
     return `
@@ -1172,7 +1172,7 @@ function renderGanttPreview() {
       </div>
     </div>
     ${normalized.map((hito) => {
-      const left = (toNumber(hito.inicio) * monthWidth) + (monthWidth / 2);
+      const left = toNumber(hito.inicio) * monthWidth;
       const width = Math.max(1, toNumber(hito.duracion)) * monthWidth;
       return `
       <div class="gantt-row">
@@ -4105,6 +4105,81 @@ function addPaymentPlanItem(type) {
   scheduleAutosave(partida.editable_source === 'terreno' ? 'terreno' : 'costos');
 }
 
+function applyQuickPaymentTemplate(templateType) {
+  const category = state.costos.find((item) => item.nombre === state.costosUi.activePaymentCategory);
+  const partida = category?.partidas?.[state.costosUi.activePaymentIndex];
+  if (!partida) return;
+
+  // Get first available Gantt reference for smart defaults
+  const firstGanttStart = state.gantt[0] ? `START:${state.gantt[0].id || state.gantt[0].nombre}` : 'MANUAL_0';
+  const firstGanttEnd = state.gantt[0] ? `END:${state.gantt[0].id || state.gantt[0].nombre}` : 'MANUAL_0';
+  const escrituracionRow = state.gantt.find((r) => /escrit/i.test(r.nombre));
+  const escrituracionEnd = escrituracionRow ? `END:${escrituracionRow.id || escrituracionRow.nombre}` : firstGanttEnd;
+
+  let plan = { tramos: [], hitos: [] };
+
+  switch (templateType) {
+    case 'monto_unico':
+      // 100% en un hito puntual (por defecto al inicio del proyecto)
+      plan.hitos = [{ pct: 100, ref: 'MANUAL_0', offset: 0 }];
+      break;
+
+    case 'cuotas_meses':
+      // 100% distribuido en cuotas durante N meses desde mes 0
+      plan.tramos = [{ pct: 100, inicio_ref: 'MANUAL_0', inicio_offset: 0, fin_ref: 'MANUAL_0', fin_offset: 12 }];
+      break;
+
+    case 'cuotas_fechas':
+      // 100% distribuido entre dos hitos del Gantt
+      plan.tramos = [{ pct: 100, inicio_ref: firstGanttStart, inicio_offset: 0, fin_ref: escrituracionEnd, fin_offset: 0 }];
+      break;
+
+    case 'pagos_puntuales':
+      // 3 pagos iguales en hitos específicos del Gantt
+      plan.hitos = [
+        { pct: 33, ref: 'MANUAL_0', offset: 0 },
+        { pct: 33, ref: firstGanttEnd, offset: 0 },
+        { pct: 34, ref: escrituracionEnd, offset: 0 },
+      ];
+      break;
+
+    case 'inicial_cuotas':
+      // Pago inicial (20%) + cuotas mensuales (80%)
+      plan.hitos = [{ pct: 20, ref: 'MANUAL_0', offset: 0 }];
+      plan.tramos = [{ pct: 80, inicio_ref: 'MANUAL_0', inicio_offset: 1, fin_ref: firstGanttEnd, fin_offset: 0 }];
+      break;
+
+    case 'final_cuotas':
+      // Cuotas mensuales (80%) + pago final al cierre (20%)
+      plan.tramos = [{ pct: 80, inicio_ref: 'MANUAL_0', inicio_offset: 0, fin_ref: escrituracionEnd, fin_offset: -1 }];
+      plan.hitos = [{ pct: 20, ref: escrituracionEnd, offset: 0 }];
+      break;
+
+    case 'hito_pct':
+      // Pagos contra hitos del Gantt (ejemplo: 3 hitos principales)
+      {
+        const ganttRows = state.gantt.slice(0, 3);
+        const pctPerHito = ganttRows.length ? Math.floor(100 / ganttRows.length) : 100;
+        const remainder = 100 - pctPerHito * (ganttRows.length - 1);
+        plan.hitos = ganttRows.map((row, idx) => ({
+          pct: idx === ganttRows.length - 1 ? remainder : pctPerHito,
+          ref: `END:${row.id || row.nombre}`,
+          offset: 0,
+        }));
+        if (!plan.hitos.length) plan.hitos = [{ pct: 100, ref: 'MANUAL_0', offset: 0 }];
+      }
+      break;
+
+    default:
+      return;
+  }
+
+  partida.plan_pago = serializeInteractivePaymentPlan(plan);
+  if (partida.editable_source === 'terreno') partida.auto_origen = false;
+  openPaymentPlanModal(state.costosUi.activePaymentCategory, state.costosUi.activePaymentIndex);
+  scheduleAutosave(partida.editable_source === 'terreno' ? 'terreno' : 'costos');
+}
+
 function removePaymentPlanItem(type, index) {
   const category = state.costos.find((item) => item.nombre === state.costosUi.activePaymentCategory);
   const partida = category?.partidas?.[state.costosUi.activePaymentIndex];
@@ -4825,7 +4900,7 @@ async function guardarVentas() {
   await refreshHealthStatus();
 }
 
-async function guardarCostos() {
+async function guardarCostos({ silent = false } = {}) {
   if (!state.proyectoId) return;
   const payload = readCostosEditor();
   setSyncStatus('saving', 'GUARDANDO', 'Persistiendo planilla de costos');
@@ -4834,8 +4909,18 @@ async function guardarCostos() {
     body: JSON.stringify(payload),
   });
   state.sync.lastSavedAt = new Date().toISOString();
-  await loadProject(state.proyectoId);
-  await refreshHealthStatus();
+  // If the user is actively editing the cost table, avoid a full re-render
+  // that would reset cursor position. Instead just refresh state silently.
+  const activeInPlanilla = document.activeElement && document.activeElement.closest('#planilla-table');
+  if (silent && activeInPlanilla) {
+    // Sync IDs in background without re-rendering
+    const freshCostos = await api(`/api/proyectos/${state.proyectoId}/costos`);
+    state.costos = freshCostos;
+    setSyncStatus('ok', 'GUARDADO', `Última sync ${new Date().toLocaleTimeString()}`);
+  } else {
+    await loadProject(state.proyectoId);
+    await refreshHealthStatus();
+  }
 }
 
 function eliminarUso(index) {
@@ -4914,6 +4999,7 @@ window.openPaymentPlanModal = openPaymentPlanModal;
 window.closePaymentPlanModal = closePaymentPlanModal;
 window.addPaymentPlanItem = addPaymentPlanItem;
 window.removePaymentPlanItem = removePaymentPlanItem;
+window.applyQuickPaymentTemplate = applyQuickPaymentTemplate;
 window.savePaymentPlanModal = savePaymentPlanModal;
 window.removeCostPartida = removeCostPartida;
 window.startCostDrag = startCostDrag;

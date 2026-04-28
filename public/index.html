@@ -945,8 +945,8 @@ table:not(.gantt-table) .tfoot-dark td,
         <div style="font-size:11px;color:#94a3b8">Esta categoría se configura en Terreno y se replica automáticamente en Costos del Proyecto.</div>
       </div>
       <div class="planilla-nav">
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('terreno-fin-planilla-scroll', -480)">← Meses</button>
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('terreno-fin-planilla-scroll', 480)">Meses →</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('terreno-fin-planilla-scroll', -480)">← Mes</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('terreno-fin-planilla-scroll', 480)">Mes →</button>
       </div>
     </div>
     <div id="terreno-fin-planilla-scroll" class="tbl-scroll finance-date-scroll">
@@ -1142,8 +1142,8 @@ table:not(.gantt-table) .tfoot-dark td,
         <div style="font-size:10px;color:#94a3b8;margin-top:2px">Ingresos distribuidos por período según cronograma de promesas y escrituración</div>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('flujo-ventas-scroll',-480)" style="font-size:11px">← Fechas</button>
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('flujo-ventas-scroll', 480)" style="font-size:11px">Fechas →</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('flujo-ventas-scroll',-480)" style="font-size:11px">← Mes</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('flujo-ventas-scroll', 480)" style="font-size:11px">Mes →</button>
       </div>
     </div>
     <div id="flujo-ventas-scroll" class="tbl-scroll" style="border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px">
@@ -1173,8 +1173,8 @@ table:not(.gantt-table) .tfoot-dark td,
   <div class="card gantt-editor-card">
     <div style="display:flex;justify-content:flex-end;align-items:center;margin-bottom:12px">
       <div class="planilla-nav">
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('gantt-editor-scroll', -480)">← Fechas</button>
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('gantt-editor-scroll', 480)">Fechas →</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('gantt-editor-scroll', -480)">← Mes</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('gantt-editor-scroll', 480)">Mes →</button>
       </div>
     </div>
     <div id="gantt-editor-scroll" class="tbl-scroll gantt-editor-shell">
@@ -1232,24 +1232,22 @@ table:not(.gantt-table) .tfoot-dark td,
             <td style="text-align:center"><input type="number" class="inp" id="constr-uf-bt" value="15" style="width:80px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">/m²</span></td>
             <td style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-bt">48.615 UF</td>
         </tr>
-          <tr>
-            <td style="font-weight:500;font-size:11px;color:#64748b">% Subterráneo / Sobre cota 0</td>
-            <td style="text-align:center"><input type="number" class="inp" id="constr-pct-bt" value="45" style="width:78px;text-align:center;font-size:11px;padding:4px 6px" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">%</span></td>
-            <td style="text-align:center;color:#64748b;font-weight:600;font-size:11px" id="constr-ratio-bt">45,0%</td>
-            <td style="text-align:center;font-size:10px;color:#94a3b8" id="constr-ratio-bt-m2">3.241 m² bajo tierra</td>
-        </tr>
       </tbody>
+        <!-- hidden binding inputs -->
+        <input type="hidden" id="constr-pct-bt" value="45">
+        <span id="constr-ratio-bt" style="display:none"></span>
+        <span id="constr-ratio-bt-m2" style="display:none"></span>
         <tfoot>
-          <tr style="background:#f8fafc">
-            <td style="font-weight:800;color:#15803d;font-size:11px;text-transform:uppercase">Total Neto Construcción</td>
-            <td style="text-align:center;font-weight:700" id="constr-sup-total">10.387 m²</td>
-            <td style="text-align:center;font-weight:700;color:#3b82f6" id="constr-uf-prom">23,26 /m²</td>
-            <td style="text-align:center;font-weight:800;color:#22c55e" id="constr-total-neto">241.557 UF</td>
+          <tr style="background:#f0fdf4;border-top:2px solid #86efac">
+            <td style="font-weight:700;color:#15803d;font-size:11px;text-transform:uppercase;padding:8px 10px">Neto</td>
+            <td style="text-align:center;font-weight:700;color:#374151;font-size:12px" id="constr-sup-total">—</td>
+            <td style="text-align:center;font-weight:700;color:#3b82f6;font-size:12px" id="constr-uf-prom">—</td>
+            <td style="text-align:center;font-weight:800;color:#15803d;font-size:13px" id="constr-total-neto">—</td>
         </tr>
-          <tr>
-            <td colspan="2" style="font-weight:800;color:#475569">Total Bruto (IVA Incluido)</td>
-            <td style="text-align:center;font-weight:700;color:#3b82f6" id="constr-uf-bruto">27,67 /m²</td>
-            <td style="text-align:center;font-weight:800;color:#22c55e" id="constr-total-bruto">287.453 UF</td>
+          <tr style="background:#f8fafc">
+            <td style="font-weight:600;color:#64748b;font-size:11px;padding:6px 10px">Bruto (IVA inc.)</td>
+            <td colspan="2" style="text-align:center;font-weight:600;color:#3b82f6;font-size:11px" id="constr-uf-bruto">—</td>
+            <td style="text-align:center;font-weight:700;color:#374151;font-size:12px" id="constr-total-bruto">—</td>
         </tr>
       </tfoot>
     </table>
@@ -1354,8 +1352,8 @@ table:not(.gantt-table) .tfoot-dark td,
         <div style="font-size:11px;color:#94a3b8">Subtotal_neto = EP + Anticipo + Retenciones. IVA efectivo = IVA bruto − CEEC. El TOTAL_A_PAGO alimenta los GIROS de la tabla siguiente.</div>
       </div>
       <div class="planilla-nav">
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-ep-scroll', -480)">← Meses</button>
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-ep-scroll', 480)">Meses →</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-ep-scroll', -480)">← Mes</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-ep-scroll', 480)">Mes →</button>
       </div>
     </div>
     <div id="constr-ep-scroll" class="tbl-scroll finance-date-scroll">
@@ -1375,8 +1373,8 @@ table:not(.gantt-table) .tfoot-dark td,
         <div style="font-size:11px;color:#94a3b8">GIROS conectado dinámicamente al TOTAL_A_PAGO de Estados de Pago. El acumulado mantiene los pagos de línea en el cálculo interno.</div>
       </div>
       <div class="planilla-nav">
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-fin-planilla-scroll', -480)">← Meses</button>
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-fin-planilla-scroll', 480)">Meses →</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-fin-planilla-scroll', -480)">← Mes</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-fin-planilla-scroll', 480)">Mes →</button>
       </div>
     </div>
     <div class="gf-param-panel">
@@ -1468,8 +1466,8 @@ table:not(.gantt-table) .tfoot-dark td,
     </div>
       <div style="display:flex;gap:8px;align-items:center">
         <div class="planilla-nav">
-          <button class="btn-outline" type="button" onclick="scrollCostPlanilla(-480)">← Meses</button>
-          <button class="btn-outline" type="button" onclick="scrollCostPlanilla(480)">Meses →</button>
+          <button class="btn-outline" type="button" onclick="scrollCostPlanilla(-480)">← Mes</button>
+          <button class="btn-outline" type="button" onclick="scrollCostPlanilla(480)">Mes →</button>
         </div>
         <button class="btn-primary" onclick="guardarCostos()"> Guardar</button>
     </div>
@@ -1745,11 +1743,16 @@ table:not(.gantt-table) .tfoot-dark td,
         </div>
 
         <div class="payment-section" style="margin-bottom:0">
-          <div class="sec-title"> AYUDA RÁPIDA</div>
-          <div style="font-size:12px;color:#64748b;line-height:1.6">
-            <div>Usa tramos para repartir pagos entre meses o hitos.</div>
-            <div>Usa hitos para cargar pagos puntuales en un momento específico.</div>
-            <div>La asignación ideal es 100% antes de sincronizar la partida.</div>
+          <div class="sec-title" style="margin-bottom:10px"> PLANTILLAS RÁPIDAS</div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:10px">Selecciona una plantilla para precargar la estructura (reemplaza el plan actual).</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button class="btn-outline" type="button" style="text-align:left;font-size:11px;padding:7px 10px" onclick="applyQuickPaymentTemplate('monto_unico')">💰 Monto único</button>
+            <button class="btn-outline" type="button" style="text-align:left;font-size:11px;padding:7px 10px" onclick="applyQuickPaymentTemplate('cuotas_meses')">📅 Cuotas fijas por meses</button>
+            <button class="btn-outline" type="button" style="text-align:left;font-size:11px;padding:7px 10px" onclick="applyQuickPaymentTemplate('cuotas_fechas')">📆 Cuotas entre dos hitos</button>
+            <button class="btn-outline" type="button" style="text-align:left;font-size:11px;padding:7px 10px" onclick="applyQuickPaymentTemplate('pagos_puntuales')">📌 Pagos puntuales (3 hitos)</button>
+            <button class="btn-outline" type="button" style="text-align:left;font-size:11px;padding:7px 10px" onclick="applyQuickPaymentTemplate('inicial_cuotas')">⬆️ Pago inicial + cuotas</button>
+            <button class="btn-outline" type="button" style="text-align:left;font-size:11px;padding:7px 10px" onclick="applyQuickPaymentTemplate('final_cuotas')">⬇️ Cuotas + pago final</button>
+            <button class="btn-outline" type="button" style="text-align:left;font-size:11px;padding:7px 10px" onclick="applyQuickPaymentTemplate('hito_pct')">🏁 Contra hitos del Gantt</button>
           </div>
         </div>
 
