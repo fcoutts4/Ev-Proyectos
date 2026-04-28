@@ -966,7 +966,7 @@ function getGanttDependencyOptions(currentName) {
 const GANTT_CANONICAL_NAME_RULES = [
   { canonical: 'Compra terreno', pattern: /^(Compra terreno|Adquisicion de Terreno|Adquisición de Terreno|Compra de Terreno)$/i },
   { canonical: 'Construcción', pattern: /^Construcci[óo]n$/i },
-  { canonical: 'Aprobaci\u00f3n del Proyecto de Edificaci\u00f3n', pattern: /^(Aprobaci(?:o|\u00f3)n(?: del)? Proyecto(?: de)? Edificaci(?:o|\u00f3)n|Aprobaci(?:o|\u00f3)n\s*P\.?\s*E\.?|Aprobaci(?:o|\u00f3)n\s*PE|Permiso(?: de)? Edificaci(?:o|\u00f3)n)$/i },
+  { canonical: 'Aprobaci\u00f3n del Proyecto de Edificaci\u00f3n', pattern: /^(Aprobaci(?:o|\u00f3)n(?: del)? Proyecto(?: de)? Edificaci(?:o|\u00f3)n|Aprobaci(?:o|\u00f3)n(?:\s+del)?\s+Pro(?:yecto)?(?:\s+de)?(?:\s+Edificaci(?:o|\u00f3)n)?|Aprobaci(?:o|\u00f3)n\s*P\.?\s*E\.?|Aprobaci(?:o|\u00f3)n\s*PE|Permiso(?: de)? Edificaci(?:o|\u00f3)n)$/i },
   { canonical: 'Promesas', pattern: /^(Promesas|Inicio promesas)$/i },
   { canonical: 'Postventa', pattern: /^Postventa$/i },
   { canonical: 'Recepción municipal', pattern: /^Recepci[óo]n municipal$/i },
@@ -984,6 +984,8 @@ function canonicalizeGanttName(name) {
   const rule = GANTT_CANONICAL_NAME_RULES.find((item) => item.pattern.test(raw));
   return rule ? rule.canonical : raw;
 }
+
+const UNIQUE_GANTT_MILESTONES = new Set(GANTT_CANONICAL_NAME_RULES.map((item) => item.canonical));
 
 function normalizeGanttColor(color) {
   const raw = String(color || '').trim().toLowerCase();
@@ -1065,11 +1067,17 @@ function onGanttColorButtonClick(button, event) {
 }
 
 function canonicalizeGanttRows(rows = []) {
+  const seen = new Set();
   return rows.map((row) => ({
     ...row,
     nombre: canonicalizeGanttName(row.nombre),
     dependencia: row.dependencia ? canonicalizeGanttName(row.dependencia) : row.dependencia,
-  }));
+  })).filter((row) => {
+    if (!UNIQUE_GANTT_MILESTONES.has(row.nombre)) return true;
+    if (seen.has(row.nombre)) return false;
+    seen.add(row.nombre);
+    return true;
+  });
 }
 
 function getGanttMonthWidth() {
@@ -2818,7 +2826,7 @@ function getEstudiosMilestone() {
 }
 
 function isBuildingApprovalMilestoneName(name) {
-  return /^(Aprobaci(?:o|\u00f3)n(?: del)? Proyecto(?: de)? Edificaci(?:o|\u00f3)n|Aprobaci(?:o|\u00f3)n\s*P\.?\s*E\.?|Aprobaci(?:o|\u00f3)n\s*PE|Permiso(?: de)? Edificaci(?:o|\u00f3)n)$/i.test(String(name || '').trim());
+  return canonicalizeGanttName(name) === 'Aprobaci\u00f3n del Proyecto de Edificaci\u00f3n';
 }
 
 function getBuildingApprovalMilestone(rows = state.gantt) {
