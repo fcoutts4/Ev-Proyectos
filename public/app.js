@@ -1444,6 +1444,9 @@ function ensureVentasState() {
       pie_cuotas_pct: toNumber(existing.pie_cuotas_pct),
       hipotecario_pct: toNumber(existing.hipotecario_pct),
       pie_cuoton_pct: toNumber(existing.pie_cuoton_pct),
+      forma_pago_promesa: ['unico', 'cuotas', 'cascada'].includes(String(existing.forma_pago_promesa || '').trim())
+        ? String(existing.forma_pago_promesa).trim()
+        : 'unico',
     };
   });
 
@@ -1571,6 +1574,9 @@ function getGlobalPaymentSettings() {
     pie_promesa_pct: toNumber(source.pie_promesa_pct),
     pie_cuotas_pct: toNumber(source.pie_cuotas_pct),
     pie_cuoton_pct: Math.max(1, toNumber(source.pie_cuoton_pct) || 1),
+    forma_pago_promesa: ['unico', 'cuotas', 'cascada'].includes(String(source.forma_pago_promesa || '').trim())
+      ? String(source.forma_pago_promesa).trim()
+      : 'unico',
   };
 }
 
@@ -1687,21 +1693,23 @@ function renderVentasPaymentForms() {
   const settings = getGlobalPaymentSettings();
   const totals = getTotalSalesMetrics();
   const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct));
-  const cuotasSobrePiePct = Math.min(100, Math.max(0, settings.pie_cuotas_pct));
   const pieUnidad = totals.precioPromedio * piePct / 100;
-  const montoPromesa = pieUnidad * Math.max(0, 100 - cuotasSobrePiePct) / 100;
-  const montoCuotas = pieUnidad * cuotasSobrePiePct / 100;
-  const mesesLabel = settings.pie_cuoton_pct <= 1
-    ? '<span style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;border-radius:99px;padding:2px 8px;font-size:10px;font-weight:700">Sin cuotas</span>'
-    : `<strong>${fmtNumber(settings.pie_cuoton_pct)}</strong> meses`;
+  const modeLabels = {
+    unico: 'Pago unico',
+    cuotas: 'Pago en cuotas',
+    cascada: 'Pago cascada',
+  };
 
   setHtml('formas-pago-tbody', `
     <tr data-ventas-payment-global>
       <td><input class="inp" type="number" step="0.01" data-field="pie_promesa_pct" value="${settings.pie_promesa_pct}" onchange="onVentasInputChange()"/></td>
-      <td style="text-align:center">${fmtTableAmount(montoPromesa, { kind: 'income' })}</td>
-      <td><input class="inp" type="number" step="0.01" data-field="pie_cuotas_pct" value="${settings.pie_cuotas_pct}" onchange="onVentasInputChange()"/></td>
+      <td>
+        <select class="inp" data-field="forma_pago_promesa" onchange="onVentasInputChange()">
+          ${Object.entries(modeLabels).map(([value, label]) => `<option value="${value}" ${settings.forma_pago_promesa === value ? 'selected' : ''}>${label}</option>`).join('')}
+        </select>
+      </td>
       <td style="text-align:center"><input class="inp" type="number" min="1" step="1" data-field="pie_cuoton_pct" value="${settings.pie_cuoton_pct}" onchange="onVentasInputChange()" style="width:70px;text-align:center"/></td>
-      <td style="text-align:center">${fmtTableAmount(montoCuotas, { kind: 'income' })}<br/><span style="font-size:10px;color:#94a3b8">${mesesLabel}</span></td>
+      <td style="text-align:center">${fmtTableAmount(pieUnidad, { kind: 'income' })}</td>
       <td style="text-align:center;color:#16a34a">${fmtTableAmount(totals.precioPromedio, { kind: 'income' })}</td>
     </tr>
   `);
@@ -1998,8 +2006,6 @@ function renderVentasCashflow() {
   const totals = getTotalSalesMetrics();
   const settings = getGlobalPaymentSettings();
   const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct));
-  const cuotasSobrePiePct = Math.min(100, Math.max(0, settings.pie_cuotas_pct));
-  const promesaSobrePiePct = Math.max(0, 100 - cuotasSobrePiePct);
   const escrituraPct = Math.max(0, 100 - piePct);
   const cuotaMonths = Math.max(1, Math.round(toNumber(settings.pie_cuoton_pct) || 1));
   const promesaRow = getCronogramaByType('PREVENTA')[0];
@@ -2012,14 +2018,11 @@ function renderVentasCashflow() {
   setHtml('flujo-ventas-header', months.map((month) => `<th>${escapeHtml(formatVentasCashflowMonth(month))}</th>`).join(''));
 
   const pieUnidad = totals.precioPromedio * piePct / 100;
-  const montoPromesaUnidad = pieUnidad * promesaSobrePiePct / 100;
-  const montoCuotasUnidad = pieUnidad * cuotasSobrePiePct / 100;
   const montoEscrituraUnidad = totals.precioPromedio * escrituraPct / 100;
   const { promesas: promesasUnidadesArr, escrituras: escrituracionUnidadesArr } = getPromesasEscrituracionUnidades(months);
   const promesasUnidades = months.map(() => 0);
   const escrituracionUnidades = months.map(() => 0);
   const promesasUf = months.map(() => 0);
-  const cuotasUf = months.map(() => 0);
   const escrituracionUf = months.map(() => 0);
   const acumuladoPromesasUnidades = [];
   const acumuladoEscriturasUnidades = [];
@@ -2033,27 +2036,42 @@ function renderVentasCashflow() {
   months.forEach((month, index) => {
     const unidadesPromesaMes = promesasUnidadesArr[index];
     const unidadesEscrituraMes = escrituracionUnidadesArr[index];
-    const ufPromesaMes = unidadesPromesaMes * montoPromesaUnidad;
+    const ufPromesaTotalMes = unidadesPromesaMes * pieUnidad;
     const ufEscrituraMes = unidadesEscrituraMes * montoEscrituraUnidad;
-    const cuotaMensual = cuotaMonths ? (unidadesPromesaMes * montoCuotasUnidad) / cuotaMonths : 0;
+    const mode = settings.forma_pago_promesa;
 
-    for (let offset = 0; offset < cuotaMonths; offset += 1) {
-      const targetIndex = monthIndex.get(month + offset);
-      if (targetIndex !== undefined) cuotasUf[targetIndex] += cuotaMensual;
+    if (mode === 'unico') {
+      promesasUf[index] += ufPromesaTotalMes;
+    } else if (mode === 'cascada') {
+      const escrituraStart = escrituraComputed ? Math.max(month, escrituraComputed.inicio) : month + cuotaMonths - 1;
+      const span = Math.max(1, escrituraStart - month);
+      const cuotaCascada = ufPromesaTotalMes / span;
+      for (let offset = 0; offset < span; offset += 1) {
+        const targetIndex = monthIndex.get(month + offset);
+        if (targetIndex !== undefined) promesasUf[targetIndex] += cuotaCascada;
+      }
+    } else {
+      const cuotaMensual = cuotaMonths ? ufPromesaTotalMes / cuotaMonths : ufPromesaTotalMes;
+      for (let offset = 0; offset < cuotaMonths; offset += 1) {
+        const targetIndex = monthIndex.get(month + offset);
+        if (targetIndex !== undefined) promesasUf[targetIndex] += cuotaMensual;
+      }
     }
 
-    promesasAcum += ufPromesaMes;
     escriturasAcum += ufEscrituraMes;
     promesasUnidadesAcum += unidadesPromesaMes;
     escriturasUnidadesAcum += unidadesEscrituraMes;
     promesasUnidades[index] = unidadesPromesaMes;
     escrituracionUnidades[index] = unidadesEscrituraMes;
-    promesasUf[index] = ufPromesaMes;
     escrituracionUf[index] = ufEscrituraMes;
     acumuladoPromesasUnidades.push(promesasUnidadesAcum);
     acumuladoEscriturasUnidades.push(escriturasUnidadesAcum);
-    acumuladoPromesas.push(promesasAcum);
     acumuladoEscrituras.push(escriturasAcum);
+  });
+
+  months.forEach((_, index) => {
+    promesasAcum += promesasUf[index];
+    acumuladoPromesas[index] = promesasAcum;
   });
 
   const rows = [
@@ -2062,7 +2080,6 @@ function renderVentasCashflow() {
     { label: 'Acum. promesas unidades', values: acumuladoPromesasUnidades, kind: 'units' },
     { label: 'Acum. escrituras unidades', values: acumuladoEscriturasUnidades, kind: 'units' },
     { label: 'Promesas UF', values: promesasUf, kind: 'income' },
-    { label: 'Cuotas UF', values: cuotasUf, kind: 'income' },
     { label: 'Escrituracion UF', values: escrituracionUf, kind: 'income' },
     { label: 'Acum. promesas UF', values: acumuladoPromesas, kind: 'income' },
     { label: 'Acum. escrituras UF', values: acumuladoEscrituras, kind: 'income' },
@@ -2074,7 +2091,7 @@ function renderVentasCashflow() {
     </tr>
   `).join(''));
 
-  const ingresos = months.map((_, index) => promesasUf[index] + cuotasUf[index] + escrituracionUf[index]);
+  const ingresos = months.map((_, index) => promesasUf[index] + escrituracionUf[index]);
   renderFinanceFixedColumn('flujo-ventas', rows, { footerLabel: 'Total ingresos UF' });
   setHtml('flujo-ventas-tfoot', ingresos.map((value) => `<td>${fmtTableAmount(value, { kind: 'income', total: true })}</td>`).join(''));
 }
@@ -3699,27 +3716,33 @@ function getProjectMonthlyIncome(monthCount) {
   const totals = getTotalSalesMetrics();
   const settings = getGlobalPaymentSettings();
   const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct));
-  const cuotasSobrePiePct = Math.min(100, Math.max(0, settings.pie_cuotas_pct));
-  const promesaSobrePiePct = Math.max(0, 100 - cuotasSobrePiePct);
   const escrituraPct = Math.max(0, 100 - piePct);
   const cuotaMonths = Math.max(1, Math.round(toNumber(settings.pie_cuoton_pct) || 1));
-  const promesaComputed = getCronogramaByType('PREVENTA')[0] ? getCronogramaComputed(getCronogramaByType('PREVENTA')[0]) : null;
   const escrituraComputed = getCronogramaByType('ESCRITURACION')[0] ? getCronogramaComputed(getCronogramaByType('ESCRITURACION')[0]) : null;
   const pieUnidad = totals.precioPromedio * piePct / 100;
-  const promesaUnidad = pieUnidad * promesaSobrePiePct / 100;
-  const cuotasUnidad = pieUnidad * cuotasSobrePiePct / 100;
   const escrituraUnidad = totals.precioPromedio * escrituraPct / 100;
   const { promesas: promesasArr, escrituras: escriturasArr } = getPromesasEscrituracionUnidades(monthCount);
 
   Array.from({ length: monthCount }, (_, month) => {
     const unidadesPromesa = promesasArr[month];
     const unidadesEscritura = escriturasArr[month];
-    income[month] += unidadesPromesa * promesaUnidad;
-    income[month] += unidadesEscritura * escrituraUnidad;
-    const cuotaMensual = cuotaMonths ? (unidadesPromesa * cuotasUnidad) / cuotaMonths : 0;
-    for (let offset = 0; offset < cuotaMonths; offset += 1) {
-      if (month + offset < income.length) income[month + offset] += cuotaMensual;
+    const promesaTotal = unidadesPromesa * pieUnidad;
+    if (settings.forma_pago_promesa === 'unico') {
+      income[month] += promesaTotal;
+    } else if (settings.forma_pago_promesa === 'cascada') {
+      const escrituraStart = escrituraComputed ? Math.max(month, escrituraComputed.inicio) : month + cuotaMonths - 1;
+      const span = Math.max(1, escrituraStart - month);
+      const cuotaCascada = promesaTotal / span;
+      for (let offset = 0; offset < span; offset += 1) {
+        if (month + offset < income.length) income[month + offset] += cuotaCascada;
+      }
+    } else {
+      const cuotaMensual = cuotaMonths ? promesaTotal / cuotaMonths : promesaTotal;
+      for (let offset = 0; offset < cuotaMonths; offset += 1) {
+        if (month + offset < income.length) income[month + offset] += cuotaMensual;
+      }
     }
+    income[month] += unidadesEscritura * escrituraUnidad;
   });
   return income;
 }
@@ -3875,7 +3898,7 @@ function getCostFormulaCatalog() {
     { label: 'Total terreno', token: '_total_terreno', value: context.total_terreno, unit: 'UF' },
     { label: 'Ventas brutas', token: '_ventas_brutas', value: context.ventas_brutas, unit: 'UF' },
     // Ingresos por tipo de venta (para calcular comisiones, gastos comerciales, etc.)
-    { label: 'Ingresos promesas total', token: '_ingresos_promesas_total', value: (() => { const totals = getTotalSalesMetrics(); const settings = getGlobalPaymentSettings(); const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct)); const cuotasSobrePiePct = Math.min(100, Math.max(0, settings.pie_cuotas_pct)); const promesaSobrePiePct = Math.max(0, 100 - cuotasSobrePiePct); const unidades = state.cabida.reduce((s, r) => s + toNumber(r.cantidad), 0); const promesaUnidad = totals.precioPromedio * piePct / 100 * promesaSobrePiePct / 100; return unidades * promesaUnidad; })(), unit: 'UF' },
+    { label: 'Ingresos promesas total', token: '_ingresos_promesas_total', value: (() => { const totals = getTotalSalesMetrics(); const settings = getGlobalPaymentSettings(); const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct)); const unidades = state.cabida.reduce((s, r) => s + toNumber(r.cantidad), 0); const promesaUnidad = totals.precioPromedio * piePct / 100; return unidades * promesaUnidad; })(), unit: 'UF' },
     { label: 'Ingresos escrituracion total', token: '_ingresos_escrituracion_total', value: (() => { const totals = getTotalSalesMetrics(); const settings = getGlobalPaymentSettings(); const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct)); const escrituraPct = Math.max(0, 100 - piePct); const unidades = state.cabida.reduce((s, r) => s + toNumber(r.cantidad), 0); return unidades * totals.precioPromedio * escrituraPct / 100; })(), unit: 'UF' },
     { label: 'Pct pie promesa', token: '_pct_pie_promesa', value: toNumber(getGlobalPaymentSettings().pie_promesa_pct), unit: '%' },
     { label: 'Pct escrituracion', token: '_pct_escrituracion', value: Math.max(0, 100 - toNumber(getGlobalPaymentSettings().pie_promesa_pct)), unit: '%' },
@@ -4834,7 +4857,9 @@ function readVentasConfigEditor() {
   const globalPayment = {};
   if (paymentInputs) {
     paymentInputs.querySelectorAll('[data-field]').forEach((input) => {
-      globalPayment[input.dataset.field] = toNumber(input.value);
+      globalPayment[input.dataset.field] = input.dataset.field === 'forma_pago_promesa'
+        ? String(input.value || 'unico')
+        : toNumber(input.value);
     });
   }
   const accessorySales = {
@@ -4851,9 +4876,10 @@ function readVentasConfigEditor() {
     target.precio_estacionamiento = accessorySales.precio_estacionamiento;
     target.precio_bodega = accessorySales.precio_bodega;
     if (Object.keys(globalPayment).length) {
-      target.pie_promesa_pct = globalPayment.pie_promesa_pct;
-      target.pie_cuotas_pct = globalPayment.pie_cuotas_pct;
-      target.pie_cuoton_pct = globalPayment.pie_cuoton_pct;
+      if (globalPayment.pie_promesa_pct !== undefined) target.pie_promesa_pct = globalPayment.pie_promesa_pct;
+      if (globalPayment.pie_cuotas_pct !== undefined) target.pie_cuotas_pct = globalPayment.pie_cuotas_pct;
+      if (globalPayment.pie_cuoton_pct !== undefined) target.pie_cuoton_pct = globalPayment.pie_cuoton_pct;
+      target.forma_pago_promesa = globalPayment.forma_pago_promesa || 'unico';
     }
   });
   return Array.from(map.values());

@@ -119,7 +119,8 @@ async function initDb() {
         pie_promesa_pct DOUBLE PRECISION DEFAULT 0,
         pie_cuotas_pct DOUBLE PRECISION DEFAULT 0,
         hipotecario_pct DOUBLE PRECISION DEFAULT 0,
-        pie_cuoton_pct DOUBLE PRECISION DEFAULT 0
+        pie_cuoton_pct DOUBLE PRECISION DEFAULT 0,
+        forma_pago_promesa TEXT DEFAULT 'unico'
       );
 
       CREATE TABLE IF NOT EXISTS ventas_cronograma (
@@ -238,6 +239,7 @@ async function initDb() {
     await query("ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS formula_overrides JSONB DEFAULT '{}'::jsonb");
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS updated_by TEXT');
     await query("ALTER TABLE gantt_hitos ADD COLUMN IF NOT EXISTS dependencia_tipo TEXT DEFAULT 'fin'");
+    await query("ALTER TABLE ventas_config ADD COLUMN IF NOT EXISTS forma_pago_promesa TEXT DEFAULT 'unico'");
     await query('ALTER TABLE ventas_cronograma ADD COLUMN IF NOT EXISTS velocidad DOUBLE PRECISION DEFAULT 0');
     await query('ALTER TABLE construccion ADD COLUMN IF NOT EXISTS pct_bajo_tierra_sobre_cota_0 DOUBLE PRECISION DEFAULT 0');
     await query('ALTER TABLE construccion ADD COLUMN IF NOT EXISTS pct_inicio_construccion DOUBLE PRECISION DEFAULT 25');
@@ -534,8 +536,9 @@ const ventas = {
         await client.query(
           `INSERT INTO ventas_config (
             id, proyecto_id, uso, precio_uf_m2, precio_estacionamiento, precio_bodega,
-            reserva_uf, pie_promesa_pct, pie_cuotas_pct, hipotecario_pct, pie_cuoton_pct
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+            reserva_uf, pie_promesa_pct, pie_cuotas_pct, hipotecario_pct, pie_cuoton_pct,
+            forma_pago_promesa
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
           [
             uuidv4(),
             pid,
@@ -548,6 +551,7 @@ const ventas = {
             row.pie_cuotas_pct || 0,
             row.hipotecario_pct || 0,
             row.pie_cuoton_pct || 0,
+            row.forma_pago_promesa || 'unico',
           ]
         );
       }
@@ -759,7 +763,7 @@ async function seedDemoProject() {
   ]);
 
   await ventas.saveConfig(pid, [
-    { uso: 'DEPTOS', precio_uf_m2: 105, precio_estacionamiento: 350, precio_bodega: 100, reserva_uf: 50, pie_promesa_pct: 5, pie_cuotas_pct: 10, hipotecario_pct: 85, pie_cuoton_pct: 0 },
+    { uso: 'DEPTOS', precio_uf_m2: 105, precio_estacionamiento: 350, precio_bodega: 100, reserva_uf: 50, pie_promesa_pct: 5, pie_cuotas_pct: 0, hipotecario_pct: 85, pie_cuoton_pct: 1, forma_pago_promesa: 'unico' },
   ]);
 
   await ventas.saveCronograma(pid, [
