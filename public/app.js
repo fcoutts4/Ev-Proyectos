@@ -33,6 +33,7 @@ const state = {
     timers: {},
     inFlight: {},
     queued: {},
+    dirty: {},
   },
 };
 
@@ -82,12 +83,14 @@ function setHtml(id, value) {
 }
 
 const AUTOSAVE_SCOPE_LABELS = {
+  proyecto: 'proyecto',
   cabida: 'cabida',
   terreno: 'terreno',
   construccion: 'construccion',
   gantt: 'carta gantt',
   ventas: 'ventas',
   costos: 'costos del proyecto',
+  capital: 'capital',
 };
 
 function getStoredUserName() {
@@ -149,9 +152,19 @@ function toNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function normalizeFormulaOverrides(value = {}) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  return {
+    flow: source.flow && typeof source.flow === 'object' && !Array.isArray(source.flow) ? { ...source.flow } : {},
+    ep: source.ep && typeof source.ep === 'object' && !Array.isArray(source.ep) ? { ...source.ep } : {},
+    gf: source.gf && typeof source.gf === 'object' && !Array.isArray(source.gf) ? { ...source.gf } : {},
+  };
+}
+
 function normalizeProject(project = {}) {
   const terrenoM2Bruto = project.terreno_m2_bruto ?? project.terreno_m2_bruto_afecto ?? 0;
-  const terrenoM2Afectacion = project.terreno_m2_afectacion ?? 0;
+  const terrenoM2Afectacion = project.terreno_m2_afectacion
+    ?? Math.max(0, toNumber(terrenoM2Bruto) - toNumber(project.terreno_m2_neto ?? terrenoM2Bruto));
   const terrenoM2Neto = project.terreno_m2_neto ?? Math.max(0, toNumber(terrenoM2Bruto) - toNumber(terrenoM2Afectacion));
   const terrenoPrecioTotal = project.terreno_precio_total ?? 0;
   const terrenoPrecioUfM2 = project.terreno_precio_uf_m2
@@ -179,7 +192,24 @@ function normalizeProject(project = {}) {
     pct_timbres: project.pct_timbres ?? 0.8,
     pct_ceec: project.pct_ceec ?? 65,
     pct_impuesto_renta: project.pct_impuesto_renta ?? 27,
+    formula_overrides: normalizeFormulaOverrides(project.formula_overrides),
   };
+}
+
+function getFormulaOverridesForSave() {
+  const getter = window.getPersistedFormulaOverrides;
+  return normalizeFormulaOverrides(
+    typeof getter === 'function'
+      ? getter()
+      : (window.__bricsaFormulaPatch?.formulaOverrides || state.proyecto?.formula_overrides || {})
+  );
+}
+
+function getProjectSavePayload() {
+  return normalizeProject({
+    ...(state.proyecto || {}),
+    formula_overrides: getFormulaOverridesForSave(),
+  });
 }
 
 function getGlobalFinancialParams() {
@@ -427,6 +457,17 @@ function normalizeFinanciamiento(data = {}) {
   };
 }
 
+function normalizeCapital(data = {}) {
+  return {
+    ...data,
+    caja_minima_buffer: data.caja_minima_buffer ?? 2000,
+    proyeccion_meses: data.proyeccion_meses ?? 6,
+    llamado_minimo: data.llamado_minimo ?? 5000,
+    caja_fuerte_retencion: data.caja_fuerte_retencion ?? 10000,
+    devolucion_minima: data.devolucion_minima ?? 3000,
+  };
+}
+
 function getConstructionDuration() {
   const hito = getConstructionMilestone();
   return hito ? Math.max(1, toNumber(hito.duracion)) : Math.max(1, toNumber(state.construccion?.plazo_meses || 1));
@@ -507,7 +548,7 @@ function setSyncStatus(status, message, detail) {
 }
 
 function getSyncDetailText() {
-  const reference = state.proyecto?.updated_at || state.sync.lastSavedAt || state.health?.timestamp;
+  const reference = state.sync.lastSavedAt || state.proyecto?.updated_at || state.health?.timestamp;
   return reference
     ? `Ultima sincronizacion: ${fmtDateTime(reference)}`
     : 'Ultima sincronizacion: sin registro';
@@ -544,7 +585,9 @@ function renderSyncStatus() {
 function scheduleAutosave(scope, delay = 900) {
   if (!state.proyectoId || !scope) return;
   window.clearTimeout(state.autosave.timers[scope]);
+  state.autosave.timers[scope] = null;
   state.autosave.queued[scope] = true;
+  state.autosave.dirty[scope] = true;
   setSyncStatus('saving', 'GUARDANDO', `Cambios pendientes en ${AUTOSAVE_SCOPE_LABELS[scope] || scope}`);
   state.autosave.timers[scope] = window.setTimeout(() => {
     runAutosave(scope);
@@ -554,6 +597,7 @@ function scheduleAutosave(scope, delay = 900) {
 async function runAutosave(scope) {
   if (!state.proyectoId || !scope) return;
   window.clearTimeout(state.autosave.timers[scope]);
+  state.autosave.timers[scope] = null;
 
   if (state.autosave.inFlight[scope]) {
     state.autosave.queued[scope] = true;
@@ -561,12 +605,14 @@ async function runAutosave(scope) {
   }
 
   const handlers = {
+    proyecto: guardarFormulaOverrides,
     cabida: guardarCabida,
     terreno: guardarTerreno,
     construccion: guardarConstruccion,
     gantt: guardarGantt,
     ventas: guardarVentas,
     costos: guardarCostos,
+    capital: guardarCapital,
   };
   const handler = handlers[scope];
   if (!handler) return;
@@ -575,6 +621,7 @@ async function runAutosave(scope) {
   state.autosave.queued[scope] = false;
   try {
     await handler({ silent: true });
+    state.autosave.dirty[scope] = false;
   } catch (error) {
     console.error(error);
     setSyncStatus('error', 'SIN CONEXION', error.message);
@@ -585,6 +632,38 @@ async function runAutosave(scope) {
     }
   }
 }
+window.scheduleAutosave = scheduleAutosave;
+
+function getPendingAutosaveScopes() {
+  return Object.keys(AUTOSAVE_SCOPE_LABELS).filter((scope) => (
+    state.autosave.queued[scope]
+    || state.autosave.dirty[scope]
+    || state.autosave.inFlight[scope]
+    || state.autosave.timers[scope]
+  ));
+}
+
+async function flushPendingAutosaves() {
+  const scopes = getPendingAutosaveScopes();
+  scopes.forEach((scope) => {
+    window.clearTimeout(state.autosave.timers[scope]);
+    state.autosave.timers[scope] = null;
+  });
+  for (const scope of scopes) {
+    let guard = 0;
+    while (state.autosave.inFlight[scope] && guard < 50) {
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+      guard += 1;
+    }
+    if (state.autosave.queued[scope] || state.autosave.dirty[scope]) await runAutosave(scope);
+  }
+}
+
+window.addEventListener('beforeunload', (event) => {
+  if (!getPendingAutosaveScopes().length) return;
+  event.preventDefault();
+  event.returnValue = '';
+});
 
 async function api(path, options = {}) {
   const headers = {
@@ -630,8 +709,9 @@ function ensureProjectControls() {
 
   controlsSlot.appendChild(controls);
 
-  $('project-selector').addEventListener('change', (event) => {
-    loadProject(event.target.value);
+  $('project-selector').addEventListener('change', async (event) => {
+    await flushPendingAutosaves();
+    await loadProject(event.target.value);
   });
 }
 
@@ -2274,7 +2354,9 @@ function onConfigParamChange() {
   // Propagar tasas a financiamiento legacy
   state.financiamiento.credito_terreno_tasa = toNumber(state.proyecto.tasa_interes_terreno);
   state.financiamiento.linea_construccion_tasa = toNumber(state.proyecto.tasa_interes_construccion);
+  scheduleAutosave('proyecto');
   scheduleAutosave('terreno');
+  scheduleAutosave('costos');
   renderConstruccion();
   if (typeof renderTerrainModule === 'function') renderTerrainModule();
   if (typeof renderProjectCashflow === 'function') renderProjectCashflow();
@@ -3146,8 +3228,8 @@ function buildFinancialCostRows(manualRows = []) {
       .map((row) => [String(row.nombre || '').trim().toLowerCase(), row])
   );
 
-  const autoRows = defaults.map((row, index) => ({
-    id: `auto-fin-${index}`,
+  const autoRows = defaults.map((row) => ({
+    id: '',
     formula_tipo: 'calculado',
     tiene_iva: false,
     es_terreno: false,
@@ -3217,10 +3299,7 @@ function ensureCostosState() {
       ...category,
       nombre: name,
       partidas: name === 'GASTOS FINANCIEROS'
-        ? buildFinancialCostRows(manualRows.filter((row) => !(
-          /^(Terreno|Construccion)/i.test(row.nombre || '')
-          && /(Linea aprobada|Interes|Pago de linea|Impuesto de timbre|Alzamiento)/i.test(row.nombre || '')
-        )))
+        ? buildFinancialCostRows(manualRows)
         : manualRows,
     };
   });
@@ -4275,6 +4354,21 @@ function renderKpis() {
   setText('cap-margen', fmtUf(state.calculos.margen_neto));
 }
 
+function renderCapitalModule() {
+  state.capital = normalizeCapital(state.capital);
+  const bindings = [
+    ['cap-buffer', 'caja_minima_buffer'],
+    ['cap-proyeccion', 'proyeccion_meses'],
+    ['cap-llamado-min', 'llamado_minimo'],
+    ['cap-caja-fuerte', 'caja_fuerte_retencion'],
+    ['cap-dev-min', 'devolucion_minima'],
+  ];
+  bindings.forEach(([inputId, field]) => {
+    const input = $(inputId);
+    if (input && !input.matches(':focus')) input.value = toNumber(state.capital[field]);
+  });
+}
+
 function renderAll() {
   syncConstructionMilestone(state.construccion?.plazo_meses || 1);
   renderProjectSelector();
@@ -4288,6 +4382,61 @@ function renderAll() {
   renderCostosModule();
   renderProjectCashflow();
   renderKpis();
+  renderCapitalModule();
+}
+
+function prepareStateForSave({ includeCostos = true } = {}) {
+  if (!state.proyectoId || !state.proyecto) return;
+
+  if ($('cabida-editor')) {
+    state.proyecto = normalizeProject(getCabidaProjectSettingsFromEditor());
+    state.cabida = getCabidaRowsFromEditor().filter((row) => row.uso);
+  }
+
+  if ($('terreno-m2-bruto')) {
+    state.proyecto = normalizeProject(readTerrenoProjectSettingsFromEditor());
+    state.financiamiento = readTerrenoFinanciamientoFromEditor();
+    state.proyecto = normalizeProject({
+      ...state.proyecto,
+      tasa_interes_terreno: toNumber(state.financiamiento.credito_terreno_tasa),
+    });
+  }
+
+  if ($('constr-sup-st')) {
+    state.construccion = readConstruccionFromEditor();
+    state.financiamiento = readConstruccionFinanciamientoFromEditor();
+    state.proyecto = normalizeProject({
+      ...state.proyecto,
+      tasa_interes_construccion: toNumber(state.financiamiento.linea_construccion_tasa),
+    });
+  }
+
+  if ($('gantt-tbody')) state.gantt = readGanttEditor();
+  syncTerrainPurchaseMilestone();
+  syncConstructionMilestone(state.construccion?.plazo_meses || 1);
+
+  if ($('ventas-tbody')) {
+    state.ventasConfig = readVentasConfigEditor();
+    state.ventasCronograma = readVentasCronogramaEditor();
+  }
+  syncSalesDrivenMilestones();
+
+  if (includeCostos && $('planilla-table')) state.costos = readCostosEditor();
+  if ($('cap-buffer')) state.capital = readCapitalFromEditor();
+  state.proyecto = getProjectSavePayload();
+}
+
+async function finishSave({ silent = false } = {}) {
+  state.sync.lastSavedAt = new Date().toISOString();
+  if (silent) {
+    setSyncStatus('ok', 'GUARDADO', `Ultima sync ${new Date().toLocaleTimeString()}`);
+    return;
+  }
+  if (state.proyectoId) {
+    state.calculos = await api(`/api/proyectos/${state.proyectoId}/calculos`).catch(() => state.calculos);
+  }
+  renderAll();
+  await refreshHealthStatus();
 }
 
 function getCabidaRowsFromEditor() {
@@ -4376,6 +4525,8 @@ function onCabidaInputChange() {
   renderCostosModule();
   renderProjectCashflow();
   scheduleAutosave('cabida');
+  scheduleAutosave('ventas');
+  scheduleAutosave('costos');
 }
 
 function onTerrenoInputChange() {
@@ -4392,6 +4543,7 @@ function onTerrenoInputChange() {
   renderProjectCashflow();
   renderKpis();
   scheduleAutosave('terreno');
+  scheduleAutosave('costos');
 }
 
 function readConstruccionFromEditor() {
@@ -4423,6 +4575,7 @@ function updateConstrParams() {
   renderKpis();
   scheduleAutosave('construccion');
   scheduleAutosave('gantt');
+  scheduleAutosave('costos');
 }
 
 function onGanttInputChange() {
@@ -4440,6 +4593,8 @@ function onGanttInputChange() {
   renderCostosModule();
   renderProjectCashflow();
   scheduleAutosave('gantt');
+  scheduleAutosave('ventas');
+  scheduleAutosave('costos');
 }
 
 function agregarHito() {
@@ -4596,6 +4751,7 @@ function onVentasInputChange() {
   renderProjectCashflow();
   scheduleAutosave('ventas');
   scheduleAutosave('gantt');
+  scheduleAutosave('costos');
 }
 
 function onVentasVelocityChange() {
@@ -4609,6 +4765,7 @@ function onVentasVelocityChange() {
   renderProjectCashflow();
   scheduleAutosave('ventas');
   scheduleAutosave('gantt');
+  scheduleAutosave('costos');
 }
 
 function parseFormulaInput(value) {
@@ -4639,11 +4796,20 @@ function readCostosEditor() {
     target.formula_referencia = formula.formula_referencia;
     target.plan_pago = target.plan_pago || '';
     target.tiene_iva = !!row.querySelector('[data-field="tiene_iva"]')?.checked;
-    target.es_terreno = !!row.querySelector('[data-field="es_terreno"]')?.checked;
+    const esTerrenoInput = row.querySelector('[data-field="es_terreno"]');
+    target.es_terreno = esTerrenoInput
+      ? !!esTerrenoInput.checked
+      : !!target.es_terreno;
     const monthInputs = Array.from(row.querySelectorAll('[data-month]'));
     if (monthInputs.length) {
       target.distribucion_mensual = monthInputs.map((input) => toNumber(input.value));
     }
+    target.total_neto = evaluateCostPartida(target, buildCostContext());
+    target.distribucion_mensual = normalizeDistribution(
+      target.distribucion_mensual,
+      target.total_neto,
+      target.plan_pago
+    );
   });
 
   state.costos = categories;
@@ -4671,6 +4837,7 @@ function agregarPartidaLinea(categoryName) {
     total_neto: 0,
     distribucion_mensual: createMonthlyArray(),
   });
+  state.costosUi.collapsed[categoryName] = false;
   renderCostosModule();
   scheduleAutosave('costos');
 }
@@ -4774,6 +4941,9 @@ async function loadProject(projectId) {
   ]);
 
   state.proyecto = normalizeProject(proyecto);
+  if (typeof window.applyPersistedFormulaOverrides === 'function') {
+    window.applyPersistedFormulaOverrides(state.proyecto.formula_overrides);
+  }
   state.cabida = cabida;
   state.gantt = normalizeGanttRows(gantt);
   state.ventasConfig = ventasData.config || [];
@@ -4781,18 +4951,57 @@ async function loadProject(projectId) {
   state.construccion = normalizeConstruccion(construccion);
   state.costos = costos;
   state.financiamiento = normalizeFinanciamiento(financiamiento);
-  state.capital = capital;
+  state.capital = normalizeCapital(capital);
   state.calculos = calculos;
 
   renderAll();
 }
 
-async function guardarCabida() {
+function readCapitalFromEditor() {
+  return normalizeCapital({
+    ...(state.capital || {}),
+    caja_minima_buffer: toNumber($('cap-buffer')?.value ?? state.capital?.caja_minima_buffer ?? 2000),
+    proyeccion_meses: Math.max(1, toNumber($('cap-proyeccion')?.value ?? state.capital?.proyeccion_meses ?? 6)),
+    llamado_minimo: toNumber($('cap-llamado-min')?.value ?? state.capital?.llamado_minimo ?? 5000),
+    caja_fuerte_retencion: toNumber($('cap-caja-fuerte')?.value ?? state.capital?.caja_fuerte_retencion ?? 10000),
+    devolucion_minima: toNumber($('cap-dev-min')?.value ?? state.capital?.devolucion_minima ?? 3000),
+  });
+}
+
+function calcularCapital() {
+  state.capital = readCapitalFromEditor();
+  scheduleAutosave('capital');
+}
+
+async function guardarCapital({ silent = false } = {}) {
   if (!state.proyectoId) return;
-  const rows = getCabidaRowsFromEditor().filter((row) => row.uso);
-  const proyecto = getCabidaProjectSettingsFromEditor();
+  state.capital = readCapitalFromEditor();
+  setSyncStatus('saving', 'GUARDANDO', 'Persistiendo parametros de capital');
+  await api(`/api/proyectos/${state.proyectoId}/capital`, {
+    method: 'POST',
+    body: JSON.stringify(state.capital),
+  });
+  await finishSave({ silent });
+}
+
+async function guardarFormulaOverrides({ silent = false } = {}) {
+  if (!state.proyectoId) return;
+  state.proyecto = getProjectSavePayload();
+  setSyncStatus('saving', 'GUARDANDO', 'Persistiendo formulas editables');
+  await api(`/api/proyectos/${state.proyectoId}/formula-overrides`, {
+    method: 'POST',
+    body: JSON.stringify(state.proyecto.formula_overrides || {}),
+  });
+  await finishSave({ silent });
+}
+
+async function guardarCabida({ silent = false } = {}) {
+  if (!state.proyectoId) return;
+  prepareStateForSave();
+  const rows = state.cabida.filter((row) => row.uso);
+  const proyecto = getProjectSavePayload();
   setSyncStatus('saving', 'GUARDANDO', 'Persistiendo cambios en la base');
-  await Promise.all([
+  const requests = [
     api(`/api/proyectos/${state.proyectoId}`, {
       method: 'PUT',
       body: JSON.stringify(proyecto),
@@ -4801,19 +5010,34 @@ async function guardarCabida() {
       method: 'POST',
       body: JSON.stringify(rows),
     }),
-  ]);
-  state.sync.lastSavedAt = new Date().toISOString();
-  await loadProject(state.proyectoId);
-  await refreshHealthStatus();
+  ];
+  if (!silent) {
+    requests.push(
+      api(`/api/proyectos/${state.proyectoId}/ventas/config`, {
+        method: 'POST',
+        body: JSON.stringify(state.ventasConfig),
+      }),
+      api(`/api/proyectos/${state.proyectoId}/ventas/cronograma`, {
+        method: 'POST',
+        body: JSON.stringify(state.ventasCronograma),
+      }),
+      api(`/api/proyectos/${state.proyectoId}/costos`, {
+        method: 'POST',
+        body: JSON.stringify(state.costos),
+      })
+    );
+  }
+  await Promise.all(requests);
+  await finishSave({ silent });
 }
 
-async function guardarTerreno() {
+async function guardarTerreno({ silent = false } = {}) {
   if (!state.proyectoId) return;
-  const proyecto = readTerrenoProjectSettingsFromEditor();
-  const financiamiento = readTerrenoFinanciamientoFromEditor();
-  syncTerrainPurchaseMilestone();
+  prepareStateForSave();
+  const proyecto = getProjectSavePayload();
+  const financiamiento = state.financiamiento;
   setSyncStatus('saving', 'GUARDANDO', 'Actualizando terreno y financiamiento terreno');
-  await Promise.all([
+  const requests = [
     api(`/api/proyectos/${state.proyectoId}`, {
       method: 'PUT',
       body: JSON.stringify(proyecto),
@@ -4830,25 +5054,29 @@ async function guardarTerreno() {
       method: 'POST',
       body: JSON.stringify(state.ventasCronograma || []),
     }),
-    api(`/api/proyectos/${state.proyectoId}/costos`, {
+  ];
+  if (!silent) {
+    requests.push(api(`/api/proyectos/${state.proyectoId}/costos`, {
       method: 'POST',
       body: JSON.stringify(state.costos),
-    }),
-  ]);
-  state.sync.lastSavedAt = new Date().toISOString();
-  await loadProject(state.proyectoId);
-  await refreshHealthStatus();
+    }));
+  }
+  await Promise.all(requests);
+  await finishSave({ silent });
 }
 
-async function guardarConstruccion() {
+async function guardarConstruccion({ silent = false } = {}) {
   if (!state.proyectoId) return;
-  syncConstructionMilestone(toNumber($('constr-plazo-meses')?.value || state.construccion?.plazo_meses || 1));
-  const payload = {
-    ...readConstruccionFromEditor(),
-  };
-  const financiamiento = readConstruccionFinanciamientoFromEditor();
+  prepareStateForSave();
+  const payload = { ...state.construccion };
+  const financiamiento = state.financiamiento;
+  const proyecto = getProjectSavePayload();
   setSyncStatus('saving', 'GUARDANDO', 'Actualizando parametros de construccion');
-  await Promise.all([
+  const requests = [
+    api(`/api/proyectos/${state.proyectoId}`, {
+      method: 'PUT',
+      body: JSON.stringify(proyecto),
+    }),
     api(`/api/proyectos/${state.proyectoId}/construccion`, {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -4861,31 +5089,45 @@ async function guardarConstruccion() {
       method: 'POST',
       body: JSON.stringify(financiamiento),
     }),
-  ]);
-  state.sync.lastSavedAt = new Date().toISOString();
-  await loadProject(state.proyectoId);
-  await refreshHealthStatus();
+  ];
+  if (!silent) {
+    requests.push(api(`/api/proyectos/${state.proyectoId}/costos`, {
+      method: 'POST',
+      body: JSON.stringify(state.costos),
+    }));
+  }
+  await Promise.all(requests);
+  await finishSave({ silent });
 }
 
-async function guardarGantt() {
+async function guardarGantt({ silent = false } = {}) {
   if (!state.proyectoId) return;
-  const rows = readGanttEditor();
+  prepareStateForSave();
+  const rows = state.gantt;
   setSyncStatus('saving', 'GUARDANDO', 'Actualizando cronograma del proyecto');
-  await api(`/api/proyectos/${state.proyectoId}/gantt`, {
-    method: 'POST',
-    body: JSON.stringify(rows),
-  });
-  state.sync.lastSavedAt = new Date().toISOString();
-  await loadProject(state.proyectoId);
-  await refreshHealthStatus();
+  const requests = [
+    api(`/api/proyectos/${state.proyectoId}/gantt`, {
+      method: 'POST',
+      body: JSON.stringify(rows),
+    }),
+  ];
+  if (!silent) {
+    requests.push(api(`/api/proyectos/${state.proyectoId}/costos`, {
+      method: 'POST',
+      body: JSON.stringify(state.costos),
+    }));
+  }
+  await Promise.all(requests);
+  await finishSave({ silent });
 }
 
-async function guardarVentas() {
+async function guardarVentas({ silent = false } = {}) {
   if (!state.proyectoId) return;
-  const config = readVentasConfigEditor();
-  const cronograma = readVentasCronogramaEditor();
+  prepareStateForSave();
+  const config = state.ventasConfig;
+  const cronograma = state.ventasCronograma;
   setSyncStatus('saving', 'GUARDANDO', 'Actualizando estrategia comercial y cronogramas');
-  await Promise.all([
+  const requests = [
     api(`/api/proyectos/${state.proyectoId}/ventas/config`, {
       method: 'POST',
       body: JSON.stringify(config),
@@ -4894,33 +5136,29 @@ async function guardarVentas() {
       method: 'POST',
       body: JSON.stringify(cronograma),
     }),
-  ]);
-  state.sync.lastSavedAt = new Date().toISOString();
-  await loadProject(state.proyectoId);
-  await refreshHealthStatus();
+  ];
+  if (!silent) {
+    requests.push(api(`/api/proyectos/${state.proyectoId}/costos`, {
+      method: 'POST',
+      body: JSON.stringify(state.costos),
+    }));
+  }
+  await Promise.all(requests);
+  await finishSave({ silent });
 }
 
 async function guardarCostos({ silent = false } = {}) {
   if (!state.proyectoId) return;
+  prepareStateForSave();
   const payload = readCostosEditor();
   setSyncStatus('saving', 'GUARDANDO', 'Persistiendo planilla de costos');
   await api(`/api/proyectos/${state.proyectoId}/costos`, {
     method: 'POST',
     body: JSON.stringify(payload),
   });
-  state.sync.lastSavedAt = new Date().toISOString();
-  // If the user is actively editing the cost table, avoid a full re-render
-  // that would reset cursor position. Instead just refresh state silently.
-  const activeInPlanilla = document.activeElement && document.activeElement.closest('#planilla-table');
-  if (silent && activeInPlanilla) {
-    // Sync IDs in background without re-rendering
-    const freshCostos = await api(`/api/proyectos/${state.proyectoId}/costos`);
-    state.costos = freshCostos;
+  await finishSave({ silent });
+  return;
     setSyncStatus('ok', 'GUARDADO', `Última sync ${new Date().toLocaleTimeString()}`);
-  } else {
-    await loadProject(state.proyectoId);
-    await refreshHealthStatus();
-  }
 }
 
 function eliminarUso(index) {
@@ -4956,7 +5194,6 @@ function agregarUso(defaultLabel = 'Departamento') {
 }
 
 [
-  'guardarCapital',
   'toggleEstructura',
   'setCostosView',
   'setDeudaView',
@@ -4964,7 +5201,6 @@ function agregarUso(defaultLabel = 'Departamento') {
   'setCapTab',
   'exportarExcel',
   'handleFileUpload',
-  'calcularCapital',
 ].forEach((fnName) => {
   window[fnName] = createPendingAction(fnName);
 });
@@ -4972,11 +5208,14 @@ function agregarUso(defaultLabel = 'Departamento') {
 window.showTab = showTab;
 window.onCabidaInputChange = onCabidaInputChange;
 window.onTerrenoInputChange = onTerrenoInputChange;
+window.guardarFormulaOverrides = guardarFormulaOverrides;
 window.guardarCabida = guardarCabida;
 window.guardarTerreno = guardarTerreno;
 window.guardarConstruccion = guardarConstruccion;
 window.guardarGantt = guardarGantt;
 window.guardarVentas = guardarVentas;
+window.guardarCapital = guardarCapital;
+window.calcularCapital = calcularCapital;
 window.updateConstrParams = updateConstrParams;
 window.guardarCostos = guardarCostos;
 window.agregarPartidaLinea = agregarPartidaLinea;

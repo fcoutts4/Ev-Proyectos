@@ -606,6 +606,30 @@ tfoot td{line-height:1.25}
 }
 .finance-date-table .finance-total-row td:first-child{font-weight:800!important;color:#0b2545!important}
 .finance-date-table .formula-inline-input{min-width:260px}
+#tab-terreno .finance-date-scroll,
+#tab-construccion .finance-date-scroll{isolation:isolate}
+#tab-terreno .finance-date-table,
+#tab-construccion .finance-date-table{border-collapse:separate!important;border-spacing:0!important}
+#tab-terreno .finance-date-table .finance-concept-col,
+#tab-construccion .finance-date-table .finance-concept-col,
+#tab-terreno .finance-date-table th:first-child,
+#tab-terreno .finance-date-table td:first-child,
+#tab-construccion .finance-date-table th:first-child,
+#tab-construccion .finance-date-table td:first-child{
+  position:sticky!important;
+  left:0!important;
+  z-index:24!important;
+  min-width:220px;
+  background:#f8fafc!important;
+  box-shadow:10px 0 16px -16px rgba(15,23,42,.5),1px 0 0 var(--border-strong)!important;
+}
+#tab-terreno .finance-date-table thead .finance-concept-col,
+#tab-construccion .finance-date-table thead .finance-concept-col,
+#tab-terreno .finance-date-table thead th:first-child,
+#tab-construccion .finance-date-table thead th:first-child{
+  z-index:34!important;
+  background:#eef3f8!important;
+}
 .cat-total-cell{background:#f6f9fc!important;border-left:1px solid var(--border-soft)!important;font-weight:600!important}
 .cat-total-cell strong{display:inline-flex;align-items:center;justify-content:center;min-height:22px;padding:2px 7px;border:1px solid #d7e0ea;border-radius:999px;background:#fff!important;font-size:10px;font-weight:700!important;color:#0b2545!important}
 table:not(.gantt-table) .tfoot-dark td,
@@ -1805,12 +1829,24 @@ table:not(.gantt-table) .tfoot-dark td,
     formulaOverrides: { flow: {}, ep: {}, gf: {} },
   };
 
+  function normalizeFormulaOverrides(value) {
+    const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    return {
+      flow: source.flow && typeof source.flow === 'object' && !Array.isArray(source.flow) ? { ...source.flow } : {},
+      ep: source.ep && typeof source.ep === 'object' && !Array.isArray(source.ep) ? { ...source.ep } : {},
+      gf: source.gf && typeof source.gf === 'object' && !Array.isArray(source.gf) ? { ...source.gf } : {},
+    };
+  }
+
+  function applyFormulaOverrides(value, persistLocal = true) {
+    patchState.formulaOverrides = normalizeFormulaOverrides(value);
+    if (persistLocal) persistFormulaOverrides();
+  }
+
   try {
     const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || '{}');
     if (stored && typeof stored === 'object') {
-      patchState.formulaOverrides.flow = stored.flow || {};
-      patchState.formulaOverrides.ep = stored.ep || {};
-      patchState.formulaOverrides.gf = stored.gf || {};
+      applyFormulaOverrides(stored, false);
     }
   } catch (error) {
     void error;
@@ -1818,6 +1854,12 @@ table:not(.gantt-table) .tfoot-dark td,
   }
 
   window.__bricsaFormulaPatch = patchState;
+  window.getPersistedFormulaOverrides = function getPersistedFormulaOverrides() {
+    return normalizeFormulaOverrides(patchState.formulaOverrides);
+  };
+  window.applyPersistedFormulaOverrides = function applyPersistedFormulaOverrides(overrides) {
+    applyFormulaOverrides(overrides || {}, true);
+  };
 
   function persistFormulaOverrides() {
     try {
@@ -1855,6 +1897,7 @@ table:not(.gantt-table) .tfoot-dark td,
     if (!patchState.formulaOverrides[scope]) patchState.formulaOverrides[scope] = {};
     patchState.formulaOverrides[scope][key] = String(value || '');
     persistFormulaOverrides();
+    if (typeof scheduleAutosave === 'function') scheduleAutosave('proyecto');
   }
 
   function formulaInput(scope, key, value, compact) {

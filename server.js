@@ -76,6 +76,11 @@ app.put('/api/proyectos/:id', asyncHandler(async (req, res) => {
   res.json({ success: true });
 }));
 
+app.post('/api/proyectos/:id/formula-overrides', asyncHandler(async (req, res) => {
+  await proyectos.saveFormulaOverrides(req.params.id, req.body || {}, getRequestUser(req));
+  res.json({ success: true });
+}));
+
 app.delete('/api/proyectos/:id', asyncHandler(async (req, res) => {
   await proyectos.delete(req.params.id);
   res.json({ success: true });

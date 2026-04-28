@@ -57,7 +57,9 @@ async function initDb() {
         tipo TEXT DEFAULT 'Residencial',
         compra_terreno_fecha DATE,
         terreno_m2_bruto_afecto DOUBLE PRECISION DEFAULT 0,
+        terreno_m2_afectacion DOUBLE PRECISION DEFAULT 0,
         terreno_m2_neto DOUBLE PRECISION DEFAULT 0,
+        terreno_precio_uf_m2 DOUBLE PRECISION DEFAULT 0,
         terreno_precio_total DOUBLE PRECISION DEFAULT 0,
         terraza_util_pct DOUBLE PRECISION DEFAULT 50,
         comunes_tipo TEXT DEFAULT 'porcentaje',
@@ -68,6 +70,12 @@ async function initDb() {
         bodegas_cantidad INTEGER DEFAULT 0,
         bodegas_sup_interior DOUBLE PRECISION DEFAULT 0,
         bodegas_sup_terrazas DOUBLE PRECISION DEFAULT 0,
+        tasa_interes_terreno DOUBLE PRECISION DEFAULT 3.5,
+        tasa_interes_construccion DOUBLE PRECISION DEFAULT 3.5,
+        pct_timbres DOUBLE PRECISION DEFAULT 0.8,
+        pct_ceec DOUBLE PRECISION DEFAULT 65,
+        pct_impuesto_renta DOUBLE PRECISION DEFAULT 27,
+        formula_overrides JSONB DEFAULT '{}'::jsonb,
         updated_by TEXT,
         created_at TIMESTAMPTZ DEFAULT NOW(),
         updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -138,7 +146,8 @@ async function initDb() {
         anticipo_pct DOUBLE PRECISION DEFAULT 0,
         retencion_pct DOUBLE PRECISION DEFAULT 0,
         ancho_curva DOUBLE PRECISION DEFAULT 0.5,
-        peak_gasto DOUBLE PRECISION DEFAULT 0.5
+        peak_gasto DOUBLE PRECISION DEFAULT 0.5,
+        pct_inicio_construccion DOUBLE PRECISION DEFAULT 25
       );
 
       CREATE TABLE IF NOT EXISTS costos_categorias (
@@ -162,6 +171,9 @@ async function initDb() {
         plan_pago TEXT,
         tiene_iva BOOLEAN DEFAULT FALSE,
         es_terreno BOOLEAN DEFAULT FALSE,
+        auto_origen BOOLEAN DEFAULT FALSE,
+        editable_source TEXT,
+        formula_display TEXT,
         total_neto DOUBLE PRECISION DEFAULT 0,
         orden_index INTEGER DEFAULT 0,
         distribucion_mensual JSONB DEFAULT '[]'::jsonb
@@ -180,6 +192,7 @@ async function initDb() {
         linea_construccion_tasa DOUBLE PRECISION DEFAULT 3.5,
         linea_construccion_pago_intereses TEXT DEFAULT 'Anual',
         linea_construccion_pago_capital TEXT DEFAULT 'Contra Escrituraciones',
+        pct_alzamiento DOUBLE PRECISION DEFAULT 90,
         linea_adicional_activo BOOLEAN DEFAULT TRUE,
         linea_adicional_monto DOUBLE PRECISION DEFAULT 10000,
         linea_adicional_tasa DOUBLE PRECISION DEFAULT 3,
@@ -205,7 +218,9 @@ async function initDb() {
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS terraza_util_pct DOUBLE PRECISION DEFAULT 50');
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS compra_terreno_fecha DATE');
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS terreno_m2_bruto_afecto DOUBLE PRECISION DEFAULT 0');
+    await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS terreno_m2_afectacion DOUBLE PRECISION DEFAULT 0');
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS terreno_m2_neto DOUBLE PRECISION DEFAULT 0');
+    await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS terreno_precio_uf_m2 DOUBLE PRECISION DEFAULT 0');
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS terreno_precio_total DOUBLE PRECISION DEFAULT 0');
     await query("ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS comunes_tipo TEXT DEFAULT 'porcentaje'");
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS comunes_valor DOUBLE PRECISION DEFAULT 0');
@@ -215,11 +230,22 @@ async function initDb() {
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS bodegas_cantidad INTEGER DEFAULT 0');
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS bodegas_sup_interior DOUBLE PRECISION DEFAULT 0');
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS bodegas_sup_terrazas DOUBLE PRECISION DEFAULT 0');
+    await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS tasa_interes_terreno DOUBLE PRECISION DEFAULT 3.5');
+    await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS tasa_interes_construccion DOUBLE PRECISION DEFAULT 3.5');
+    await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS pct_timbres DOUBLE PRECISION DEFAULT 0.8');
+    await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS pct_ceec DOUBLE PRECISION DEFAULT 65');
+    await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS pct_impuesto_renta DOUBLE PRECISION DEFAULT 27');
+    await query("ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS formula_overrides JSONB DEFAULT '{}'::jsonb");
     await query('ALTER TABLE proyectos ADD COLUMN IF NOT EXISTS updated_by TEXT');
     await query("ALTER TABLE gantt_hitos ADD COLUMN IF NOT EXISTS dependencia_tipo TEXT DEFAULT 'fin'");
     await query('ALTER TABLE ventas_cronograma ADD COLUMN IF NOT EXISTS velocidad DOUBLE PRECISION DEFAULT 0');
     await query('ALTER TABLE construccion ADD COLUMN IF NOT EXISTS pct_bajo_tierra_sobre_cota_0 DOUBLE PRECISION DEFAULT 0');
+    await query('ALTER TABLE construccion ADD COLUMN IF NOT EXISTS pct_inicio_construccion DOUBLE PRECISION DEFAULT 25');
+    await query('ALTER TABLE financiamiento ADD COLUMN IF NOT EXISTS pct_alzamiento DOUBLE PRECISION DEFAULT 90');
     await query('ALTER TABLE costos_partidas ADD COLUMN IF NOT EXISTS plan_pago TEXT');
+    await query('ALTER TABLE costos_partidas ADD COLUMN IF NOT EXISTS auto_origen BOOLEAN DEFAULT FALSE');
+    await query('ALTER TABLE costos_partidas ADD COLUMN IF NOT EXISTS editable_source TEXT');
+    await query('ALTER TABLE costos_partidas ADD COLUMN IF NOT EXISTS formula_display TEXT');
   })();
 
   return initPromise;
@@ -230,7 +256,13 @@ function normalizeBoolean(value) {
 }
 
 async function upsertSingleRow(table, pid, data) {
-  const columns = Object.keys(data);
+  const columns = Object.keys(data).filter((column) => ![
+    'id',
+    'proyecto_id',
+    'created_at',
+    'updated_at',
+    'updated_by',
+  ].includes(column));
   if (!columns.length) return;
 
   const insertColumns = ['id', 'proyecto_id', ...columns];
@@ -249,6 +281,11 @@ async function upsertSingleRow(table, pid, data) {
 function normalizeUpdatedBy(value) {
   const normalized = String(value || '').trim();
   return normalized ? normalized.slice(0, 120) : null;
+}
+
+function normalizeJsonObject(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value;
 }
 
 async function touchProject(pid, updatedBy = null) {
@@ -276,10 +313,13 @@ const proyectos = {
     const id = uuidv4();
     await query(
       `INSERT INTO proyectos (
-        id, nombre, direccion, tipo, compra_terreno_fecha, terreno_m2_bruto_afecto, terreno_m2_neto, terreno_precio_total, terraza_util_pct, comunes_tipo, comunes_valor,
+        id, nombre, direccion, tipo, compra_terreno_fecha, terreno_m2_bruto_afecto, terreno_m2_afectacion,
+        terreno_m2_neto, terreno_precio_uf_m2, terreno_precio_total, terraza_util_pct, comunes_tipo, comunes_valor,
         estacionamientos_cantidad, estacionamientos_sup_interior, estacionamientos_sup_terrazas,
-        bodegas_cantidad, bodegas_sup_interior, bodegas_sup_terrazas, updated_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+        bodegas_cantidad, bodegas_sup_interior, bodegas_sup_terrazas,
+        tasa_interes_terreno, tasa_interes_construccion, pct_timbres, pct_ceec, pct_impuesto_renta,
+        formula_overrides, updated_by
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)`,
       [
         id,
         data.nombre,
@@ -287,7 +327,9 @@ const proyectos = {
         data.tipo || 'Residencial',
         data.compra_terreno_fecha || null,
         data.terreno_m2_bruto_afecto || 0,
+        data.terreno_m2_afectacion || 0,
         data.terreno_m2_neto || 0,
+        data.terreno_precio_uf_m2 || 0,
         data.terreno_precio_total || 0,
         data.terraza_util_pct ?? 50,
         data.comunes_tipo || 'porcentaje',
@@ -298,6 +340,12 @@ const proyectos = {
         data.bodegas_cantidad || 0,
         data.bodegas_sup_interior || 0,
         data.bodegas_sup_terrazas || 0,
+        data.tasa_interes_terreno ?? 3.5,
+        data.tasa_interes_construccion ?? 3.5,
+        data.pct_timbres ?? 0.8,
+        data.pct_ceec ?? 65,
+        data.pct_impuesto_renta ?? 27,
+        JSON.stringify(normalizeJsonObject(data.formula_overrides)),
         normalizeUpdatedBy(updatedBy),
       ]
     );
@@ -313,27 +361,37 @@ const proyectos = {
         tipo = $3,
         compra_terreno_fecha = $4,
         terreno_m2_bruto_afecto = $5,
-        terreno_m2_neto = $6,
-        terreno_precio_total = $7,
-        terraza_util_pct = $8,
-        comunes_tipo = $9,
-        comunes_valor = $10,
-        estacionamientos_cantidad = $11,
-        estacionamientos_sup_interior = $12,
-        estacionamientos_sup_terrazas = $13,
-        bodegas_cantidad = $14,
-        bodegas_sup_interior = $15,
-        bodegas_sup_terrazas = $16,
-        updated_by = COALESCE($17, updated_by),
+        terreno_m2_afectacion = $6,
+        terreno_m2_neto = $7,
+        terreno_precio_uf_m2 = $8,
+        terreno_precio_total = $9,
+        terraza_util_pct = $10,
+        comunes_tipo = $11,
+        comunes_valor = $12,
+        estacionamientos_cantidad = $13,
+        estacionamientos_sup_interior = $14,
+        estacionamientos_sup_terrazas = $15,
+        bodegas_cantidad = $16,
+        bodegas_sup_interior = $17,
+        bodegas_sup_terrazas = $18,
+        tasa_interes_terreno = $19,
+        tasa_interes_construccion = $20,
+        pct_timbres = $21,
+        pct_ceec = $22,
+        pct_impuesto_renta = $23,
+        formula_overrides = $24::jsonb,
+        updated_by = COALESCE($25, updated_by),
         updated_at = NOW()
-      WHERE id = $18`,
+      WHERE id = $26`,
       [
         data.nombre,
         data.direccion || '',
         data.tipo || 'Residencial',
         data.compra_terreno_fecha || null,
         data.terreno_m2_bruto_afecto || 0,
+        data.terreno_m2_afectacion || 0,
         data.terreno_m2_neto || 0,
+        data.terreno_precio_uf_m2 || 0,
         data.terreno_precio_total || 0,
         data.terraza_util_pct ?? 50,
         data.comunes_tipo || 'porcentaje',
@@ -344,9 +402,27 @@ const proyectos = {
         data.bodegas_cantidad || 0,
         data.bodegas_sup_interior || 0,
         data.bodegas_sup_terrazas || 0,
+        data.tasa_interes_terreno ?? 3.5,
+        data.tasa_interes_construccion ?? 3.5,
+        data.pct_timbres ?? 0.8,
+        data.pct_ceec ?? 65,
+        data.pct_impuesto_renta ?? 27,
+        JSON.stringify(normalizeJsonObject(data.formula_overrides)),
         normalizeUpdatedBy(updatedBy),
         id,
       ]
+    );
+  },
+
+  async saveFormulaOverrides(id, formulaOverrides, updatedBy = null) {
+    await initDb();
+    await query(
+      `UPDATE proyectos
+       SET formula_overrides = $1::jsonb,
+           updated_by = COALESCE($2, updated_by),
+           updated_at = NOW()
+       WHERE id = $3`,
+      [JSON.stringify(normalizeJsonObject(formulaOverrides)), normalizeUpdatedBy(updatedBy), id]
     );
   },
 
@@ -532,6 +608,7 @@ const construccion = {
       retencion_pct: data.retencion_pct || 0,
       ancho_curva: data.ancho_curva ?? 0.5,
       peak_gasto: data.peak_gasto ?? 0.5,
+      pct_inicio_construccion: data.pct_inicio_construccion ?? 25,
     });
     await touchProject(pid, updatedBy);
   },
@@ -577,8 +654,9 @@ const costos = {
             `INSERT INTO costos_partidas (
               id, categoria_id, proyecto_id, nombre, formula_tipo, formula_valor,
               formula_referencia, formula_multiplicador, formula_inicio_gantt, formula_fin_gantt,
-              plan_pago, tiene_iva, es_terreno, total_neto, orden_index, distribucion_mensual
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb)`,
+              plan_pago, tiene_iva, es_terreno, auto_origen, editable_source, formula_display,
+              total_neto, orden_index, distribucion_mensual
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::jsonb)`,
             [
               partida.id || uuidv4(),
               categoriaId,
@@ -593,6 +671,9 @@ const costos = {
               partida.plan_pago || null,
               normalizeBoolean(partida.tiene_iva),
               normalizeBoolean(partida.es_terreno),
+              normalizeBoolean(partida.auto_origen),
+              partida.editable_source || null,
+              partida.formula_display || null,
               partida.total_neto || 0,
               partidaIndex,
               JSON.stringify(partida.distribucion_mensual || []),
