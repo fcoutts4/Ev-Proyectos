@@ -966,7 +966,7 @@ function getGanttDependencyOptions(currentName) {
 const GANTT_CANONICAL_NAME_RULES = [
   { canonical: 'Compra terreno', pattern: /^(Compra terreno|Adquisicion de Terreno|Adquisición de Terreno|Compra de Terreno)$/i },
   { canonical: 'Construcción', pattern: /^Construcci[óo]n$/i },
-  { canonical: 'Aprobaci\u00f3n del Proyecto de Edificaci\u00f3n', pattern: /^(Aprobaci(?:o|\u00f3)n(?: del)? Proyecto(?: de)? Edificaci(?:o|\u00f3)n|Aprobaci(?:o|\u00f3)n(?:\s+del)?\s+Pro(?:yecto)?(?:\s+de)?(?:\s+Edificaci(?:o|\u00f3)n)?|Aprobaci(?:o|\u00f3)n\s*P\.?\s*E\.?|Aprobaci(?:o|\u00f3)n\s*PE|Permiso(?: de)? Edificaci(?:o|\u00f3)n)$/i },
+  { canonical: 'Aprobaci\u00f3n PE', pattern: /^(Aprobaci(?:o|\u00f3)n(?: del)? Proyecto(?: de)? Edificaci(?:o|\u00f3)n|Aprobaci(?:o|\u00f3)n(?:\s+del)?\s+Pro(?:yecto)?(?:\s+de)?(?:\s+Edificaci(?:o|\u00f3)n)?|Aprobaci(?:o|\u00f3)n\s*P\.?\s*E\.?|Aprobaci(?:o|\u00f3)n\s*PE|Permiso(?: de)? Edificaci(?:o|\u00f3)n)$/i },
   { canonical: 'Promesas', pattern: /^(Promesas|Inicio promesas)$/i },
   { canonical: 'Postventa', pattern: /^Postventa$/i },
   { canonical: 'Recepción municipal', pattern: /^Recepci[óo]n municipal$/i },
@@ -1154,8 +1154,9 @@ function renderGanttTimelineScale(containerId, meta, monthWidth = getGanttMonthW
 
 function normalizeGanttRows(rows) {
   const canonicalRows = canonicalizeGanttRows(rows);
+  const normalizedRows = [];
   const byName = new Map(canonicalRows.map((row) => [row.nombre, row]));
-  return canonicalRows.map((row) => {
+  canonicalRows.forEach((row) => {
     const dependencia = row.dependencia || '';
     const dependenciaTipo = row.dependencia_tipo || 'fin';
     const dependenciaRow = dependencia ? byName.get(dependencia) : null;
@@ -1169,7 +1170,7 @@ function normalizeGanttRows(rows) {
     const inicio = dependenciaRow ? inicioBase + toNumber(row.desfase) : toNumber(row.inicio);
     const duracion = Math.max(1, toNumber(row.duracion || 1));
     const fin = inicio + duracion - 1;
-    return {
+    const normalizedRow = {
       ...row,
       color: normalizeGanttColor(row.color),
       dependencia,
@@ -1179,7 +1180,10 @@ function normalizeGanttRows(rows) {
       duracion,
       fin,
     };
+    normalizedRows.push(normalizedRow);
+    byName.set(normalizedRow.nombre, normalizedRow);
   });
+  return normalizedRows;
 }
 
 function readGanttEditor() {
@@ -2826,7 +2830,7 @@ function getEstudiosMilestone() {
 }
 
 function isBuildingApprovalMilestoneName(name) {
-  return canonicalizeGanttName(name) === 'Aprobaci\u00f3n del Proyecto de Edificaci\u00f3n';
+  return canonicalizeGanttName(name) === 'Aprobaci\u00f3n PE';
 }
 
 function getBuildingApprovalMilestone(rows = state.gantt) {
@@ -2914,7 +2918,7 @@ function syncTerrainPurchaseMilestone() {
 }
 
 function syncSalesDrivenMilestones() {
-  const approvalName = 'Aprobaci\u00f3n del Proyecto de Edificaci\u00f3n';
+  const approvalName = 'Aprobaci\u00f3n PE';
   const velocity = getVentasVelocitySettings();
   const preventaUnits = Math.max(0, getPreventaUnitsTotal());
   const promiseDuration = Math.max(1, Math.ceil(preventaUnits / Math.max(1, velocity.promesas)));
