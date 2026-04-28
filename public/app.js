@@ -966,6 +966,7 @@ function getGanttDependencyOptions(currentName) {
 const GANTT_CANONICAL_NAME_RULES = [
   { canonical: 'Compra terreno', pattern: /^(Compra terreno|Adquisicion de Terreno|Adquisición de Terreno|Compra de Terreno)$/i },
   { canonical: 'Construcción', pattern: /^Construcci[óo]n$/i },
+  { canonical: 'Aprobaci\u00f3n del Proyecto de Edificaci\u00f3n', pattern: /^(Aprobaci(?:o|\u00f3)n(?: del)? Proyecto(?: de)? Edificaci(?:o|\u00f3)n|Permiso(?: de)? Edificaci(?:o|\u00f3)n)$/i },
   { canonical: 'Promesas', pattern: /^(Promesas|Inicio promesas)$/i },
   { canonical: 'Postventa', pattern: /^Postventa$/i },
   { canonical: 'Recepción municipal', pattern: /^Recepci[óo]n municipal$/i },
@@ -2816,6 +2817,14 @@ function getEstudiosMilestone() {
     || null;
 }
 
+function isBuildingApprovalMilestoneName(name) {
+  return /^(Aprobaci(?:o|\u00f3)n(?: del)? Proyecto(?: de)? Edificaci(?:o|\u00f3)n|Permiso(?: de)? Edificaci(?:o|\u00f3)n)$/i.test(String(name || '').trim());
+}
+
+function getBuildingApprovalMilestone(rows = state.gantt) {
+  return rows.find((row) => isBuildingApprovalMilestoneName(row.nombre)) || null;
+}
+
 function getConstructionStartFromPreventa() {
   const pctReq = toNumber(state.construccion?.pct_inicio_construccion ?? 25) / 100;
   const totalUnits = Math.max(1, getTotalCommercialUnits());
@@ -2897,6 +2906,7 @@ function syncTerrainPurchaseMilestone() {
 }
 
 function syncSalesDrivenMilestones() {
+  const approvalName = 'Aprobaci\u00f3n del Proyecto de Edificaci\u00f3n';
   const velocity = getVentasVelocitySettings();
   const preventaUnits = Math.max(0, getPreventaUnitsTotal());
   const promiseDuration = Math.max(1, Math.ceil(preventaUnits / Math.max(1, velocity.promesas)));
@@ -2916,9 +2926,24 @@ function syncSalesDrivenMilestones() {
     || getTerrainMilestone()
     || rows.find((row) => /ADQUISICION DE TERRENO|COMPRA DE TERRENO|TERRENO/i.test(String(row.nombre || '').trim()));
   const estudiosMilestone = rows.find((row) => /^(Estudios|Estudios previos|Estudios y permisos)$/i.test(String(row.nombre || '').trim()));
-  // Promesas = Mes siguiente a Estudios. Si no hay Estudios, depende de Compra terreno.
-  // El +1 ahora viene automático de normalizeGanttRows (tipo 'fin'), así que desfase=0.
-  const promiseDependency = estudiosMilestone?.nombre || terrainMilestone?.nombre || 'Compra terreno';
+  // Promesas parte el mes siguiente al fin de la aprobacion del proyecto de edificacion.
+  // El +1 viene de normalizeGanttRows con dependencia_tipo 'fin'; desfase queda bloqueado en 0.
+  let buildingApprovalRow = getBuildingApprovalMilestone(rows);
+  if (!buildingApprovalRow) {
+    buildingApprovalRow = {
+      id: '',
+      nombre: approvalName,
+      color: '#64748b',
+      dependencia: estudiosMilestone?.nombre || terrainMilestone?.nombre || '',
+      dependencia_tipo: 'fin',
+      desfase: 0,
+      inicio: 0,
+      duracion: 1,
+      fin: 0,
+    };
+    rows.push(buildingApprovalRow);
+  }
+  const promiseDependency = buildingApprovalRow.nombre;
   const promiseDesfase = 0;
 
   const promiseRow = ensureMilestone(/^(Promesas|Inicio promesas)$/i, (baseRow) => ({
@@ -2962,6 +2987,9 @@ function syncSalesDrivenMilestones() {
     fin: 0,
   }));
 
+  escrituraRow.dependencia = 'Recepci\u00f3n municipal';
+  escrituraRow.dependencia_tipo = 'fin';
+  escrituraRow.desfase = 0;
   state.gantt = normalizeGanttRows(rows);
   const normalizedPromise = state.gantt.find((row) => /^(Promesas|Inicio promesas)$/i.test(String(row.nombre || '').trim())) || promiseRow;
   const normalizedEscritura = state.gantt.find((row) => /^Escrituraci[óo]n$/i.test(String(row.nombre || '').trim())) || escrituraRow;
@@ -3019,6 +3047,8 @@ function indexSafeNumber(value, fallback) {
 
 function getGanttLockConfig(row) {
   const name = String(row?.nombre || '').trim();
+  if (/^(Promesas|Inicio promesas)$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: false, hint: 'Inicio ligado al mes siguiente del fin de Aprobacion del Proyecto de Edificacion; duracion calculada desde Ventas.' };
+  if (/^Escrituraci(?:o|\u00f3)n$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: false, hint: 'Inicio ligado al mes siguiente del fin de Recepcion municipal; duracion calculada desde Ventas con techo de promesas acumuladas.' };
   // Filas clave: nombre y borrado bloqueados; dependencia, fechas y duración editables.
   if (/^Compra terreno$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
   if (/^Construcci[óo]n$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Nombre protegido. Duración viene de la hoja de Construcción.' };
