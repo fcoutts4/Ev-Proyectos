@@ -2624,10 +2624,10 @@ function renderFinancingSourcePlanilla(sourceType) {
 
     const rows = [
       { label: 'GIROS', values: giros, formula: `GIROS = % línea × Costo terreno · desembolso en mes compra`, color: '#22c55e', actionHtml: makeGfPlanBtn(gfLineaIdx, 'Giro línea terreno') },
+      { label: 'PAGO LÍNEA', values: pagosLinea, formula: `PAGO_LÍNEA(t) = pago al vencimiento del plazo de la línea de terreno`, color: '#ef4444', actionHtml: makeGfPlanBtn(gfPagoIdx, 'Pago de línea terreno') },
       { label: 'ACUMULADO', values: acumulado, formula: 'ACUMULADO(t) = ACUMULADO(t−1) + GIROS(t) + PAGOS_LINEA(t)', bold: true, color: '#0f172a' },
       { label: `INTERÉS ANUAL (${tasaTerreno}%)`, values: interesAnual, formula: `Acumulado anual de interés · pagado en aniversario del giro o al cierre anticipado`, color: '#f59e0b' },
       { label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, values: impTimbres, formula: `IMP_TIMBRES(t) = GIROS(t) × ${cfg.pct_timbres}%`, color: '#f59e0b' },
-      { label: 'PAGO LÍNEA', values: pagosLinea, formula: `PAGO_LÍNEA(t) = pago al vencimiento del plazo de la línea de terreno`, color: '#ef4444', actionHtml: makeGfPlanBtn(gfPagoIdx, 'Pago de línea terreno') },
     ];
 
     setHtml('terreno-fin-planilla-tbody', rows.map((r) => {

@@ -2217,6 +2217,8 @@ table:not(.gantt-table) .tfoot-dark td,
       const pagosLineaFormula = getFormula('gf', 'pagos_linea', '[PAGOS LINEA fuente]');
       const pagosLinea = evaluateSeries(pagosLineaFormula, series, scalars, pagosLineaDefault);
       addSeries(series, 'PAGOS LINEA', pagosLinea, 'pagos_linea');
+      // Pago línea va justo después de GIROS
+      rows.push({ key: 'pagos_linea', label: 'PAGOS LÍNEA', formula: pagosLineaFormula, values: pagosLinea, mode: 'signed', color: '#ef4444', actionHtml: mkPlanBtn(gfPagoLineaIdx, 'Pago de línea construcción') });
 
       const acumFormula = getFormula('gf', 'acumulado', '[Acumulado anterior] + [GIROS (desde EP)] + [PAGOS LINEA]');
       const acumulado = [];
@@ -2232,8 +2234,6 @@ table:not(.gantt-table) .tfoot-dark td,
       pushRow({ key: 'interes', label: `INTERES (${cfg.tasa_construccion}% anual)`, fallback: interesDefault, formula: '[ACUMULADO] * [Tasa_interes_construccion] / 12 / 100', mode: 'cost' });
       const timbresDefault = giros.map((value) => value * (cfg.pct_timbres / 100));
       pushRow({ key: 'timbres', label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, fallback: timbresDefault, formula: '[GIROS (desde EP)] * [Timbres] / 100', mode: 'cost' });
-      // Fila de pago de línea con botón plan de pago
-      rows.push({ key: 'pagos_linea', label: 'PAGOS LÍNEA', formula: pagosLineaFormula, values: pagosLinea, mode: 'signed', color: '#ef4444', actionHtml: mkPlanBtn(gfPagoLineaIdx, 'Pago de línea construcción') });
 
       renderFormulaTableHeader('constr-fin-planilla-head', labels);
       setHtml('constr-fin-planilla-tbody', rows.map((row) => `
