@@ -2946,17 +2946,25 @@ function syncSalesDrivenMilestones() {
     fin: 0,
   }));
 
-  // Construcción: inicio determinado por % de promesas acumuladas
-  const constrStart = getConstructionStartFromPreventa();
+  // Construcción: si el usuario NO definió dependencia manual, se usa el cálculo
+  // automático desde % de promesas acumuladas. Si SÍ tiene dependencia manual,
+  // se respeta y normalizeGanttRows calculará el inicio.
   const constrIdx = rows.findIndex((r) => /CONSTRUCCI[ÓO]N/i.test(String(r.nombre || '').trim()));
   if (constrIdx >= 0) {
-    rows[constrIdx] = {
-      ...rows[constrIdx],
-      dependencia: null,
-      desfase: 0,
-      inicio: constrStart,
-      fin: constrStart + Math.max(1, toNumber(rows[constrIdx].duracion)),
-    };
+    const existingDep = String(rows[constrIdx].dependencia || '').trim();
+    const depExists = existingDep && rows.some((r, i) => i !== constrIdx && String(r.nombre || '').trim() === existingDep);
+    if (!depExists) {
+      // Sin dependencia válida: usar cálculo automático desde preventa%
+      const constrStart = getConstructionStartFromPreventa();
+      rows[constrIdx] = {
+        ...rows[constrIdx],
+        dependencia: '',
+        desfase: 0,
+        inicio: constrStart,
+        fin: constrStart + Math.max(1, toNumber(rows[constrIdx].duracion)),
+      };
+    }
+    // Con dependencia manual válida: no tocar — normalizeGanttRows hace el resto
   }
 
   state.gantt = normalizeGanttRows(rows);
