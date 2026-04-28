@@ -1108,7 +1108,7 @@ function formatTimelineMonthLabel(month) {
 
 function getGanttRangeLabel(startMonth, durationMonths) {
   const start = Math.max(0, toNumber(startMonth));
-  const end = Math.max(start, start + Math.max(0, toNumber(durationMonths)));
+  const end = Math.max(start, start + Math.max(1, toNumber(durationMonths)) - 1);
   return `Entre ${formatTimelineMonthLabel(start)} y ${formatTimelineMonthLabel(end)}`;
 }
 
@@ -1158,8 +1158,8 @@ function normalizeGanttRows(rows) {
           : toNumber(dependenciaRow.fin) + 1)
       : toNumber(row.inicio);
     const inicio = dependenciaRow ? inicioBase + toNumber(row.desfase) : toNumber(row.inicio);
-    const duracion = Math.max(0, toNumber(row.duracion));
-    const fin = inicio + duracion;
+    const duracion = Math.max(1, toNumber(row.duracion || 1));
+    const fin = inicio + duracion - 1;
     return {
       ...row,
       color: normalizeGanttColor(row.color),
@@ -1524,7 +1524,7 @@ function findGanttByName(name) {
 
 function getCronogramaComputed(item) {
   const ganttRef = findGanttByName(item.vinculo_gantt);
-  const base = isVentasCronogramaType(item, 'PREVENTA') ? toNumber(ganttRef?.inicio) : toNumber(ganttRef?.fin);
+  const base = isVentasCronogramaType(item, 'PREVENTA') ? toNumber(ganttRef?.inicio) : toNumber(ganttRef?.fin) + 1;
   const inicio = ganttRef ? base + toNumber(item.mes_inicio) : toNumber(item.mes_inicio);
 
   // Duración calculada automáticamente basada en velocidad
@@ -1551,7 +1551,7 @@ function getCronogramaComputed(item) {
     }
   }
 
-  const fin = inicio + duracion;
+  const fin = inicio + duracion - 1;
   return { inicio, duracion, fin };
 }
 
@@ -1758,7 +1758,7 @@ function renderVentasSummaryCardsLegacy() {
       ...preRows.concat(ventaRows).map((row) => getCronogramaComputed(row).fin),
       escrituraFin || 0
     );
-  const duration = analysisEnd > analysisStart ? analysisEnd - analysisStart : 1;
+  const duration = analysisEnd >= analysisStart ? analysisEnd - analysisStart + 1 : 1;
   const velUf = totalVenta / duration;
   const velUn = totalUnidades / duration;
 
@@ -1786,7 +1786,7 @@ function buildTimelineMonths(extraEnd = 0) {
     .map((row) => getCronogramaComputed(row));
   if (!ranges.length) return [0];
   const start = Math.max(1, Math.min(...ranges.map((row) => row.inicio), 1));
-  const end = Math.max(start, toNumber(extraEnd), ...ranges.map((row) => Math.max(row.inicio, row.fin - 1)));
+  const end = Math.max(start, toNumber(extraEnd), ...ranges.map((row) => Math.max(row.inicio, row.fin)));
   return Array.from({ length: end - start + 1 }, (_, index) => start + index);
 }
 
@@ -1795,7 +1795,7 @@ function formatVentasCashflowMonth(month) {
 }
 
 function getScheduledWholeUnits(totalUnits, computed, month) {
-  if (!computed || month < computed.inicio || month >= computed.fin) return 0;
+  if (!computed || month < computed.inicio || month > computed.fin) return 0;
   const units = Math.max(0, Math.round(toNumber(totalUnits)));
   const duration = Math.max(1, Math.round(toNumber(computed.duracion)));
   const elapsed = Math.max(0, month - computed.inicio);
@@ -1883,7 +1883,7 @@ function renderVentasSummaryCards() {
       ...analysisPoints.map((row) => row.fin),
       escrituraFin || 0
     );
-  const duration = analysisEnd > analysisStart ? analysisEnd - analysisStart : 1;
+  const duration = analysisEnd >= analysisStart ? analysisEnd - analysisStart + 1 : 1;
   const velUf = totalVenta / duration;
   const velUn = totalUnidades / duration;
 
@@ -1926,7 +1926,7 @@ function renderVentasCashflowLegacy() {
 
       if (preventa) {
         const computed = getCronogramaComputed(preventa);
-        if (month >= computed.inicio && month < computed.fin) {
+        if (month >= computed.inicio && month <= computed.fin) {
           totalReserva += toNumber(config.reserva_uf) * (metrics.unidades * toNumber(preventa.porcentaje) / 100) / computed.duracion;
           totalCuotas += (metrics.ticket * toNumber(config.pie_cuotas_pct) / 100) * (metrics.unidades * toNumber(preventa.porcentaje) / 100) / computed.duracion;
         }
@@ -1934,14 +1934,14 @@ function renderVentasCashflowLegacy() {
 
       if (venta) {
         const computed = getCronogramaComputed(venta);
-        if (month >= computed.inicio && month < computed.fin) {
+        if (month >= computed.inicio && month <= computed.fin) {
           totalCuotas += (metrics.ticket * toNumber(config.pie_promesa_pct) / 100) * (metrics.unidades * toNumber(venta.porcentaje) / 100) / computed.duracion;
         }
       }
 
       if (escritura) {
         const computed = getCronogramaComputed(escritura);
-        if (month >= computed.inicio && month < computed.fin) {
+        if (month >= computed.inicio && month <= computed.fin) {
           totalEscritura += (metrics.ticket * toNumber(config.hipotecario_pct) / 100) * metrics.unidades / computed.duracion;
         }
       }
@@ -1981,7 +1981,7 @@ function renderVentasCashflow() {
   const escrituraRow = getCronogramaByType('ESCRITURACION')[0];
   const promesaComputed = promesaRow ? getCronogramaComputed(promesaRow) : null;
   const escrituraComputed = escrituraRow ? getCronogramaComputed(escrituraRow) : null;
-  const cuotaEndMonth = promesaComputed ? promesaComputed.fin + cuotaMonths - 2 : 0;
+  const cuotaEndMonth = promesaComputed ? promesaComputed.fin + cuotaMonths - 1 : 0;
   const months = buildTimelineMonths(cuotaEndMonth);
   const monthIndex = new Map(months.map((month, index) => [month, index]));
   setHtml('flujo-ventas-header', months.map((month) => `<th>${escapeHtml(formatVentasCashflowMonth(month))}</th>`).join(''));
@@ -2775,7 +2775,7 @@ function syncConstructionMilestone(duration = toNumber(state.construccion?.plazo
   if (index >= 0) {
     rows[index].nombre = 'Construcción';
     rows[index].duracion = targetDuration;
-    rows[index].fin = toNumber(rows[index].inicio) + targetDuration;
+    rows[index].fin = toNumber(rows[index].inicio) + targetDuration - 1;
     // Limpiar dependencia si apunta a una fila que ya no existe
     const depRef = rows[index].dependencia;
     if (depRef && !rows.some((r, i) => i !== index && String(r.nombre || '').trim() === depRef)) {
@@ -2792,7 +2792,7 @@ function syncConstructionMilestone(duration = toNumber(state.construccion?.plazo
       desfase: 0,
       inicio: 1,
       duracion: targetDuration,
-      fin: 1 + targetDuration,
+      fin: 1 + targetDuration - 1,
     });
   }
   state.gantt = normalizeGanttRows(rows);
@@ -2863,7 +2863,7 @@ function syncTerrainPurchaseMilestone() {
     desfase: toNumber(baseRow.desfase),
     inicio: indexSafeNumber(baseRow.inicio, 0),
     duracion: Math.max(1, toNumber(baseRow.duracion || 1)),
-    fin: indexSafeNumber(baseRow.inicio, 0) + Math.max(1, toNumber(baseRow.duracion || 1)),
+    fin: indexSafeNumber(baseRow.inicio, 0) + Math.max(1, toNumber(baseRow.duracion || 1)) - 1,
   };
 
   if (index >= 0) currentRows[index] = milestone;
@@ -2889,7 +2889,8 @@ function syncSalesDrivenMilestones() {
   const preventaUnits = Math.max(0, getPreventaUnitsTotal());
   const totalUnits = Math.max(0, getTotalCommercialUnits());
   const promiseDuration = Math.max(1, Math.ceil(preventaUnits / Math.max(1, velocity.promesas)));
-  const escrituraDuration = Math.max(1, Math.ceil(totalUnits / Math.max(1, velocity.escrituracion)));
+  const escrituraVelocity = Math.min(Math.max(1, velocity.promesas), Math.max(1, velocity.escrituracion));
+  const escrituraDuration = Math.max(1, Math.ceil(totalUnits / escrituraVelocity));
   const rows = Array.isArray(state.gantt) ? state.gantt.map((row) => ({ ...row })) : [];
 
   const ensureMilestone = (matcher, buildRow) => {
@@ -2919,14 +2920,14 @@ function syncSalesDrivenMilestones() {
     desfase: promiseDesfase,
     inicio: toNumber(baseRow.inicio),
     duracion: promiseDuration,
-    fin: toNumber(baseRow.inicio) + promiseDuration,
+    fin: toNumber(baseRow.inicio) + promiseDuration - 1,
   }));
 
   // Actualizar gantt temporalmente para que getConstructionStartFromPreventa use inicio_promesas correcto
   state.gantt = normalizeGanttRows(rows);
 
   const constructionRow = getConstructionMilestone() || rows.find((row) => /CONSTRUCCI[ÓO]N/i.test(String(row.nombre || '').trim()));
-  const defaultReceptionStart = constructionRow ? toNumber(constructionRow.fin) : 1;
+  const defaultReceptionStart = constructionRow ? toNumber(constructionRow.fin) + 1 : 1;
   const receptionRow = ensureMilestone(/^Recepción municipal$/i, (baseRow) => ({
     id: baseRow.id || '',
     nombre: 'Recepción municipal',
@@ -2966,7 +2967,7 @@ function syncSalesDrivenMilestones() {
         dependencia: '',
         desfase: 0,
         inicio: constrStart,
-        fin: constrStart + Math.max(1, toNumber(rows[constrIdx].duracion)),
+        fin: constrStart + Math.max(1, toNumber(rows[constrIdx].duracion)) - 1,
       };
     }
     // Con dependencia manual válida: no tocar — normalizeGanttRows hace el resto
@@ -3117,9 +3118,9 @@ function evaluateCostPartida(partida, context) {
 }
 
 function getProjectFinalMonth() {
-  const ganttEnd = state.gantt.reduce((max, row) => Math.max(max, toNumber(row.fin), toNumber(row.inicio) + toNumber(row.duracion)), 0);
-  const ventasEnd = state.ventasCronograma.reduce((max, row) => Math.max(max, toNumber(row.mes_inicio) + toNumber(row.duracion)), 0);
-  const constructionEnd = getConstructionStartMonth() + getConstructionDuration();
+  const ganttEnd = state.gantt.reduce((max, row) => Math.max(max, toNumber(row.fin), toNumber(row.inicio) + Math.max(1, toNumber(row.duracion || 1)) - 1), 0);
+  const ventasEnd = state.ventasCronograma.reduce((max, row) => Math.max(max, toNumber(row.mes_inicio) + Math.max(1, toNumber(row.duracion || 1)) - 1), 0);
+  const constructionEnd = getConstructionStartMonth() + getConstructionDuration() - 1;
   return Math.max(12, ganttEnd, ventasEnd, constructionEnd);
 }
 
@@ -4706,7 +4707,7 @@ function agregarHito() {
     desfase: 0,
     inicio: 0,
     duracion: 1,
-    fin: 1,
+    fin: 0,
   });
   renderGanttEditor(next);
   onGanttInputChange();
