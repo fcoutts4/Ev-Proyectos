@@ -966,7 +966,7 @@ function getGanttDependencyOptions(currentName) {
 const GANTT_CANONICAL_NAME_RULES = [
   { canonical: 'Compra terreno', pattern: /^(Compra terreno|Adquisicion de Terreno|Adquisición de Terreno|Compra de Terreno)$/i },
   { canonical: 'Construcción', pattern: /^Construcci[óo]n$/i },
-  { canonical: 'Aprobaci\u00f3n del Proyecto de Edificaci\u00f3n', pattern: /^(Aprobaci(?:o|\u00f3)n(?: del)? Proyecto(?: de)? Edificaci(?:o|\u00f3)n|Permiso(?: de)? Edificaci(?:o|\u00f3)n)$/i },
+  { canonical: 'Aprobaci\u00f3n del Proyecto de Edificaci\u00f3n', pattern: /^(Aprobaci(?:o|\u00f3)n(?: del)? Proyecto(?: de)? Edificaci(?:o|\u00f3)n|Aprobaci(?:o|\u00f3)n\s*P\.?\s*E\.?|Aprobaci(?:o|\u00f3)n\s*PE|Permiso(?: de)? Edificaci(?:o|\u00f3)n)$/i },
   { canonical: 'Promesas', pattern: /^(Promesas|Inicio promesas)$/i },
   { canonical: 'Postventa', pattern: /^Postventa$/i },
   { canonical: 'Recepción municipal', pattern: /^Recepci[óo]n municipal$/i },
@@ -2818,7 +2818,7 @@ function getEstudiosMilestone() {
 }
 
 function isBuildingApprovalMilestoneName(name) {
-  return /^(Aprobaci(?:o|\u00f3)n(?: del)? Proyecto(?: de)? Edificaci(?:o|\u00f3)n|Permiso(?: de)? Edificaci(?:o|\u00f3)n)$/i.test(String(name || '').trim());
+  return /^(Aprobaci(?:o|\u00f3)n(?: del)? Proyecto(?: de)? Edificaci(?:o|\u00f3)n|Aprobaci(?:o|\u00f3)n\s*P\.?\s*E\.?|Aprobaci(?:o|\u00f3)n\s*PE|Permiso(?: de)? Edificaci(?:o|\u00f3)n)$/i.test(String(name || '').trim());
 }
 
 function getBuildingApprovalMilestone(rows = state.gantt) {
