@@ -1900,7 +1900,7 @@ function renderVentasSummaryCards() {
 
 function renderVentasCashflowLegacy() {
   const months = buildTimelineMonths();
-  setHtml('flujo-ventas-header', `<th>Concepto</th>${months.map((month) => `<th>M${fmtNumber(month)}</th>`).join('')}`);
+  setHtml('flujo-ventas-header', months.map((month) => `<th>M${fmtNumber(month)}</th>`).join(''));
 
   const reservations = [];
   const cuotas = [];
@@ -1953,13 +1953,13 @@ function renderVentasCashflowLegacy() {
 
   setHtml('flujo-ventas-tbody', rows.map((row) => `
     <tr>
-      <td>${row.label}</td>
       ${row.values.map((value) => `<td>${fmtTableAmount(value, { kind: 'income' })}</td>`).join('')}
     </tr>
   `).join(''));
 
   const totals = months.map((_, index) => rows.reduce((sum, row) => sum + row.values[index], 0));
-  setHtml('flujo-ventas-tfoot', `<td>Total</td>${totals.map((value) => `<td>${fmtTableAmount(value, { kind: 'income', total: true })}</td>`).join('')}`);
+  renderFinanceFixedColumn('flujo-ventas', rows, { footerLabel: 'Total' });
+  setHtml('flujo-ventas-tfoot', totals.map((value) => `<td>${fmtTableAmount(value, { kind: 'income', total: true })}</td>`).join(''));
 }
 
 function renderVentasCashflow() {
@@ -1977,7 +1977,7 @@ function renderVentasCashflow() {
   const cuotaEndMonth = promesaComputed ? promesaComputed.fin + cuotaMonths - 2 : 0;
   const months = buildTimelineMonths(cuotaEndMonth);
   const monthIndex = new Map(months.map((month, index) => [month, index]));
-  setHtml('flujo-ventas-header', `<th>Concepto</th>${months.map((month) => `<th>${escapeHtml(formatVentasCashflowMonth(month))}</th>`).join('')}`);
+  setHtml('flujo-ventas-header', months.map((month) => `<th>${escapeHtml(formatVentasCashflowMonth(month))}</th>`).join(''));
 
   const pieUnidad = totals.precioPromedio * piePct / 100;
   const montoPromesaUnidad = pieUnidad * promesaSobrePiePct / 100;
@@ -2038,13 +2038,13 @@ function renderVentasCashflow() {
 
   setHtml('flujo-ventas-tbody', rows.map((row) => `
     <tr>
-      <td>${row.label}</td>
       ${row.values.map((value) => `<td>${row.kind === 'units' ? fmtNumber(value) : fmtTableAmount(value, { kind: 'income' })}</td>`).join('')}
     </tr>
   `).join(''));
 
   const ingresos = months.map((_, index) => promesasUf[index] + cuotasUf[index] + escrituracionUf[index]);
-  setHtml('flujo-ventas-tfoot', `<td>Total ingresos UF</td>${ingresos.map((value) => `<td>${fmtTableAmount(value, { kind: 'income', total: true })}</td>`).join('')}`);
+  renderFinanceFixedColumn('flujo-ventas', rows, { footerLabel: 'Total ingresos UF' });
+  setHtml('flujo-ventas-tfoot', ingresos.map((value) => `<td>${fmtTableAmount(value, { kind: 'income', total: true })}</td>`).join(''));
 }
 
 function renderCostStructure() {

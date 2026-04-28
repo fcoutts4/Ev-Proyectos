@@ -1224,12 +1224,21 @@ table:not(.gantt-table) .tfoot-dark td,
         <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('flujo-ventas-scroll', 480)" style="font-size:11px">Mes →</button>
       </div>
     </div>
-    <div id="flujo-ventas-scroll" class="tbl-scroll" style="border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px">
-      <table id="flujo-ventas-table" style="min-width:1200px">
-        <thead><tr id="flujo-ventas-header" style="background:#1e293b"></tr></thead>
-        <tbody id="flujo-ventas-tbody"></tbody>
-        <tfoot><tr class="tfoot-dark" id="flujo-ventas-tfoot" style="background:#0f172a"></tr></tfoot>
-      </table>
+    <div id="flujo-ventas-scroll" class="finance-split-shell" style="border-top:none;border-radius:0 0 10px 10px">
+      <div class="finance-split-fixed">
+        <table>
+          <thead id="flujo-ventas-fixed-head"></thead>
+          <tbody id="flujo-ventas-fixed-tbody"></tbody>
+          <tfoot id="flujo-ventas-fixed-tfoot"></tfoot>
+        </table>
+      </div>
+      <div id="flujo-ventas-month-scroll" class="finance-split-scroll">
+        <table id="flujo-ventas-table" style="min-width:980px">
+          <thead><tr id="flujo-ventas-header" style="background:#1e293b"></tr></thead>
+          <tbody id="flujo-ventas-tbody"></tbody>
+          <tfoot><tr class="tfoot-dark" id="flujo-ventas-tfoot" style="background:#0f172a"></tr></tfoot>
+        </table>
+      </div>
     </div>
   </div>
 
