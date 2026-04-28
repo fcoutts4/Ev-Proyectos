@@ -3049,13 +3049,14 @@ function getGanttLockConfig(row) {
   const name = String(row?.nombre || '').trim();
   if (/^(Promesas|Inicio promesas)$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: false, hint: 'Inicio ligado al mes siguiente del fin de Aprobacion del Proyecto de Edificacion; duracion calculada desde Ventas.' };
   if (/^Escrituraci(?:o|\u00f3)n$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: false, hint: 'Inicio ligado al mes siguiente del fin de Recepcion municipal; duracion calculada desde Ventas con techo de promesas acumuladas.' };
+  if (isBuildingApprovalMilestoneName(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
   // Filas clave: nombre y borrado bloqueados; dependencia, fechas y duración editables.
   if (/^Compra terreno$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
   if (/^Construcci[óo]n$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Nombre protegido. Duración viene de la hoja de Construcción.' };
   if (/^(Promesas|Inicio promesas)$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Duración calculada desde la hoja Ventas.' };
   if (/^Recepci[óo]n municipal$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
   if (/^Escrituraci[óo]n$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Duración calculada desde Ventas con techo de promesas acumuladas.' };
-  return { fixed: false, name: false, dependency: false, start: false, duration: false, delete: false, drag: false, hint: '' };
+  return { fixed: false, name: true, dependency: false, start: false, duration: false, delete: false, drag: false, hint: 'Nombre bloqueado para evitar romper dependencias; usa este hito auxiliar para controlar costos o fechas.' };
 }
 
 function getPartidaFormulaText(partida) {
@@ -4747,7 +4748,7 @@ function agregarHito() {
   const next = readGanttEditor();
   next.push({
     id: '',
-    nombre: `Nuevo hito ${next.length + 1}`,
+    nombre: `Hito auxiliar ${next.length + 1}`,
     color: '#3b82f6',
     dependencia: null,
     dependencia_tipo: 'fin',
