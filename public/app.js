@@ -2224,7 +2224,7 @@ function renderConstructionEP() {
 
   setHtml('constr-ep-head', `
     <tr>
-      <th class="finance-concept-col" style="min-width:200px;text-align:left">Concepto</th>
+      <th class="finance-concept-col finance-sticky-left finance-sticky-head" style="left:0;width:220px;min-width:220px;max-width:260px;text-align:left">Concepto</th>
       <th style="width:60px;text-align:center">ƒx</th>
       <th class="finance-total-col" style="width:110px;text-align:right">Total</th>
       ${labels.map((l) => `<th data-month-col>${escapeHtml(l)}</th>`).join('')}
@@ -2248,7 +2248,7 @@ function renderConstructionEP() {
     const bg = r.bold ? 'background:#f0fdf4' : '';
     return `
       <tr class="${r.bold ? 'finance-total-row' : ''}" style="${bg}">
-        <td class="finance-concept-col" style="text-align:left;font-weight:${r.bold ? 800 : 600};color:${r.bold ? '#166534' : '#334155'}">${escapeHtml(r.label)}</td>
+        <td class="finance-concept-col finance-sticky-left" style="left:0;width:220px;min-width:220px;max-width:260px;text-align:left;font-weight:${r.bold ? 800 : 600};color:${r.bold ? '#166534' : '#334155'}">${escapeHtml(r.label)}</td>
         <td style="text-align:center;position:relative" class="formula-host">
           <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #cbd5e1;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">ƒx</button>
           <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;left:0;top:100%;margin-top:4px;background:#0f172a;color:#fff;border-radius:8px;padding:10px 12px;min-width:260px;max-width:360px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">
@@ -2302,7 +2302,7 @@ function renderConstructionGF(epData) {
 
   setHtml('constr-fin-planilla-head', `
     <tr>
-      <th class="finance-concept-col" style="min-width:200px;text-align:left">Concepto</th>
+      <th class="finance-concept-col finance-sticky-left finance-sticky-head" style="left:0;width:220px;min-width:220px;max-width:260px;text-align:left">Concepto</th>
       <th style="width:60px;text-align:center">ƒx</th>
       <th class="finance-total-col" style="width:110px;text-align:right">Total</th>
       ${labels.map((l) => `<th data-month-col>${escapeHtml(l)}</th>`).join('')}
@@ -2322,7 +2322,7 @@ function renderConstructionGF(epData) {
     const bg = r.bold ? 'background:#f8fafc' : '';
     return `
       <tr class="${r.bold ? 'finance-total-row' : ''}" style="${bg}">
-        <td class="finance-concept-col" style="text-align:left;font-weight:${r.bold ? 800 : 600};color:${r.color}">${escapeHtml(r.label)}</td>
+        <td class="finance-concept-col finance-sticky-left" style="left:0;width:220px;min-width:220px;max-width:260px;text-align:left;font-weight:${r.bold ? 800 : 600};color:${r.color}">${escapeHtml(r.label)}</td>
         <td style="text-align:center;position:relative" class="formula-host">
           <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #cbd5e1;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">ƒx</button>
           <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;left:0;top:100%;margin-top:4px;background:#0f172a;color:#fff;border-radius:8px;padding:10px 12px;min-width:260px;max-width:360px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">
@@ -2580,7 +2580,7 @@ function renderFinancingSourcePlanilla(sourceType) {
 
     setHtml('terreno-fin-planilla-head', `
       <tr>
-        <th class="finance-concept-col" style="position:sticky;left:0;z-index:10;background:#eef3f8;min-width:200px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:1px 0 0 #e2e8f0">Concepto</th>
+        <th class="finance-concept-col finance-sticky-left finance-sticky-head" style="left:0;width:220px;min-width:220px;max-width:260px;text-align:left">Concepto</th>
         <th style="width:60px;text-align:center">ƒx</th>
         ${labels.map((l) => `<th data-month-col>${escapeHtml(l)}</th>`).join('')}
       </tr>
@@ -2598,7 +2598,7 @@ function renderFinancingSourcePlanilla(sourceType) {
       const bg = r.bold ? 'background:#f8fafc' : '';
       return `
         <tr class="${r.bold ? 'finance-total-row' : ''}" style="${bg}">
-          <td class="finance-concept-col" style="position:sticky;left:0;z-index:5;background:${r.bold ? '#f8fafc' : '#fff'};text-align:left;font-weight:${r.bold ? 800 : 600};color:${r.color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px;box-shadow:1px 0 0 #e2e8f0">${escapeHtml(r.label)}</td>
+          <td class="finance-concept-col finance-sticky-left" style="left:0;width:220px;min-width:220px;max-width:260px;background:${r.bold ? '#f8fafc' : '#fff'};text-align:left;font-weight:${r.bold ? 800 : 600};color:${r.color}">${escapeHtml(r.label)}</td>
           <td style="text-align:center;position:relative" class="formula-host">
             <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #cbd5e1;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">ƒx</button>
             <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;left:0;top:100%;margin-top:4px;background:#0f172a;color:#fff;border-radius:8px;padding:10px 12px;min-width:260px;max-width:360px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">
