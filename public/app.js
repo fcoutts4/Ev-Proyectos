@@ -1444,7 +1444,7 @@ function ensureVentasState() {
       pie_cuotas_pct: toNumber(existing.pie_cuotas_pct),
       hipotecario_pct: toNumber(existing.hipotecario_pct),
       pie_cuoton_pct: toNumber(existing.pie_cuoton_pct),
-      forma_pago_promesa: ['unico', 'cuotas', 'cascada'].includes(String(existing.forma_pago_promesa || '').trim())
+      forma_pago_promesa: ['unico', 'cuotas'].includes(String(existing.forma_pago_promesa || '').trim())
         ? String(existing.forma_pago_promesa).trim()
         : 'unico',
     };
@@ -1574,7 +1574,7 @@ function getGlobalPaymentSettings() {
     pie_promesa_pct: toNumber(source.pie_promesa_pct),
     pie_cuotas_pct: toNumber(source.pie_cuotas_pct),
     pie_cuoton_pct: Math.max(1, toNumber(source.pie_cuoton_pct) || 1),
-    forma_pago_promesa: ['unico', 'cuotas', 'cascada'].includes(String(source.forma_pago_promesa || '').trim())
+    forma_pago_promesa: ['unico', 'cuotas'].includes(String(source.forma_pago_promesa || '').trim())
       ? String(source.forma_pago_promesa).trim()
       : 'unico',
   };
@@ -1697,7 +1697,6 @@ function renderVentasPaymentForms() {
   const modeLabels = {
     unico: 'Pago unico',
     cuotas: 'Pago en cuotas',
-    cascada: 'Pago cascada',
   };
 
   setHtml('formas-pago-tbody', `
@@ -2042,14 +2041,6 @@ function renderVentasCashflow() {
 
     if (mode === 'unico') {
       promesasUf[index] += ufPromesaTotalMes;
-    } else if (mode === 'cascada') {
-      const escrituraStart = escrituraComputed ? Math.max(month, escrituraComputed.inicio) : month + cuotaMonths - 1;
-      const span = Math.max(1, escrituraStart - month);
-      const cuotaCascada = ufPromesaTotalMes / span;
-      for (let offset = 0; offset < span; offset += 1) {
-        const targetIndex = monthIndex.get(month + offset);
-        if (targetIndex !== undefined) promesasUf[targetIndex] += cuotaCascada;
-      }
     } else {
       const cuotaMensual = cuotaMonths ? ufPromesaTotalMes / cuotaMonths : ufPromesaTotalMes;
       for (let offset = 0; offset < cuotaMonths; offset += 1) {
@@ -3718,7 +3709,6 @@ function getProjectMonthlyIncome(monthCount) {
   const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct));
   const escrituraPct = Math.max(0, 100 - piePct);
   const cuotaMonths = Math.max(1, Math.round(toNumber(settings.pie_cuoton_pct) || 1));
-  const escrituraComputed = getCronogramaByType('ESCRITURACION')[0] ? getCronogramaComputed(getCronogramaByType('ESCRITURACION')[0]) : null;
   const pieUnidad = totals.precioPromedio * piePct / 100;
   const escrituraUnidad = totals.precioPromedio * escrituraPct / 100;
   const { promesas: promesasArr, escrituras: escriturasArr } = getPromesasEscrituracionUnidades(monthCount);
@@ -3729,13 +3719,6 @@ function getProjectMonthlyIncome(monthCount) {
     const promesaTotal = unidadesPromesa * pieUnidad;
     if (settings.forma_pago_promesa === 'unico') {
       income[month] += promesaTotal;
-    } else if (settings.forma_pago_promesa === 'cascada') {
-      const escrituraStart = escrituraComputed ? Math.max(month, escrituraComputed.inicio) : month + cuotaMonths - 1;
-      const span = Math.max(1, escrituraStart - month);
-      const cuotaCascada = promesaTotal / span;
-      for (let offset = 0; offset < span; offset += 1) {
-        if (month + offset < income.length) income[month + offset] += cuotaCascada;
-      }
     } else {
       const cuotaMensual = cuotaMonths ? promesaTotal / cuotaMonths : promesaTotal;
       for (let offset = 0; offset < cuotaMonths; offset += 1) {
