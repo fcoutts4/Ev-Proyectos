@@ -5709,13 +5709,16 @@ function renderCostConfigFormulaInput(value = '', label = 'Fórmula', options = 
   `;
 }
 
-function renderCostConfigFields() {
+function renderCostConfigFields(options = {}) {
   if (!$('cost-config-fields')) return;
-  const previous = readCostConfigForm();
+  const fromDraft = options === true || !!options?.fromDraft;
+  const previous = fromDraft
+    ? (normalizeCostConfig(state.costosUi.costConfigDraft) || { method: 'manual', start: makeCostPoint(), end: makeCostPoint() })
+    : readCostConfigForm();
   const method = $('cost-config-method')?.value || previous.method || 'manual';
   const config = normalizeCostConfig({ ...previous, method }) || { method, start: makeCostPoint(), end: makeCostPoint() };
   state.costosUi.costConfigDraft = config;
-  const deleteButton = (type, idx, title) => `<button class="btn-outline btn-plus" type="button" title="${escapeHtml(title)}" onclick="removeCostConfigLine('${type}', ${idx})">&times;</button>`;
+  const deleteButton = (type, idx, title) => `<button class="btn-outline btn-plus cost-config-delete" type="button" title="${escapeHtml(title)}" onclick="removeCostConfigLine('${type}', ${idx}); return false;">&times;</button>`;
 
   let html = '';
   if (method === 'manual') {
@@ -5765,7 +5768,7 @@ function renderCostConfigFields() {
       </div>
     `;
   } else if (method === 'milestones') {
-    const hitos = config.hitos?.length ? config.hitos : [{ ref: 'MANUAL_0', offset: 0, kind: 'pct', amount: 0, pct: 100 }];
+    const hitos = Array.isArray(config.hitos) ? config.hitos : [];
     const rows = hitos.map((item, idx) => {
       const pctValue = item.kind === 'pct'
         ? toNumber(item.pct)
@@ -5799,18 +5802,19 @@ function renderCostConfigFields() {
       <div class="cost-config-panel">
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:8px">
           <div class="cost-config-label" style="margin-bottom:0">Pagos por hito</div>
-          <button class="btn-outline cost-config-add" type="button" onclick="addCostConfigLine('hito')">+ Hito</button>
+          <button class="btn-outline cost-config-add" type="button" onclick="addCostConfigLine('hito'); return false;">+ Hito</button>
         </div>
-        <div id="cost-config-hitos" class="cost-config-list compact">${rows}</div>
+        <div id="cost-config-hitos" class="cost-config-list compact">${rows || '<div class="cost-config-empty">Sin hitos. Usa + Hito para agregar un pago puntual por porcentaje.</div>'}</div>
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin:10px 0 8px">
           <div class="cost-config-label" style="margin-bottom:0">Distribuido dentro del total</div>
-          <button class="btn-outline cost-config-add" type="button" onclick="addCostConfigLine('tramo')">+ Tramo</button>
+          <button class="btn-outline cost-config-add" type="button" onclick="addCostConfigLine('tramo'); return false;">+ Tramo</button>
         </div>
-        <div id="cost-config-tramos" class="cost-config-list compact">${tramoRows || '<div style="font-size:11px;color:#94a3b8">Sin tramo distribuido.</div>'}</div>
+        <div id="cost-config-tramos" class="cost-config-list compact">${tramoRows || '<div class="cost-config-empty">Sin tramo distribuido. Usa + Tramo para repartir un porcentaje entre dos fechas.</div>'}</div>
       </div>
     `;
   } else if (method === 'manual_distribution') {
-    const rows = (config.payments?.length ? config.payments : [{ ref: 'MANUAL_0', offset: 0, amount: 0 }]).map((item, idx) => `
+    const payments = Array.isArray(config.payments) ? config.payments : [];
+    const rows = payments.map((item, idx) => `
       <div class="cost-config-line payment">
         ${renderCostConfigField('Fecha/Hito', `<select class="inp" data-field="ref" onchange="updateCostConfigPreview()">${renderCostConfigRefOptions(item.ref)}</select>`)}
         ${renderCostConfigField('Monto UF', `<input class="inp" data-field="amount" type="text" inputmode="decimal" data-localized-number="1" value="${fmtInputNumber(item.amount, 2)}" placeholder="Monto UF" oninput="updateCostConfigPreview()">`)}
@@ -5822,9 +5826,9 @@ function renderCostConfigFields() {
       <div class="cost-config-panel">
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:8px">
           <div class="cost-config-label" style="margin-bottom:0">Pagos puntuales</div>
-          <button class="btn-outline cost-config-add" type="button" onclick="addCostConfigLine('payment')">+ Pago</button>
+          <button class="btn-outline cost-config-add" type="button" onclick="addCostConfigLine('payment'); return false;">+ Pago</button>
         </div>
-        <div id="cost-config-payments" class="cost-config-list">${rows}</div>
+        <div id="cost-config-payments" class="cost-config-list">${rows || '<div class="cost-config-empty">Sin pagos puntuales. Usa + Pago para agregar una fecha y monto.</div>'}</div>
       </div>
     `;
   }
@@ -5885,6 +5889,10 @@ function updateCostConfigPreview() {
   const labels = getCostMonthLabels();
   setHtml('cost-config-preview', `
     <div class="cost-config-preview-row">
+      <div class="cost-config-preview-month cost-config-preview-total-card">
+        <div class="cost-config-preview-label">Total</div>
+        <div class="cost-config-preview-value">${fmtUf(total)}</div>
+      </div>
       ${labels.map((label, index) => {
         const value = toNumber(monthly[index]);
         return `<div class="cost-config-preview-month ${value ? 'has-value' : ''}">
@@ -5908,7 +5916,7 @@ function openCostConfigModal(categoryName, index) {
   setText('cost-config-subtitle', 'Define cómo nace el costo; el flujo mensual y el total se calculan automáticamente.');
   const methodSelect = $('cost-config-method');
   if (methodSelect) methodSelect.value = state.costosUi.costConfigDraft.method || 'manual';
-  renderCostConfigFields();
+  renderCostConfigFields({ fromDraft: true });
   updateCostConfigPreview();
   $('cost-config-modal').style.display = 'flex';
 }
@@ -5961,7 +5969,7 @@ function addCostConfigLine(type) {
   if (type === 'tramo') config.tramos = [...(config.tramos || []), { pct: 0, inicio_ref: 'MANUAL_0', inicio_offset: 0, fin_ref: 'MANUAL_0', fin_offset: 0 }];
   if (type === 'payment') config.payments = [...(config.payments || []), { ref: 'MANUAL_0', offset: 0, amount: 0 }];
   state.costosUi.costConfigDraft = config;
-  renderCostConfigFields();
+  renderCostConfigFields({ fromDraft: true });
   updateCostConfigPreview();
 }
 
@@ -5971,7 +5979,7 @@ function removeCostConfigLine(type, index) {
   if (type === 'tramo') config.tramos = (config.tramos || []).filter((_, idx) => idx !== index);
   if (type === 'payment') config.payments = (config.payments || []).filter((_, idx) => idx !== index);
   state.costosUi.costConfigDraft = config;
-  renderCostConfigFields();
+  renderCostConfigFields({ fromDraft: true });
   updateCostConfigPreview();
 }
 

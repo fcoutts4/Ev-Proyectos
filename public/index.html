@@ -135,8 +135,11 @@ tbody tr:hover{background:#f8fafc}
 .cost-config-state.estado-hitos{background:#ede9fe;color:#6d28d9;border-color:#ddd6fe}
 .cost-config-total{font-size:17px;font-weight:900;color:#0f172a}
 .cost-config-preview{height:82px;overflow-x:auto;overflow-y:hidden;border:1px solid #e2e8f0;border-radius:10px;background:#fff}
-.cost-config-preview-row{display:flex;gap:7px;align-items:stretch;height:100%;min-width:max-content;padding:8px}
+.cost-config-preview-row{display:flex;gap:7px;align-items:center;height:100%;min-width:max-content;padding:8px}
 .cost-config-preview-month{min-width:92px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;padding:7px 8px;display:flex;flex-direction:column;justify-content:center;gap:4px}
+.cost-config-preview-total-card{position:sticky;left:8px;z-index:2;min-width:112px;text-align:center;align-items:center;background:#fff!important;border-color:#cbd5e1;box-shadow:8px 0 14px -14px rgba(15,23,42,.42)}
+.cost-config-preview-total-card .cost-config-preview-label{color:#0f172a}
+.cost-config-preview-total-card .cost-config-preview-value{font-size:12px}
 .cost-config-preview-month.has-value{background:#ecfeff;border-color:#67e8f9}
 .cost-config-preview-label{font-size:10px;font-weight:800;color:#475569;white-space:nowrap}
 .cost-config-preview-value{font-size:11px;font-weight:900;color:#0f172a;white-space:nowrap}
@@ -151,6 +154,8 @@ tbody tr:hover{background:#f8fafc}
 .cost-config-warning.is-warn{background:#fff7ed;color:#9a3412;border-color:#fed7aa}
 .cost-config-warning.is-error{background:#fee2e2;color:#991b1b;border-color:#fecaca}
 .cost-config-add{height:28px;padding:0 10px;font-size:10px}
+.cost-config-delete{height:30px!important;min-height:30px!important;width:32px;padding:0!important;font-size:14px!important}
+.cost-config-empty{font-size:11px;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px;padding:9px 10px;background:#f8fafc}
 .cost-config-pill{display:inline-flex;align-items:center;justify-content:center;min-width:84px;max-width:112px;padding:3px 8px;border-radius:999px;font-size:9px;font-weight:800;line-height:1.1;border:1px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
 .cost-config-pill.estado-ok{background:#dcfce7;color:#166534;border-color:#bbf7d0}
 .cost-config-pill.estado-pendiente{background:#fee2e2;color:#991b1b;border-color:#fecaca}
@@ -610,6 +615,17 @@ tbody tr:hover{background:#f3f7fb!important}
 .flow-planilla thead th{position:sticky;top:0;z-index:2}
 .flow-category-row td{background:var(--bg-soft)!important;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#334155!important;border-bottom:2px solid var(--border-strong)!important;padding:7px 8px}
 .flow-category-title{display:flex;align-items:center;gap:8px}
+.flow-row-label{display:flex;align-items:center;gap:7px;min-width:0}
+.flow-row-label span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.flow-toggle{width:22px;height:22px;min-height:22px!important;border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:6px;font-size:11px;font-weight:800;line-height:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}
+.flow-toggle:hover{background:#eef3f8}
+.flow-origin{font-size:10px;color:#64748b;font-weight:700;line-height:1.25;max-width:320px}
+.flow-row-level-1 td:first-child{padding-left:24px!important}
+.flow-row-level-2 td:first-child{padding-left:44px!important}
+.flow-row-total td{background:#eef3f8!important;font-weight:700!important}
+.flow-row-subtotal td{background:#e8f3ed!important;font-weight:800!important;border-top:2px solid #9cc7ad!important}
+.flow-row-iva td{background:#f8fafc!important;font-weight:700!important}
+.flow-row-muted td{color:#475569!important}
 .flow-value-cost,.amount-cost,.flow-value-negative,.amount-negative{color:#334155!important}
 .gf-param-panel{background:#f8fafc;border:1px solid var(--border-strong);border-radius:10px;padding:12px;margin-bottom:12px}
 .gf-param-panel .inp{font-weight:700}
@@ -2425,106 +2441,429 @@ table:not(.gantt-table) .tfoot-dark td,
     window.renderConstructionGF = renderConstructionGF;
   }
 
+  function normalizeMonthlySeries(values, monthCount) {
+    const source = Array.isArray(values) ? values : [];
+    return Array.from({ length: monthCount }, (_, index) => toNumber(source[index]));
+  }
+
+  function sumMonthlySeries(seriesList, monthCount) {
+    const result = createMonthlyArray(monthCount, 0);
+    (seriesList || []).forEach((series) => {
+      normalizeMonthlySeries(series, monthCount).forEach((value, index) => {
+        result[index] += toNumber(value);
+      });
+    });
+    return result;
+  }
+
+  function isFlowCollapsedKey(key, defaultCollapsed) {
+    if (Object.prototype.hasOwnProperty.call(patchState.flowCollapsed, key)) {
+      return !!patchState.flowCollapsed[key];
+    }
+    return !!defaultCollapsed;
+  }
+
+  function getCostFlowStructure(monthCount) {
+    const categories = (typeof ensureCostosState === 'function' ? ensureCostosState() : [])
+      .filter((category) => category.nombre !== 'GASTOS FINANCIEROS')
+      .map((category, categoryIndex) => {
+        const partidas = (category.partidas || []).map((partida, partidaIndex) => {
+          const values = normalizeMonthlySeries(getMonthlyDistributionForPartida(partida, monthCount), monthCount);
+          return {
+            key: `flow_gastos_${categoryIndex}_${partidaIndex}`,
+            label: partida.nombre || `Subpartida ${partidaIndex + 1}`,
+            values,
+            origin: partida.tiene_iva ? 'Neto sin IVA · IVA activo' : 'Neto sin IVA',
+          };
+        });
+        return {
+          key: `flow_gastos_cat_${normToken(category.nombre) || categoryIndex}`,
+          label: category.nombre || `Categoria ${categoryIndex + 1}`,
+          values: sumMonthlySeries(partidas.map((partida) => partida.values), monthCount),
+          partidas,
+        };
+      })
+      .filter((category) => category.partidas.length);
+
+    return {
+      categories,
+      total: sumMonthlySeries(categories.map((category) => category.values), monthCount),
+    };
+  }
+
+  function getTerrainFinancialFlowForCashflow(monthCount) {
+    const cfg = getGlobalFinancialParams();
+    const fin = state.financiamiento || {};
+    const tasaTerreno = toNumber(fin.credito_terreno_tasa);
+    const tasaMensual = (tasaTerreno / 100) / 12;
+    const timbrePct = toNumber(cfg.pct_timbres) / 100;
+    const maxMonth = Math.max(0, monthCount - 1);
+    const terrainBase = getTerrainBaseCost();
+    const approved = fin.credito_terreno_activo
+      ? terrainBase * toNumber(fin.credito_terreno_pct) / 100
+      : 0;
+    const terrainMilestone = typeof getTerrainMilestone === 'function' ? getTerrainMilestone() : null;
+    const terrainPurchaseMonth = Math.min(maxMonth, Math.max(0, toNumber(terrainMilestone?.inicio || 0)));
+    const anticipoLineaMonth = Math.max(0, Math.min(maxMonth, getConstructionStartMonth() - 1));
+    const giros = createMonthlyArray(monthCount, 0);
+    const pagosLinea = createMonthlyArray(monthCount, 0);
+    const acumulado = createMonthlyArray(monthCount, 0);
+    const stamp = createMonthlyArray(monthCount, 0);
+
+    if (monthCount) {
+      giros[terrainPurchaseMonth] = approved;
+      pagosLinea[anticipoLineaMonth] = -approved;
+    }
+
+    let prevAcum = 0;
+    for (let index = 0; index < monthCount; index += 1) {
+      stamp[index] = Math.max(0, toNumber(giros[index])) * timbrePct;
+      acumulado[index] = prevAcum + toNumber(giros[index]) + toNumber(pagosLinea[index]);
+      prevAcum = acumulado[index];
+    }
+
+    const interest = createMonthlyArray(monthCount, 0);
+    let accrued = 0;
+    for (let index = 0; index < monthCount; index += 1) {
+      accrued += Math.max(0, toNumber(acumulado[index])) * tasaMensual;
+      const monthsSinceGiro = index - terrainPurchaseMonth;
+      const isAnniversary = monthsSinceGiro > 0 && monthsSinceGiro % 12 === 0;
+      const isCreditPaidOff = acumulado[index] <= 0 && index > 0 && acumulado[index - 1] > 0;
+      if ((isAnniversary || isCreditPaidOff) && accrued > 0) {
+        interest[index] = accrued;
+        accrued = 0;
+      }
+    }
+    if (monthCount && accrued > 0) interest[monthCount - 1] += accrued;
+
+    return { interest, stamp };
+  }
+
+  function getConstructionEPFlowForCashflow(monthCount) {
+    const data = typeof computeConstructionEP === 'function' ? computeConstructionEP() : null;
+    if (!data) return { totalPago: createMonthlyArray(monthCount, 0) };
+    const cfg = getGlobalFinancialParams();
+    const series = {};
+    const scalars = { CEEC: cfg.pct_ceec };
+
+    addSeries(series, 'EDPP bruto fuente', normalizeMonthlySeries(data.ep, monthCount), 'edpp_bruto_fuente');
+    addSeries(series, 'Anticipo unico fuente', normalizeMonthlySeries(data.anticipo, monthCount), 'anticipo_unico_fuente');
+    addSeries(series, 'Retenciones fuente', normalizeMonthlySeries(data.retenciones, monthCount), 'retenciones_fuente');
+
+    function evaluateEpRow(key, label, fallback, formula, rowScalars = scalars) {
+      const values = normalizeMonthlySeries(evaluateSeries(getFormula('ep', key, formula), series, rowScalars, normalizeMonthlySeries(fallback, monthCount)), monthCount);
+      addSeries(series, label, values, key);
+      return values;
+    }
+
+    evaluateEpRow('ep_bruto', 'EP (EDPP bruto)', data.ep, '[EDPP bruto fuente]');
+    evaluateEpRow('anticipo', 'Anticipo', data.anticipo, '[Anticipo unico fuente]');
+    evaluateEpRow('retenciones', 'Retenciones', data.retenciones, '[Retenciones fuente]');
+    const subtotal = evaluateEpRow('subtotal', 'Subtotal neto', data.subtotal, '[EP (EDPP bruto)] + [Anticipo] + [Retenciones]');
+    evaluateEpRow('iva_bruto', 'IVA bruto (19%)', data.ivaBruto, '[Subtotal neto] * 0.19');
+    evaluateEpRow('ceec', `CEEC (${fmtInputNumber(cfg.pct_ceec, 2)}%)`, data.ceec, '[IVA bruto (19%)] * [CEEC] / 100');
+    const ivaEfectivo = evaluateEpRow('iva_efectivo', 'IVA efectivo', data.ivaEfectivo, '[IVA bruto (19%)] - [CEEC]', {});
+    const totalPago = evaluateEpRow('total_pago', 'TOTAL A PAGO (c/IVA)', data.totalPago, '[Subtotal neto] + [IVA efectivo]', {});
+
+    return Object.assign({}, data, { totalPago, subtotal, ivaEfectivo });
+  }
+
+  function getConstructionFinancialFlowForCashflow(monthCount) {
+    const cfg = getGlobalFinancialParams();
+    const income = getProjectMonthlyIncome(monthCount);
+    const epData = getConstructionEPFlowForCashflow(monthCount);
+    const girosSource = normalizeMonthlySeries(epData.totalPago, monthCount);
+    const pagosLineaDefault = createMonthlyArray(monthCount, 0);
+    const acumuladoDefault = createMonthlyArray(monthCount, 0);
+    let prevAcumDefault = 0;
+    for (let index = 0; index < monthCount; index += 1) {
+      const giro = toNumber(girosSource[index]);
+      const pagoMax = Math.max(0, Math.min(prevAcumDefault + giro, toNumber(income[index])));
+      pagosLineaDefault[index] = -pagoMax;
+      acumuladoDefault[index] = prevAcumDefault + giro + pagosLineaDefault[index];
+      prevAcumDefault = acumuladoDefault[index];
+    }
+
+    const series = {};
+    const scalars = {
+      Tasa_interes_construccion: cfg.tasa_construccion,
+      Timbres: cfg.pct_timbres,
+    };
+    addSeries(series, 'GIROS fuente', girosSource, 'giros_fuente');
+    addSeries(series, 'PAGOS LINEA fuente', pagosLineaDefault, 'pagos_linea_fuente');
+
+    const girosFormula = getFormula('gf', 'giros', '[GIROS fuente]');
+    const giros = normalizeMonthlySeries(evaluateSeries(girosFormula, series, scalars, girosSource), monthCount);
+    addSeries(series, 'GIROS (desde EP)', giros, 'giros');
+
+    const pagosLineaFormula = getFormula('gf', 'pagos_linea', '[PAGOS LINEA fuente]');
+    const pagosLinea = normalizeMonthlySeries(evaluateSeries(pagosLineaFormula, series, scalars, pagosLineaDefault), monthCount);
+    addSeries(series, 'PAGOS LINEA', pagosLinea, 'pagos_linea');
+
+    const acumuladoFormula = getFormula('gf', 'acumulado', '[Acumulado anterior] + [GIROS (desde EP)] + [PAGOS LINEA]');
+    const acumulado = [];
+    acumuladoDefault.forEach((fallbackValue, index) => {
+      const context = buildFormulaContext(series, scalars, index, { 'Acumulado anterior': acumulado[index - 1] || 0 });
+      const value = evalFormulaValue(acumuladoFormula, context);
+      acumulado.push(value === null ? fallbackValue : value);
+    });
+    addSeries(series, 'ACUMULADO', acumulado, 'acumulado');
+
+    const interestDefault = acumulado.map((value) => Math.max(0, toNumber(value)) * (toNumber(cfg.tasa_construccion) / 100) / 12);
+    const interest = normalizeMonthlySeries(evaluateSeries(
+      getFormula('gf', 'interes', '[ACUMULADO] * [Tasa_interes_construccion] / 12 / 100'),
+      series,
+      scalars,
+      interestDefault
+    ), monthCount);
+
+    const stampDefault = giros.map((value) => Math.max(0, toNumber(value)) * (toNumber(cfg.pct_timbres) / 100));
+    const stamp = normalizeMonthlySeries(evaluateSeries(
+      getFormula('gf', 'timbres', '[GIROS (desde EP)] * [Timbres] / 100'),
+      series,
+      scalars,
+      stampDefault
+    ), monthCount);
+
+    return { interest, stamp };
+  }
+
+  function getBankCommissionsForCashflow(monthCount) {
+    const units = getPromesasEscrituracionUnidades(monthCount).promesas || [];
+    return normalizeMonthlySeries(units, monthCount).map((value) => Math.max(0, value) * 2.5);
+  }
+
+  function getCostIvaCreditoForCashflow(monthCount) {
+    const monthly = createMonthlyArray(monthCount, 0);
+    (typeof ensureCostosState === 'function' ? ensureCostosState() : []).forEach((category) => {
+      if (category.nombre === 'GASTOS FINANCIEROS') return;
+      (category.partidas || []).forEach((partida) => {
+        if (!partida.tiene_iva) return;
+        normalizeMonthlySeries(getMonthlyDistributionForPartida(partida, monthCount), monthCount).forEach((value, index) => {
+          monthly[index] += toNumber(value) * 0.19;
+        });
+      });
+    });
+    return monthly;
+  }
+
   if (typeof renderProjectCashflow === 'function') {
     renderProjectCashflow = function patchedRenderProjectCashflow() {
       if (!$('flujo-tabla')) return;
       const monthCount = getCostMonthCount();
       const labels = getCostMonthLabels();
-      const incomeSource = getProjectMonthlyIncome(monthCount);
-      const costsSource = getProjectMonthlyCosts(false);
-      const financialSource = getProjectMonthlyCosts(true).map((value, index) => Math.max(0, value - costsSource[index]));
-      const ivaCreditoSource = getMonthlyIvaCredito();
-      const ivaDebitoSource = getMonthlyIvaDebito(incomeSource);
+      const incomeSource = normalizeMonthlySeries(getProjectMonthlyIncome(monthCount), monthCount);
+      const costStructure = getCostFlowStructure(monthCount);
+      const terrainFinancial = getTerrainFinancialFlowForCashflow(monthCount);
+      const constructionFinancial = getConstructionFinancialFlowForCashflow(monthCount);
+      const commissions = getBankCommissionsForCashflow(monthCount);
+      const interestTotal = sumMonthlySeries([terrainFinancial.interest, constructionFinancial.interest], monthCount);
+      const stampTotal = sumMonthlySeries([terrainFinancial.stamp, constructionFinancial.stamp], monthCount);
+      const financialTotal = sumMonthlySeries([interestTotal, stampTotal, commissions], monthCount);
+      const subtotalEgresos = sumMonthlySeries([costStructure.total, financialTotal], monthCount);
+      const ivaCreditoSource = getCostIvaCreditoForCashflow(monthCount);
+      const flujoSinIva = incomeSource.map((value, index) => toNumber(value) - toNumber(subtotalEgresos[index]));
+      const flujoConIva = flujoSinIva.map((value, index) => value + toNumber(ivaCreditoSource[index]));
+      const cumulativeSin = cumulativeSeries(flujoSinIva);
+      const cumulativeCon = cumulativeSeries(flujoConIva);
+      const totalIncome = total(incomeSource);
+      const totalGastos = total(costStructure.total);
+      const totalFinancial = total(financialTotal);
+      const totalSubtotal = total(subtotalEgresos);
+      const totalFlujoSin = total(flujoSinIva);
+      const totalFlujoCon = total(flujoConIva);
+      const capitalNeedSin = Math.abs(cumulativeSin.reduce((min, value) => Math.min(min, toNumber(value)), 0));
+      const capitalNeedCon = Math.abs(cumulativeCon.reduce((min, value) => Math.min(min, toNumber(value)), 0));
 
-      const sourceSeries = {};
-      const series = {};
-      addSeries(sourceSeries, 'Ventas por mes', incomeSource, 'ventas_por_mes');
-      addSeries(sourceSeries, 'Costos proyecto', costsSource, 'costos_proyecto');
-      addSeries(sourceSeries, 'Gastos financieros fuente', financialSource, 'gastos_financieros_fuente');
-      addSeries(sourceSeries, 'IVA credito fuente', ivaCreditoSource, 'iva_credito_fuente');
-      addSeries(sourceSeries, 'IVA debito fuente', ivaDebitoSource, 'iva_debito_fuente');
+      setText('flujo-margen-sin', fmtUf(totalFlujoSin));
+      setText('flujo-margen-sin-pct', `${fmtPct(totalIncome ? totalFlujoSin / totalIncome * 100 : 0)} s/ventas`);
+      setText('flujo-margen-con', fmtUf(totalFlujoCon));
+      setText('flujo-margen-con-pct', `${fmtPct(totalIncome ? totalFlujoCon / totalIncome * 100 : 0)} s/ventas`);
+      setText('flujo-k-sin', fmtUf(capitalNeedSin));
+      setText('flujo-k-con', fmtUf(capitalNeedCon));
+      setText('flujo-tir-sin', fmtPct(irrAnualFromMensual(flujoSinIva) * 100));
+      setText('flujo-tir-con', fmtPct(irrAnualFromMensual(flujoConIva) * 100));
+
+      setHtml('estructura-proyecto-list', [
+        ['Ventas', totalIncome, '#16a34a'],
+        ['Gastos', totalGastos, '#ef4444'],
+        ['Gastos financieros', totalFinancial, '#f59e0b'],
+        ['Subtotal egresos neto', totalSubtotal, '#0f766e'],
+        ['IVA crédito', total(ivaCreditoSource), '#2563eb'],
+      ].map(([label, value, color]) => {
+        const pct = totalIncome ? toNumber(value) / totalIncome * 100 : 0;
+        return `<div class="dist-row"><div class="dist-label">${escapeHtml(label)}</div><div class="dist-bar-wrap"><div class="dist-bar" style="width:${Math.max(2, Math.min(100, Math.abs(pct)))}%;background:${color}"></div></div><div class="dist-pct">${fmtPct(pct)}</div></div>`;
+      }).join(''));
+
+      setHtml('flujo-tabla-header', `<tr><th style="text-align:left;min-width:280px">Concepto</th><th style="text-align:left;min-width:260px">Origen / lógica</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}</tr>`);
 
       const rows = [];
-      function allSeries() {
-        return Object.assign({}, sourceSeries, series);
+      function pushRow(row) {
+        rows.push(row);
       }
-      function pushRow(config) {
-        const formula = getFormula('flow', config.key, config.formula);
-        const values = evaluateSeries(formula, allSeries(), {}, config.fallback);
-        addSeries(series, config.label, values, config.key);
-        rows.push(Object.assign({}, config, { formula, values }));
-        return values;
+      function pushGroupChildren(groupKey, defaultCollapsed, callback) {
+        if (!isFlowCollapsedKey(groupKey, defaultCollapsed)) callback();
       }
 
-      const ingresos = pushRow({ key: 'ingresos', category: 'Ingresos', label: 'Ingresos (Ventas)', fallback: incomeSource, formula: '[Ventas por mes]', mode: 'signed' });
-      const costosBase = pushRow({ key: 'costos_base', category: 'Costos', label: 'Costos base', fallback: costsSource.map((value) => -value), formula: '-[Costos proyecto]', mode: 'signed' });
-      const gastosFin = pushRow({ key: 'gastos_financieros', category: 'Costos', label: 'Gastos financieros', fallback: financialSource.map((value) => -value), formula: '-[Gastos financieros fuente]', mode: 'signed' });
-      const flujoOperativo = pushRow({ key: 'flujo_operativo', category: 'Costos', label: 'Flujo operativo bruto', fallback: ingresos.map((value, index) => value + costosBase[index] + gastosFin[index]), formula: '[Ingresos (Ventas)] + [Costos base] + [Gastos financieros]', mode: 'signed', bold: true });
-      pushRow({ key: 'iva_credito', category: 'IVA', label: 'IVA credito', fallback: ivaCreditoSource, formula: '[IVA credito fuente]', mode: 'signed' });
-      pushRow({ key: 'iva_debito', category: 'IVA', label: 'IVA debito', fallback: ivaDebitoSource.map((value) => -value), formula: '-[IVA debito fuente]', mode: 'signed' });
-      const flujoAntes = pushRow({ key: 'flujo_antes_impuestos', category: 'IVA', label: 'Flujo antes de impuestos', fallback: flujoOperativo.map((value, index) => value + toNumber(series.iva_credito[index]) + toNumber(series.iva_debito[index])), formula: '[Flujo operativo bruto] + [IVA credito] + [IVA debito]', mode: 'signed', bold: true });
-      const ppmSource = getMonthlyPPM(incomeSource);
-      const rentaSource = getMonthlyImpuestoRenta(flujoAntes, incomeSource);
-      addSeries(sourceSeries, 'PPM fuente', ppmSource, 'ppm_fuente');
-      addSeries(sourceSeries, 'Impuesto renta fuente', rentaSource, 'impuesto_renta_fuente');
-      pushRow({ key: 'ppm', category: 'Impuestos', label: 'PPM', fallback: ppmSource, formula: '[PPM fuente]', mode: 'signed' });
-      pushRow({ key: 'impuesto_renta', category: 'Impuestos', label: 'Impuesto Renta', fallback: rentaSource, formula: '[Impuesto renta fuente]', mode: 'signed' });
-      const flujoDespues = pushRow({ key: 'flujo_despues_impuestos', category: 'Impuestos', label: 'Flujo despues de impuestos', fallback: flujoAntes.map((value, index) => value + toNumber(series.ppm[index]) + toNumber(series.impuesto_renta[index])), formula: '[Flujo antes de impuestos] + [PPM] + [Impuesto Renta]', mode: 'signed', bold: true });
-
-      const cumulativeFallback = cumulativeSeries(flujoDespues);
-      const cumulativeFormula = getFormula('flow', 'flujo_acumulado', '[Flujo acumulado anterior] + [Flujo despues de impuestos]');
-      const cumulative = [];
-      cumulativeFallback.forEach((fallbackValue, index) => {
-        const context = buildFormulaContext(Object.assign({}, sourceSeries, series), {}, index, { 'Flujo acumulado anterior': cumulative[index - 1] || 0 });
-        const value = evalFormulaValue(cumulativeFormula, context);
-        cumulative.push(value === null ? fallbackValue : value);
+      pushRow({
+        key: 'ingresos',
+        label: 'Ingresos (Ventas)',
+        origin: 'Referencia de ventas para KPIs',
+        values: incomeSource,
+        mode: 'signed',
+        sign: '+',
       });
-      addSeries(series, 'Flujo acumulado', cumulative, 'flujo_acumulado');
-      rows.push({ key: 'flujo_acumulado', category: 'Resultado', label: 'Flujo acumulado', fallback: cumulativeFallback, formula: cumulativeFormula, values: cumulative, mode: 'signed', bold: true });
 
-      const totalIncome = total(ingresos);
-      const totalFlujoBruto = total(flujoOperativo);
-      const margin = total(flujoDespues);
-      const capitalNeed = Math.abs(cumulative.reduce((min, value) => Math.min(min, toNumber(value)), 0));
-      const cumulativeBruto = cumulativeSeries(flujoOperativo);
-      const capitalNeedSin = Math.abs(cumulativeBruto.reduce((min, value) => Math.min(min, toNumber(value)), 0));
-      const tirNetaAnual = irrAnualFromMensual(flujoDespues);
-      const tirBrutaAnual = irrAnualFromMensual(flujoOperativo);
+      const gastosCollapsed = isFlowCollapsedKey('flow_gastos', false);
+      pushRow({
+        key: 'gastos',
+        label: 'Gastos',
+        origin: 'Hoja Costos · valores netos sin IVA',
+        values: costStructure.total,
+        mode: 'cost',
+        sign: '-',
+        toggleKey: 'flow_gastos',
+        defaultCollapsed: false,
+        collapsed: gastosCollapsed,
+        total: true,
+      });
+      pushGroupChildren('flow_gastos', false, () => {
+        costStructure.categories.forEach((category) => {
+          const categoryCollapsed = isFlowCollapsedKey(category.key, true);
+          pushRow({
+            key: category.key,
+            label: category.label,
+            origin: 'Suma subpartidas desde Costos',
+            values: category.values,
+            mode: 'cost',
+            sign: '-',
+            level: 1,
+            toggleKey: category.key,
+            defaultCollapsed: true,
+            collapsed: categoryCollapsed,
+          });
+          pushGroupChildren(category.key, true, () => {
+            category.partidas.forEach((partida) => {
+              pushRow({
+                key: partida.key,
+                label: partida.label,
+                origin: partida.origin,
+                values: partida.values,
+                mode: 'cost',
+                sign: '-',
+                level: 2,
+                muted: true,
+              });
+            });
+          });
+        });
+      });
 
-      setText('flujo-margen-sin', fmtUf(totalFlujoBruto));
-      setText('flujo-margen-sin-pct', `${fmtPct(totalIncome ? totalFlujoBruto / totalIncome * 100 : 0)} s/ventas`);
-      setText('flujo-margen-con', fmtUf(margin));
-      setText('flujo-margen-con-pct', `${fmtPct(totalIncome ? margin / totalIncome * 100 : 0)} s/ventas`);
-      setText('flujo-k-sin', fmtUf(capitalNeedSin));
-      setText('flujo-k-con', fmtUf(capitalNeed));
-      setText('flujo-tir-sin', fmtPct(tirBrutaAnual * 100));
-      setText('flujo-tir-con', fmtPct(tirNetaAnual * 100));
+      const gfCollapsed = isFlowCollapsedKey('flow_gastos_financieros', false);
+      pushRow({
+        key: 'gastos_financieros',
+        label: 'Gastos financieros',
+        origin: 'Intereses + timbres + comisiones bancarias',
+        values: financialTotal,
+        mode: 'cost',
+        sign: '-',
+        toggleKey: 'flow_gastos_financieros',
+        defaultCollapsed: false,
+        collapsed: gfCollapsed,
+        total: true,
+      });
+      pushGroupChildren('flow_gastos_financieros', false, () => {
+        const interestCollapsed = isFlowCollapsedKey('flow_gf_intereses', true);
+        pushRow({
+          key: 'gf_intereses',
+          label: 'Intereses Crédito Banco',
+          origin: 'Hoja Terreno + Hoja Construcción',
+          values: interestTotal,
+          mode: 'cost',
+          sign: '-',
+          level: 1,
+          toggleKey: 'flow_gf_intereses',
+          defaultCollapsed: true,
+          collapsed: interestCollapsed,
+        });
+        pushGroupChildren('flow_gf_intereses', true, () => {
+          pushRow({ key: 'gf_intereses_terreno', label: 'Intereses Crédito Banco - Terreno', origin: 'Hoja Terreno', values: terrainFinancial.interest, mode: 'cost', sign: '-', level: 2, muted: true });
+          pushRow({ key: 'gf_intereses_construccion', label: 'Intereses Crédito Banco - Construcción', origin: 'Hoja Construcción', values: constructionFinancial.interest, mode: 'cost', sign: '-', level: 2, muted: true });
+          pushRow({ key: 'gf_intereses_total', label: 'Total Intereses Crédito Banco', origin: 'Suma Terreno + Construcción', values: interestTotal, mode: 'cost', sign: '-', level: 2, total: true });
+        });
 
-      setHtml('flujo-tabla-header', `<tr><th style="text-align:left;min-width:220px">Concepto</th><th style="text-align:left;min-width:320px">Formula editable</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}</tr>`);
+        const stampCollapsed = isFlowCollapsedKey('flow_gf_timbres', true);
+        pushRow({
+          key: 'gf_timbres',
+          label: 'Impto. Timbre Y Estampillas',
+          origin: 'Hoja Terreno + Hoja Construcción',
+          values: stampTotal,
+          mode: 'cost',
+          sign: '-',
+          level: 1,
+          toggleKey: 'flow_gf_timbres',
+          defaultCollapsed: true,
+          collapsed: stampCollapsed,
+        });
+        pushGroupChildren('flow_gf_timbres', true, () => {
+          pushRow({ key: 'gf_timbres_terreno', label: 'Impto. Timbre Y Estampillas - Terreno', origin: 'Hoja Terreno', values: terrainFinancial.stamp, mode: 'cost', sign: '-', level: 2, muted: true });
+          pushRow({ key: 'gf_timbres_construccion', label: 'Impto. Timbre Y Estampillas - Construcción', origin: 'Hoja Construcción', values: constructionFinancial.stamp, mode: 'cost', sign: '-', level: 2, muted: true });
+          pushRow({ key: 'gf_timbres_total', label: 'Total Impto. Timbre Y Estampillas', origin: 'Suma Terreno + Construcción', values: stampTotal, mode: 'cost', sign: '-', level: 2, total: true });
+        });
 
-      const categories = ['Ingresos', 'Costos', 'IVA', 'Impuestos', 'Resultado'];
-      const body = categories.map((category) => {
-        const categoryRows = rows.filter((row) => row.category === category);
-        if (!categoryRows.length) return '';
-        const isCollapsed = !!patchState.flowCollapsed[category];
-        const categoryTotal = categoryRows.reduce((sum, row) => sum + total(row.values), 0);
+        pushRow({
+          key: 'gf_comisiones',
+          label: 'Comisiones Bancarias',
+          origin: '2,5 UF por promesa',
+          values: commissions,
+          mode: 'cost',
+          sign: '-',
+          level: 1,
+        });
+      });
+
+      pushRow({
+        key: 'subtotal_egresos_neto',
+        label: 'Subtotal Egresos Neto',
+        origin: 'Gastos + Gastos financieros · neto sin IVA',
+        values: subtotalEgresos,
+        mode: 'cost',
+        sign: '-',
+        subtotal: true,
+      });
+      pushRow({
+        key: 'iva_credito',
+        label: 'IVA Crédito',
+        origin: '19% solo sobre costos con IVA activado',
+        values: ivaCreditoSource,
+        mode: 'signed',
+        sign: '+',
+        iva: true,
+      });
+
+      function renderToggle(row) {
+        if (!row.toggleKey) return '';
+        const defaultFlag = row.defaultCollapsed ? 'true' : 'false';
+        return `<button class="flow-toggle" type="button" onclick="toggleFlowCategory('${escapeHtml(row.toggleKey)}', ${defaultFlag})" aria-label="${row.collapsed ? 'Abrir' : 'Cerrar'} ${escapeHtml(row.label)}">${row.collapsed ? '+' : '-'}</button>`;
+      }
+
+      const body = rows.map((row) => {
+        const className = [
+          `flow-row-level-${row.level || 0}`,
+          row.total ? 'flow-row-total' : '',
+          row.subtotal ? 'flow-row-subtotal' : '',
+          row.iva ? 'flow-row-iva' : '',
+          row.muted ? 'flow-row-muted' : '',
+        ].filter(Boolean).join(' ');
+        const sign = row.sign ? `<span style="color:#64748b;font-weight:800;flex:0 0 auto">${escapeHtml(row.sign)}</span>` : '';
         return `
-          <tr class="flow-category-row">
-            <td colspan="${2 + labels.length}">
-              <div class="flow-category-title">
-                <button class="btn-outline btn-plus" type="button" onclick="toggleFlowCategory('${escapeHtml(category)}')">${isCollapsed ? '+' : '-'}</button>
-                <span>${escapeHtml(category)}</span>
-                <span style="margin-left:auto">${formatAmount(categoryTotal, category === 'Costos' ? 'cost' : 'signed', true)}</span>
-              </div>
+          <tr class="${className}" data-flow-row="${escapeHtml(row.key)}">
+            <td style="text-align:left;font-weight:${row.total || row.subtotal || row.iva ? 800 : 600};color:#0f172a">
+              <div class="flow-row-label">${renderToggle(row)}${sign}<span>${escapeHtml(row.label)}</span></div>
             </td>
+            <td><div class="flow-origin">${escapeHtml(row.origin || '')}</div></td>
+            ${row.values.map((value) => `<td data-flow-value style="text-align:center;${row.total || row.subtotal || row.iva ? 'font-weight:700' : ''}">${formatAmount(value, row.mode)}</td>`).join('')}
           </tr>
-          ${isCollapsed ? '' : categoryRows.map((row) => `
-            <tr data-flow-row="${escapeHtml(row.key)}">
-              <td style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.bold ? '#0f172a' : '#334155'}">${escapeHtml(row.label)}</td>
-              <td>${formulaInput('flow', row.key, row.formula, false)}</td>
-              ${row.values.map((value) => `<td data-flow-value style="text-align:center;${row.bold ? 'font-weight:700' : ''}">${formatAmount(value, row.mode)}</td>`).join('')}
-            </tr>
-          `).join('')}
         `;
       }).join('');
       setHtml('flujo-tabla-tbody', body);
@@ -2532,8 +2871,8 @@ table:not(.gantt-table) .tfoot-dark td,
     window.renderProjectCashflow = renderProjectCashflow;
   }
 
-  window.toggleFlowCategory = function toggleFlowCategory(category) {
-    patchState.flowCollapsed[category] = !patchState.flowCollapsed[category];
+  window.toggleFlowCategory = function toggleFlowCategory(category, defaultCollapsed) {
+    patchState.flowCollapsed[category] = !isFlowCollapsedKey(category, defaultCollapsed === true || defaultCollapsed === 'true' || defaultCollapsed === '1');
     renderProjectCashflow();
   };
 
