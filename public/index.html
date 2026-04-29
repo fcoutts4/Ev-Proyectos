@@ -10,28 +10,27 @@
 <style>
 *{box-sizing:border-box}
 body{font-family:'Inter',system-ui,sans-serif;background:#f1f5f9;color:#1e293b}
+:root{--topnav-height:60px;--section-nav-height:48px}
 /* NAV */
-.topnav{position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid #e2e8f0;min-height:60px;display:flex;align-items:center;padding:8px 24px;justify-content:space-between;gap:14px}
+.topnav{position:sticky;top:0;z-index:90;background:#fff;border-bottom:1px solid #e2e8f0;min-height:var(--topnav-height);display:flex;align-items:center;padding:8px 24px;justify-content:space-between;gap:14px}
 .logo-box{width:28px;height:28px;background:#0f172a;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:12px}
 /* PROJECT HEADER */
-.proj-header{position:sticky;top:60px;z-index:40;background:#fff;border-bottom:1px solid #e2e8f0;padding:8px 24px;display:flex;justify-content:flex-start;min-height:52px}
+.proj-header{position:sticky;top:var(--topnav-height);z-index:80;background:#fff;border-bottom:1px solid #e2e8f0;padding:6px 24px;display:block;min-height:var(--section-nav-height);box-shadow:0 8px 18px rgba(15,23,42,.04)}
 .topnav-left{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
 .topnav-right{display:flex;align-items:center;gap:12px;min-width:0}
 .topnav-sync{display:flex;align-items:center;gap:10px;min-width:0}
 .topnav-sync-detail{font-size:11px;color:#64748b;white-space:nowrap}
 /* TABS */
-.tab-dock{position:relative;display:inline-flex;align-items:flex-start;min-width:0}
-.tab-dock-toggle{display:inline-flex;align-items:center;gap:8px;min-height:34px;padding:7px 13px;border:1px solid #dbe4ee;background:#fff;border-radius:999px;font-size:12px;font-weight:800;color:#334155;cursor:pointer;box-shadow:0 8px 18px rgba(15,23,42,.08)}
-.tab-dock-toggle:hover,.tab-dock:focus-within .tab-dock-toggle{background:#f8fafc;border-color:#cbd5e1;color:#0f172a}
-.tab-dock-toggle-caret{font-size:11px;color:#64748b;transition:transform .16s ease}
-.tab-nav-wrap{position:absolute;left:0;top:calc(100% + 8px);width:260px;opacity:0;visibility:hidden;transform:translateY(-4px);pointer-events:none;transition:opacity .16s ease,transform .16s ease,visibility .16s ease;z-index:160}
-.tab-dock:hover .tab-nav-wrap,.tab-dock:focus-within .tab-nav-wrap,.tab-dock.is-open .tab-nav-wrap{opacity:1;visibility:visible;transform:translateY(0);pointer-events:auto}
-.tab-dock:hover .tab-dock-toggle-caret,.tab-dock:focus-within .tab-dock-toggle-caret,.tab-dock.is-open .tab-dock-toggle-caret{transform:rotate(180deg)}
-.tab-nav{display:flex;flex-direction:column;gap:3px;max-height:min(70vh,440px);overflow:auto;white-space:normal;background:#fff;border:1px solid #dbe4ee;border-radius:12px;padding:8px;box-shadow:0 18px 40px rgba(15,23,42,.16)}
-.tab-nav::-webkit-scrollbar{display:none}
-.tab-btn{min-height:32px;padding:7px 10px;font-size:12px;font-weight:650;color:#64748b;border:1px solid transparent;cursor:pointer;background:none;border-radius:8px;transition:background .14s ease,color .14s ease,border-color .14s ease;text-align:left;width:100%}
-.tab-btn:hover{color:#0f172a;background:#f8fafc}
-.tab-btn.active{color:#0f172a;font-weight:800;background:#eef3f8;border-color:#dbe4ee}
+.tab-dock{position:relative;display:flex;align-items:center;width:min(100%,1600px);margin:0 auto;min-width:0}
+.tab-dock-toggle,.tab-dock-toggle-caret{display:none}
+.tab-nav-wrap{position:relative;width:100%;min-width:0;opacity:1;visibility:visible;transform:none;pointer-events:auto;z-index:auto;overflow:hidden}
+.tab-nav{display:flex;flex-direction:row;align-items:center;gap:6px;max-height:none;overflow-x:auto;overflow-y:hidden;white-space:nowrap;background:transparent;border:0;border-radius:0;padding:4px 0;box-shadow:none;scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent;overscroll-behavior-inline:contain}
+.tab-nav::-webkit-scrollbar{height:6px}
+.tab-nav::-webkit-scrollbar-track{background:transparent}
+.tab-nav::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:999px}
+.tab-btn{flex:0 0 auto;min-height:32px!important;padding:7px 12px;font-size:12px;font-weight:700;color:#475569;border:1px solid transparent;cursor:pointer;background:transparent;border-radius:999px;transition:background .14s ease,color .14s ease,border-color .14s ease,box-shadow .14s ease;text-align:center;width:auto;white-space:nowrap}
+.tab-btn:hover{color:#0f172a;background:#eef3f8;border-color:#d7e0ea}
+.tab-btn.active{color:#0f172a;font-weight:800;background:#fff;border-color:#c7d2e0;box-shadow:0 1px 2px rgba(15,23,42,.08)}
 /* TAB CONTENT */
 .tab-pane{display:none}.tab-pane.active{display:block}
 /* CARDS */
@@ -153,6 +152,10 @@ tbody tr:hover{background:#f8fafc}
 .cost-config-warning.is-ok{background:#ecfdf5;color:#166534;border-color:#bbf7d0}
 .cost-config-warning.is-warn{background:#fff7ed;color:#9a3412;border-color:#fed7aa}
 .cost-config-warning.is-error{background:#fee2e2;color:#991b1b;border-color:#fecaca}
+.cost-inline-result{min-height:16px;font-size:10px;font-weight:700;color:#64748b;line-height:1.25}
+.cost-inline-result.is-ok{color:#166534}
+.cost-inline-result.is-error{color:#991b1b}
+.cost-config-field.has-error .inp{border-color:#fca5a5!important;box-shadow:0 0 0 2px rgba(239,68,68,.10)!important}
 .cost-config-add{height:28px;padding:0 10px;font-size:10px}
 .cost-config-delete{height:30px!important;min-height:30px!important;width:32px;padding:0!important;font-size:14px!important}
 .cost-config-empty{font-size:11px;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:8px;padding:9px 10px;background:#f8fafc}
@@ -695,7 +698,8 @@ button:disabled,.btn-outline:disabled,.inp:disabled,select:disabled{opacity:.62!
 .kpi-sub,.sync-text{line-height:1.35}
 .tab-nav{scrollbar-gutter:stable}
 .tab-btn{border-radius:8px;min-width:0;min-height:32px!important}
-.tab-btn[aria-selected="true"]{background:var(--bg-soft)}
+.tab-nav .tab-btn{border-radius:999px;min-width:max-content;min-height:32px!important}
+.tab-nav .tab-btn[aria-selected="true"]{background:#fff!important;border-color:var(--border-strong)!important;box-shadow:0 1px 2px rgba(15,23,42,.08)}
 .tab-pane{scroll-margin-top:132px}
 .tab-pane.active{animation:uiFadeIn .12s ease-out}
 @keyframes uiFadeIn{from{opacity:.72;transform:translateY(2px)}to{opacity:1;transform:none}}
@@ -834,7 +838,8 @@ table:not(.gantt-table) .tfoot-dark td,
 @media (max-width: 900px){
   .topnav{padding:6px 12px!important}
   .proj-header{padding-left:12px!important;padding-right:12px!important}
-  .tab-nav-wrap{width:min(260px,calc(100vw - 24px))}
+  .tab-nav-wrap{width:100%}
+  .tab-nav{gap:4px;padding-bottom:6px}
   main{padding:12px!important}
   .card,.card-dark,.kpi-card,.req-kpi{padding:14px!important}
   .flow-kpi-grid{grid-template-columns:1fr!important}
@@ -854,9 +859,10 @@ table:not(.gantt-table) .tfoot-dark td,
 
 /* Más legibilidad cuando la pantalla es angosta */
 @media (max-width: 1366px){
+  :root{--topnav-height:56px}
   body{font-size:15px}
   .topnav{min-height:56px;padding:6px 16px}
-  .proj-header{top:56px;padding:8px 16px}
+  .proj-header{top:var(--topnav-height);padding:6px 16px}
   main{padding:16px!important}
   .card,.card-dark,.kpi-card,.req-kpi{padding:16px!important;border-radius:10px!important}
   .tab-btn{padding:7px 10px;font-size:12px}
@@ -896,28 +902,24 @@ table:not(.gantt-table) .tfoot-dark td,
 </nav>
 
 <!-- PROJECT HEADER -->
-<div class="proj-header">
+<nav class="proj-header" aria-label="Secciones principales">
   <div class="tab-dock" id="tabDock">
-    <button class="tab-dock-toggle" id="tabDockToggle" type="button" aria-expanded="false" aria-controls="tabNavWrap">
-      <span>Secciones</span>
-      <span class="tab-dock-toggle-caret" id="tabDockCaret">&#9662;</span>
-    </button>
     <div class="tab-nav-wrap" id="tabNavWrap">
       <div class="tab-nav" id="tabBar">
-        <button class="tab-btn active" onclick="showTab('resumen',this)">Resumen</button>
-        <button class="tab-btn" onclick="showTab('cabida',this)">Cabida Proyecto</button>
-        <button class="tab-btn" onclick="showTab('terreno',this)">Terreno</button>
-        <button class="tab-btn" onclick="showTab('construccion',this)">Construcción</button>
-        <button class="tab-btn" onclick="showTab('ventas',this)">Ventas</button>
-        <button class="tab-btn" onclick="showTab('gantt',this)">Carta Gantt</button>
-        <button class="tab-btn" onclick="showTab('costos',this)">Costos del Proyecto</button>
-        <button class="tab-btn" onclick="showTab('flujo',this)">Flujo de Caja</button>
-        <button class="tab-btn" onclick="showTab('flujo',this)">Resultados</button>
-        <button class="tab-btn" onclick="showTab('resumen',this)">Reportes</button>
+        <button class="tab-btn active" type="button" data-tab-target="resumen" onclick="showTab('resumen',this)">Resumen Ejecutivo</button>
+        <button class="tab-btn" type="button" data-tab-target="cabida" onclick="showTab('cabida',this)">Cabida Proyecto</button>
+        <button class="tab-btn" type="button" data-tab-target="terreno" onclick="showTab('terreno',this)">Terreno</button>
+        <button class="tab-btn" type="button" data-tab-target="construccion" onclick="showTab('construccion',this)">Construcción</button>
+        <button class="tab-btn" type="button" data-tab-target="ventas" onclick="showTab('ventas',this)">Ventas</button>
+        <button class="tab-btn" type="button" data-tab-target="gantt" onclick="showTab('gantt',this)">Carta Gantt</button>
+        <button class="tab-btn" type="button" data-tab-target="costos" onclick="showTab('costos',this)">Costos del Proyecto</button>
+        <button class="tab-btn" type="button" data-tab-target="flujo" onclick="showTab('flujo',this)">Flujo de Caja</button>
+        <button class="tab-btn" type="button" data-tab-target="flujo" data-tab-alias="resultados" onclick="showTab('flujo',this)">Resultados</button>
+        <button class="tab-btn" type="button" data-tab-target="resumen" data-tab-alias="reportes" onclick="showTab('resumen',this)">Reportes</button>
       </div>
     </div>
   </div>
-</div>
+</nav>
 
 <!-- MAIN -->
 <main id="main-content" tabindex="-1" style="max-width:1600px;margin:0 auto;padding:20px 24px">
@@ -2158,6 +2160,55 @@ table:not(.gantt-table) .tfoot-dark td,
       .replace(/-?\d{1,3}(?:\.\d{3})+(?:,\d+)?|-?\d+,\d+/g, (value) => normalizeLiteral(value));
   }
 
+  function evalArithmeticExpression(expr) {
+    let index = 0;
+    const source = String(expr || '').replace(/\s+/g, '');
+    function peek() { return source[index]; }
+    function readNumber() {
+      const start = index;
+      while (/[0-9.]/.test(peek())) index += 1;
+      if (start === index) throw new Error('number expected');
+      const value = Number(source.slice(start, index));
+      if (!Number.isFinite(value)) throw new Error('invalid number');
+      return value;
+    }
+    function factor() {
+      if (peek() === '+') { index += 1; return factor(); }
+      if (peek() === '-') { index += 1; return -factor(); }
+      if (peek() === '(') {
+        index += 1;
+        const value = expression();
+        if (peek() !== ')') throw new Error('missing parenthesis');
+        index += 1;
+        return value;
+      }
+      return readNumber();
+    }
+    function term() {
+      let value = factor();
+      while (peek() === '*' || peek() === '/') {
+        const op = peek();
+        index += 1;
+        const rhs = factor();
+        value = op === '*' ? value * rhs : value / rhs;
+      }
+      return value;
+    }
+    function expression() {
+      let value = term();
+      while (peek() === '+' || peek() === '-') {
+        const op = peek();
+        index += 1;
+        const rhs = term();
+        value = op === '+' ? value + rhs : value - rhs;
+      }
+      return value;
+    }
+    const value = expression();
+    if (index !== source.length || !Number.isFinite(value)) throw new Error('invalid expression');
+    return value;
+  }
+
   function evalFormulaValue(rawFormula, context) {
     let expr = String(rawFormula || '').trim();
     if (!expr) return null;
@@ -2179,7 +2230,7 @@ table:not(.gantt-table) .tfoot-dark td,
 
     if (/[^0-9+\-*/().\s]/.test(expr)) return null;
     try {
-      const result = Function('"use strict";return (' + expr + ');')();
+      const result = evalArithmeticExpression(expr);
       return Number.isFinite(result) ? result : null;
     } catch (error) {
       void error;
@@ -2967,16 +3018,21 @@ table:not(.gantt-table) .tfoot-dark td,
     buttons.forEach((button, index) => {
       const clickHandler = button.getAttribute('onclick') || '';
       const match = clickHandler.match(/showTab\('([^']+)'/);
-      const tabId = match ? match[1] : `tab-${index + 1}`;
+      const tabId = button.dataset.tabTarget || (match ? match[1] : `tab-${index + 1}`);
+      const navKey = button.dataset.tabAlias || tabId;
       const pane = document.getElementById(`tab-${tabId}`);
-      if (!button.id) button.id = `tab-btn-${tabId}`;
+      if (!button.id) button.id = `tab-btn-${navKey}-${index + 1}`;
       button.setAttribute('role', 'tab');
       button.setAttribute('aria-controls', `tab-${tabId}`);
       button.setAttribute('aria-selected', button.classList.contains('active') ? 'true' : 'false');
       button.setAttribute('tabindex', button.classList.contains('active') ? '0' : '-1');
+      if (button.classList.contains('active')) button.setAttribute('aria-current', 'page');
+      else button.removeAttribute('aria-current');
       if (pane) {
         pane.setAttribute('role', 'tabpanel');
-        pane.setAttribute('aria-labelledby', button.id);
+        if (button.classList.contains('active') || !pane.getAttribute('aria-labelledby')) {
+          pane.setAttribute('aria-labelledby', button.id);
+        }
         if (pane.classList.contains('active')) pane.removeAttribute('hidden');
         else pane.setAttribute('hidden', '');
       }

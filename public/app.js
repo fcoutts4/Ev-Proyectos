@@ -44,13 +44,56 @@ const USER_STORAGE_KEYS = [
   'user_name',
 ];
 
-function showTab(tabId, button) {
-  document.querySelectorAll('.tab-pane').forEach((pane) => pane.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach((tab) => tab.classList.remove('active'));
+function getTabButtonTarget(button) {
+  if (!button) return '';
+  if (button.dataset?.tabTarget) return button.dataset.tabTarget;
+  const clickHandler = button.getAttribute('onclick') || '';
+  const match = clickHandler.match(/showTab\('([^']+)'/);
+  return match ? match[1] : '';
+}
 
-  const pane = document.getElementById(`tab-${tabId}`);
-  if (pane) pane.classList.add('active');
-  if (button) button.classList.add('active');
+function scrollTabPaneBelowSticky(pane) {
+  if (!pane) return;
+  window.requestAnimationFrame(() => {
+    const topnav = document.querySelector('.topnav');
+    const projectHeader = document.querySelector('.proj-header');
+    const stickyOffset = (topnav?.offsetHeight || 0) + (projectHeader?.offsetHeight || 0) + 12;
+    const targetY = Math.max(0, pane.getBoundingClientRect().top + window.scrollY - stickyOffset);
+    if (Math.abs(window.scrollY - targetY) > 2) {
+      window.scrollTo({ top: targetY, behavior: 'smooth' });
+    }
+  });
+}
+
+function showTab(tabId, button) {
+  const targetTabId = String(tabId || '').trim();
+  const targetPaneId = `tab-${targetTabId}`;
+  let activePane = null;
+
+  document.querySelectorAll('.tab-pane').forEach((pane) => {
+    const isActive = pane.id === targetPaneId;
+    pane.classList.toggle('active', isActive);
+    if (isActive) {
+      pane.removeAttribute('hidden');
+      activePane = pane;
+    } else {
+      pane.setAttribute('hidden', '');
+    }
+  });
+
+  const tabButtons = Array.from(document.querySelectorAll('#tabBar .tab-btn'));
+  const activeButton = button || tabButtons.find((tab) => getTabButtonTarget(tab) === targetTabId) || null;
+  tabButtons.forEach((tab) => {
+    const isActive = tab === activeButton;
+    tab.classList.toggle('active', isActive);
+    tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    tab.setAttribute('tabindex', isActive ? '0' : '-1');
+    if (isActive) tab.setAttribute('aria-current', 'page');
+    else tab.removeAttribute('aria-current');
+  });
+
+  if (activeButton) activeButton.scrollIntoView({ block: 'nearest', inline: 'center' });
+  if (button) scrollTabPaneBelowSticky(activePane);
   closeTabDock();
 }
 
@@ -492,7 +535,7 @@ function normalizeFinanciamiento(data = {}) {
     credito_terreno_pct: data.credito_terreno_pct ?? 70,
     credito_terreno_tasa: data.credito_terreno_tasa ?? 3.5,
     credito_terreno_pago_intereses: data.credito_terreno_pago_intereses || 'Semestral',
-    credito_terreno_pago_capital: data.credito_terreno_pago_capital || 'Inicio Construccion',
+    credito_terreno_pago_capital: data.credito_terreno_pago_capital || 'Inicio: Construcción',
     linea_construccion_activo: data.linea_construccion_activo ?? true,
     linea_construccion_pct: data.linea_construccion_pct ?? 100,
     linea_construccion_tasa: data.linea_construccion_tasa ?? 3.5,
@@ -575,11 +618,13 @@ function getLocalizedInputDecimals(input) {
 
 function formatLocalizedNumberInput(input) {
   if (!input || input.type === 'hidden' || input.type === 'month' || input.value === '') return;
+  if (input.dataset?.formulaAmount === '1') return;
   input.value = fmtInputNumber(input.value, getLocalizedInputDecimals(input));
 }
 
 function prepareLocalizedNumberInput(input) {
   if (!input || input.type === 'hidden' || input.type === 'month') return;
+  if (input.dataset?.formulaAmount === '1') return;
   if (input.type === 'number') input.type = 'text';
   input.dataset.localizedNumber = '1';
   input.inputMode = getLocalizedInputDecimals(input) === 0 ? 'numeric' : 'decimal';
@@ -3301,6 +3346,74 @@ function normalizeFormulaExpressionSyntax(expression) {
     .replace(/-?\d{1,3}(?:\.\d{3})+(?:,\d+)?|-?\d+,\d+/g, (value) => normalizeFormulaNumberLiteral(value));
 }
 
+function normalizeFormulaIdentifier(value) {
+  return String(value || '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function addFormulaReferenceAlias(map, key, value) {
+  const normalized = normalizeFormulaIdentifier(key);
+  if (!normalized) return;
+  const numericValue = toNumber(value);
+  map.set(normalized, numericValue);
+  map.set(`_${normalized}`, numericValue);
+}
+
+function buildFormulaReferenceMaps(context = {}) {
+  const values = new Map();
+  const bracketValues = new Map();
+  Object.entries(context || {}).forEach(([key, value]) => addFormulaReferenceAlias(values, key, value));
+
+  getCostFormulaCatalog().forEach((entry) => {
+    const token = String(entry.token || '');
+    const tokenKey = normalizeFormulaIdentifier(token);
+    const replacementValue = Object.prototype.hasOwnProperty.call(context || {}, tokenKey)
+      ? context[tokenKey]
+      : entry.value;
+    addFormulaReferenceAlias(values, token, replacementValue);
+    addFormulaReferenceAlias(values, token.replace(/^_+/, ''), replacementValue);
+    const shortPartida = tokenKey.replace(/^total_partida_/, '');
+    if (shortPartida !== tokenKey) addFormulaReferenceAlias(values, shortPartida, replacementValue);
+    const shortCategoria = tokenKey.replace(/^total_categoria_/, '');
+    if (shortCategoria !== tokenKey) addFormulaReferenceAlias(values, shortCategoria, replacementValue);
+    if (entry.label) {
+      bracketValues.set(String(entry.label).trim().toLowerCase(), toNumber(replacementValue));
+      addFormulaReferenceAlias(values, entry.label, replacementValue);
+    }
+  });
+
+  return { values, bracketValues };
+}
+
+function extractFormulaReferences(expression = '') {
+  const raw = String(expression || '');
+  const refs = [];
+  const seen = new Set();
+  raw.replace(/\[[^\]]+\]|[_A-Za-zÀ-ÿ][_A-Za-z0-9À-ÿ]*/g, (match) => {
+    if (/^SI$/i.test(match)) return match;
+    if (/^\[[^\]]+\]$/.test(match)) {
+      const label = match.slice(1, -1).trim();
+      if (label && !seen.has(label.toLowerCase())) {
+        seen.add(label.toLowerCase());
+        refs.push(label);
+      }
+      return match;
+    }
+    const key = normalizeFormulaIdentifier(match);
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      refs.push(match);
+    }
+    return match;
+  });
+  return refs;
+}
+
 function isFormulaDecimalComma(source, index) {
   const before = source[index - 1] || '';
   const after = source[index + 1] || '';
@@ -3353,7 +3466,90 @@ function convertSiToTernary(expression) {
   return result;
 }
 
+function evaluateExpressionFormulaDetailed(expression, context = {}) {
+  const source = String(expression || '').trim();
+  if (!source) return { ok: true, value: 0, references: [], expression: '', error: '' };
+  const aliases = normalizeFormulaExpressionSyntax(convertSiToTernary(source))
+    .replace(/cantidad de meses de construcci[oÃ³ó]n/gi, 'meses_construccion')
+    .replace(/meses de construcci[oÃ³ó]n/gi, 'meses_construccion')
+    .replace(/meses preventa/gi, 'meses_preventa')
+    .replace(/meses venta/gi, 'meses_venta')
+    .replace(/meses escrituraci[oÃ³ó]n/gi, 'meses_escrituracion')
+    .replace(/m2 utiles/gi, 'm2_utiles')
+    .replace(/m2 municipales/gi, 'm2_municipales')
+    .replace(/m2 sobre cota 0/gi, 'm2_sobre_cota_0')
+    .replace(/m2 subterraneo/gi, 'm2_subterraneo')
+    .replace(/ventas brutas/gi, 'ventas_brutas');
+  const { values, bracketValues } = buildFormulaReferenceMaps(context);
+  const references = [];
+  const missing = [];
+  const seen = new Set();
+  let expr = aliases.replace(/\[([^\]]+)\]/g, (match, label) => {
+    const key = String(label || '').trim().toLowerCase();
+    if (bracketValues.has(key)) {
+      if (!seen.has(key)) {
+        seen.add(key);
+        references.push(label);
+      }
+      return String(toNumber(bracketValues.get(key)));
+    }
+    missing.push(label || match);
+    return '0';
+  });
+
+  expr = expr.replace(/[_A-Za-zÀ-ÿ][_A-Za-z0-9À-ÿ]*/g, (token) => {
+    if (/^SI$/i.test(token)) return token;
+    const normalized = normalizeFormulaIdentifier(token);
+    if (values.has(normalized)) {
+      if (!seen.has(normalized)) {
+        seen.add(normalized);
+        references.push(token);
+      }
+      return String(toNumber(values.get(normalized)));
+    }
+    const underscored = `_${normalized}`;
+    if (values.has(underscored)) {
+      if (!seen.has(underscored)) {
+        seen.add(underscored);
+        references.push(token);
+      }
+      return String(toNumber(values.get(underscored)));
+    }
+    missing.push(token);
+    return '0';
+  });
+
+  if (missing.length) {
+    return {
+      ok: false,
+      value: 0,
+      references,
+      expression: expr,
+      error: `Referencia no encontrada: ${missing[0]}`,
+      missingReference: missing[0],
+    };
+  }
+  if (!/^[0-9+\-*/().\s<>=!?:]+$/.test(expr)) {
+    return { ok: false, value: 0, references, expression: expr, error: 'La formula contiene caracteres no permitidos.' };
+  }
+  if (!expr.trim()) return { ok: true, value: 0, references, expression: expr, error: '' };
+  try {
+    // La expresion ya fue reducida a numeros, operadores, parentesis y comparadores.
+    // eslint-disable-next-line no-new-func
+    const value = Function(`"use strict"; return (${expr});`)();
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return { ok: false, value: 0, references, expression: expr, error: 'La formula no entrega un numero valido.' };
+    }
+    return { ok: true, value: numeric, references, expression: expr, error: '' };
+  } catch {
+    return { ok: false, value: 0, references, expression: expr, error: 'Formula incompleta o mal escrita.' };
+  }
+}
+
 function evaluateExpressionFormula(expression, context = {}) {
+  const safeResult = evaluateExpressionFormulaDetailed(expression, context);
+  return safeResult.ok ? safeResult.value : 0;
   if (!expression) return 0;
   const contextValues = Object.entries(context || {}).reduce((acc, [key, value]) => {
     acc[String(key || '').toLowerCase()] = value;
@@ -3391,7 +3587,7 @@ function evaluateExpressionFormula(expression, context = {}) {
   if (!expr.trim()) return 0;
   try {
     // eslint-disable-next-line no-new-func
-    return Function(`"use strict"; return (${expr});`)();
+    return 0;
   } catch {
     return 0;
   }
@@ -4258,26 +4454,32 @@ function getCostFormulaCatalog() {
       value: toNumber(p.total_neto),
       unit: 'UF',
     }))),
-    ...state.gantt.flatMap((row) => ([
-      {
-        label: `Inicio ${String(row.nombre || '').toLowerCase()}`,
-        token: `_inicio_${String(row.nombre || '').toLowerCase().replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}`,
-        value: toNumber(row.inicio),
-        unit: 'mes',
-      },
-      {
-        label: `Fin ${String(row.nombre || '').toLowerCase()}`,
-        token: `_fin_${String(row.nombre || '').toLowerCase().replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}`,
-        value: toNumber(row.fin),
-        unit: 'mes',
-      },
-      {
-        label: `Duracion ${String(row.nombre || '').toLowerCase()}`,
-        token: `_duracion_${String(row.nombre || '').toLowerCase().replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}`,
-        value: toNumber(row.duracion),
-        unit: 'mes',
-      },
-    ])),
+    ...state.gantt.flatMap((row) => {
+      const name = getMilestoneDisplayName(row);
+      const slug = normalizeFormulaIdentifier(name);
+      const isRange = getMilestoneDurationMonths(row) > 1;
+      return [
+        {
+          label: getMilestonePointLabel(row, 'START'),
+          token: `_inicio_${slug}`,
+          value: toNumber(row.inicio),
+          unit: 'mes',
+        },
+        {
+          label: getMilestonePointLabel(row, 'END'),
+          token: `_fin_${slug}`,
+          value: toNumber(row.fin),
+          unit: 'mes',
+          visible: isRange,
+        },
+        {
+          label: `Duracion ${name}`,
+          token: `_duracion_${slug}`,
+          value: getMilestoneDurationMonths(row),
+          unit: 'mes',
+        },
+      ];
+    }),
   ];
   const uniqueByToken = new Map();
   rawCatalog.forEach((entry) => {
@@ -4288,7 +4490,7 @@ function getCostFormulaCatalog() {
 }
 
 function splitFormulaTokens(rawValue) {
-  const parts = String(rawValue || '').match(/\[[^\]]+\]|_[a-z0-9_]+|[a-z][a-z0-9_]*|\d+(?:[.,]\d+)?%?|>=|<=|==|!=|[()+\-*/<>,%]|[^\s]+/gi);
+  const parts = String(rawValue || '').match(/\[[^\]]+\]|_[a-z0-9_À-ÿ]+|[a-zÀ-ÿ][a-z0-9_À-ÿ]*|\d+(?:[.,]\d+)?%?|>=|<=|==|!=|[()+\-*/<>,%]|[^\s]+/gi);
   return Array.isArray(parts) ? parts.slice(0, 40) : [];
 }
 
@@ -4453,12 +4655,16 @@ function updateCostFormulaModalPreview() {
       if (rawValue && !isAuto) {
         let result;
         if (isMensual) {
+          const check = evaluateExpressionFormulaDetailed(rawValue, buildMonthlyContext(0, getCostMonthCount()));
+          if (!check.ok) throw new Error(check.error);
           const monthly = evaluateMonthlyExpressionFormula(rawValue, getCostMonthCount());
           result = monthly.reduce((a, b) => a + toNumber(b), 0);
         } else if (isManual) {
           result = toNumber(parsed.formula_valor);
         } else {
-          result = evaluateExpressionFormula(rawValue, buildCostContext());
+          const check = evaluateExpressionFormulaDetailed(rawValue, buildCostContext());
+          if (!check.ok) throw new Error(check.error);
+          result = check.value;
         }
         resultEl.textContent = `= UF ${fmtNumber(result)}`;
         resultEl.style.color = '#0f172a';
@@ -4467,14 +4673,14 @@ function updateCostFormulaModalPreview() {
         resultEl.style.color = '#0f172a';
       }
     } catch (e) {
-      resultEl.textContent = '= Error';
-      resultEl.style.color = '#475569';
+      resultEl.textContent = e?.message || '= Error';
+      resultEl.style.color = '#991b1b';
     }
   }
 }
 
 function renderCostFormulaOptions() {
-  setHtml('cost-formula-refs', getCostFormulaCatalog().map((entry) => (
+  setHtml('cost-formula-refs', getCostFormulaCatalog().filter((entry) => entry.visible !== false).map((entry) => (
     `<option value="${escapeHtml(entry.token)}">${escapeHtml(entry.label)} (${escapeHtml(formatFormulaCatalogValue(entry))})</option>`
   )).join(''));
 }
@@ -4554,7 +4760,7 @@ const FORMULA_REF_GROUPS = [
 function renderFormulaRefPanel() {
   const panel = $('cost-formula-ref-panel');
   if (!panel) return;
-  const catalog = getCostFormulaCatalog();
+  const catalog = getCostFormulaCatalog().filter((entry) => entry.visible !== false);
   const catalogMap = new Map(catalog.map((e) => [e.token, e]));
 
   const html = FORMULA_REF_GROUPS.map((group, groupIdx) => {
@@ -4681,6 +4887,19 @@ function syncCostFormulaRowFields(categoryName, index, partida) {
   if (formulaTypeInput) formulaTypeInput.value = partida.formula_tipo || 'expr';
 }
 
+function validateCostFormulaText(rawValue, mode = '') {
+  const parsed = parseFormulaInput(rawValue, mode);
+  const raw = String(rawValue || '').trim();
+  if (!raw || parsed.formula_tipo === 'manual') return { ok: true, parsed, error: '' };
+  const context = parsed.formula_tipo === 'expr_mensual'
+    ? buildMonthlyContext(0, getCostMonthCount())
+    : buildCostContext();
+  const check = evaluateExpressionFormulaDetailed(raw, context);
+  return check.ok
+    ? { ok: true, parsed, error: '' }
+    : { ok: false, parsed, error: check.error };
+}
+
 function saveCostFormulaModal() {
   const categoryName = state.costosUi.activeFormulaCategory;
   const index = state.costosUi.activeFormulaIndex;
@@ -4689,7 +4908,13 @@ function saveCostFormulaModal() {
   const category = state.costos.find((item) => item.nombre === categoryName);
   const partida = category?.partidas?.[index];
   if (!partida) return;
-  const formula = parseFormulaInput(input.value || '', getCostFormulaModalMode());
+  const validation = validateCostFormulaText(input.value || '', getCostFormulaModalMode());
+  if (!validation.ok) {
+    updateCostFormulaModalPreview();
+    window.alert(validation.error);
+    return;
+  }
+  const formula = validation.parsed;
   partida.formula_tipo = formula.formula_tipo;
   partida.formula_valor = formula.formula_valor;
   partida.formula_referencia = formula.formula_referencia;
@@ -4711,7 +4936,12 @@ function autosaveCostFormulaModal() {
   const category = state.costos.find((item) => item.nombre === categoryName);
   const partida = category?.partidas?.[index];
   if (!partida) return;
-  const formula = parseFormulaInput(input.value || '', getCostFormulaModalMode());
+  const validation = validateCostFormulaText(input.value || '', getCostFormulaModalMode());
+  if (!validation.ok) {
+    updateCostFormulaModalPreview();
+    return;
+  }
+  const formula = validation.parsed;
   partida.formula_tipo = formula.formula_tipo;
   partida.formula_valor = formula.formula_valor;
   partida.formula_referencia = formula.formula_referencia;
@@ -4728,7 +4958,7 @@ function insertCostFormulaReference(input, token) {
   const start = input.selectionStart ?? value.length;
   const end = input.selectionEnd ?? value.length;
   const beforeCursor = value.slice(0, start);
-  const match = beforeCursor.match(/(?:_|[a-z])[a-z0-9_]*$/i);
+  const match = beforeCursor.match(/(?:_|[a-zÀ-ÿ])[a-z0-9_À-ÿ]*$/i);
   const replaceStart = match ? match.index : start;
   input.value = `${value.slice(0, replaceStart)}${token}${value.slice(end)}`;
   if (input.id === 'cost-config-formula-inline') {
@@ -4746,11 +4976,12 @@ function renderCostFormulaSuggestions(input, query = '') {
   const panel = input?.closest('.formula-cell')?.querySelector('.formula-suggest');
   if (!panel) return;
   const normalizedQuery = String(query || '').toLowerCase().replace(/^_/, '');
-  const options = getCostFormulaCatalog().filter(({ label, token }) => (
-    !normalizedQuery
-    || label.toLowerCase().includes(normalizedQuery)
-    || token.toLowerCase().includes(`_${normalizedQuery}`)
-    || token.toLowerCase().replace(/^_+/, '').includes(normalizedQuery)
+  const options = getCostFormulaCatalog().filter(({ label, token, visible }) => (
+    visible !== false
+    && (!normalizedQuery
+      || label.toLowerCase().includes(normalizedQuery)
+      || token.toLowerCase().includes(`_${normalizedQuery}`)
+      || token.toLowerCase().replace(/^_+/, '').includes(normalizedQuery))
   )).slice(0, 12);
 
   if (!options.length) {
@@ -4766,6 +4997,7 @@ function renderCostFormulaSuggestions(input, query = '') {
 }
 
 function sanitizeCostFormulaFreeText(raw) {
+  return String(raw || '');
   const source = String(raw || '');
   // Solo permite referencias técnicas (_token). Evita texto libre como referencias manuales.
   return source.replace(/\b(?!SI\b)[A-Za-zÁÉÍÓÚáéíóúÑñ][A-Za-z0-9_ÁÉÍÓÚáéíóúÑñ]*\b/g, '');
@@ -4783,7 +5015,7 @@ function handleCostFormulaInput(input) {
   if (!input.id) input.id = `cost-formula-${Math.random().toString(36).slice(2, 9)}`;
   state.costosUi.formulaInputId = input.id;
   const cursor = input.selectionStart ?? String(input.value || '').length;
-  const match = String(input.value || '').slice(0, cursor).match(/(?:_|[a-z])[a-z0-9_]*$/i);
+  const match = String(input.value || '').slice(0, cursor).match(/(?:_|[a-zÀ-ÿ])[a-z0-9_À-ÿ]*$/i);
   if (!match) {
     renderCostFormulaSuggestions(input, '');
     const panel = input.closest('.formula-cell')?.querySelector('.formula-suggest');
@@ -4808,13 +5040,43 @@ function pickCostFormulaSuggestion(button) {
   hideCostFormulaSuggestionsLater();
 }
 
-function getPaymentReferenceOptions() {
+function getMilestoneReferenceKey(row) {
+  return row?.id || row?.nombre || '';
+}
+
+function getMilestoneDurationMonths(row) {
+  const explicit = toNumber(row?.duracion_meses ?? row?.duracion);
+  if (explicit > 0) return explicit;
+  const inferred = toNumber(row?.fin) - toNumber(row?.inicio) + 1;
+  return Math.max(1, inferred || 1);
+}
+
+function getMilestoneDisplayName(row) {
+  return String(row?.nombre || 'Hito').trim();
+}
+
+function getMilestonePointLabel(row, point = 'START') {
+  const name = getMilestoneDisplayName(row);
+  return getMilestoneDurationMonths(row) > 1
+    ? `${point === 'END' ? 'Fin' : 'Inicio'}: ${name}`
+    : name;
+}
+
+function getPaymentReferenceOptions(selectedValue = '') {
   return [
     { value: 'MANUAL_0', label: 'Manual (M0)' },
-    ...state.gantt.flatMap((row) => ([
-      { value: `START:${row.id || row.nombre}`, label: `Inicio: ${row.nombre}` },
-      { value: `END:${row.id || row.nombre}`, label: `Fin: ${row.nombre}` },
-    ])),
+    ...state.gantt.flatMap((row) => {
+      const key = getMilestoneReferenceKey(row);
+      const startValue = `START:${key}`;
+      const endValue = `END:${key}`;
+      if (getMilestoneDurationMonths(row) > 1) {
+        return [
+          { value: startValue, label: getMilestonePointLabel(row, 'START') },
+          { value: endValue, label: getMilestonePointLabel(row, 'END') },
+        ];
+      }
+      return [{ value: selectedValue === endValue ? endValue : startValue, label: getMilestonePointLabel(row, 'START') }];
+    }),
   ];
 }
 
@@ -4949,6 +5211,72 @@ function makeCostPoint(overrides = {}) {
   };
 }
 
+function isPlainFormulaNumber(rawValue) {
+  return /^-?(?:(?:\d{1,3}(?:\.\d{3})+)|\d+)(?:[,.]\d+)?$/.test(String(rawValue || '').trim());
+}
+
+function getCostAmountRawInput(source = {}, key = 'amount') {
+  const inputKeys = [`${key}_input`, `${key}Input`, `${key}_formula`, `${key}Formula`, 'totalInput', 'totalFormula'];
+  for (const inputKey of inputKeys) {
+    if (source[inputKey] != null && String(source[inputKey]).trim() !== '') return String(source[inputKey]);
+  }
+  const value = source[key] ?? source[`${key}_value`] ?? source[`${key}Value`] ?? source[`${key}_calculated`] ?? source[`${key}Calculated`];
+  return value == null || value === '' ? '' : fmtInputNumber(value, 2);
+}
+
+function evaluateCostAmountInput(rawValue, context = buildCostContext(), fallbackValue = 0) {
+  const input = String(rawValue ?? '').trim();
+  if (!input) {
+    return { ok: true, input: '', formula: '', value: 0, calculated: 0, references: [], error: '' };
+  }
+  const formulaLike = !isPlainFormulaNumber(input);
+  if (!formulaLike) {
+    const value = toNumber(input);
+    return { ok: true, input, formula: '', value, calculated: value, references: [], error: '' };
+  }
+  const result = evaluateExpressionFormulaDetailed(input, context);
+  if (!result.ok) {
+    const fallback = toNumber(fallbackValue);
+    return {
+      ok: false,
+      input,
+      formula: input,
+      value: fallback,
+      calculated: fallback,
+      references: result.references || extractFormulaReferences(input),
+      error: result.error || 'Formula incompleta o mal escrita.',
+    };
+  }
+  return {
+    ok: true,
+    input,
+    formula: input,
+    value: result.value,
+    calculated: result.value,
+    references: result.references || extractFormulaReferences(input),
+    error: '',
+  };
+}
+
+function applyCostAmountMeta(target, meta, key = 'amount') {
+  target[key] = toNumber(meta.value);
+  target[`${key}_input`] = meta.input;
+  target[`${key}_formula`] = meta.formula;
+  target[`${key}_calculated`] = toNumber(meta.calculated);
+  target[`${key}_value`] = toNumber(meta.value);
+  target[`${key}_references`] = Array.isArray(meta.references) ? meta.references : [];
+  if (meta.error) target[`${key}_error`] = meta.error;
+  else delete target[`${key}_error`];
+  if (key === 'amount') {
+    target.totalInput = meta.input;
+    target.totalFormula = meta.formula;
+    target.totalCalculated = toNumber(meta.calculated);
+    target.totalValue = toNumber(meta.value);
+    target.totalReferences = Array.isArray(meta.references) ? meta.references : [];
+  }
+  return target;
+}
+
 function resolveCostConfigPoint(point) {
   const safePoint = makeCostPoint(point);
   if (safePoint.mode === 'date') return monthDiffFromProjectStart(safePoint.date);
@@ -4964,9 +5292,25 @@ function normalizeCostConfig(rawConfig) {
   if (!parsed || typeof parsed !== 'object') return null;
   const method = String(parsed.method || '').trim();
   if (!method) return null;
+  const amountMeta = evaluateCostAmountInput(
+    getCostAmountRawInput(parsed, 'amount'),
+    buildCostContext(),
+    parsed.amount_value ?? parsed.amount_calculated ?? parsed.amount
+  );
   return {
     method,
-    amount: toNumber(parsed.amount),
+    amount: toNumber(amountMeta.value),
+    amount_input: amountMeta.input,
+    amount_formula: amountMeta.formula,
+    amount_calculated: toNumber(amountMeta.calculated),
+    amount_value: toNumber(amountMeta.value),
+    amount_references: amountMeta.references,
+    amount_error: amountMeta.error || '',
+    totalInput: amountMeta.input,
+    totalFormula: amountMeta.formula,
+    totalCalculated: toNumber(amountMeta.calculated),
+    totalValue: toNumber(amountMeta.value),
+    totalReferences: amountMeta.references,
     formula: String(parsed.formula || ''),
     total_source: ['amount', 'formula'].includes(String(parsed.total_source || '').trim())
       ? String(parsed.total_source || '').trim()
@@ -4990,11 +5334,13 @@ function normalizeCostConfig(rawConfig) {
       pct: toNumber(item.pct),
       amount: toNumber(item.amount),
     })) : [],
-    payments: Array.isArray(parsed.payments) ? parsed.payments.map((item) => ({
-      ref: item.ref || item.point?.ref || 'MANUAL_0',
-      offset: toNumber(item.offset ?? item.point?.offset),
-      amount: toNumber(item.amount),
-    })) : [],
+    payments: Array.isArray(parsed.payments) ? parsed.payments.map((item) => {
+      const itemAmount = evaluateCostAmountInput(getCostAmountRawInput(item, 'amount'), buildCostContext(), item.amount);
+      return applyCostAmountMeta({
+        ref: item.ref || item.point?.ref || 'MANUAL_0',
+        offset: toNumber(item.offset ?? item.point?.offset),
+      }, itemAmount, 'amount');
+    }) : [],
   };
 }
 
@@ -5163,7 +5509,6 @@ function openPaymentPlanModal(categoryName, index) {
   state.costosUi.activePaymentCategory = categoryName;
   state.costosUi.activePaymentIndex = index;
   const plan = parseInteractivePaymentPlan(partida.plan_pago);
-  const refs = getPaymentReferenceOptions();
   const partidaTotal = evaluateCostPartida(partida, buildCostContext());
 
   setText('payment-plan-title', `Configurar costo: ${partida.nombre}`);
@@ -5172,7 +5517,7 @@ function openPaymentPlanModal(categoryName, index) {
   setText('payment-plan-assigned-card', `${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago, partidaTotal))}`);
   setText('payment-plan-counts', (plan.tramos.length || plan.hitos.length || plan.periodicos.length) ? 'Configurado' : 'Pendiente');
 
-  const renderRefOptions = (selectedValue) => refs.map((option) => `<option value="${escapeHtml(option.value)}" ${option.value === selectedValue ? 'selected' : ''}>${escapeHtml(option.label)}</option>`).join('');
+  const renderRefOptions = (selectedValue) => getPaymentReferenceOptions(selectedValue).map((option) => `<option value="${escapeHtml(option.value)}" ${option.value === selectedValue ? 'selected' : ''}>${escapeHtml(option.label)}</option>`).join('');
 
   setHtml('payment-plan-tramos', plan.tramos.map((tramo, idx) => `
     <div class="payment-line" data-tramo-index="${idx}" style="display:grid;grid-template-columns:100px 1fr 90px 1fr 90px 40px;gap:8px;margin-bottom:10px">
@@ -5201,7 +5546,7 @@ function openPaymentPlanModal(categoryName, index) {
       <select class="inp" data-field="fin_ref">${renderRefOptions(item.fin_ref || 'MANUAL_0')}</select>
       <input class="inp" data-field="fin_offset" type="text" inputmode="numeric" data-localized-number="1" step="1" value="${fmtInputNumber(item.fin_offset, 0)}" placeholder="Meses"/>
       <input class="inp" data-field="cada_meses" type="text" inputmode="numeric" data-localized-number="1" step="1" value="${fmtInputNumber(Math.max(1, toNumber(item.cada_meses) || 1), 0)}" placeholder="Cada"/>
-      <input class="inp" data-field="monto" type="text" inputmode="decimal" data-localized-number="1" step="0.01" value="${fmtInputNumber(toNumber(item.monto), 2)}" placeholder="UF por pago"/>
+      <input class="inp" data-field="monto" data-formula-amount="1" type="text" inputmode="text" value="${escapeHtml(item.monto_input || item.monto_formula || fmtInputNumber(toNumber(item.monto), 2))}" placeholder="Monto o formula"/>
       <button class="btn-outline btn-plus" type="button" onclick="removePaymentPlanItem('periodico', ${idx})">&times;</button>
     </div>
   `).join('') || '<div style="font-size:11px;color:#94a3b8">Sin pagos periódicos.</div>');
@@ -5334,14 +5679,21 @@ function savePaymentPlanModal() {
     ref: row.querySelector('[data-field="ref"]')?.value || 'MANUAL_0',
     offset: toNumber(row.querySelector('[data-field="offset"]')?.value),
   }));
-  const periodicos = Array.from(document.querySelectorAll('#payment-plan-periodicos .payment-line')).map((row) => ({
-    inicio_ref: row.querySelector('[data-field="inicio_ref"]')?.value || 'MANUAL_0',
-    inicio_offset: toNumber(row.querySelector('[data-field="inicio_offset"]')?.value),
-    fin_ref: row.querySelector('[data-field="fin_ref"]')?.value || 'MANUAL_0',
-    fin_offset: toNumber(row.querySelector('[data-field="fin_offset"]')?.value),
-    cada_meses: Math.max(1, Math.round(toNumber(row.querySelector('[data-field="cada_meses"]')?.value) || 1)),
-    monto: toNumber(row.querySelector('[data-field="monto"]')?.value),
-  }));
+  const periodicos = Array.from(document.querySelectorAll('#payment-plan-periodicos .payment-line')).map((row) => {
+    const amountMeta = evaluateCostAmountInput(row.querySelector('[data-field="monto"]')?.value, buildCostContext(), 0);
+    return applyCostAmountMeta({
+      inicio_ref: row.querySelector('[data-field="inicio_ref"]')?.value || 'MANUAL_0',
+      inicio_offset: toNumber(row.querySelector('[data-field="inicio_offset"]')?.value),
+      fin_ref: row.querySelector('[data-field="fin_ref"]')?.value || 'MANUAL_0',
+      fin_offset: toNumber(row.querySelector('[data-field="fin_offset"]')?.value),
+      cada_meses: Math.max(1, Math.round(toNumber(row.querySelector('[data-field="cada_meses"]')?.value) || 1)),
+    }, amountMeta, 'monto');
+  });
+  const periodicError = periodicos.find((item) => item.monto_error);
+  if (periodicError) {
+    window.alert(periodicError.monto_error);
+    return;
+  }
 
   partida.plan_pago = serializeInteractivePaymentPlan({ tramos, hitos, periodicos });
   if (partida.editable_source === 'terreno') partida.auto_origen = false;
@@ -5369,46 +5721,29 @@ function autosavePaymentPlanModal() {
     ref: row.querySelector('[data-field="ref"]')?.value || 'MANUAL_0',
     offset: toNumber(row.querySelector('[data-field="offset"]')?.value),
   }));
-  const periodicos = Array.from(document.querySelectorAll('#payment-plan-periodicos .payment-line')).map((row) => ({
-    inicio_ref: row.querySelector('[data-field="inicio_ref"]')?.value || 'MANUAL_0',
-    inicio_offset: toNumber(row.querySelector('[data-field="inicio_offset"]')?.value),
-    fin_ref: row.querySelector('[data-field="fin_ref"]')?.value || 'MANUAL_0',
-    fin_offset: toNumber(row.querySelector('[data-field="fin_offset"]')?.value),
-    cada_meses: Math.max(1, Math.round(toNumber(row.querySelector('[data-field="cada_meses"]')?.value) || 1)),
-    monto: toNumber(row.querySelector('[data-field="monto"]')?.value),
-  }));
+  const periodicos = Array.from(document.querySelectorAll('#payment-plan-periodicos .payment-line')).map((row) => {
+    const amountMeta = evaluateCostAmountInput(row.querySelector('[data-field="monto"]')?.value, buildCostContext(), 0);
+    return applyCostAmountMeta({
+      inicio_ref: row.querySelector('[data-field="inicio_ref"]')?.value || 'MANUAL_0',
+      inicio_offset: toNumber(row.querySelector('[data-field="inicio_offset"]')?.value),
+      fin_ref: row.querySelector('[data-field="fin_ref"]')?.value || 'MANUAL_0',
+      fin_offset: toNumber(row.querySelector('[data-field="fin_offset"]')?.value),
+      cada_meses: Math.max(1, Math.round(toNumber(row.querySelector('[data-field="cada_meses"]')?.value) || 1)),
+    }, amountMeta, 'monto');
+  });
+  if (periodicos.some((item) => item.monto_error)) return;
 
   partida.plan_pago = serializeInteractivePaymentPlan({ tramos, hitos, periodicos });
   if (partida.editable_source === 'terreno') partida.auto_origen = false;
   scheduleAutosave(partida.editable_source === 'terreno' ? 'terreno' : 'costos');
 }
 
-function getCostConfigReferenceOptions() {
-  const refs = getPaymentReferenceOptions();
-  const preferred = [
-    [/construcci/i, 'Inicio Construcción', 'START'],
-    [/construcci/i, 'Fin Construcción', 'END'],
-    [/promesa/i, 'Inicio Promesas', 'START'],
-    [/promesa/i, 'Fin Promesas', 'END'],
-    [/escrituraci/i, 'Inicio Escrituración', 'START'],
-    [/escrituraci/i, 'Fin Escrituración', 'END'],
-    [/recepci/i, 'Recepción Municipal', 'START'],
-    [/postventa/i, 'Fin Postventa', 'END'],
-  ].map(([matcher, label, kind]) => {
-    const row = state.gantt.find((item) => matcher.test(item.nombre || ''));
-    return row ? { value: `${kind}:${row.id || row.nombre}`, label } : null;
-  }).filter(Boolean);
-  const seen = new Set();
-  return [...preferred, ...refs].filter((item) => {
-    const key = `${item.value}|${item.label}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+function getCostConfigReferenceOptions(selectedValue = 'MANUAL_0') {
+  return getPaymentReferenceOptions(selectedValue);
 }
 
 function renderCostConfigRefOptions(selectedValue = 'MANUAL_0') {
-  return getCostConfigReferenceOptions().map((option) => (
+  return getCostConfigReferenceOptions(selectedValue).map((option) => (
     `<option value="${escapeHtml(option.value)}" ${option.value === selectedValue ? 'selected' : ''}>${escapeHtml(option.label)}</option>`
   )).join('');
 }
@@ -5423,11 +5758,14 @@ function renderCostConfigField(label, controlHtml) {
 }
 
 function renderCostConfigAmountField({ id = 'cost-config-amount', label = 'Monto total UF', value = 0, decimals = 2, placeholder = '0,00' } = {}) {
+  const rawValue = typeof value === 'string' ? value : fmtInputNumber(value, decimals);
   return `
-    <div class="cost-config-panel">
+    <div class="cost-config-panel formula-cell">
       ${renderCostConfigField(label, `
-        <input id="${escapeHtml(id)}" class="inp" type="text" inputmode="decimal" data-localized-number="1" value="${fmtInputNumber(value, decimals)}" placeholder="${escapeHtml(placeholder)}" oninput="updateCostConfigPreview()" onchange="updateCostConfigPreview()">
+        <input id="${escapeHtml(id)}" class="inp" type="text" inputmode="text" data-formula-amount="1" value="${escapeHtml(rawValue)}" placeholder="${escapeHtml(placeholder || 'Monto o formula, ej: 2500 o 15*_meses_preventa')}" oninput="handleCostFormulaInput(this); updateCostConfigPreview()" onchange="updateCostConfigPreview()" onfocus="handleCostFormulaInput(this)" onblur="hideCostFormulaSuggestionsLater()">
+        <div id="${escapeHtml(id)}-feedback" class="cost-inline-result"></div>
       `)}
+      <div class="formula-suggest"></div>
     </div>
   `;
 }
@@ -5502,7 +5840,19 @@ function getCostConfigPctSummary(config) {
 
 function getCostConfigValidation(config) {
   const safeConfig = normalizeCostConfig(config);
-  if (!safeConfig || safeConfig.method !== 'milestones') return { ok: true, label: '', message: '' };
+  if (!safeConfig) return { ok: true, label: '', message: '' };
+  if (safeConfig.amount_error) return { ok: false, label: 'Formula invalida', message: safeConfig.amount_error };
+  const paymentError = (safeConfig.payments || []).find((item) => item.amount_error);
+  if (paymentError) return { ok: false, label: 'Formula invalida', message: paymentError.amount_error };
+  if (safeConfig.method === 'monthly_formula' && safeConfig.formula) {
+    const formulaCheck = evaluateExpressionFormulaDetailed(safeConfig.formula, buildMonthlyContext(0, getCostMonthCount()));
+    if (!formulaCheck.ok) return { ok: false, label: 'Formula invalida', message: formulaCheck.error };
+  }
+  if (safeConfig.method === 'global_formula' && safeConfig.total_source === 'formula' && safeConfig.formula) {
+    const formulaCheck = evaluateExpressionFormulaDetailed(safeConfig.formula, buildCostContext());
+    if (!formulaCheck.ok) return { ok: false, label: 'Formula invalida', message: formulaCheck.error };
+  }
+  if (safeConfig.method !== 'milestones') return { ok: true, label: '', message: '' };
   const summary = getCostConfigPctSummary(safeConfig);
   if (summary.ok) return { ok: true, label: '100% asignado', message: '' };
   const label = summary.delta > 0
@@ -5524,6 +5874,26 @@ function updateCostConfigPctWarning(config) {
     ? `Total asignado: ${fmtNumber(summary.pct, 2)}%`
     : `${validation.label} · total asignado: ${fmtNumber(summary.pct, 2)}%`;
   warning.className = `cost-config-warning ${validation.ok ? 'is-ok' : (summary.pct > 100 ? 'is-error' : 'is-warn')}`;
+}
+
+function updateCostAmountFeedback(input, meta) {
+  if (!input) return;
+  const field = input.closest('.cost-config-field');
+  const feedback = $(`${input.id}-feedback`) || field?.querySelector('.cost-inline-result');
+  field?.classList.toggle('has-error', !!meta?.error);
+  if (!feedback) return;
+  if (meta?.error) {
+    feedback.textContent = meta.error;
+    feedback.className = 'cost-inline-result is-error';
+    return;
+  }
+  if (meta?.formula) {
+    feedback.textContent = `Resultado: ${fmtUf(meta.value)}`;
+    feedback.className = 'cost-inline-result is-ok';
+    return;
+  }
+  feedback.textContent = '';
+  feedback.className = 'cost-inline-result';
 }
 
 function getCostConfigFormulaValueFromEditor() {
@@ -5618,6 +5988,12 @@ function clearCostConfigFormula() {
 }
 
 function insertCostConfigFormulaReference(token) {
+  const activeInput = $(state.costosUi.formulaInputId);
+  if (activeInput && activeInput.closest('#cost-config-modal')) {
+    insertCostFormulaReference(activeInput, token);
+    updateCostConfigPreview();
+    return;
+  }
   const inline = $('cost-config-formula-inline');
   if (inline) {
     insertCostFormulaReference(inline, token);
@@ -5633,15 +6009,20 @@ function readCostConfigForm() {
   getCostConfigFormulaValueFromEditor();
   const draft = normalizeCostConfig(state.costosUi.costConfigDraft) || { method: 'manual', start: makeCostPoint(), end: makeCostPoint() };
   const method = $('cost-config-method')?.value || draft.method || 'manual';
+  const amountMeta = evaluateCostAmountInput(
+    $('cost-config-amount')?.value ?? getCostAmountRawInput(draft, 'amount'),
+    buildCostContext(),
+    draft.amount
+  );
   const common = {
     ...draft,
     method,
-    amount: toNumber($('cost-config-amount')?.value ?? draft.amount),
     formula: $('cost-config-formula')?.value ?? draft.formula ?? '',
     total_source: $('cost-config-total-source')?.value || draft.total_source || (draft.formula ? 'formula' : 'amount'),
     periodicity: Math.max(1, Math.round(toNumber($('cost-config-periodicity')?.value ?? draft.periodicity) || 1)),
     payment_count: Math.max(0, Math.round(toNumber($('cost-config-payment-count')?.value ?? draft.payment_count))),
   };
+  applyCostAmountMeta(common, amountMeta, 'amount');
 
   if ($('cost-config-start-mode')) common.start = readCostPointControls('start', draft.start);
   if ($('cost-config-end-mode')) common.end = readCostPointControls('end', draft.end);
@@ -5673,8 +6054,15 @@ function readCostConfigForm() {
     common.payments = paymentRows.map((row) => ({
       ref: row.querySelector('[data-field="ref"]')?.value || 'MANUAL_0',
       offset: toNumber(row.querySelector('[data-field="offset"]')?.value),
-      amount: toNumber(row.querySelector('[data-field="amount"]')?.value),
-    }));
+    })).map((item, index) => applyCostAmountMeta(
+      item,
+      evaluateCostAmountInput(
+        paymentRows[index]?.querySelector('[data-field="amount"]')?.value,
+        buildCostContext(),
+        draft.payments?.[index]?.amount
+      ),
+      'amount'
+    ));
   }
 
   state.costosUi.costConfigDraft = normalizeCostConfig(common);
@@ -5724,14 +6112,14 @@ function renderCostConfigFields(options = {}) {
   if (method === 'manual') {
     html = `
       <div class="cost-config-grid">
-        ${renderCostConfigAmountField({ label: 'Monto único UF', value: config.amount, placeholder: 'Monto único' })}
+        ${renderCostConfigAmountField({ label: 'Monto único UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula, ej: 2500 o 15*_meses_preventa' })}
         ${renderCostPointControls('start', 'Fecha de imputación', config.start)}
       </div>
     `;
   } else if (method === 'monthly_amount') {
     html = `
       <div class="cost-config-grid three">
-        ${renderCostConfigAmountField({ label: 'Monto mensual UF', value: config.amount, placeholder: 'Monto mensual' })}
+        ${renderCostConfigAmountField({ label: 'Monto mensual UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula mensual, ej: 2500 o 15*_meses_preventa' })}
         ${renderCostPointControls('start', 'Desde', config.start)}
         ${renderCostPointControls('end', 'Hasta', config.end)}
       </div>
@@ -5745,7 +6133,7 @@ function renderCostConfigFields(options = {}) {
         ${renderCostConfigTotalSourceControl(totalSource)}
         ${totalSource === 'formula'
           ? renderCostConfigFormulaInput(config.formula, 'Total por fórmula', { chipEditor: true })
-          : renderCostConfigAmountField({ label: 'Monto total UF', value: config.amount, placeholder: 'Monto total' })}
+          : renderCostConfigAmountField({ label: 'Monto total UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula, ej: 2500 o 15*_meses_preventa' })}
       </div>
       <div class="cost-config-grid">
         ${renderCostPointControls('start', 'Distribuir desde', config.start)}
@@ -5755,7 +6143,7 @@ function renderCostConfigFields(options = {}) {
   } else if (method === 'periodic') {
     html = `
       <div class="cost-config-grid three">
-        ${renderCostConfigAmountField({ label: 'Monto por pago UF', value: config.amount, placeholder: 'Monto por pago' })}
+        ${renderCostConfigAmountField({ label: 'Monto por pago UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula, ej: 2500 o 15*_meses_preventa' })}
         <div class="cost-config-panel">
           ${renderCostConfigField('Repetir cada X meses', `<input id="cost-config-periodicity" class="inp" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(config.periodicity || 1, 0)}" placeholder="Ej: 3" oninput="updateCostConfigPreview()" onchange="updateCostConfigPreview()">`)}
         </div>
@@ -5793,7 +6181,7 @@ function renderCostConfigFields(options = {}) {
     `).join('');
     html = `
       <div class="cost-config-grid">
-        ${renderCostConfigAmountField({ label: 'Monto total UF', value: config.amount, placeholder: 'Monto total' })}
+        ${renderCostConfigAmountField({ label: 'Monto total UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula, ej: 2500 o 15*_meses_preventa' })}
         <div class="cost-config-panel">
           <div class="cost-config-label">Validación de porcentajes</div>
           <div id="cost-config-pct-warning" class="cost-config-warning">Total asignado: 0%</div>
@@ -5817,7 +6205,7 @@ function renderCostConfigFields(options = {}) {
     const rows = payments.map((item, idx) => `
       <div class="cost-config-line payment">
         ${renderCostConfigField('Fecha/Hito', `<select class="inp" data-field="ref" onchange="updateCostConfigPreview()">${renderCostConfigRefOptions(item.ref)}</select>`)}
-        ${renderCostConfigField('Monto UF', `<input class="inp" data-field="amount" type="text" inputmode="decimal" data-localized-number="1" value="${fmtInputNumber(item.amount, 2)}" placeholder="Monto UF" oninput="updateCostConfigPreview()">`)}
+        ${renderCostConfigField('Monto UF', `<input class="inp" data-field="amount" data-formula-amount="1" type="text" inputmode="text" value="${escapeHtml(getCostAmountRawInput(item, 'amount'))}" placeholder="Monto o formula, ej: 2500 o 15*_meses_preventa" oninput="handleCostFormulaInput(this); updateCostConfigPreview()" onfocus="handleCostFormulaInput(this)" onblur="hideCostFormulaSuggestionsLater()">`)}
         ${renderCostConfigField('Desfase en meses', `<input class="inp" data-field="offset" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(item.offset, 0)}" placeholder="-1, 0, +1" oninput="updateCostConfigPreview()">`)}
         ${deleteButton('payment', idx, 'Eliminar pago')}
       </div>
@@ -5842,7 +6230,7 @@ function renderCostConfigFields(options = {}) {
 function renderCostConfigRefPanel() {
   const panel = $('cost-config-ref-panel');
   if (!panel) return;
-  const catalog = getCostFormulaCatalog();
+  const catalog = getCostFormulaCatalog().filter((entry) => entry.visible !== false);
   const catalogMap = new Map(catalog.map((entry) => [entry.token, entry]));
   panel.innerHTML = FORMULA_REF_GROUPS.map((group, groupIdx) => {
     const entries = group.tokens
@@ -5871,6 +6259,7 @@ function updateCostConfigPreview() {
   if (!partida) return;
   const config = readCostConfigForm();
   const monthCount = getCostMonthCount();
+  updateCostAmountFeedback($('cost-config-amount'), config);
   const monthly = buildDistributionFromCostConfig(config, monthCount) || createMonthlyArray(monthCount, 0);
   const total = monthly.reduce((sum, value) => sum + toNumber(value), 0);
   const validation = getCostConfigValidation(config);
@@ -7009,7 +7398,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupAutosaveListeners();
   renderSyncStatus();
   const tabDock = $('tabDock');
-  if (tabDock) {
+  const tabDockToggle = $('tabDockToggle');
+  if (tabDock && tabDockToggle) {
     tabDock.addEventListener('mouseenter', () => openTabDock());
     tabDock.addEventListener('mouseleave', () => closeTabDock());
     tabDock.addEventListener('focusin', () => openTabDock());
@@ -7018,25 +7408,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!tabDock.contains(document.activeElement)) closeTabDock();
       }, 80);
     });
-  }
-  const tabDockToggle = $('tabDockToggle');
-  if (tabDockToggle) {
     tabDockToggle.addEventListener('click', (event) => {
       event.preventDefault();
       toggleTabDock();
     });
+    document.addEventListener('click', (event) => {
+      const dock = $('tabDock');
+      if (!dock) return;
+      if (dock.contains(event.target)) return;
+      closeTabDock();
+    });
   }
-  document.addEventListener('click', (event) => {
-    const dock = $('tabDock');
-    if (!dock) return;
-    if (dock.contains(event.target)) return;
-    closeTabDock();
-  });
 
   const activeTab = document.querySelector('.tab-btn.active');
   if (activeTab) {
-    const match = activeTab.getAttribute('onclick')?.match(/showTab\('([^']+)'/);
-    if (match) showTab(match[1], activeTab);
+    const tabId = getTabButtonTarget(activeTab);
+    if (tabId) showTab(tabId, activeTab);
   }
 
   try {
