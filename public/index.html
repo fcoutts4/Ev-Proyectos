@@ -136,8 +136,16 @@ tbody tr:hover{background:#f8fafc}
 .formula-mode-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;font-size:10px;font-weight:800;letter-spacing:.05em}
 .formula-mode-global{background:#dcfce7;color:#166534}
 .formula-mode-mensual{background:#fef3c7;color:#92400e}
+.formula-mode-manual{background:#e0f2fe;color:#075985}
 .formula-si-btn{display:block;width:100%;text-align:left;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;font-size:11px;color:#334155;cursor:pointer}
 .formula-si-btn:hover{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
+.formula-imputation-box{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:12px}
+.monthly-preview-head{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px;font-weight:800;color:#0f172a;margin:12px 0 6px}
+.monthly-preview-scroll{max-height:210px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;background:#fff}
+.monthly-preview-scroll table{width:100%;border-collapse:collapse;font-size:11px}
+.monthly-preview-scroll th,.monthly-preview-scroll td{padding:6px 8px;border-bottom:1px solid #f1f5f9;text-align:right;white-space:nowrap}
+.monthly-preview-scroll th:first-child,.monthly-preview-scroll td:first-child{text-align:left}
+.monthly-preview-scroll tr.has-value{background:#fff7ed}
 /* ===== FORMULA REF PANEL ===== */
 .formula-ref-panel{display:flex;flex-direction:column;overflow-y:auto;max-height:420px;border:1px solid #e2e8f0;border-radius:10px;background:#fafbfc}
 .formula-ref-group{border-bottom:1px solid #f1f5f9}
@@ -1914,10 +1922,19 @@ table:not(.gantt-table) .tfoot-dark td,
             <div id="cost-formula-modal-result" style="font-size:20px;font-weight:900;color:#0f172a">= UF</div>
           </div>
           <div class="formula-cell">
+            <div class="formula-imputation-box">
+              <div style="font-size:10px;color:#94a3b8;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Tipo de imputación</div>
+              <select id="cost-formula-imputation-type" class="inp" onchange="updateCostFormulaModalPreview(); autosaveCostFormulaModal()">
+                <option value="global">Total global</option>
+                <option value="monthly">Mensual por fórmula</option>
+                <option value="manual">Plan de pago manual</option>
+              </select>
+            </div>
             <div style="font-size:10px;color:#94a3b8;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Editar fórmula</div>
             <div id="cost-formula-modal-preview" class="formula-chip-editor" style="margin-bottom:8px"></div>
-            <input id="cost-formula-modal-input" class="inp" placeholder="Ej: 2500 * _meses_construccion  ·  SI(_ingresos_mes > 0, 50, 0)  ·  0.043 * _precio_promedio_unidad * _unidades_escrituradas_mes" oninput="handleCostFormulaInput(this); updateCostFormulaModalPreview(); autosaveCostFormulaModal()" onfocus="handleCostFormulaInput(this); updateCostFormulaModalPreview()" onblur="hideCostFormulaSuggestionsLater()"/>
+            <input id="cost-formula-modal-input" class="inp" placeholder="Ej: 25% * (ingresos_promesa_mes + ingresos_escrituracion_mes)  ·  SI(ingresos_mes > 0, 50, 0)  ·  -4,3% * valor_promedio_total_unidad * unidades_escrituradas_mes" oninput="handleCostFormulaInput(this); updateCostFormulaModalPreview(); autosaveCostFormulaModal()" onfocus="handleCostFormulaInput(this); updateCostFormulaModalPreview()" onblur="hideCostFormulaSuggestionsLater()"/>
             <div class="formula-suggest"></div>
+            <div id="cost-formula-monthly-preview" class="formula-monthly-preview" style="display:none"></div>
           </div>
           <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:18px">
             <button class="btn-outline" type="button" onclick="closeCostFormulaModal()">Cancelar</button>
