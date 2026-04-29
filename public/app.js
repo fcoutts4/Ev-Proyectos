@@ -51,6 +51,18 @@ function showTab(tabId, button) {
   const pane = document.getElementById(`tab-${tabId}`);
   if (pane) pane.classList.add('active');
   if (button) button.classList.add('active');
+  if (window.innerWidth <= 1100) toggleTabDock(true);
+}
+
+function toggleTabDock(forceCollapsed = null) {
+  const dock = $('tabDock');
+  const toggle = $('tabDockToggle');
+  const caret = $('tabDockCaret');
+  if (!dock) return;
+  const shouldCollapse = forceCollapsed == null ? !dock.classList.contains('is-collapsed') : !!forceCollapsed;
+  dock.classList.toggle('is-collapsed', shouldCollapse);
+  if (toggle) toggle.setAttribute('aria-expanded', shouldCollapse ? 'false' : 'true');
+  if (caret) caret.innerHTML = shouldCollapse ? '&#9656;' : '&#9662;';
 }
 
 function createPendingAction(name) {
@@ -2163,15 +2175,16 @@ function renderVentasCashflow() {
 }
 
 function renderCostStructure() {
-  const total = state.costos
+  const visibleCategories = (state.costos || []).filter((categoria) => !['TERRENO', 'CONSTRUCCIÓN', 'CONSTRUCCION', 'GASTOS FINANCIEROS'].includes(String(categoria.nombre || '').toUpperCase().trim()));
+  const total = visibleCategories
     .flatMap((categoria) => categoria.partidas || [])
     .reduce((sum, partida) => sum + toNumber(partida.total_neto), 0);
-  const totalBruto = state.costos
+  const totalBruto = visibleCategories
     .flatMap((categoria) => categoria.partidas || [])
     .reduce((sum, partida) => sum + (toNumber(partida.total_neto) * (partida.tiene_iva ? 1.19 : 1)), 0);
 
   const colors = ['#0f172a', '#22c55e', '#3b82f6', '#f59e0b', '#a855f7', '#ef4444'];
-  const rowsHtml = state.costos.map((categoria, index) => {
+  const rowsHtml = visibleCategories.map((categoria, index) => {
     const subtotal = (categoria.partidas || []).reduce((sum, partida) => sum + toNumber(partida.total_neto), 0);
     const pct = total ? (subtotal / total) * 100 : 0;
     return `
@@ -3833,7 +3846,6 @@ function renderCostPlanilla() {
     <tr>
       <th style="width:60px"></th>
       <th style="min-width:220px;text-align:left">Subpartida</th>
-      <th style="width:126px;text-align:center">Ver formula</th>
       <th style="min-width:170px;text-align:left">Plan de pago</th>
       <th style="min-width:110px">Total neto</th>
       <th style="width:64px">IVA</th>
@@ -3888,7 +3900,7 @@ function renderCostPlanilla() {
         if (sectionLabel && sectionLabel !== previousLabel) {
           categoryRows.push(`
             <tr class="subcat-row">
-              <td colspan="${6 + monthCount}">${escapeHtml(sectionLabel)}</td>
+              <td colspan="${5 + monthCount}">${escapeHtml(sectionLabel)}</td>
             </tr>
           `);
         }
@@ -3896,6 +3908,7 @@ function renderCostPlanilla() {
 
       const total = evaluateCostPartida(partida, context);
       const distribucion = getMonthlyDistributionForPartida(partida, monthCount);
+      const estadoPlanPago = getEstadoPlanPago(partida, total, monthCount);
       partida.total_neto = total;
       partida.distribucion_mensual = distribucion;
       totalNeto += total;
@@ -3906,18 +3919,11 @@ function renderCostPlanilla() {
       distribucion.forEach((value, monthIndex) => { categoryMonthlyTotals[monthIndex] += value; });
 
       categoryRows.push(`
-        <tr class="partida-row" data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" data-cost-id="${escapeHtml(partida.id || '')}" ${rowReadOnly ? 'data-auto="1" data-readonly="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
+        <tr class="partida-row is-subpartida" data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" data-cost-id="${escapeHtml(partida.id || '')}" ${rowReadOnly ? 'data-auto="1" data-readonly="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
           <td style="text-align:center">${rowReadOnly ? '' : `<span class="row-tools">${isProtectedDefault ? '<button class="btn-outline btn-delete-inline" type="button" title="Subpartida base protegida" disabled>&times;</button>' : `<button class="btn-outline btn-delete-inline" type="button" title="Eliminar subpartida" onclick="removeCostPartida('${escapeHtml(categoria.nombre)}', ${index})">&times;</button>`}<span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span></span>`}</td>
           <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${rowReadOnly ? 'disabled' : ''}/></td>
-          <td style="text-align:center">
-            <div class="formula-chip-cell ${rowReadOnly ? 'is-readonly' : 'is-clickable'}" ${rowReadOnly ? '' : `onclick="openCostFormulaModal('${escapeHtml(categoria.nombre)}', ${index})"`} title="${rowReadOnly ? 'Fórmula automática' : 'Click para editar la fórmula'}">
-              ${renderFormulaChipsForCell(partida, rowReadOnly)}
-            </div>
-            <input type="hidden" class="cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}"/>
-            <input type="hidden" data-field="formula_tipo" value="${escapeHtml(partida.formula_tipo || 'expr')}"/>
-          </td>
-          <td>${isMonthlyFormula ? '<span class="badge badge-yellow" title="La formula define directamente el flujo de cada mes">Mensual por formula</span>' : (planEditable ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><button class="btn-outline" type="button" onclick="openPaymentPlanModal('${escapeHtml(categoria.nombre)}', ${index})">${escapeHtml(summarizePaymentPlan(partida.plan_pago))}</button><div style="font-size:10px;color:${Math.abs(getPaymentPlanAssignedPct(partida.plan_pago, total) - 100) < 0.01 ? '#16a34a' : '#b45309'};white-space:nowrap">${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago, total))}</div></div>` : '<span class="badge badge-yellow">AUTO</span>')}</td>
-          <td style="text-align:center;color:#22c55e;font-weight:800">${fmtTableAmount(total, { kind: 'cost' })}</td>
+          <td>${planEditable ? `<span class="plan-status-pill ${estadoPlanPago.className}" onclick="${isMonthlyFormula ? `openCostFormulaModal('${escapeHtml(categoria.nombre)}', ${index})` : `openPaymentPlanModal('${escapeHtml(categoria.nombre)}', ${index})`}" title="${isMonthlyFormula ? 'Editar fórmula mensual' : 'Editar plan de pago'}">${escapeHtml(estadoPlanPago.label)}</span>` : '<span class="badge badge-yellow">AUTO</span>'}</td>
+          <td style="text-align:center;color:#22c55e;font-weight:800"><span class="cost-total-cell" ${rowReadOnly ? '' : `onclick="openCostFormulaModal('${escapeHtml(categoria.nombre)}', ${index})"`} title="${rowReadOnly ? 'Fórmula automática' : 'Click para editar fórmula'}">${fmtTableAmount(total, { kind: 'cost' })}${partida.formula_tipo === 'expr_mensual' ? '<span class="cost-total-badge">MES</span>' : ''}</span><input type="hidden" class="cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}"/><input type="hidden" data-field="formula_tipo" value="${escapeHtml(partida.formula_tipo || 'expr')}"/></td>
           <td style="text-align:center"><input type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''} ${rowReadOnly ? 'disabled' : ''}/></td>
           ${distribucion.map((value) => `<td data-month-cell style="text-align:center">${fmtTableAmount(value, { kind: 'cost' })}</td>`).join('')}
         </tr>
@@ -3925,13 +3931,13 @@ function renderCostPlanilla() {
     });
 
     return `
-      <tr class="cat-row">
-        <td colspan="4" style="padding:10px">
+      <tr class="cat-row ${!isCollapsed ? 'is-expanded' : ''}">
+        <td colspan="3" style="padding:8px 8px">
           <div class="cost-category-header">
             <div class="cost-category-title">
-              <button class="btn-outline btn-plus" type="button" onclick="${hasSubpartidas ? `toggleCostCategoryCollapse('${escapeHtml(categoria.nombre)}')` : ''}" title="${hasSubpartidas ? 'Expandir o colapsar' : 'Sin subpartidas'}" ${hasSubpartidas ? '' : 'disabled style="opacity:.45;cursor:not-allowed"'}>${hasSubpartidas ? (isCollapsed ? '+' : '-') : '·'}</button>
+              <button class="btn-collapse-cost" type="button" onclick="${hasSubpartidas ? `toggleCostCategoryCollapse('${escapeHtml(categoria.nombre)}')` : ''}" title="${hasSubpartidas ? 'Expandir o colapsar' : 'Sin subpartidas'}" ${hasSubpartidas ? '' : 'disabled style="opacity:.45;cursor:not-allowed"'}>${hasSubpartidas ? (isCollapsed ? '&#9656;' : '&#9662;') : '&middot;'}</button>
               <span class="cost-category-name">${escapeHtml(categoria.nombre)}</span>
-              ${categoryReadOnly ? '' : `<button class="btn-outline btn-subpartida" type="button" onclick="agregarPartidaLinea('${escapeHtml(categoria.nombre)}')" title="Agregar subpartida">+</button>`}
+              ${categoryReadOnly ? '' : `<button class="btn-add-cost" type="button" onclick="agregarPartidaLinea('${escapeHtml(categoria.nombre)}')" title="Agregar partida">+ Agregar partida</button>`}
             </div>
             <div class="cost-category-actions">
             </div>
@@ -3947,7 +3953,7 @@ function renderCostPlanilla() {
 
   setHtml('planilla-tfoot', `
     <tr class="tfoot-dark">
-      <td colspan="4">Totales</td>
+      <td colspan="3">Totales</td>
       <td>${fmtTableAmount(totalNeto, { kind: 'cost', total: true })}</td>
       <td>${fmtTableAmount(totalIva, { kind: 'cost', total: true })}</td>
       ${monthlyTotals.map((value) => `<td>${fmtTableAmount(value, { kind: 'cost', total: true })}</td>`).join('')}
@@ -4665,7 +4671,21 @@ function renderCostFormulaSuggestions(input, query = '') {
   panel.style.display = 'block';
 }
 
+function sanitizeCostFormulaFreeText(raw) {
+  const source = String(raw || '');
+  // Solo permite referencias técnicas (_token). Evita texto libre como referencias manuales.
+  return source.replace(/\b(?!SI\b)[A-Za-zÁÉÍÓÚáéíóúÑñ][A-Za-z0-9_ÁÉÍÓÚáéíóúÑñ]*\b/g, '');
+}
+
 function handleCostFormulaInput(input) {
+  if (input?.id === 'cost-formula-modal-input') {
+    const sanitized = sanitizeCostFormulaFreeText(input.value || '');
+    if (sanitized !== input.value) {
+      const cursor = input.selectionStart ?? sanitized.length;
+      input.value = sanitized;
+      input.setSelectionRange(Math.max(0, cursor - 1), Math.max(0, cursor - 1));
+    }
+  }
   if (!input.id) input.id = `cost-formula-${Math.random().toString(36).slice(2, 9)}`;
   state.costosUi.formulaInputId = input.id;
   const cursor = input.selectionStart ?? String(input.value || '').length;
@@ -4749,6 +4769,25 @@ function getPaymentPlanAssignedPct(rawValue, total = 0) {
   });
   const periodicTotal = months.reduce((sum, value) => sum + toNumber(value), 0);
   return pctBase + (periodicTotal / totalNeto) * 100;
+}
+
+function getEstadoPlanPago(partida, total = 0, monthCount = getCostMonthCount()) {
+  const isMonthlyFormula = partida?.formula_tipo === 'expr_mensual';
+  if (isMonthlyFormula) return { activo: true, label: 'Flujo listo', className: 'estado-ok' };
+
+  const rawPlan = String(partida?.plan_pago || '').trim();
+  if (!rawPlan) return { activo: false, label: 'Configurar plan', className: 'estado-pendiente' };
+
+  const plan = parseInteractivePaymentPlan(rawPlan);
+  const hasInteractiveItems = (plan.tramos?.length || 0) > 0 || (plan.hitos?.length || 0) > 0 || (plan.periodicos?.length || 0) > 0;
+  const distribution = hasInteractiveItems
+    ? buildDistributionFromInteractivePlan(rawPlan, toNumber(total))
+    : buildDistributionFromPlan(rawPlan, toNumber(total));
+  const hasFlow = Array.isArray(distribution) && distribution.some((value, idx) => idx < monthCount && Math.abs(toNumber(value)) > 0.0001);
+
+  return hasFlow
+    ? { activo: true, label: 'Plan listo', className: 'estado-ok' }
+    : { activo: false, label: 'Configurar plan', className: 'estado-pendiente' };
 }
 
 function resolvePaymentReference(refValue, offset = 0) {
@@ -5934,6 +5973,7 @@ function agregarUso(defaultLabel = 'Departamento') {
 });
 
 window.showTab = showTab;
+window.toggleTabDock = toggleTabDock;
 window.onCabidaInputChange = onCabidaInputChange;
 window.onTerrenoInputChange = onTerrenoInputChange;
 window.guardarFormulaOverrides = guardarFormulaOverrides;
@@ -6000,6 +6040,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupLocalizedNumberInputs();
   setupAutosaveListeners();
   renderSyncStatus();
+  if (window.innerWidth <= 1100) toggleTabDock(true);
+  document.addEventListener('click', (event) => {
+    const dock = $('tabDock');
+    if (!dock || window.innerWidth > 1100) return;
+    if (dock.contains(event.target)) return;
+    if (!dock.classList.contains('is-collapsed')) toggleTabDock(true);
+  });
 
   const activeTab = document.querySelector('.tab-btn.active');
   if (activeTab) {
