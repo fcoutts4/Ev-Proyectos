@@ -3455,6 +3455,7 @@ function buildMonthlyContext(monthIndex, monthCount) {
     unidades_no_vendidas_mes: unidadesNoVendidasMes,
     unidades_promesadas_escrituradas_mes: unidadesPromesa + unidadesEscritura,
     ingresos_promesa_mes: ingresosPromesa,
+    ingresos_promesas_mes: ingresosPromesa,
     ingresos_escrituracion_mes: ingresosEscrituracion,
     ingresos_promesa_escrituracion_mes: ingresosPromesa + ingresosEscrituracion,
     ingresos_mes: ingresosPromesa + ingresosEscrituracion,
@@ -4195,6 +4196,7 @@ function getCostFormulaCatalog() {
     { label: 'Unidades no vendidas mes', token: '_unidades_no_vendidas_mes', value: 0, unit: 'un', monthly: true },
     { label: 'Unidades promesadas + escrituradas mes', token: '_unidades_promesadas_escrituradas_mes', value: 0, unit: 'un', monthly: true },
     { label: 'Ingresos promesa mes', token: '_ingresos_promesa_mes', value: 0, unit: 'UF', monthly: true },
+    { label: 'Ingresos promesas mes', token: '_ingresos_promesas_mes', value: 0, unit: 'UF', monthly: true },
     { label: 'Ingresos escrituracion mes', token: '_ingresos_escrituracion_mes', value: 0, unit: 'UF', monthly: true },
     { label: 'Ingresos promesa + escrituracion mes', token: '_ingresos_promesa_escrituracion_mes', value: 0, unit: 'UF', monthly: true },
     { label: 'Ingresos totales mes', token: '_ingresos_mes', value: 0, unit: 'UF', monthly: true },
@@ -4509,10 +4511,10 @@ function scrollFinancialPlanilla(containerId, offset) {
 const FORMULA_REF_GROUPS = [
   {
     label: 'Ingresos',
-    tokens: ['_ingresos_promesa_mes', '_ingresos_escrituracion_mes', '_ingresos_promesa_escrituracion_mes', '_ingresos_mes', '_ingresos_promesas_total', '_ingresos_escrituracion_total', '_ventas_totales', '_ventas_brutas'],
+    tokens: ['_ingresos_promesa_mes', '_ingresos_promesas_mes', '_ingresos_escrituracion_mes', '_ingresos_promesa_escrituracion_mes', '_ingresos_mes', '_ingresos_promesas_total', '_ingresos_escrituracion_total', '_ventas_totales', '_ventas_brutas'],
   },
   {
-    tokens: ['_unidades_promesadas_mes', '_ingresos_promesa_mes', '_ingresos_promesas_total', '_pct_pie_promesa'],
+    tokens: ['_unidades_promesadas_mes', '_ingresos_promesa_mes', '_ingresos_promesas_mes', '_ingresos_promesas_total', '_pct_pie_promesa'],
     label: 'Promesas',
   },
   {
@@ -4957,9 +4959,17 @@ function normalizeCostConfig(rawConfig) {
     amount: toNumber(parsed.amount),
     formula: String(parsed.formula || ''),
     periodicity: Math.max(1, Math.round(toNumber(parsed.periodicity) || 1)),
+    payment_count: Math.max(0, Math.round(toNumber(parsed.payment_count ?? parsed.repetitions ?? parsed.count ?? parsed.cantidad_pagos))),
     start: makeCostPoint(parsed.start),
     end: makeCostPoint(parsed.end),
     legacy_plan: parsed.legacy_plan || null,
+    tramos: Array.isArray(parsed.tramos) ? parsed.tramos.map((item) => ({
+      pct: toNumber(item.pct),
+      inicio_ref: item.inicio_ref || item.start?.ref || item.ref || 'MANUAL_0',
+      inicio_offset: toNumber(item.inicio_offset ?? item.start?.offset),
+      fin_ref: item.fin_ref || item.end?.ref || item.ref || 'MANUAL_0',
+      fin_offset: toNumber(item.fin_offset ?? item.end?.offset),
+    })) : [],
     hitos: Array.isArray(parsed.hitos) ? parsed.hitos.map((item) => ({
       ref: item.ref || item.point?.ref || 'MANUAL_0',
       offset: toNumber(item.offset ?? item.point?.offset),
@@ -4988,12 +4998,18 @@ function migrateLegacyCostConfig(partida) {
     config = { method: 'monthly_formula', formula: partida.formula_referencia || '' };
   } else if (hasPlan && plan.periodicos.length && !plan.tramos.length && !plan.hitos.length) {
     const first = plan.periodicos[0];
+    const step = Math.max(1, Math.round(toNumber(first.cada_meses) || 1));
+    const startPoint = makeCostPoint({ ref: first.inicio_ref || 'MANUAL_0', offset: first.inicio_offset });
+    const endPoint = makeCostPoint({ ref: first.fin_ref || 'MANUAL_0', offset: first.fin_offset });
+    const startMonth = resolveCostConfigPoint(startPoint);
+    const endMonth = Math.max(startMonth, resolveCostConfigPoint(endPoint));
     config = {
       method: 'periodic',
       amount: toNumber(first.monto),
-      periodicity: Math.max(1, Math.round(toNumber(first.cada_meses) || 1)),
-      start: makeCostPoint({ ref: first.inicio_ref || 'MANUAL_0', offset: first.inicio_offset }),
-      end: makeCostPoint({ ref: first.fin_ref || 'MANUAL_0', offset: first.fin_offset }),
+      periodicity: step,
+      payment_count: Math.max(1, Math.floor((endMonth - startMonth) / step) + 1),
+      start: startPoint,
+      end: endPoint,
       legacy_plan: plan,
     };
   } else if (hasPlan) {
@@ -5026,7 +5042,7 @@ function migrateLegacyCostConfig(partida) {
 function evaluateCostConfigBaseAmount(config, context = buildCostContext()) {
   const safeConfig = normalizeCostConfig(config);
   if (!safeConfig) return 0;
-  if (safeConfig.formula) return toNumber(evaluateExpressionFormula(safeConfig.formula, context));
+  if (safeConfig.method !== 'milestones' && safeConfig.formula) return toNumber(evaluateExpressionFormula(safeConfig.formula, context));
   return toNumber(safeConfig.amount);
 }
 
@@ -5056,8 +5072,16 @@ function buildDistributionFromCostConfig(config, monthCount = getCostMonthCount(
 
   if (safeConfig.method === 'periodic') {
     const step = Math.max(1, Math.round(toNumber(safeConfig.periodicity) || 1));
-    for (let month = startMonth; month <= endMonth && month < monthCount; month += step) {
-      placeMonthlyValue(months, month, amount);
+    const count = Math.max(0, Math.round(toNumber(safeConfig.payment_count)));
+    if (count > 0) {
+      for (let index = 0; index < count; index += 1) {
+        const month = startMonth + (index * step);
+        if (month >= 0 && month < monthCount) placeMonthlyValue(months, month, amount);
+      }
+    } else {
+      for (let month = startMonth; month <= endMonth && month < monthCount; month += step) {
+        placeMonthlyValue(months, month, amount);
+      }
     }
     return months;
   }
@@ -5074,6 +5098,12 @@ function buildDistributionFromCostConfig(config, monthCount = getCostMonthCount(
 
   if (safeConfig.method === 'milestones') {
     const total = evaluateCostConfigBaseAmount(safeConfig, context);
+    safeConfig.tramos.forEach((tramo) => {
+      const lineAmount = total * toNumber(tramo.pct) / 100;
+      const tramoStart = resolvePaymentReference(tramo.inicio_ref, tramo.inicio_offset);
+      const tramoEnd = Math.max(tramoStart, resolvePaymentReference(tramo.fin_ref, tramo.fin_offset));
+      distributeEvenly(months, lineAmount, tramoStart, Math.max(1, tramoEnd - tramoStart + 1));
+    });
     safeConfig.hitos.forEach((item) => {
       const lineAmount = item.kind === 'pct' ? total * toNumber(item.pct) / 100 : toNumber(item.amount);
       placeMonthlyValue(months, resolvePaymentReference(item.ref, item.offset), lineAmount);
@@ -5105,7 +5135,7 @@ function getEstadoCosto(partida, total = 0, monthCount = getCostMonthCount()) {
   if (config.method === 'monthly_formula') return { activo: true, label: 'Fórmula mensual', className: 'estado-monthly' };
   if (config.method === 'monthly_amount') return { activo: true, label: 'Monto mensual', className: 'estado-ok' };
   if (config.method === 'periodic') return { activo: true, label: 'Periódico', className: 'estado-periodic' };
-  if (config.method === 'milestones') return { activo: true, label: 'Hitos', className: 'estado-hitos' };
+  if (config.method === 'milestones') return { activo: true, label: config.tramos?.length ? 'Combinado' : 'Hitos', className: 'estado-hitos' };
   return { activo: true, label: 'Configurado', className: 'estado-ok' };
 }
 
@@ -5368,26 +5398,47 @@ function renderCostConfigRefOptions(selectedValue = 'MANUAL_0') {
   )).join('');
 }
 
+function renderCostConfigField(label, controlHtml) {
+  return `
+    <div class="cost-config-field">
+      <label class="cost-config-field-label">${escapeHtml(label)}</label>
+      ${controlHtml}
+    </div>
+  `;
+}
+
+function renderCostConfigAmountField({ id = 'cost-config-amount', label = 'Monto total UF', value = 0, decimals = 2, placeholder = '0,00' } = {}) {
+  return `
+    <div class="cost-config-panel">
+      ${renderCostConfigField(label, `
+        <input id="${escapeHtml(id)}" class="inp" type="text" inputmode="decimal" data-localized-number="1" value="${fmtInputNumber(value, decimals)}" placeholder="${escapeHtml(placeholder)}" oninput="updateCostConfigPreview()" onchange="updateCostConfigPreview()">
+      `)}
+    </div>
+  `;
+}
+
 function renderCostPointControls(name, label, point = makeCostPoint()) {
   const safePoint = makeCostPoint(point);
   const mode = safePoint.mode || 'ref';
   const mainControl = mode === 'date'
-    ? `<input id="cost-config-${name}-date" class="inp" type="month" value="${escapeHtml(safePoint.date || '')}" oninput="updateCostConfigPreview()" onchange="updateCostConfigPreview()">`
+    ? renderCostConfigField('Fecha seleccionada', `<input id="cost-config-${name}-date" class="inp" type="month" value="${escapeHtml(safePoint.date || '')}" oninput="updateCostConfigPreview()" onchange="updateCostConfigPreview()">`)
     : mode === 'month'
-      ? `<input id="cost-config-${name}-month" class="inp" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(safePoint.month, 0)}" placeholder="Mes" oninput="updateCostConfigPreview()" onchange="updateCostConfigPreview()">`
-      : `<select id="cost-config-${name}-ref" class="inp" onchange="updateCostConfigPreview()">${renderCostConfigRefOptions(safePoint.ref)}</select>`;
+      ? renderCostConfigField('Mes desde inicio', `<input id="cost-config-${name}-month" class="inp" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(safePoint.month, 0)}" placeholder="Ej: 3" oninput="updateCostConfigPreview()" onchange="updateCostConfigPreview()">`)
+      : renderCostConfigField('Hito base', `<select id="cost-config-${name}-ref" class="inp" onchange="updateCostConfigPreview()">${renderCostConfigRefOptions(safePoint.ref)}</select>`);
   const offsetControl = mode === 'ref'
-    ? `<input id="cost-config-${name}-offset" class="inp" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(safePoint.offset, 0)}" placeholder="+/-" oninput="updateCostConfigPreview()" onchange="updateCostConfigPreview()">`
-    : '<span></span>';
+    ? renderCostConfigField('Desfase en meses', `<input id="cost-config-${name}-offset" class="inp" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(safePoint.offset, 0)}" placeholder="-1, 0, +1" oninput="updateCostConfigPreview()" onchange="updateCostConfigPreview()">`)
+    : '';
   return `
     <div class="cost-config-panel">
       <div class="cost-config-label">${escapeHtml(label)}</div>
-      <div class="cost-config-point">
-        <select id="cost-config-${name}-mode" class="inp" onchange="renderCostConfigFields(); updateCostConfigPreview()">
-          <option value="ref" ${mode === 'ref' ? 'selected' : ''}>Hito</option>
-          <option value="date" ${mode === 'date' ? 'selected' : ''}>Fecha fija</option>
-          <option value="month" ${mode === 'month' ? 'selected' : ''}>Mes</option>
-        </select>
+      <div class="cost-config-point ${mode === 'ref' ? '' : 'two'}">
+        ${renderCostConfigField('Tipo de fecha', `
+          <select id="cost-config-${name}-mode" class="inp" onchange="renderCostConfigFields(); updateCostConfigPreview()">
+            <option value="ref" ${mode === 'ref' ? 'selected' : ''}>Hito</option>
+            <option value="date" ${mode === 'date' ? 'selected' : ''}>Fecha fija</option>
+            <option value="month" ${mode === 'month' ? 'selected' : ''}>Mes</option>
+          </select>
+        `)}
         ${mainControl}
         ${offsetControl}
       </div>
@@ -5411,6 +5462,41 @@ function getActiveCostConfigPartida() {
   return category?.partidas?.[state.costosUi.activeConfigIndex] || null;
 }
 
+function getCostConfigPctSummary(config) {
+  const safeConfig = normalizeCostConfig(config);
+  if (!safeConfig || safeConfig.method !== 'milestones') return { pct: 0, delta: 0, ok: true };
+  const pct = [...(safeConfig.hitos || []), ...(safeConfig.tramos || [])]
+    .reduce((sum, item) => sum + toNumber(item.pct), 0);
+  const delta = 100 - pct;
+  return { pct, delta, ok: Math.abs(delta) <= 0.01 };
+}
+
+function getCostConfigValidation(config) {
+  const safeConfig = normalizeCostConfig(config);
+  if (!safeConfig || safeConfig.method !== 'milestones') return { ok: true, label: '', message: '' };
+  const summary = getCostConfigPctSummary(safeConfig);
+  if (summary.ok) return { ok: true, label: '100% asignado', message: '' };
+  const label = summary.delta > 0
+    ? `Falta ${fmtNumber(summary.delta, 2)}%`
+    : `Supera 100% en ${fmtNumber(Math.abs(summary.delta), 2)}%`;
+  return {
+    ok: false,
+    label,
+    message: `La suma de hitos y tramos distribuidos debe ser 100%. Actualmente suma ${fmtNumber(summary.pct, 2)}%.`,
+  };
+}
+
+function updateCostConfigPctWarning(config) {
+  const warning = $('cost-config-pct-warning');
+  if (!warning) return;
+  const summary = getCostConfigPctSummary(config);
+  const validation = getCostConfigValidation(config);
+  warning.textContent = validation.ok
+    ? `Total asignado: ${fmtNumber(summary.pct, 2)}%`
+    : `${validation.label} · total asignado: ${fmtNumber(summary.pct, 2)}%`;
+  warning.className = `cost-config-warning ${validation.ok ? 'is-ok' : (summary.pct > 100 ? 'is-error' : 'is-warn')}`;
+}
+
 function readCostConfigForm() {
   const draft = normalizeCostConfig(state.costosUi.costConfigDraft) || { method: 'manual', start: makeCostPoint(), end: makeCostPoint() };
   const method = $('cost-config-method')?.value || draft.method || 'manual';
@@ -5420,24 +5506,36 @@ function readCostConfigForm() {
     amount: toNumber($('cost-config-amount')?.value ?? draft.amount),
     formula: $('cost-config-formula')?.value ?? draft.formula ?? '',
     periodicity: Math.max(1, Math.round(toNumber($('cost-config-periodicity')?.value ?? draft.periodicity) || 1)),
+    payment_count: Math.max(0, Math.round(toNumber($('cost-config-payment-count')?.value ?? draft.payment_count))),
   };
 
   if ($('cost-config-start-mode')) common.start = readCostPointControls('start', draft.start);
   if ($('cost-config-end-mode')) common.end = readCostPointControls('end', draft.end);
 
   const hitoRows = Array.from(document.querySelectorAll('#cost-config-hitos .cost-config-line'));
-  if (hitoRows.length) {
+  if ($('cost-config-hitos')) {
     common.hitos = hitoRows.map((row) => ({
       ref: row.querySelector('[data-field="ref"]')?.value || 'MANUAL_0',
       offset: toNumber(row.querySelector('[data-field="offset"]')?.value),
-      kind: row.querySelector('[data-field="kind"]')?.value === 'pct' ? 'pct' : 'amount',
+      kind: 'pct',
       pct: toNumber(row.querySelector('[data-field="pct"]')?.value),
-      amount: toNumber(row.querySelector('[data-field="amount"]')?.value),
+      amount: 0,
+    }));
+  }
+
+  const tramoRows = Array.from(document.querySelectorAll('#cost-config-tramos .cost-config-line'));
+  if ($('cost-config-tramos')) {
+    common.tramos = tramoRows.map((row) => ({
+      pct: toNumber(row.querySelector('[data-field="pct"]')?.value),
+      inicio_ref: row.querySelector('[data-field="inicio_ref"]')?.value || 'MANUAL_0',
+      inicio_offset: toNumber(row.querySelector('[data-field="inicio_offset"]')?.value),
+      fin_ref: row.querySelector('[data-field="fin_ref"]')?.value || 'MANUAL_0',
+      fin_offset: toNumber(row.querySelector('[data-field="fin_offset"]')?.value),
     }));
   }
 
   const paymentRows = Array.from(document.querySelectorAll('#cost-config-payments .cost-config-line'));
-  if (paymentRows.length) {
+  if ($('cost-config-payments')) {
     common.payments = paymentRows.map((row) => ({
       ref: row.querySelector('[data-field="ref"]')?.value || 'MANUAL_0',
       offset: toNumber(row.querySelector('[data-field="offset"]')?.value),
@@ -5453,7 +5551,7 @@ function renderCostConfigFormulaInput(value = '', label = 'Fórmula') {
   return `
     <div class="cost-config-panel formula-cell">
       <div class="cost-config-label">${escapeHtml(label)}</div>
-      <input id="cost-config-formula" class="inp" value="${escapeHtml(value || '')}" placeholder="Ej: 25% * (_ingresos_promesa_mes + _ingresos_escrituracion_mes)" oninput="handleCostFormulaInput(this); updateCostConfigPreview()" onfocus="handleCostFormulaInput(this)" onblur="hideCostFormulaSuggestionsLater()">
+      <input id="cost-config-formula" class="inp" value="${escapeHtml(value || '')}" placeholder="Ej: ingresos_promesas_mes * 4.5%" oninput="handleCostFormulaInput(this); updateCostConfigPreview()" onfocus="handleCostFormulaInput(this)" onblur="hideCostFormulaSuggestionsLater()">
       <div class="formula-suggest"></div>
     </div>
   `;
@@ -5463,36 +5561,34 @@ function renderCostConfigFields() {
   if (!$('cost-config-fields')) return;
   const previous = readCostConfigForm();
   const method = $('cost-config-method')?.value || previous.method || 'manual';
-  const config = { ...previous, method };
-  state.costosUi.costConfigDraft = normalizeCostConfig(config);
+  const config = normalizeCostConfig({ ...previous, method }) || { method, start: makeCostPoint(), end: makeCostPoint() };
+  state.costosUi.costConfigDraft = config;
+  const deleteButton = (type, idx, title) => `<button class="btn-outline btn-plus" type="button" title="${escapeHtml(title)}" onclick="removeCostConfigLine('${type}', ${idx})">&times;</button>`;
 
   let html = '';
   if (method === 'manual') {
     html = `
       <div class="cost-config-grid">
-        <div class="cost-config-panel">
-          <div class="cost-config-label">Monto total UF</div>
-          <input id="cost-config-amount" class="inp" type="text" inputmode="decimal" data-localized-number="1" value="${fmtInputNumber(config.amount, 2)}" oninput="updateCostConfigPreview()" onchange="updateCostConfigPreview()">
-        </div>
-        ${renderCostPointControls('start', 'Mes de imputación', config.start)}
+        ${renderCostConfigAmountField({ label: 'Monto único UF', value: config.amount, placeholder: 'Monto único' })}
+        ${renderCostPointControls('start', 'Fecha de imputación', config.start)}
       </div>
     `;
   } else if (method === 'monthly_amount') {
     html = `
       <div class="cost-config-grid three">
-        <div class="cost-config-panel">
-          <div class="cost-config-label">Monto mensual UF</div>
-          <input id="cost-config-amount" class="inp" type="text" inputmode="decimal" data-localized-number="1" value="${fmtInputNumber(config.amount, 2)}" oninput="updateCostConfigPreview()" onchange="updateCostConfigPreview()">
-        </div>
+        ${renderCostConfigAmountField({ label: 'Monto mensual UF', value: config.amount, placeholder: 'Monto mensual' })}
         ${renderCostPointControls('start', 'Desde', config.start)}
         ${renderCostPointControls('end', 'Hasta', config.end)}
       </div>
     `;
   } else if (method === 'monthly_formula') {
-    html = renderCostConfigFormulaInput(config.formula, 'Fórmula mensual dinámica');
+    html = renderCostConfigFormulaInput(config.formula, 'Fórmula mensual');
   } else if (method === 'global_formula') {
     html = `
-      ${renderCostConfigFormulaInput(config.formula, 'Fórmula global o monto total')}
+      <div class="cost-config-grid">
+        ${renderCostConfigAmountField({ label: 'Monto total UF', value: config.amount, placeholder: 'Monto total' })}
+        ${renderCostConfigFormulaInput(config.formula, 'Fórmula total opcional')}
+      </div>
       <div class="cost-config-grid">
         ${renderCostPointControls('start', 'Distribuir desde', config.start)}
         ${renderCostPointControls('end', 'Distribuir hasta', config.end)}
@@ -5500,50 +5596,71 @@ function renderCostConfigFields() {
     `;
   } else if (method === 'periodic') {
     html = `
-      <div class="cost-config-grid">
+      <div class="cost-config-grid three">
+        ${renderCostConfigAmountField({ label: 'Monto por pago UF', value: config.amount, placeholder: 'Monto por pago' })}
         <div class="cost-config-panel">
-          <div class="cost-config-label">Monto por pago UF</div>
-          <input id="cost-config-amount" class="inp" type="text" inputmode="decimal" data-localized-number="1" value="${fmtInputNumber(config.amount, 2)}" oninput="updateCostConfigPreview()" onchange="updateCostConfigPreview()">
+          ${renderCostConfigField('Repetir cada X meses', `<input id="cost-config-periodicity" class="inp" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(config.periodicity || 1, 0)}" placeholder="Ej: 3" oninput="updateCostConfigPreview()" onchange="updateCostConfigPreview()">`)}
         </div>
         <div class="cost-config-panel">
-          <div class="cost-config-label">Periodicidad cada X meses</div>
-          <input id="cost-config-periodicity" class="inp" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(config.periodicity || 1, 0)}" oninput="updateCostConfigPreview()" onchange="updateCostConfigPreview()">
+          ${renderCostConfigField('Cantidad de pagos', `<input id="cost-config-payment-count" class="inp" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(config.payment_count || 1, 0)}" placeholder="Ej: 3" oninput="updateCostConfigPreview()" onchange="updateCostConfigPreview()">`)}
         </div>
       </div>
-      <div class="cost-config-grid">
+      <div class="cost-config-grid" style="grid-template-columns:minmax(0,1fr)">
         ${renderCostPointControls('start', 'Fecha inicio', config.start)}
-        ${renderCostPointControls('end', 'Fecha término', config.end)}
       </div>
     `;
   } else if (method === 'milestones') {
-    const rows = (config.hitos?.length ? config.hitos : [{ ref: 'MANUAL_0', offset: 0, kind: 'amount', amount: 0, pct: 0 }]).map((item, idx) => `
+    const hitos = config.hitos?.length ? config.hitos : [{ ref: 'MANUAL_0', offset: 0, kind: 'pct', amount: 0, pct: 100 }];
+    const rows = hitos.map((item, idx) => {
+      const pctValue = item.kind === 'pct'
+        ? toNumber(item.pct)
+        : (toNumber(config.amount) ? (toNumber(item.amount) / toNumber(config.amount)) * 100 : toNumber(item.pct));
+      return `
       <div class="cost-config-line hito">
-        <select class="inp" data-field="ref" onchange="updateCostConfigPreview()">${renderCostConfigRefOptions(item.ref)}</select>
-        <input class="inp" data-field="offset" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(item.offset, 0)}" placeholder="+/-" oninput="updateCostConfigPreview()">
-        <div style="display:grid;grid-template-columns:60px 1fr;gap:6px">
-          <select class="inp" data-field="kind" onchange="renderCostConfigFields(); updateCostConfigPreview()"><option value="amount" ${item.kind !== 'pct' ? 'selected' : ''}>UF</option><option value="pct" ${item.kind === 'pct' ? 'selected' : ''}>%</option></select>
-          <input class="inp" data-field="${item.kind === 'pct' ? 'pct' : 'amount'}" type="text" inputmode="decimal" data-localized-number="1" value="${fmtInputNumber(item.kind === 'pct' ? item.pct : item.amount, 2)}" oninput="updateCostConfigPreview()">
-        </div>
-        <button class="btn-outline btn-plus" type="button" onclick="removeCostConfigLine('hito', ${idx})">&times;</button>
+        ${renderCostConfigField('Fecha/Hito', `<select class="inp" data-field="ref" onchange="updateCostConfigPreview()">${renderCostConfigRefOptions(item.ref)}</select>`)}
+        ${renderCostConfigField('Porcentaje %', `<input class="inp" data-field="pct" type="text" inputmode="decimal" data-localized-number="1" value="${fmtInputNumber(pctValue, 2)}" placeholder="%" oninput="updateCostConfigPreview()">`)}
+        ${renderCostConfigField('Desfase en meses', `<input class="inp" data-field="offset" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(item.offset, 0)}" placeholder="-1, 0, +1" oninput="updateCostConfigPreview()">`)}
+        ${deleteButton('hito', idx, 'Eliminar hito')}
+      </div>
+    `; }).join('');
+    const tramoRows = (config.tramos || []).map((item, idx) => `
+      <div class="cost-config-line tramo">
+        ${renderCostConfigField('Porcentaje %', `<input class="inp" data-field="pct" type="text" inputmode="decimal" data-localized-number="1" value="${fmtInputNumber(item.pct, 2)}" placeholder="%" oninput="updateCostConfigPreview()">`)}
+        ${renderCostConfigField('Desde', `<select class="inp" data-field="inicio_ref" onchange="updateCostConfigPreview()">${renderCostConfigRefOptions(item.inicio_ref)}</select>`)}
+        ${renderCostConfigField('Desfase inicio', `<input class="inp" data-field="inicio_offset" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(item.inicio_offset, 0)}" placeholder="-1, 0, +1" oninput="updateCostConfigPreview()">`)}
+        ${renderCostConfigField('Hasta', `<select class="inp" data-field="fin_ref" onchange="updateCostConfigPreview()">${renderCostConfigRefOptions(item.fin_ref)}</select>`)}
+        ${renderCostConfigField('Desfase fin', `<input class="inp" data-field="fin_offset" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(item.fin_offset, 0)}" placeholder="-1, 0, +1" oninput="updateCostConfigPreview()">`)}
+        ${deleteButton('tramo', idx, 'Eliminar tramo distribuido')}
       </div>
     `).join('');
     html = `
-      ${renderCostConfigFormulaInput(config.formula, 'Base para porcentajes (opcional)')}
+      <div class="cost-config-grid">
+        ${renderCostConfigAmountField({ label: 'Monto total UF', value: config.amount, placeholder: 'Monto total' })}
+        <div class="cost-config-panel">
+          <div class="cost-config-label">Validación de porcentajes</div>
+          <div id="cost-config-pct-warning" class="cost-config-warning">Total asignado: 0%</div>
+        </div>
+      </div>
       <div class="cost-config-panel">
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:8px">
           <div class="cost-config-label" style="margin-bottom:0">Pagos por hito</div>
           <button class="btn-outline cost-config-add" type="button" onclick="addCostConfigLine('hito')">+ Hito</button>
         </div>
-        <div id="cost-config-hitos">${rows}</div>
+        <div id="cost-config-hitos" class="cost-config-list compact">${rows}</div>
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin:10px 0 8px">
+          <div class="cost-config-label" style="margin-bottom:0">Distribuido dentro del total</div>
+          <button class="btn-outline cost-config-add" type="button" onclick="addCostConfigLine('tramo')">+ Tramo</button>
+        </div>
+        <div id="cost-config-tramos" class="cost-config-list compact">${tramoRows || '<div style="font-size:11px;color:#94a3b8">Sin tramo distribuido.</div>'}</div>
       </div>
     `;
   } else if (method === 'manual_distribution') {
     const rows = (config.payments?.length ? config.payments : [{ ref: 'MANUAL_0', offset: 0, amount: 0 }]).map((item, idx) => `
-      <div class="cost-config-line">
-        <select class="inp" data-field="ref" onchange="updateCostConfigPreview()">${renderCostConfigRefOptions(item.ref)}</select>
-        <input class="inp" data-field="amount" type="text" inputmode="decimal" data-localized-number="1" value="${fmtInputNumber(item.amount, 2)}" placeholder="UF" oninput="updateCostConfigPreview()">
-        <button class="btn-outline btn-plus" type="button" onclick="removeCostConfigLine('payment', ${idx})">&times;</button>
-        <input class="inp" data-field="offset" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(item.offset, 0)}" placeholder="+/-" oninput="updateCostConfigPreview()" style="grid-column:1 / span 2">
+      <div class="cost-config-line payment">
+        ${renderCostConfigField('Fecha/Hito', `<select class="inp" data-field="ref" onchange="updateCostConfigPreview()">${renderCostConfigRefOptions(item.ref)}</select>`)}
+        ${renderCostConfigField('Monto UF', `<input class="inp" data-field="amount" type="text" inputmode="decimal" data-localized-number="1" value="${fmtInputNumber(item.amount, 2)}" placeholder="Monto UF" oninput="updateCostConfigPreview()">`)}
+        ${renderCostConfigField('Desfase en meses', `<input class="inp" data-field="offset" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(item.offset, 0)}" placeholder="-1, 0, +1" oninput="updateCostConfigPreview()">`)}
+        ${deleteButton('payment', idx, 'Eliminar pago')}
       </div>
     `).join('');
     html = `
@@ -5552,12 +5669,14 @@ function renderCostConfigFields() {
           <div class="cost-config-label" style="margin-bottom:0">Pagos puntuales</div>
           <button class="btn-outline cost-config-add" type="button" onclick="addCostConfigLine('payment')">+ Pago</button>
         </div>
-        <div id="cost-config-payments">${rows}</div>
+        <div id="cost-config-payments" class="cost-config-list">${rows}</div>
       </div>
     `;
   }
 
   setHtml('cost-config-fields', html);
+  updateCostConfigPctWarning(state.costosUi.costConfigDraft);
+  if (typeof localizeNumberInputs === 'function') localizeNumberInputs($('cost-config-fields'));
   renderCostConfigRefPanel();
 }
 
@@ -5595,7 +5714,11 @@ function updateCostConfigPreview() {
   const monthCount = getCostMonthCount();
   const monthly = buildDistributionFromCostConfig(config, monthCount) || createMonthlyArray(monthCount, 0);
   const total = monthly.reduce((sum, value) => sum + toNumber(value), 0);
-  const estado = getEstadoCosto({ ...partida, cost_config: config, auto_origen: false }, total, monthCount);
+  const validation = getCostConfigValidation(config);
+  updateCostConfigPctWarning(config);
+  const estado = validation.ok
+    ? getEstadoCosto({ ...partida, cost_config: config, auto_origen: false }, total, monthCount)
+    : { activo: false, label: validation.label, className: 'estado-pendiente' };
   setText('cost-config-total', `Total: ${fmtUf(total)}`);
   const status = $('cost-config-status');
   const previewStatus = $('cost-config-preview-state');
@@ -5606,13 +5729,15 @@ function updateCostConfigPreview() {
   });
   const labels = getCostMonthLabels();
   setHtml('cost-config-preview', `
-    <table>
-      <thead><tr><th style="text-align:left">Mes</th><th style="text-align:right">Monto</th></tr></thead>
-      <tbody>${labels.map((label, index) => {
+    <div class="cost-config-preview-row">
+      ${labels.map((label, index) => {
         const value = toNumber(monthly[index]);
-        return `<tr class="${value ? 'has-value' : ''}"><td>${escapeHtml(label)}</td><td style="text-align:right">${fmtTableAmount(value, { kind: 'cost' })}</td></tr>`;
-      }).join('')}</tbody>
-    </table>
+        return `<div class="cost-config-preview-month ${value ? 'has-value' : ''}">
+          <div class="cost-config-preview-label">${escapeHtml(label)}</div>
+          <div class="cost-config-preview-value">${fmtTableAmount(value, { kind: 'cost' })}</div>
+        </div>`;
+      }).join('')}
+    </div>
   `);
 }
 
@@ -5650,6 +5775,12 @@ function saveCostConfigModal() {
   const partida = category?.partidas?.[index];
   if (!partida) return;
   const config = readCostConfigForm();
+  const validation = getCostConfigValidation(config);
+  if (!validation.ok) {
+    updateCostConfigPreview();
+    window.alert(validation.message);
+    return;
+  }
   const monthly = buildDistributionFromCostConfig(config, getCostMonthCount()) || createMonthlyArray();
   const total = monthly.reduce((sum, value) => sum + toNumber(value), 0);
   partida.cost_config = normalizeCostConfig(config);
@@ -5670,7 +5801,8 @@ function saveCostConfigModal() {
 
 function addCostConfigLine(type) {
   const config = readCostConfigForm();
-  if (type === 'hito') config.hitos = [...(config.hitos || []), { ref: 'MANUAL_0', offset: 0, kind: 'amount', amount: 0, pct: 0 }];
+  if (type === 'hito') config.hitos = [...(config.hitos || []), { ref: 'MANUAL_0', offset: 0, kind: 'pct', amount: 0, pct: 0 }];
+  if (type === 'tramo') config.tramos = [...(config.tramos || []), { pct: 0, inicio_ref: 'MANUAL_0', inicio_offset: 0, fin_ref: 'MANUAL_0', fin_offset: 0 }];
   if (type === 'payment') config.payments = [...(config.payments || []), { ref: 'MANUAL_0', offset: 0, amount: 0 }];
   state.costosUi.costConfigDraft = config;
   renderCostConfigFields();
@@ -5680,6 +5812,7 @@ function addCostConfigLine(type) {
 function removeCostConfigLine(type, index) {
   const config = readCostConfigForm();
   if (type === 'hito') config.hitos = (config.hitos || []).filter((_, idx) => idx !== index);
+  if (type === 'tramo') config.tramos = (config.tramos || []).filter((_, idx) => idx !== index);
   if (type === 'payment') config.payments = (config.payments || []).filter((_, idx) => idx !== index);
   state.costosUi.costConfigDraft = config;
   renderCostConfigFields();
@@ -6160,7 +6293,7 @@ function onVentasVelocityChange() {
 
 const MONTHLY_FORMULA_TOKENS = [
   '_unidades_promesadas_mes', '_unidades_escrituradas_mes', '_unidades_no_vendidas_mes', '_unidades_promesadas_escrituradas_mes',
-  '_ingresos_promesa_mes', '_ingresos_escrituracion_mes', '_ingresos_promesa_escrituracion_mes', '_ingresos_mes',
+  '_ingresos_promesa_mes', '_ingresos_promesas_mes', '_ingresos_escrituracion_mes', '_ingresos_promesa_escrituracion_mes', '_ingresos_mes',
 ];
 
 function normalizeImputationMode(mode) {
