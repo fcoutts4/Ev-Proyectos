@@ -164,6 +164,8 @@ function toNumber(value) {
         : normalized.replace(/,/g, '');
     } else if (commaIndex >= 0) {
       normalized = normalized.replace(',', '.');
+    } else if (dotIndex >= 0 && /^\d{1,3}(?:\.\d{3})+$/.test(normalized.replace(/^-/, ''))) {
+      normalized = normalized.replace(/\./g, '');
     }
     const localized = Number(normalized);
     return Number.isFinite(localized) ? localized : 0;
@@ -522,6 +524,80 @@ function fmtNumber(value, decimals = 0) {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   }).format(toNumber(value));
+}
+
+function fmtInputNumber(value, decimals = 2, options = {}) {
+  if (value == null || value === '') return '';
+  const numeric = toNumber(value);
+  if (options.blankZero && !numeric) return '';
+  return new Intl.NumberFormat('es-CL', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: decimals,
+  }).format(numeric);
+}
+
+function getLocalizedInputDecimals(input) {
+  const step = String(input?.getAttribute?.('step') || '').trim();
+  if (step && step !== 'any') {
+    const decimalPart = step.split(/[,.]/)[1];
+    if (decimalPart) return decimalPart.length;
+    if (step === '1') return 0;
+  }
+  const field = `${input?.id || ''} ${input?.dataset?.field || ''}`.toLowerCase();
+  if (/cantidad|mes|inicio|fin|duracion|desfase|offset|proyeccion|plazo/.test(field)) return 0;
+  return 2;
+}
+
+function formatLocalizedNumberInput(input) {
+  if (!input || input.type === 'hidden' || input.type === 'month' || input.value === '') return;
+  input.value = fmtInputNumber(input.value, getLocalizedInputDecimals(input));
+}
+
+function prepareLocalizedNumberInput(input) {
+  if (!input || input.type === 'hidden' || input.type === 'month') return;
+  if (input.type === 'number') input.type = 'text';
+  input.dataset.localizedNumber = '1';
+  input.inputMode = getLocalizedInputDecimals(input) === 0 ? 'numeric' : 'decimal';
+  input.autocomplete = 'off';
+  if (!input.matches(':focus')) formatLocalizedNumberInput(input);
+}
+
+function localizeNumberInputs(root = document) {
+  root.querySelectorAll?.('input[type="number"], input[data-localized-number="1"]').forEach(prepareLocalizedNumberInput);
+}
+
+function setupLocalizedNumberInputs() {
+  if (document.body?.dataset.localizedNumberInputsBound) return;
+  localizeNumberInputs(document);
+
+  document.addEventListener('focusout', (event) => {
+    const input = event.target;
+    if (input?.matches?.('input[data-localized-number="1"]')) formatLocalizedNumberInput(input);
+  });
+
+  document.addEventListener('change', (event) => {
+    const input = event.target;
+    if (input?.matches?.('input[data-localized-number="1"]')) formatLocalizedNumberInput(input);
+  });
+
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node.nodeType !== 1) return;
+        if (node.matches?.('input[type="number"], input[data-localized-number="1"]')) prepareLocalizedNumberInput(node);
+        localizeNumberInputs(node);
+      });
+    });
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+  document.body.dataset.localizedNumberInputsBound = '1';
+}
+
+function setLocalizedInputValue(id, value, decimals = 2, options = {}) {
+  const input = $(id);
+  if (!input || (input.matches(':focus') && !options.force)) return;
+  input.value = fmtInputNumber(value, decimals, options);
+  prepareLocalizedNumberInput(input);
 }
 
 function fmtUf(value) {
@@ -917,9 +993,9 @@ function renderCabidaEditor(rows) {
     <div class="card" style="margin-bottom:12px;background:#f8fafc">
       <div class="sec-title" style="font-size:14px">Parametros Generales de Cabida</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
-        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">% terraza considerada en vendible</label><input id="cabida-terraza-util-pct" class="inp" type="number" step="0.01" value="${toNumber(proyecto.terraza_util_pct)}" onchange="onCabidaInputChange()"/></div>
+        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">% terraza considerada en vendible</label><input id="cabida-terraza-util-pct" class="inp" type="text" inputmode="decimal" data-localized-number="1" step="0.01" value="${fmtInputNumber(proyecto.terraza_util_pct, 2)}" onchange="onCabidaInputChange()"/></div>
         <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Comunes modo</label><select id="cabida-comunes-tipo" class="inp" onchange="onCabidaInputChange()"><option value="porcentaje" ${proyecto.comunes_tipo === 'porcentaje' ? 'selected' : ''}>% m2 utiles</option><option value="total" ${proyecto.comunes_tipo === 'total' ? 'selected' : ''}>Total m2</option></select></div>
-        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">M2 comunes totales</label><input id="cabida-comunes-valor" class="inp" type="number" step="0.01" value="${toNumber(proyecto.comunes_valor)}" onchange="onCabidaInputChange()"/></div>
+        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">M2 comunes totales</label><input id="cabida-comunes-valor" class="inp" type="text" inputmode="decimal" data-localized-number="1" step="0.01" value="${fmtInputNumber(proyecto.comunes_valor, 2)}" onchange="onCabidaInputChange()"/></div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:12px">
@@ -934,9 +1010,9 @@ function renderCabidaEditor(rows) {
               <label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Nombre del tipo</label>
               <input class="inp" data-field="uso" value="${escapeHtml(row.uso)}" onchange="onCabidaInputChange()"/>
             </div>
-            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Cantidad</label><input class="inp" type="number" data-field="cantidad" value="${toNumber(row.cantidad)}" onchange="onCabidaInputChange()"/></div>
-            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">M² interior</label><input class="inp" type="number" step="0.01" data-field="sup_interior" value="${toNumber(row.sup_interior)}" onchange="onCabidaInputChange()"/></div>
-            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">M² terraza</label><input class="inp" type="number" step="0.01" data-field="sup_terrazas" value="${toNumber(row.sup_terrazas)}" onchange="onCabidaInputChange()"/></div>
+            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Cantidad</label><input class="inp" type="text" inputmode="numeric" data-localized-number="1" data-field="cantidad" value="${fmtInputNumber(row.cantidad, 0)}" onchange="onCabidaInputChange()"/></div>
+            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">M² interior</label><input class="inp" type="text" inputmode="decimal" data-localized-number="1" step="0.01" data-field="sup_interior" value="${fmtInputNumber(row.sup_interior, 2)}" onchange="onCabidaInputChange()"/></div>
+            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">M² terraza</label><input class="inp" type="text" inputmode="decimal" data-localized-number="1" step="0.01" data-field="sup_terrazas" value="${fmtInputNumber(row.sup_terrazas, 2)}" onchange="onCabidaInputChange()"/></div>
             <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">M² vendible</label><input class="inp" type="text" value="${fmtNumber(getSellableAreaPerUnit(row.sup_interior, row.sup_terrazas), 2)}" disabled/></div>
           </div>
         </div>
@@ -945,8 +1021,8 @@ function renderCabidaEditor(rows) {
     <div class="card" style="background:#f8fafc">
       <div class="sec-title" style="font-size:14px">Estacionamientos y Bodegas</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">
-        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Numero de estacionamientos</label><input id="cabida-estacionamientos-cantidad" class="inp" type="number" value="${toNumber(proyecto.estacionamientos_cantidad)}" onchange="onCabidaInputChange()"/></div>
-        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Numero de bodegas</label><input id="cabida-bodegas-cantidad" class="inp" type="number" value="${toNumber(proyecto.bodegas_cantidad)}" onchange="onCabidaInputChange()"/></div>
+        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Numero de estacionamientos</label><input id="cabida-estacionamientos-cantidad" class="inp" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(proyecto.estacionamientos_cantidad, 0)}" onchange="onCabidaInputChange()"/></div>
+        <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Numero de bodegas</label><input id="cabida-bodegas-cantidad" class="inp" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(proyecto.bodegas_cantidad, 0)}" onchange="onCabidaInputChange()"/></div>
       </div>
     </div>
   `);
@@ -1246,9 +1322,9 @@ function renderGanttEditor(rows = state.gantt) {
             </select>
           </div>
         </td>
-        <td class="gantt-sticky-left gantt-cell-tight" style="left:336px;width:72px"><input class="inp" data-field="desfase" type="number" value="${toNumber(row.desfase)}" ${lock.start ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
-        <td class="gantt-sticky-left gantt-cell-tight" style="left:408px;width:72px"><input class="inp" data-field="inicio" type="number" value="${toNumber(row.inicio)}" ${(row.dependencia || lock.start) ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
-        <td class="gantt-sticky-left gantt-cell-tight" style="left:480px;width:78px"><input class="inp" data-field="duracion" type="number" value="${toNumber(row.duracion)}" ${lock.duration ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
+        <td class="gantt-sticky-left gantt-cell-tight" style="left:336px;width:72px"><input class="inp" data-field="desfase" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(row.desfase, 0)}" ${lock.start ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
+        <td class="gantt-sticky-left gantt-cell-tight" style="left:408px;width:72px"><input class="inp" data-field="inicio" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(row.inicio, 0)}" ${(row.dependencia || lock.start) ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
+        <td class="gantt-sticky-left gantt-cell-tight" style="left:480px;width:78px"><input class="inp" data-field="duracion" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(row.duracion, 0)}" ${lock.duration ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
         <td>
           <div class="gantt-editor-track" style="width:${meta.timelineWidth}px;--month-width:${monthWidth}px">
             <div class="gantt-editor-bar" title="Inicio ${fmtNumber(row.inicio)} · Fin ${fmtNumber(row.fin)}" style="left:${left}px;width:${width}px;background:${escapeHtml(row.color || '#3b82f6')}"></div>
@@ -1614,8 +1690,8 @@ function getCronogramaComputed(item) {
 function renderVentasModule() {
   ensureVentasState();
   syncSalesDrivenMilestones();
-  if ($('ventas-velocidad-promesas')) $('ventas-velocidad-promesas').value = getVentasVelocitySettings().promesas;
-  if ($('ventas-velocidad-escrituracion')) $('ventas-velocidad-escrituracion').value = getVentasVelocitySettings().escrituracion;
+  setLocalizedInputValue('ventas-velocidad-promesas', getVentasVelocitySettings().promesas, 0);
+  setLocalizedInputValue('ventas-velocidad-escrituracion', getVentasVelocitySettings().escrituracion, 0);
   renderGanttEditor(state.gantt);
   renderVentasPricing();
   renderVentasPaymentForms();
@@ -1634,7 +1710,7 @@ function renderVentasPricing() {
         <td style="text-align:center">${fmtNumber(metrics.unidades)}</td>
         <td style="text-align:center">${fmtNumber(metrics.supVendible, 1)}</td>
         <td style="text-align:center">${fmtNumber(metrics.m2PorUnidad, 1)}</td>
-        <td><input class="inp" type="number" step="0.01" data-field="precio_uf_m2" value="${toNumber(config.precio_uf_m2)}" onchange="onVentasInputChange()"/></td>
+        <td><input class="inp" type="text" inputmode="decimal" data-localized-number="1" step="0.01" data-field="precio_uf_m2" value="${fmtInputNumber(config.precio_uf_m2, 2)}" onchange="onVentasInputChange()"/></td>
         <td style="text-align:center">${fmtTableAmount(metrics.precioBase, { kind: 'income' })}</td>
         <td style="text-align:center;color:#16a34a">${fmtTableAmount(metrics.total, { kind: 'income' })}</td>
         <td style="text-align:center">-</td>
@@ -1660,7 +1736,7 @@ function renderVentasPricing() {
       <td style="text-align:center">-</td>
       <td style="text-align:center">-</td>
       <td style="text-align:center">-</td>
-      <td><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#64748b;white-space:nowrap">${fmtNumber(addons.estacionamientos.unidades)} un</span><input id="ventas-precio-estacionamiento-global" class="inp" type="number" step="0.01" value="${toNumber(accessorySales.precio_estacionamiento)}" onchange="onVentasInputChange()"/></div></td>
+      <td><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#64748b;white-space:nowrap">${fmtNumber(addons.estacionamientos.unidades)} un</span><input id="ventas-precio-estacionamiento-global" class="inp" type="text" inputmode="decimal" data-localized-number="1" step="0.01" value="${fmtInputNumber(accessorySales.precio_estacionamiento, 2)}" onchange="onVentasInputChange()"/></div></td>
       <td style="text-align:center;color:#ea580c;font-weight:800">${fmtTableAmount(addons.estacionamientos.total, { kind: 'income' })}</td>
       <td style="text-align:center">-</td>
     </tr>
@@ -1672,7 +1748,7 @@ function renderVentasPricing() {
       <td style="text-align:center">-</td>
       <td style="text-align:center">-</td>
       <td style="text-align:center">-</td>
-      <td><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#64748b;white-space:nowrap">${fmtNumber(addons.bodegas.unidades)} un</span><input id="ventas-precio-bodega-global" class="inp" type="number" step="0.01" value="${toNumber(accessorySales.precio_bodega)}" onchange="onVentasInputChange()"/></div></td>
+      <td><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#64748b;white-space:nowrap">${fmtNumber(addons.bodegas.unidades)} un</span><input id="ventas-precio-bodega-global" class="inp" type="text" inputmode="decimal" data-localized-number="1" step="0.01" value="${fmtInputNumber(accessorySales.precio_bodega, 2)}" onchange="onVentasInputChange()"/></div></td>
       <td style="text-align:center;color:#ea580c;font-weight:800">${fmtTableAmount(addons.bodegas.total, { kind: 'income' })}</td>
       <td style="text-align:center">-</td>
     </tr>
@@ -1700,13 +1776,13 @@ function renderVentasPaymentForms() {
 
   setHtml('formas-pago-tbody', `
     <tr data-ventas-payment-global>
-      <td><input class="inp" type="number" step="0.01" data-field="pie_promesa_pct" value="${settings.pie_promesa_pct}" onchange="onVentasInputChange()"/></td>
+      <td><input class="inp" type="text" inputmode="decimal" data-localized-number="1" step="0.01" data-field="pie_promesa_pct" value="${fmtInputNumber(settings.pie_promesa_pct, 2)}" onchange="onVentasInputChange()"/></td>
       <td>
         <select class="inp" data-field="forma_pago_promesa" onchange="onVentasInputChange()">
           ${Object.entries(modeLabels).map(([value, label]) => `<option value="${value}" ${settings.forma_pago_promesa === value ? 'selected' : ''}>${label}</option>`).join('')}
         </select>
       </td>
-      <td style="text-align:center"><input class="inp" type="number" min="1" step="1" data-field="pie_cuoton_pct" value="${settings.pie_cuoton_pct}" onchange="onVentasInputChange()" style="width:70px;text-align:center"/></td>
+      <td style="text-align:center"><input class="inp" type="text" inputmode="numeric" data-localized-number="1" min="1" step="1" data-field="pie_cuoton_pct" value="${fmtInputNumber(settings.pie_cuoton_pct, 0)}" onchange="onVentasInputChange()" style="width:70px;text-align:center"/></td>
       <td style="text-align:center">${fmtTableAmount(pieUnidad, { kind: 'income' })}</td>
       <td style="text-align:center;color:#16a34a">${fmtTableAmount(totals.precioPromedio, { kind: 'income' })}</td>
     </tr>
@@ -2116,8 +2192,8 @@ function renderCostStructure() {
 function renderConstruccion() {
   const metrics = getConstructionMetrics();
 
-  if ($('constr-sup-st') && !$('constr-sup-st').matches(':focus')) $('constr-sup-st').value = toNumber(state.construccion?.sup_sobre_tierra) || '';
-  if ($('constr-sup-bt') && !$('constr-sup-bt').matches(':focus')) $('constr-sup-bt').value = toNumber(state.construccion?.sup_bajo_tierra) || '';
+  setLocalizedInputValue('constr-sup-st', state.construccion?.sup_sobre_tierra, 0, { blankZero: true });
+  setLocalizedInputValue('constr-sup-bt', state.construccion?.sup_bajo_tierra, 0, { blankZero: true });
   setText('constr-total-st', fmtTableAmount(metrics.total_st, { kind: 'cost' }));
   setText('constr-total-bt', fmtTableAmount(metrics.total_bt, { kind: 'cost' }));
   setText('constr-sup-total', `${fmtNumber(metrics.sup_total, 1)} m2`);
@@ -2131,13 +2207,13 @@ function renderConstruccion() {
   setText('anticipo-label', `${fmtNumber(metrics.anticipo_pct)}%`);
   setText('retencion-label', `${fmtNumber(metrics.retencion_pct)}%`);
 
-  if ($('constr-uf-st')) $('constr-uf-st').value = toNumber(metrics.costo_uf_m2_sobre_tierra);
-  if ($('constr-uf-bt')) $('constr-uf-bt').value = toNumber(metrics.costo_uf_m2_bajo_tierra);
+  setLocalizedInputValue('constr-uf-st', metrics.costo_uf_m2_sobre_tierra, 2);
+  setLocalizedInputValue('constr-uf-bt', metrics.costo_uf_m2_bajo_tierra, 2);
   if ($('constr-pct-bt')) $('constr-pct-bt').value = toNumber(metrics.pct_bajo_tierra_sobre_cota_0);
-  if ($('constr-plazo-meses')) $('constr-plazo-meses').value = toNumber(metrics.plazo_meses);
-  if ($('anticipo-slider')) $('anticipo-slider').value = toNumber(metrics.anticipo_pct);
-  if ($('retencion-slider')) $('retencion-slider').value = toNumber(metrics.retencion_pct);
-  if ($('constr-pct-inicio')) $('constr-pct-inicio').value = toNumber(metrics.pct_inicio_construccion ?? 25);
+  setLocalizedInputValue('constr-plazo-meses', metrics.plazo_meses, 0);
+  setLocalizedInputValue('anticipo-slider', metrics.anticipo_pct, 1);
+  setLocalizedInputValue('retencion-slider', metrics.retencion_pct, 1);
+  setLocalizedInputValue('constr-pct-inicio', metrics.pct_inicio_construccion ?? 25, 2);
 
   const meses = Math.max(1, metrics.plazo_meses);
   const distribution = buildConstructionSCurve(metrics, meses);
@@ -2162,11 +2238,11 @@ function renderTerrainModule() {
     : 0;
 
   if ($('terreno-fecha-compra')) $('terreno-fecha-compra').value = toMonthInputValue(purchaseDate);
-  if ($('terreno-m2-bruto')) $('terreno-m2-bruto').value = purchaseMetrics.bruto;
-  if ($('terreno-m2-afectacion')) $('terreno-m2-afectacion').value = purchaseMetrics.afectacion;
-  if ($('terreno-m2-neto')) $('terreno-m2-neto').value = purchaseMetrics.neto;
-  if ($('terreno-precio-uf-m2')) $('terreno-precio-uf-m2').value = purchaseMetrics.precioUfM2;
-  if ($('terreno-precio-total')) $('terreno-precio-total').value = purchaseMetrics.precioTotal;
+  setLocalizedInputValue('terreno-m2-bruto', purchaseMetrics.bruto, 2);
+  setLocalizedInputValue('terreno-m2-afectacion', purchaseMetrics.afectacion, 2);
+  setLocalizedInputValue('terreno-m2-neto', purchaseMetrics.neto, 2);
+  setLocalizedInputValue('terreno-precio-uf-m2', purchaseMetrics.precioUfM2, 2);
+  setLocalizedInputValue('terreno-precio-total', purchaseMetrics.precioTotal, 2);
   setText('terreno-monto-financiado', fmtUf(approved));
   setText(
     'terreno-gantt-sync',
@@ -2175,8 +2251,8 @@ function renderTerrainModule() {
       : 'Sin bloque Compra terreno en la carta gantt.'
   );
 
-  if ($('fin-terreno-pct')) $('fin-terreno-pct').value = toNumber(state.financiamiento.credito_terreno_pct);
-  if ($('fin-terreno-tasa')) $('fin-terreno-tasa').value = toNumber(state.financiamiento.credito_terreno_tasa);
+  setLocalizedInputValue('fin-terreno-pct', state.financiamiento.credito_terreno_pct, 2);
+  setLocalizedInputValue('fin-terreno-tasa', state.financiamiento.credito_terreno_tasa, 2);
   if ($('fin-terreno-pago-int')) $('fin-terreno-pago-int').value = state.financiamiento.credito_terreno_pago_intereses || 'Semestral';
   if ($('cfg-tasa-terreno')) $('cfg-tasa-terreno').value = toNumber(state.financiamiento.credito_terreno_tasa);
   setText('fin-terreno-costo', fmtUf(terrainBase));
@@ -2195,10 +2271,10 @@ function renderConstructionFinancing() {
   const start = getConstructionStartMonth();
   const duration = getConstructionDuration();
 
-  if ($('fin-constr-pct')) $('fin-constr-pct').value = toNumber(state.financiamiento.linea_construccion_pct);
-  if ($('fin-constr-tasa')) $('fin-constr-tasa').value = toNumber(state.financiamiento.linea_construccion_tasa);
+  setLocalizedInputValue('fin-constr-pct', state.financiamiento.linea_construccion_pct, 2);
+  setLocalizedInputValue('fin-constr-tasa', state.financiamiento.linea_construccion_tasa, 2);
   if ($('fin-constr-pago-int')) $('fin-constr-pago-int').value = state.financiamiento.linea_construccion_pago_intereses || 'Anual';
-  if ($('fin-constr-alzamiento')) $('fin-constr-alzamiento').value = toNumber(state.financiamiento.pct_alzamiento ?? 90);
+  setLocalizedInputValue('fin-constr-alzamiento', state.financiamiento.pct_alzamiento ?? 90, 0);
   setText('fin-constr-costo', fmtUf(metrics.total_neto));
   setText('fin-constr-monto', fmtUf(approved));
   setText('fin-constr-plazos', `Plazo estimado: mes ${fmtNumber(start)} a mes ${fmtNumber(start + duration)}`);
@@ -2206,11 +2282,11 @@ function renderConstructionFinancing() {
 
   // Sync global config inputs
   const cfg = getGlobalFinancialParams();
-  if ($('cfg-tasa-terreno')) $('cfg-tasa-terreno').value = cfg.tasa_terreno;
-  if ($('cfg-tasa-construccion')) $('cfg-tasa-construccion').value = cfg.tasa_construccion;
-  if ($('cfg-pct-timbres')) $('cfg-pct-timbres').value = cfg.pct_timbres;
-  if ($('cfg-pct-ceec')) $('cfg-pct-ceec').value = cfg.pct_ceec;
-  if ($('cfg-pct-renta')) $('cfg-pct-renta').value = cfg.pct_impuesto_renta;
+  if ($('cfg-tasa-terreno')) $('cfg-tasa-terreno').value = toNumber(cfg.tasa_terreno);
+  setLocalizedInputValue('cfg-tasa-construccion', cfg.tasa_construccion, 2);
+  setLocalizedInputValue('cfg-pct-timbres', cfg.pct_timbres, 2);
+  setLocalizedInputValue('cfg-pct-ceec', cfg.pct_ceec, 2);
+  if ($('cfg-pct-renta')) $('cfg-pct-renta').value = toNumber(cfg.pct_impuesto_renta);
 
   // Renderizar tabla EP + GF conectadas
   const epData = renderConstructionEP();
@@ -3083,7 +3159,7 @@ function getGanttLockConfig(row) {
 function getPartidaFormulaText(partida) {
   if (partida.auto_origen) return partida.formula_display || 'extraido';
   if (partida.formula_tipo === 'expr') return partida.formula_referencia || '';
-  if (partida.formula_tipo === 'manual') return partida.formula_valor ? String(partida.formula_valor) : '';
+  if (partida.formula_tipo === 'manual') return partida.formula_valor ? fmtInputNumber(partida.formula_valor, 2) : '';
   return partida.formula_referencia || partida.formula_tipo || '';
 }
 
@@ -3152,9 +3228,37 @@ function buildCostContext() {
   };
 }
 
+function normalizeFormulaNumberLiteral(value) {
+  let normalized = String(value || '').trim();
+  if (!normalized) return '0';
+  const negative = normalized.startsWith('-');
+  if (negative) normalized = normalized.slice(1);
+  const commaIndex = normalized.lastIndexOf(',');
+  const dotIndex = normalized.lastIndexOf('.');
+  if (commaIndex >= 0 && dotIndex >= 0) {
+    normalized = commaIndex > dotIndex
+      ? normalized.replace(/\./g, '').replace(',', '.')
+      : normalized.replace(/,/g, '');
+  } else if (commaIndex >= 0) {
+    normalized = normalized.replace(',', '.');
+  } else if (dotIndex >= 0 && /^\d{1,3}(?:\.\d{3})+$/.test(normalized)) {
+    normalized = normalized.replace(/\./g, '');
+  }
+  return `${negative ? '-' : ''}${normalized}`;
+}
+
 function normalizeFormulaExpressionSyntax(expression) {
   return String(expression || '')
-    .replace(/(-?\d+(?:[.,]\d+)?)\s*%/g, (_, value) => `(${String(value).replace(',', '.')}/100)`);
+    .trim()
+    .replace(/^=/, '')
+    .replace(/(-?(?:(?:\d{1,3}(?:\.\d{3})+)(?:,\d+)?|\d+(?:[.,]\d+)?))\s*%/g, (_, value) => `(${normalizeFormulaNumberLiteral(value)}/100)`)
+    .replace(/-?\d{1,3}(?:\.\d{3})+(?:,\d+)?|-?\d+,\d+/g, (value) => normalizeFormulaNumberLiteral(value));
+}
+
+function isFormulaDecimalComma(source, index) {
+  const before = source[index - 1] || '';
+  const after = source[index + 1] || '';
+  return /\d/.test(before) && /\d/.test(after);
 }
 
 function convertSiToTernary(expression) {
@@ -3165,6 +3269,7 @@ function convertSiToTernary(expression) {
     if (!match) break;
     const openParenIdx = match.index + match[0].length - 1;
     const args = [];
+    const topCommas = [];
     let depth = 1;
     let argStart = openParenIdx + 1;
     let i = openParenIdx + 1;
@@ -3174,11 +3279,23 @@ function convertSiToTernary(expression) {
       else if (c === ')') {
         depth--;
         if (depth === 0) { args.push(result.slice(argStart, i).trim()); break; }
-      } else if (c === ',' && depth === 1) {
+      } else if (c === ',' && depth === 1 && !isFormulaDecimalComma(result, i)) {
+        topCommas.push(i);
         args.push(result.slice(argStart, i).trim());
         argStart = i + 1;
+      } else if (c === ',' && depth === 1) {
+        topCommas.push(i);
       }
       i++;
+    }
+    if (args.length < 2 && topCommas.length === 2 && depth === 0) {
+      args.splice(
+        0,
+        args.length,
+        result.slice(openParenIdx + 1, topCommas[0]).trim(),
+        result.slice(topCommas[0] + 1, topCommas[1]).trim(),
+        result.slice(topCommas[1] + 1, i).trim()
+      );
     }
     if (args.length >= 2) {
       const [cond, valTrue, valFalse = '0'] = args;
@@ -3196,7 +3313,7 @@ function evaluateExpressionFormula(expression, context = {}) {
     acc[String(key || '').toLowerCase()] = value;
     return acc;
   }, {});
-  let normalized = convertSiToTernary(normalizeFormulaExpressionSyntax(expression));
+  let normalized = normalizeFormulaExpressionSyntax(convertSiToTernary(expression));
   getCostFormulaCatalog().forEach(({ label, value, token }) => {
     const tokenKey = String(token ?? '').replace(/^_+/, '').toLowerCase();
     const replacementValue = Object.prototype.hasOwnProperty.call(contextValues, tokenKey)
@@ -4656,20 +4773,20 @@ function openPaymentPlanModal(categoryName, index) {
 
   setHtml('payment-plan-tramos', plan.tramos.map((tramo, idx) => `
     <div class="payment-line" data-tramo-index="${idx}" style="display:grid;grid-template-columns:100px 1fr 90px 1fr 90px 40px;gap:8px;margin-bottom:10px">
-      <input class="inp" data-field="pct" type="number" step="0.01" value="${toNumber(tramo.pct)}" placeholder="%"/>
+      <input class="inp" data-field="pct" type="text" inputmode="decimal" data-localized-number="1" step="0.01" value="${fmtInputNumber(tramo.pct, 2)}" placeholder="%"/>
       <select class="inp" data-field="inicio_ref">${renderRefOptions(tramo.inicio_ref || 'MANUAL_0')}</select>
-      <input class="inp" data-field="inicio_offset" type="number" value="${toNumber(tramo.inicio_offset)}" placeholder="Meses"/>
+      <input class="inp" data-field="inicio_offset" type="text" inputmode="numeric" data-localized-number="1" step="1" value="${fmtInputNumber(tramo.inicio_offset, 0)}" placeholder="Meses"/>
       <select class="inp" data-field="fin_ref">${renderRefOptions(tramo.fin_ref || 'MANUAL_0')}</select>
-      <input class="inp" data-field="fin_offset" type="number" value="${toNumber(tramo.fin_offset)}" placeholder="Meses"/>
+      <input class="inp" data-field="fin_offset" type="text" inputmode="numeric" data-localized-number="1" step="1" value="${fmtInputNumber(tramo.fin_offset, 0)}" placeholder="Meses"/>
       <button class="btn-outline btn-plus" type="button" onclick="removePaymentPlanItem('tramo', ${idx})">&times;</button>
     </div>
   `).join('') || '<div style="font-size:11px;color:#94a3b8">Sin tramos mensuales.</div>');
 
   setHtml('payment-plan-hitos', plan.hitos.map((hito, idx) => `
     <div class="payment-line" data-hito-index="${idx}" style="display:grid;grid-template-columns:100px 1fr 90px 40px;gap:8px;margin-bottom:10px">
-      <input class="inp" data-field="pct" type="number" step="0.01" value="${toNumber(hito.pct)}" placeholder="%"/>
+      <input class="inp" data-field="pct" type="text" inputmode="decimal" data-localized-number="1" step="0.01" value="${fmtInputNumber(hito.pct, 2)}" placeholder="%"/>
       <select class="inp" data-field="ref">${renderRefOptions(hito.ref || 'MANUAL_0')}</select>
-      <input class="inp" data-field="offset" type="number" value="${toNumber(hito.offset)}" placeholder="Meses"/>
+      <input class="inp" data-field="offset" type="text" inputmode="numeric" data-localized-number="1" step="1" value="${fmtInputNumber(hito.offset, 0)}" placeholder="Meses"/>
       <button class="btn-outline btn-plus" type="button" onclick="removePaymentPlanItem('hito', ${idx})">&times;</button>
     </div>
   `).join('') || '<div style="font-size:11px;color:#94a3b8">Sin pagos por hito.</div>');
@@ -4875,7 +4992,7 @@ function renderCapitalModule() {
   ];
   bindings.forEach(([inputId, field]) => {
     const input = $(inputId);
-    if (input && !input.matches(':focus')) input.value = toNumber(state.capital[field]);
+    if (input) setLocalizedInputValue(inputId, state.capital[field], 0);
   });
 }
 
@@ -4893,6 +5010,7 @@ function renderAll() {
   renderProjectCashflow();
   renderKpis();
   renderCapitalModule();
+  localizeNumberInputs(document);
 }
 
 function prepareStateForSave({ includeCostos = true } = {}) {
@@ -5095,8 +5213,8 @@ function onGanttInputChange() {
   renderGanttEditor(state.gantt);
   renderConstruccion();
   ensureVentasState();
-  if ($('ventas-velocidad-promesas')) $('ventas-velocidad-promesas').value = getVentasVelocitySettings().promesas;
-  if ($('ventas-velocidad-escrituracion')) $('ventas-velocidad-escrituracion').value = getVentasVelocitySettings().escrituracion;
+  setLocalizedInputValue('ventas-velocidad-promesas', getVentasVelocitySettings().promesas, 0);
+  setLocalizedInputValue('ventas-velocidad-escrituracion', getVentasVelocitySettings().escrituracion, 0);
   renderVentasSchedules();
   renderVentasSummaryCards();
   renderVentasCashflow();
@@ -5307,7 +5425,7 @@ function parseFormulaInput(value, forcedMode = '') {
   if (mode === 'global') return { formula_tipo: 'expr', formula_valor: 0, formula_referencia: raw };
   if (mode === 'manual') return { formula_tipo: 'manual', formula_valor: toNumber(raw), formula_referencia: '' };
   if (!raw) return { formula_tipo: 'manual', formula_valor: 0, formula_referencia: '' };
-  if (/^[0-9.,]+$/.test(raw)) return { formula_tipo: 'manual', formula_valor: toNumber(raw.replace(',', '.')), formula_referencia: '' };
+  if (/^-?[0-9.,]+$/.test(raw)) return { formula_tipo: 'manual', formula_valor: toNumber(raw), formula_referencia: '' };
   const isMensual = formulaContainsMonthlyReference(raw);
   return { formula_tipo: isMensual ? 'expr_mensual' : 'expr', formula_valor: 0, formula_referencia: raw };
 }
@@ -5396,7 +5514,8 @@ function redistribuirPartida(button) {
     normalized = normalizeDistribution([], total, planText);
   }
   row.querySelectorAll('[data-month]').forEach((input, index) => {
-    input.value = toNumber(normalized[index]);
+    input.value = fmtInputNumber(normalized[index], getLocalizedInputDecimals(input));
+    prepareLocalizedNumberInput(input);
   });
 }
 
@@ -5767,6 +5886,7 @@ window.openCostFormulaModal = openCostFormulaModal;
 window.renderFormulaRefPanel = renderFormulaRefPanel;
 window.toggleFormulaRefGroup = toggleFormulaRefGroup;
 window.insertFormulaTemplate = insertFormulaTemplate;
+window.normalizeFormulaExpressionSyntax = normalizeFormulaExpressionSyntax;
 window.closeCostFormulaModal = closeCostFormulaModal;
 window.saveCostFormulaModal = saveCostFormulaModal;
 window.toggleCostCategoryCollapse = toggleCostCategoryCollapse;
@@ -5807,6 +5927,7 @@ window.onVentasVelocityChange = onVentasVelocityChange;
 document.addEventListener('DOMContentLoaded', async () => {
   ensureProjectControls();
   ensureActionButtons();
+  setupLocalizedNumberInputs();
   setupAutosaveListeners();
   renderSyncStatus();
 
