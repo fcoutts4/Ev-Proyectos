@@ -3916,7 +3916,7 @@ function renderCostPlanilla() {
     <tr>
       <th style="width:60px"></th>
       <th style="min-width:220px;text-align:left">Subpartida</th>
-      <th style="min-width:170px;text-align:left">Plan de pago</th>
+      <th class="cost-plan-cell">Plan de pago</th>
       <th style="min-width:110px">Total neto</th>
       <th style="width:64px">IVA</th>
       ${monthLabels.map((label) => `<th data-month-col>${escapeHtml(label)}</th>`).join('')}
@@ -3991,8 +3991,8 @@ function renderCostPlanilla() {
         <tr class="partida-row is-subpartida" data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" data-cost-id="${escapeHtml(partida.id || '')}" ${rowReadOnly ? 'data-auto="1" data-readonly="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
           <td style="text-align:center">${rowReadOnly ? '' : `<span class="row-tools">${isProtectedDefault ? '<button class="btn-outline btn-delete-inline" type="button" title="Subpartida base protegida" disabled>&times;</button>' : `<button class="btn-outline btn-delete-inline" type="button" title="Eliminar subpartida" onclick="removeCostPartida('${escapeHtml(categoria.nombre)}', ${index})">&times;</button>`}<span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span></span>`}</td>
           <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${rowReadOnly ? 'disabled' : ''}/></td>
-          <td>${planEditable ? `<span class="plan-status-pill ${estadoPlanPago.className}" onclick="${isMonthlyFormula ? `openCostFormulaModal('${escapeHtml(categoria.nombre)}', ${index})` : `openPaymentPlanModal('${escapeHtml(categoria.nombre)}', ${index})`}" title="${isMonthlyFormula ? 'Editar fórmula mensual' : 'Editar plan de pago'}">${escapeHtml(estadoPlanPago.label)}</span>` : '<span class="badge badge-yellow">AUTO</span>'}</td>
-          <td style="text-align:center;color:#22c55e;font-weight:800"><span class="cost-total-cell" ${rowReadOnly ? '' : `onclick="openCostFormulaModal('${escapeHtml(categoria.nombre)}', ${index})"`} title="${rowReadOnly ? 'Fórmula automática' : 'Click para editar fórmula'}">${fmtTableAmount(total, { kind: 'cost' })}${partida.formula_tipo === 'expr_mensual' ? '<span class="cost-total-badge">MES</span>' : ''}</span><input type="hidden" class="cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}"/><input type="hidden" data-field="formula_tipo" value="${escapeHtml(partida.formula_tipo || 'expr')}"/></td>
+          <td class="cost-plan-cell">${planEditable ? `<span class="plan-status-pill ${estadoPlanPago.className}" onclick="${isMonthlyFormula ? `openCostFormulaModal('${escapeHtml(categoria.nombre)}', ${index})` : `openPaymentPlanModal('${escapeHtml(categoria.nombre)}', ${index})`}" title="${isMonthlyFormula ? 'Editar fórmula mensual' : 'Editar plan de pago'}">${escapeHtml(estadoPlanPago.label)}</span>` : '<span class="badge badge-yellow">AUTO</span>'}</td>
+          <td style="text-align:center;color:#22c55e;font-weight:800"><span class="cost-total-cell" ${rowReadOnly ? '' : `onclick="openCostFormulaModal('${escapeHtml(categoria.nombre)}', ${index})"`} title="${rowReadOnly ? 'Fórmula automática' : 'Click para editar fórmula'}">${fmtTableAmount(total, { kind: 'cost', total: true })}${partida.formula_tipo === 'expr_mensual' ? '<span class="cost-total-badge">MES</span>' : ''}</span><input type="hidden" class="cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}"/><input type="hidden" data-field="formula_tipo" value="${escapeHtml(partida.formula_tipo || 'expr')}"/></td>
           <td style="text-align:center"><input type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''} ${rowReadOnly ? 'disabled' : ''}/></td>
           ${distribucion.map((value) => `<td data-month-cell style="text-align:center">${fmtTableAmount(value, { kind: 'cost' })}</td>`).join('')}
         </tr>
@@ -4013,8 +4013,8 @@ function renderCostPlanilla() {
           </div>
         </td>
         <td class="cat-total-cell cat-total-neto"><strong>${fmtTableAmount(categoryTotalNeto, { kind: 'cost', total: true })}</strong></td>
-        <td class="cat-total-cell"><strong>${fmtTableAmount(categoryTotalIva, { kind: 'cost', total: true })}</strong></td>
-        ${categoryMonthlyTotals.map((value) => `<td class="cat-total-cell"><strong>${fmtTableAmount(value, { kind: 'cost', total: true })}</strong></td>`).join('')}
+        <td class="cat-total-cell"><strong>${fmtTableAmount(categoryTotalIva, { kind: 'cost' })}</strong></td>
+        ${categoryMonthlyTotals.map((value) => `<td class="cat-total-cell"><strong>${fmtTableAmount(value, { kind: 'cost' })}</strong></td>`).join('')}
       </tr>
       ${isCollapsed ? '' : categoryRows.join('')}
     `;
@@ -4024,8 +4024,8 @@ function renderCostPlanilla() {
     <tr class="tfoot-dark">
       <td colspan="3">Totales</td>
       <td>${fmtTableAmount(totalNeto, { kind: 'cost', total: true })}</td>
-      <td>${fmtTableAmount(totalIva, { kind: 'cost', total: true })}</td>
-      ${monthlyTotals.map((value) => `<td>${fmtTableAmount(value, { kind: 'cost', total: true })}</td>`).join('')}
+      <td>${fmtTableAmount(totalIva, { kind: 'cost' })}</td>
+      ${monthlyTotals.map((value) => `<td>${fmtTableAmount(value, { kind: 'cost' })}</td>`).join('')}
     </tr>
   `);
 

@@ -69,7 +69,7 @@ tbody tr:hover{background:#f8fafc}
 .btn-plus{width:28px;height:28px;padding:0;justify-content:center;font-size:16px;font-weight:800;line-height:1}
 .btn-collapse-cost{width:24px;height:24px;padding:0;display:inline-flex;align-items:center;justify-content:center;font-size:12px;line-height:1;background:linear-gradient(180deg,#fff,#f8fafc);border:1px solid #cbd5e1;color:#475569;border-radius:999px;box-shadow:0 1px 2px rgba(15,23,42,.08);transition:background .15s,border-color .15s,color .15s,box-shadow .15s,transform .15s}
 .btn-collapse-cost:hover:not(:disabled){background:#eef3f8;border-color:#94a3b8;color:#0f172a;box-shadow:0 3px 8px rgba(15,23,42,.12);transform:translateY(-1px)}
-.btn-add-cost{height:20px;padding:0 7px;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:6px}
+.btn-add-cost{height:18px;min-height:18px;padding:0 6px;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;line-height:1;letter-spacing:0;text-transform:none;white-space:nowrap;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:5px}
 .btn-add-cost:hover{background:#e2e8f0;border-color:#94a3b8;color:#334155}
 .drag-handle{display:inline-flex;align-items:center;justify-content:center;width:22px;color:#94a3b8;cursor:grab;font-size:14px;letter-spacing:-2px;user-select:none}
 .drag-handle:active{cursor:grabbing}
@@ -106,7 +106,8 @@ tbody tr:hover{background:#f8fafc}
 .cost-total-cell{cursor:pointer;border-radius:6px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px}
 .cost-total-cell:hover{background:#ecfeff}
 .cost-total-badge{font-size:9px;padding:1px 5px;border-radius:999px;background:#dcfce7;color:#166534;font-weight:700;line-height:1}
-.plan-status-pill{display:inline-flex;align-items:center;justify-content:center;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;line-height:1.2;cursor:pointer;border:1px solid transparent;white-space:nowrap}
+.cost-plan-cell{width:108px;min-width:108px;max-width:108px;text-align:center;padding-left:4px!important;padding-right:4px!important}
+.plan-status-pill{display:inline-flex;align-items:center;justify-content:center;max-width:96px;padding:2px 7px;border-radius:999px;font-size:9px;font-weight:800;line-height:1.15;cursor:pointer;border:1px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 .plan-status-pill.estado-ok{background:#dcfce7;color:#166534;border-color:#bbf7d0}
 .plan-status-pill.estado-pendiente{background:#fee2e2;color:#991b1b;border-color:#fecaca}
 .formula-chip-row{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px}
@@ -386,6 +387,7 @@ tbody tr:hover{background:#f8fafc}
 #planilla-table thead th{padding:6px 8px;font-size:9px}
 #planilla-table .inp{padding:4px 8px;font-size:11px;min-height:28px}
 #planilla-table .btn-outline{padding:5px 10px;font-size:11px}
+#planilla-table .btn-add-cost{height:18px!important;min-height:18px!important;padding:0 6px!important;font-size:8px!important}
 #planilla-table .btn-plus{width:24px;height:24px;font-size:14px}
 #planilla-table .drag-handle{width:18px;font-size:12px}
 #planilla-table th[data-month-col]{min-width:84px}
@@ -1631,7 +1633,6 @@ table:not(.gantt-table) .tfoot-dark td,
     <div class="planilla-header">
       <div>
         <div style="font-size:13px;font-weight:900;color:#fff;letter-spacing:.08em;text-transform:uppercase">PLANILLA DE COSTOS</div>
-        <div style="font-size:10px;color:#94a3b8;margin-top:2px">Arrastra las subpartidas manuales desde los 6 puntos. El plan de pago puede ser mixto por meses o hitos.</div>
     </div>
       <div style="display:flex;gap:8px;align-items:center">
         <div class="planilla-nav">
