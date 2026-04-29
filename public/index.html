@@ -420,12 +420,24 @@ tbody tr:hover{background:#f8fafc}
 .planilla-nav{display:flex;align-items:center;gap:6px}
 .planilla-nav .btn-outline{padding:4px 8px;font-size:11px}
 #planilla-table{min-width:1500px}
-#planilla-table thead th{padding:6px 8px;font-size:9px}
-#planilla-table .inp{padding:4px 8px;font-size:11px;min-height:28px}
-#planilla-table .btn-outline{padding:5px 10px;font-size:11px}
-#planilla-table .btn-add-cost{height:18px!important;min-height:18px!important;padding:0 6px!important;font-size:8px!important}
-#planilla-table .btn-plus{width:24px;height:24px;font-size:14px}
-#planilla-table .drag-handle{width:18px;font-size:12px}
+#planilla-table thead th{padding:4px 6px;font-size:9px;line-height:1.1}
+#planilla-table .cat-row td{padding:2px 6px!important;font-size:9px!important;line-height:1.1!important;height:28px}
+#planilla-table .cat-row td:first-child{padding:2px 6px!important}
+#planilla-table .partida-row td{padding:1px 4px!important;font-size:9px!important;line-height:1.1!important;height:22px}
+#planilla-table .partida-row.is-subpartida td{padding:1px 3px!important;height:21px}
+#planilla-table .inp{padding:1px 6px;font-size:10px;min-height:20px;height:20px;line-height:1.1}
+#planilla-table .btn-outline{padding:2px 6px;font-size:9px;min-height:18px}
+#planilla-table .btn-collapse-cost{width:18px!important;height:18px!important;min-width:18px!important;min-height:18px!important;font-size:10px!important;box-shadow:0 1px 2px rgba(15,23,42,.06)}
+#planilla-table .btn-add-cost{height:15px!important;min-height:15px!important;padding:0 5px!important;font-size:7px!important;border-radius:4px!important}
+#planilla-table .btn-plus{width:18px;height:18px;font-size:11px}
+#planilla-table .btn-delete-inline{width:18px!important;height:18px!important;min-height:18px!important;font-size:11px!important}
+#planilla-table .drag-handle{width:14px;font-size:10px}
+#planilla-table .cost-category-header{gap:6px;min-height:20px}
+#planilla-table .cost-category-title{gap:6px}
+#planilla-table .cost-total-cell{padding:1px 5px;font-size:9px;line-height:1.1}
+#planilla-table .cat-total-neto strong{min-height:18px!important;padding:1px 6px!important;font-size:9px!important}
+#planilla-table .cost-config-pill{min-width:70px;max-width:96px;padding:2px 6px;font-size:8px}
+#planilla-table input[type="checkbox"]{width:14px;height:14px}
 #planilla-table th[data-month-col]{min-width:84px}
 #planilla-table td[data-month-cell]{min-width:84px}
 /* INPUT */
