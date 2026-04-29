@@ -106,10 +106,46 @@ tbody tr:hover{background:#f8fafc}
 .cost-total-cell{cursor:pointer;border-radius:6px;padding:2px 6px;display:inline-flex;align-items:center;gap:4px}
 .cost-total-cell:hover{background:#ecfeff}
 .cost-total-badge{font-size:9px;padding:1px 5px;border-radius:999px;background:#dcfce7;color:#166534;font-weight:700;line-height:1}
-.cost-plan-cell{width:108px;min-width:108px;max-width:108px;text-align:center;padding-left:4px!important;padding-right:4px!important}
+.cost-plan-cell,.cost-config-cell{width:112px;min-width:112px;max-width:112px;text-align:center;padding-left:4px!important;padding-right:4px!important}
 .plan-status-pill{display:inline-flex;align-items:center;justify-content:center;max-width:96px;padding:2px 7px;border-radius:999px;font-size:9px;font-weight:800;line-height:1.15;cursor:pointer;border:1px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 .plan-status-pill.estado-ok{background:#dcfce7;color:#166534;border-color:#bbf7d0}
 .plan-status-pill.estado-pendiente{background:#fee2e2;color:#991b1b;border-color:#fecaca}
+.cost-config-card{max-width:1180px;width:min(1180px,calc(100vw - 18px));max-height:calc(100vh - 18px)}
+.cost-config-body{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;background:#f8fafc}
+.cost-config-main,.cost-config-side{display:flex;flex-direction:column;gap:12px;min-width:0}
+.cost-config-panel{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px}
+.cost-config-fields{display:flex;flex-direction:column;gap:10px}
+.cost-config-label{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#64748b;margin-bottom:6px}
+.cost-config-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.cost-config-grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.cost-config-point{display:grid;grid-template-columns:100px minmax(0,1fr) 72px;gap:8px;align-items:end}
+.cost-config-point .date-mode{display:none}
+.cost-config-point .month-mode{display:none}
+.cost-config-state{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:3px 9px;font-size:10px;font-weight:800;line-height:1.1;border:1px solid transparent;white-space:nowrap}
+.cost-config-state.estado-ok{background:#dcfce7;color:#166534;border-color:#bbf7d0}
+.cost-config-state.estado-pendiente{background:#fee2e2;color:#991b1b;border-color:#fecaca}
+.cost-config-state.estado-monthly{background:#dbeafe;color:#1d4ed8;border-color:#bfdbfe}
+.cost-config-state.estado-periodic{background:#fef3c7;color:#92400e;border-color:#fde68a}
+.cost-config-state.estado-hitos{background:#ede9fe;color:#6d28d9;border-color:#ddd6fe}
+.cost-config-total{font-size:18px;font-weight:900;color:#0f172a}
+.cost-config-preview{max-height:230px;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;background:#fff}
+.cost-config-preview table{width:100%;border:0;border-radius:0}
+.cost-config-preview th,.cost-config-preview td{padding:6px 8px;font-size:10px;white-space:nowrap}
+.cost-config-preview tr.has-value td{font-weight:800;color:#0b2545}
+.cost-config-line{display:grid;grid-template-columns:minmax(0,1fr) 110px 38px;gap:8px;align-items:end;margin-bottom:8px}
+.cost-config-line.hito{grid-template-columns:minmax(0,1fr) 84px 110px 38px}
+.cost-config-add{height:28px;padding:0 10px;font-size:10px}
+.cost-config-pill{display:inline-flex;align-items:center;justify-content:center;min-width:84px;max-width:112px;padding:3px 8px;border-radius:999px;font-size:9px;font-weight:800;line-height:1.1;border:1px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.cost-config-pill.estado-ok{background:#dcfce7;color:#166534;border-color:#bbf7d0}
+.cost-config-pill.estado-pendiente{background:#fee2e2;color:#991b1b;border-color:#fecaca}
+.cost-config-pill.estado-monthly{background:#dbeafe;color:#1d4ed8;border-color:#bfdbfe}
+.cost-config-pill.estado-periodic{background:#fef3c7;color:#92400e;border-color:#fde68a}
+.cost-config-pill.estado-hitos{background:#ede9fe;color:#6d28d9;border-color:#ddd6fe}
+@media (max-width: 980px){
+  .cost-config-body{grid-template-columns:1fr}
+  .cost-config-side{display:none}
+  .cost-config-grid,.cost-config-grid.three{grid-template-columns:1fr}
+}
 .formula-chip-row{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px}
 .formula-chip-row .formula-token{min-height:22px;padding:2px 7px;font-size:10px;border-radius:6px}
 .formula-chip-empty{font-size:10px;color:#94a3b8;font-style:italic}
@@ -1852,100 +1888,56 @@ table:not(.gantt-table) .tfoot-dark td,
 
 </main><!-- end main -->
 
-<div id="payment-plan-modal" class="modal-backdrop">
-  <div class="modal-card payment-plan-card">
+<div id="cost-config-modal" class="modal-backdrop">
+  <div class="modal-card cost-config-card">
     <div class="modal-head">
       <div>
-        <div id="payment-plan-title" style="font-size:22px;font-weight:900;color:#0f172a">Configurar pagos</div>
-        <div style="font-size:12px;color:#64748b;margin-top:4px">Monto total partida: <strong id="payment-plan-total">0 UF</strong></div>
+        <div id="cost-config-title" style="font-size:22px;font-weight:900;color:#0f172a">Configurar Costo</div>
+        <div id="cost-config-subtitle" style="font-size:12px;color:#64748b;margin-top:4px">Define el origen del costo y su flujo mensual en un solo lugar.</div>
       </div>
       <div style="display:flex;align-items:center;gap:10px">
-        <div class="badge badge-yellow">Asignación total <span id="payment-plan-assigned" style="margin-left:6px">0%</span></div>
-        <button class="btn-outline btn-plus" type="button" onclick="closePaymentPlanModal()">×</button>
+        <span id="cost-config-status" class="cost-config-state estado-pendiente">Pendiente</span>
+        <button class="btn-outline btn-plus" type="button" onclick="closeCostConfigModal()">×</button>
       </div>
     </div>
-    <div class="modal-body payment-plan-body">
-      <div class="payment-plan-stack">
-        <div class="payment-section" style="margin-bottom:0">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-            <div class="sec-title" style="margin-bottom:0">1. Tramos de cuotas mensuales</div>
-            <button class="btn-dark" type="button" onclick="addPaymentPlanItem('tramo')">+ Agregar tramo</button>
-          </div>
-          <div class="payment-plan-grid-head">
-            <div>%</div>
-            <div>Inicio del periodo</div>
-            <div>Desfase</div>
-            <div>Fin del periodo</div>
-            <div>Desfase</div>
-            <div></div>
-          </div>
-          <div id="payment-plan-tramos"></div>
+    <div class="modal-body cost-config-body">
+      <div class="cost-config-main">
+        <div class="cost-config-panel">
+          <div class="cost-config-label">Método de cálculo e imputación</div>
+          <select id="cost-config-method" class="inp" onchange="renderCostConfigFields(); updateCostConfigPreview()">
+            <option value="manual">Manual / monto único</option>
+            <option value="monthly_amount">Monto mensual durante período</option>
+            <option value="monthly_formula">Fórmula mensual dinámica</option>
+            <option value="global_formula">Fórmula global + distribución</option>
+            <option value="periodic">Pago periódico</option>
+            <option value="milestones">Pago por hitos</option>
+            <option value="manual_distribution">Distribución manual</option>
+          </select>
         </div>
-
-        <div class="payment-section" style="margin-bottom:0">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-            <div class="sec-title" style="margin-bottom:0">2. Pagos específicos (hitos)</div>
-            <button class="btn-dark" type="button" onclick="addPaymentPlanItem('hito')">+ Agregar hito</button>
+        <div id="cost-config-fields" class="cost-config-fields"></div>
+        <div class="cost-config-panel">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px">
+            <div>
+              <div class="cost-config-label">Vista previa mensual</div>
+              <div id="cost-config-total" class="cost-config-total">Total: 0 UF</div>
+            </div>
+            <span id="cost-config-preview-state" class="cost-config-state estado-pendiente">Pendiente</span>
           </div>
-          <div class="payment-plan-grid-head hitos">
-            <div>%</div>
-            <div>Referencia</div>
-            <div>Desfase</div>
-            <div></div>
-          </div>
-          <div id="payment-plan-hitos"></div>
+          <div id="cost-config-preview" class="cost-config-preview"></div>
         </div>
-
-        <div class="payment-section" style="margin-bottom:0">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-            <div class="sec-title" style="margin-bottom:0">3. Entre dos fechas con periodicidad</div>
-            <button class="btn-dark" type="button" onclick="addPaymentPlanItem('periodico')">+ Agregar periodicidad</button>
-          </div>
-          <div class="payment-plan-grid-head periodicos">
-            <div>Inicio</div>
-            <div>Desfase</div>
-            <div>Término</div>
-            <div>Desfase</div>
-            <div>Cada (meses)</div>
-            <div>Monto UF</div>
-            <div></div>
-          </div>
-          <div id="payment-plan-periodicos"></div>
+        <div style="display:flex;justify-content:flex-end;gap:10px">
+          <button class="btn-outline" type="button" onclick="closeCostConfigModal()">Cancelar</button>
+          <button class="btn-primary" type="button" onclick="saveCostConfigModal()">Guardar costo</button>
         </div>
       </div>
-
-      <div class="payment-plan-stack">
-        <div class="payment-section" style="margin-bottom:0">
-          <div class="sec-title"> RESUMEN DE ASIGNACIÓN</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px">
-              <div style="font-size:10px;color:#64748b;text-transform:uppercase;margin-bottom:4px">Asignado</div>
-              <div id="payment-plan-assigned-card" style="font-size:1.6rem;font-weight:900;color:#0f172a">0%</div>
-            </div>
-            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px">
-              <div style="font-size:10px;color:#64748b;text-transform:uppercase;margin-bottom:4px">Tramos + hitos</div>
-              <div id="payment-plan-counts" style="font-size:1rem;font-weight:800;color:#334155">0 elementos</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="payment-section" style="margin-bottom:0">
-          <div class="sec-title" style="margin-bottom:10px"> PLANTILLAS RÁPIDAS</div>
-          <div style="font-size:10px;color:#94a3b8;margin-bottom:10px">Selecciona una plantilla para precargar la estructura (reemplaza el plan actual).</div>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            <button class="btn-outline" type="button" style="text-align:left;font-size:11px;padding:7px 10px" onclick="applyQuickPaymentTemplate('monto_unico')">💰 Monto único</button>
-            <button class="btn-outline" type="button" style="text-align:left;font-size:11px;padding:7px 10px" onclick="applyQuickPaymentTemplate('cuotas_meses')">📅 Cuotas fijas por meses</button>
-            <button class="btn-outline" type="button" style="text-align:left;font-size:11px;padding:7px 10px" onclick="applyQuickPaymentTemplate('cuotas_fechas')">📆 Cuotas entre dos hitos</button>
-            <button class="btn-outline" type="button" style="text-align:left;font-size:11px;padding:7px 10px" onclick="applyQuickPaymentTemplate('pagos_puntuales')">📌 Pagos puntuales (3 hitos)</button>
-            <button class="btn-outline" type="button" style="text-align:left;font-size:11px;padding:7px 10px" onclick="applyQuickPaymentTemplate('inicial_cuotas')">⬆️ Pago inicial + cuotas</button>
-            <button class="btn-outline" type="button" style="text-align:left;font-size:11px;padding:7px 10px" onclick="applyQuickPaymentTemplate('final_cuotas')">⬇️ Cuotas + pago final</button>
-            <button class="btn-outline" type="button" style="text-align:left;font-size:11px;padding:7px 10px" onclick="applyQuickPaymentTemplate('hito_pct')">🏁 Contra hitos del Gantt</button>
-          </div>
-        </div>
-
-        <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:auto">
-          <button class="btn-outline" type="button" onclick="closePaymentPlanModal()">Cancelar</button>
-          <button class="btn-primary" type="button" onclick="savePaymentPlanModal()">Sincronizar partida</button>
+      <div class="cost-config-side">
+        <div class="cost-config-panel">
+          <div class="cost-config-label">Referencias disponibles</div>
+          <button class="formula-si-btn" type="button" onmousedown="event.preventDefault(); insertCostConfigFormulaTemplate('SI')">
+            <strong>SI(</strong>condición<strong>, </strong>valor_si<strong>, </strong>valor_no<strong>)</strong>
+            <small style="display:block;color:#94a3b8;margin-top:3px">Ej: SI(_ingresos_mes &gt; 0, 50, 0)</small>
+          </button>
+          <div id="cost-config-ref-panel" class="formula-ref-panel"></div>
         </div>
       </div>
     </div>
@@ -1978,7 +1970,7 @@ table:not(.gantt-table) .tfoot-dark td,
               <select id="cost-formula-imputation-type" class="inp" onchange="updateCostFormulaModalPreview(); autosaveCostFormulaModal()">
                 <option value="global">Total global</option>
                 <option value="monthly">Mensual por fórmula</option>
-                <option value="manual">Plan de pago manual</option>
+                <option value="manual">Manual</option>
               </select>
             </div>
             <div style="font-size:10px;color:#94a3b8;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Editar fórmula</div>
@@ -2347,13 +2339,13 @@ table:not(.gantt-table) .tfoot-dark td,
         return values;
       }
 
-      // Buscar índices GASTOS FINANCIEROS para botones Plan de pago
+      // Buscar índices GASTOS FINANCIEROS para botones de configuración
       const gfCatGF = (typeof ensureCostosState === 'function' ? ensureCostosState() : []).find((item) => item.nombre === 'GASTOS FINANCIEROS');
       const gfPartidasGF = gfCatGF?.partidas || [];
       const gfGirosIdx = gfPartidasGF.findIndex((p) => /Construccion.*Linea aprobada/i.test(p.nombre || ''));
       const gfPagoLineaIdx = gfPartidasGF.findIndex((p) => /Construccion.*Pago de linea/i.test(p.nombre || ''));
       const mkPlanBtn = (idx, lbl) => idx >= 0
-        ? `<button type="button" title="Plan de pago: ${lbl}" onclick="openPaymentPlanModal('GASTOS FINANCIEROS',${idx})" style="font-size:9px;padding:1px 5px;background:#eff6ff;border:1px solid #93c5fd;color:#1d4ed8;border-radius:3px;cursor:pointer;flex-shrink:0">plan</button>`
+        ? `<button type="button" title="Configurar costo: ${lbl}" onclick="openPaymentPlanModal('GASTOS FINANCIEROS',${idx})" style="font-size:9px;padding:1px 5px;background:#eff6ff;border:1px solid #93c5fd;color:#1d4ed8;border-radius:3px;cursor:pointer;flex-shrink:0">config</button>`
         : '';
 
       pushRow({ key: 'giros', label: 'GIROS (desde EP)', fallback: giros, formula: '[GIROS fuente]', mode: 'signed', actionHtml: mkPlanBtn(gfGirosIdx, 'Giro línea construcción') });
@@ -2514,7 +2506,7 @@ table:not(.gantt-table) .tfoot-dark td,
 
   function enhanceCostFormulaInputs() {
     const header = document.querySelector('#planilla-head th:nth-child(3)');
-    if (header) header.textContent = 'Plan de pago';
+    if (header) header.textContent = 'Configurar';
   }
 
   if (typeof renderCostosModule === 'function') {
