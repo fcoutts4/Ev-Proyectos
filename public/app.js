@@ -2805,7 +2805,7 @@ function renderFinancingSourcePlanilla(sourceType) {
             ${renderFormulaChipsForCell(partida, false)}
           </div>
         </td>
-        <td><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><button class="btn-outline" type="button" onclick="openPaymentPlanModal('GASTOS FINANCIEROS', ${partida._costIndex})">${escapeHtml(summarizePaymentPlan(partida.plan_pago))}</button><div style="font-size:10px;color:${Math.abs(getPaymentPlanAssignedPct(partida.plan_pago) - 100) < 0.01 ? '#16a34a' : '#b45309'};white-space:nowrap">${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))}</div></div></td>
+        <td><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><button class="btn-outline" type="button" onclick="openPaymentPlanModal('GASTOS FINANCIEROS', ${partida._costIndex})">${escapeHtml(summarizePaymentPlan(partida.plan_pago))}</button><div style="font-size:10px;color:${Math.abs(getPaymentPlanAssignedPct(partida.plan_pago, total) - 100) < 0.01 ? '#16a34a' : '#b45309'};white-space:nowrap">${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago, total))}</div></div></td>
         <td data-month-cell style="text-align:center;color:#22c55e;font-weight:800">${fmtTableAmount(total, { kind: 'cost' })}</td>
         <td style="text-align:center">${partida.tiene_iva ? '<span class="badge badge-blue">SI</span>' : '<span class="badge">NO</span>'}</td>
         ${distribucion.map((value) => `<td data-month-cell style="text-align:center">${fmtTableAmount(value, { kind: 'cost' })}</td>`).join('')}
@@ -3392,12 +3392,21 @@ function buildMonthlyContext(monthIndex, monthCount) {
   const salesFlow = getProjectMonthlySalesFlows(monthCount);
   const unidadesPromesa = toNumber(salesFlow.unidadesPromesadas[monthIndex]);
   const unidadesEscritura = toNumber(salesFlow.unidadesEscrituradas[monthIndex]);
+  const escriturasAcumuladas = salesFlow.unidadesEscrituradas
+    .slice(0, monthIndex + 1)
+    .reduce((sum, value) => sum + toNumber(value), 0);
+  const recepcionMunicipal = getMunicipalReceptionMilestone();
+  const recepcionMes = recepcionMunicipal ? toNumber(recepcionMunicipal.inicio) : Number.POSITIVE_INFINITY;
+  const unidadesNoVendidasMes = monthIndex >= recepcionMes
+    ? Math.max(0, toNumber(baseContext.total_unidades) - escriturasAcumuladas)
+    : 0;
   const ingresosPromesa = toNumber(salesFlow.ingresosPromesa[monthIndex]);
   const ingresosEscrituracion = toNumber(salesFlow.ingresosEscrituracion[monthIndex]);
   return {
     ...baseContext,
     unidades_promesadas_mes: unidadesPromesa,
     unidades_escrituradas_mes: unidadesEscritura,
+    unidades_no_vendidas_mes: unidadesNoVendidasMes,
     unidades_promesadas_escrituradas_mes: unidadesPromesa + unidadesEscritura,
     ingresos_promesa_mes: ingresosPromesa,
     ingresos_escrituracion_mes: ingresosEscrituracion,
@@ -3692,6 +3701,7 @@ function ensureCostosState() {
       current.partidas.push({
         ...partida,
         id: partida.id || makeClientId('cost'),
+        isDefault: typeof partida.isDefault === 'boolean' ? partida.isDefault : true,
         plan_pago: partida.plan_pago || '',
         distribucion_mensual: Array.isArray(partida.distribucion_mensual) ? partida.distribucion_mensual : [],
       });
@@ -3860,6 +3870,7 @@ function renderCostPlanilla() {
       const rowReadOnly = categoryReadOnly || !!partida.auto_origen;
       const planEditable = !rowReadOnly || !!partida.editable_source;
       const isMonthlyFormula = partida.formula_tipo === 'expr_mensual';
+      const isProtectedDefault = !!partida.isDefault;
 
       if (categoria.nombre === 'GASTOS FINANCIEROS' && partida.auto_origen) {
         const sectionLabel = /^Terreno/i.test(partida.nombre || '')
@@ -3896,7 +3907,7 @@ function renderCostPlanilla() {
 
       categoryRows.push(`
         <tr class="partida-row" data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" data-cost-id="${escapeHtml(partida.id || '')}" ${rowReadOnly ? 'data-auto="1" data-readonly="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
-          <td style="text-align:center">${rowReadOnly ? '' : `<span class="row-tools"><button class="btn-outline btn-delete-inline" type="button" title="Eliminar subpartida" onclick="removeCostPartida('${escapeHtml(categoria.nombre)}', ${index})">&times;</button><span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span></span>`}</td>
+          <td style="text-align:center">${rowReadOnly ? '' : `<span class="row-tools">${isProtectedDefault ? '<button class="btn-outline btn-delete-inline" type="button" title="Subpartida base protegida" disabled>&times;</button>' : `<button class="btn-outline btn-delete-inline" type="button" title="Eliminar subpartida" onclick="removeCostPartida('${escapeHtml(categoria.nombre)}', ${index})">&times;</button>`}<span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span></span>`}</td>
           <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${rowReadOnly ? 'disabled' : ''}/></td>
           <td style="text-align:center">
             <div class="formula-chip-cell ${rowReadOnly ? 'is-readonly' : 'is-clickable'}" ${rowReadOnly ? '' : `onclick="openCostFormulaModal('${escapeHtml(categoria.nombre)}', ${index})"`} title="${rowReadOnly ? 'Fórmula automática' : 'Click para editar la fórmula'}">
@@ -3905,7 +3916,7 @@ function renderCostPlanilla() {
             <input type="hidden" class="cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}"/>
             <input type="hidden" data-field="formula_tipo" value="${escapeHtml(partida.formula_tipo || 'expr')}"/>
           </td>
-          <td>${isMonthlyFormula ? '<span class="badge badge-yellow" title="La formula define directamente el flujo de cada mes">Mensual por formula</span>' : (planEditable ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><button class="btn-outline" type="button" onclick="openPaymentPlanModal('${escapeHtml(categoria.nombre)}', ${index})">${escapeHtml(summarizePaymentPlan(partida.plan_pago))}</button><div style="font-size:10px;color:${Math.abs(getPaymentPlanAssignedPct(partida.plan_pago) - 100) < 0.01 ? '#16a34a' : '#b45309'};white-space:nowrap">${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))}</div></div>` : '<span class="badge badge-yellow">AUTO</span>')}</td>
+          <td>${isMonthlyFormula ? '<span class="badge badge-yellow" title="La formula define directamente el flujo de cada mes">Mensual por formula</span>' : (planEditable ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><button class="btn-outline" type="button" onclick="openPaymentPlanModal('${escapeHtml(categoria.nombre)}', ${index})">${escapeHtml(summarizePaymentPlan(partida.plan_pago))}</button><div style="font-size:10px;color:${Math.abs(getPaymentPlanAssignedPct(partida.plan_pago, total) - 100) < 0.01 ? '#16a34a' : '#b45309'};white-space:nowrap">${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago, total))}</div></div>` : '<span class="badge badge-yellow">AUTO</span>')}</td>
           <td style="text-align:center;color:#22c55e;font-weight:800">${fmtTableAmount(total, { kind: 'cost' })}</td>
           <td style="text-align:center"><input type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''} ${rowReadOnly ? 'disabled' : ''}/></td>
           ${distribucion.map((value) => `<td data-month-cell style="text-align:center">${fmtTableAmount(value, { kind: 'cost' })}</td>`).join('')}
@@ -4093,6 +4104,7 @@ function getCostFormulaCatalog() {
     // Variables mensuales (se usan en expr_mensual, varían por mes)
     { label: 'Unidades promesadas mes', token: '_unidades_promesadas_mes', value: 0, unit: 'un', monthly: true },
     { label: 'Unidades escrituradas mes', token: '_unidades_escrituradas_mes', value: 0, unit: 'un', monthly: true },
+    { label: 'Unidades no vendidas mes', token: '_unidades_no_vendidas_mes', value: 0, unit: 'un', monthly: true },
     { label: 'Unidades promesadas + escrituradas mes', token: '_unidades_promesadas_escrituradas_mes', value: 0, unit: 'un', monthly: true },
     { label: 'Ingresos promesa mes', token: '_ingresos_promesa_mes', value: 0, unit: 'UF', monthly: true },
     { label: 'Ingresos escrituracion mes', token: '_ingresos_escrituracion_mes', value: 0, unit: 'UF', monthly: true },
@@ -4420,7 +4432,7 @@ const FORMULA_REF_GROUPS = [
     label: 'Escrituracion',
   },
   {
-    tokens: ['_unidades_promesadas_escrituradas_mes', '_unidades_totales', '_total_unidades', '_precio_promedio_unidad', '_valor_promedio_total_unidad', '_precio_estacionamiento', '_precio_bodega'],
+    tokens: ['_unidades_promesadas_escrituradas_mes', '_unidades_no_vendidas_mes', '_unidades_totales', '_total_unidades', '_precio_promedio_unidad', '_valor_promedio_total_unidad', '_precio_estacionamiento', '_precio_bodega'],
     label: 'Unidades',
   },
   {
@@ -4692,15 +4704,16 @@ function getPaymentReferenceOptions() {
 }
 
 function parseInteractivePaymentPlan(rawValue) {
-  if (!rawValue) return { tramos: [], hitos: [] };
+  if (!rawValue) return { tramos: [], hitos: [], periodicos: [] };
   try {
     const parsed = JSON.parse(rawValue);
     return {
       tramos: Array.isArray(parsed.tramos) ? parsed.tramos : [],
       hitos: Array.isArray(parsed.hitos) ? parsed.hitos : [],
+      periodicos: Array.isArray(parsed.periodicos) ? parsed.periodicos : [],
     };
   } catch {
-    return { tramos: [], hitos: [] };
+    return { tramos: [], hitos: [], periodicos: [] };
   }
 }
 
@@ -4708,19 +4721,34 @@ function serializeInteractivePaymentPlan(plan) {
   return JSON.stringify({
     tramos: plan.tramos || [],
     hitos: plan.hitos || [],
+    periodicos: plan.periodicos || [],
   });
 }
 
 function summarizePaymentPlan(rawValue) {
   const plan = parseInteractivePaymentPlan(rawValue);
-  if (!plan.tramos.length && !plan.hitos.length) return 'Configurar';
-  return `${plan.tramos.length} tramo(s) | ${plan.hitos.length} hito(s)`;
+  if (!plan.tramos.length && !plan.hitos.length && !plan.periodicos.length) return 'Configurar';
+  return `${plan.tramos.length} tramo(s) | ${plan.hitos.length} hito(s) | ${plan.periodicos.length} periódico(s)`;
 }
 
-function getPaymentPlanAssignedPct(rawValue) {
+function getPaymentPlanAssignedPct(rawValue, total = 0) {
   const plan = parseInteractivePaymentPlan(rawValue);
-  return plan.tramos.reduce((sum, item) => sum + toNumber(item.pct), 0)
+  const pctBase = plan.tramos.reduce((sum, item) => sum + toNumber(item.pct), 0)
     + plan.hitos.reduce((sum, item) => sum + toNumber(item.pct), 0);
+  const totalNeto = toNumber(total);
+  if (!totalNeto) return pctBase;
+  const months = createMonthlyArray();
+  plan.periodicos.forEach((item) => {
+    const startMonth = resolvePaymentReference(item.inicio_ref, item.inicio_offset);
+    const endMonth = resolvePaymentReference(item.fin_ref, item.fin_offset);
+    const step = Math.max(1, Math.round(toNumber(item.cada_meses) || 1));
+    const amount = toNumber(item.monto);
+    for (let month = startMonth; month <= endMonth; month += step) {
+      placeMonthlyValue(months, month, amount);
+    }
+  });
+  const periodicTotal = months.reduce((sum, value) => sum + toNumber(value), 0);
+  return pctBase + (periodicTotal / totalNeto) * 100;
 }
 
 function resolvePaymentReference(refValue, offset = 0) {
@@ -4734,7 +4762,7 @@ function resolvePaymentReference(refValue, offset = 0) {
 function buildDistributionFromInteractivePlan(rawValue, total) {
   if (!rawValue || !total) return null;
   const plan = parseInteractivePaymentPlan(rawValue);
-  if (!plan.tramos.length && !plan.hitos.length) return null;
+  if (!plan.tramos.length && !plan.hitos.length && !plan.periodicos.length) return null;
   const months = createMonthlyArray();
 
   plan.tramos.forEach((tramo) => {
@@ -4747,6 +4775,15 @@ function buildDistributionFromInteractivePlan(rawValue, total) {
   plan.hitos.forEach((hito) => {
     const amount = total * toNumber(hito.pct) / 100;
     placeMonthlyValue(months, resolvePaymentReference(hito.ref, hito.offset), amount);
+  });
+  plan.periodicos.forEach((item) => {
+    const startMonth = resolvePaymentReference(item.inicio_ref, item.inicio_offset);
+    const endMonth = resolvePaymentReference(item.fin_ref, item.fin_offset);
+    const step = Math.max(1, Math.round(toNumber(item.cada_meses) || 1));
+    const amount = toNumber(item.monto);
+    for (let month = startMonth; month <= endMonth; month += step) {
+      placeMonthlyValue(months, month, amount);
+    }
   });
 
   return months;
@@ -4762,12 +4799,13 @@ function openPaymentPlanModal(categoryName, index) {
   state.costosUi.activePaymentIndex = index;
   const plan = parseInteractivePaymentPlan(partida.plan_pago);
   const refs = getPaymentReferenceOptions();
+  const partidaTotal = evaluateCostPartida(partida, buildCostContext());
 
   setText('payment-plan-title', `Configurar pagos: ${partida.nombre}`);
-  setText('payment-plan-total', fmtUf(evaluateCostPartida(partida, buildCostContext())));
-  setText('payment-plan-assigned', `${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))}`);
-  setText('payment-plan-assigned-card', `${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago))}`);
-  setText('payment-plan-counts', `${plan.tramos.length} tramo(s) · ${plan.hitos.length} hito(s)`);
+  setText('payment-plan-total', fmtUf(partidaTotal));
+  setText('payment-plan-assigned', `${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago, partidaTotal))}`);
+  setText('payment-plan-assigned-card', `${fmtPct(getPaymentPlanAssignedPct(partida.plan_pago, partidaTotal))}`);
+  setText('payment-plan-counts', `${plan.tramos.length} tramo(s) · ${plan.hitos.length} hito(s) · ${plan.periodicos.length} periódico(s)`);
 
   const renderRefOptions = (selectedValue) => refs.map((option) => `<option value="${escapeHtml(option.value)}" ${option.value === selectedValue ? 'selected' : ''}>${escapeHtml(option.label)}</option>`).join('');
 
@@ -4791,6 +4829,18 @@ function openPaymentPlanModal(categoryName, index) {
     </div>
   `).join('') || '<div style="font-size:11px;color:#94a3b8">Sin pagos por hito.</div>');
 
+  setHtml('payment-plan-periodicos', plan.periodicos.map((item, idx) => `
+    <div class="payment-line" data-periodico-index="${idx}" style="display:grid;grid-template-columns:1fr 90px 1fr 90px 90px 120px 40px;gap:8px;margin-bottom:10px">
+      <select class="inp" data-field="inicio_ref">${renderRefOptions(item.inicio_ref || 'MANUAL_0')}</select>
+      <input class="inp" data-field="inicio_offset" type="text" inputmode="numeric" data-localized-number="1" step="1" value="${fmtInputNumber(item.inicio_offset, 0)}" placeholder="Meses"/>
+      <select class="inp" data-field="fin_ref">${renderRefOptions(item.fin_ref || 'MANUAL_0')}</select>
+      <input class="inp" data-field="fin_offset" type="text" inputmode="numeric" data-localized-number="1" step="1" value="${fmtInputNumber(item.fin_offset, 0)}" placeholder="Meses"/>
+      <input class="inp" data-field="cada_meses" type="text" inputmode="numeric" data-localized-number="1" step="1" value="${fmtInputNumber(Math.max(1, toNumber(item.cada_meses) || 1), 0)}" placeholder="Cada"/>
+      <input class="inp" data-field="monto" type="text" inputmode="decimal" data-localized-number="1" step="0.01" value="${fmtInputNumber(toNumber(item.monto), 2)}" placeholder="UF por pago"/>
+      <button class="btn-outline btn-plus" type="button" onclick="removePaymentPlanItem('periodico', ${idx})">&times;</button>
+    </div>
+  `).join('') || '<div style="font-size:11px;color:#94a3b8">Sin pagos periódicos.</div>');
+
   $('payment-plan-modal').style.display = 'flex';
 }
 
@@ -4805,6 +4855,7 @@ function addPaymentPlanItem(type) {
   const plan = parseInteractivePaymentPlan(partida.plan_pago);
   if (type === 'tramo') plan.tramos.push({ pct: 0, inicio_ref: 'MANUAL_0', inicio_offset: 0, fin_ref: 'MANUAL_0', fin_offset: 0 });
   if (type === 'hito') plan.hitos.push({ pct: 0, ref: 'MANUAL_0', offset: 0 });
+  if (type === 'periodico') plan.periodicos.push({ inicio_ref: 'MANUAL_0', inicio_offset: 0, fin_ref: 'MANUAL_0', fin_offset: 0, cada_meses: 1, monto: 0 });
   partida.plan_pago = serializeInteractivePaymentPlan(plan);
   if (partida.editable_source === 'terreno') partida.auto_origen = false;
   openPaymentPlanModal(state.costosUi.activePaymentCategory, state.costosUi.activePaymentIndex);
@@ -4822,7 +4873,7 @@ function applyQuickPaymentTemplate(templateType) {
   const escrituracionRow = state.gantt.find((r) => /escrit/i.test(r.nombre));
   const escrituracionEnd = escrituracionRow ? `END:${escrituracionRow.id || escrituracionRow.nombre}` : firstGanttEnd;
 
-  let plan = { tramos: [], hitos: [] };
+  let plan = { tramos: [], hitos: [], periodicos: [] };
 
   switch (templateType) {
     case 'monto_unico':
@@ -4893,6 +4944,7 @@ function removePaymentPlanItem(type, index) {
   const plan = parseInteractivePaymentPlan(partida.plan_pago);
   if (type === 'tramo') plan.tramos.splice(index, 1);
   if (type === 'hito') plan.hitos.splice(index, 1);
+  if (type === 'periodico') plan.periodicos.splice(index, 1);
   partida.plan_pago = serializeInteractivePaymentPlan(plan);
   if (partida.editable_source === 'terreno') partida.auto_origen = false;
   openPaymentPlanModal(state.costosUi.activePaymentCategory, state.costosUi.activePaymentIndex);
@@ -4917,8 +4969,16 @@ function savePaymentPlanModal() {
     ref: row.querySelector('[data-field="ref"]')?.value || 'MANUAL_0',
     offset: toNumber(row.querySelector('[data-field="offset"]')?.value),
   }));
+  const periodicos = Array.from(document.querySelectorAll('#payment-plan-periodicos .payment-line')).map((row) => ({
+    inicio_ref: row.querySelector('[data-field="inicio_ref"]')?.value || 'MANUAL_0',
+    inicio_offset: toNumber(row.querySelector('[data-field="inicio_offset"]')?.value),
+    fin_ref: row.querySelector('[data-field="fin_ref"]')?.value || 'MANUAL_0',
+    fin_offset: toNumber(row.querySelector('[data-field="fin_offset"]')?.value),
+    cada_meses: Math.max(1, Math.round(toNumber(row.querySelector('[data-field="cada_meses"]')?.value) || 1)),
+    monto: toNumber(row.querySelector('[data-field="monto"]')?.value),
+  }));
 
-  partida.plan_pago = serializeInteractivePaymentPlan({ tramos, hitos });
+  partida.plan_pago = serializeInteractivePaymentPlan({ tramos, hitos, periodicos });
   if (partida.editable_source === 'terreno') partida.auto_origen = false;
   closePaymentPlanModal();
   if (partida.editable_source === 'terreno') renderTerrainModule();
@@ -4944,8 +5004,16 @@ function autosavePaymentPlanModal() {
     ref: row.querySelector('[data-field="ref"]')?.value || 'MANUAL_0',
     offset: toNumber(row.querySelector('[data-field="offset"]')?.value),
   }));
+  const periodicos = Array.from(document.querySelectorAll('#payment-plan-periodicos .payment-line')).map((row) => ({
+    inicio_ref: row.querySelector('[data-field="inicio_ref"]')?.value || 'MANUAL_0',
+    inicio_offset: toNumber(row.querySelector('[data-field="inicio_offset"]')?.value),
+    fin_ref: row.querySelector('[data-field="fin_ref"]')?.value || 'MANUAL_0',
+    fin_offset: toNumber(row.querySelector('[data-field="fin_offset"]')?.value),
+    cada_meses: Math.max(1, Math.round(toNumber(row.querySelector('[data-field="cada_meses"]')?.value) || 1)),
+    monto: toNumber(row.querySelector('[data-field="monto"]')?.value),
+  }));
 
-  partida.plan_pago = serializeInteractivePaymentPlan({ tramos, hitos });
+  partida.plan_pago = serializeInteractivePaymentPlan({ tramos, hitos, periodicos });
   if (partida.editable_source === 'terreno') partida.auto_origen = false;
   scheduleAutosave(partida.editable_source === 'terreno' ? 'terreno' : 'costos');
 }
@@ -4955,6 +5023,7 @@ function removeCostPartida(categoryName, index) {
   readCostosEditor();
   const category = state.costos.find((item) => item.nombre === categoryName);
   if (!category) return;
+  if (category.partidas?.[index]?.isDefault) return;
   category.partidas.splice(index, 1);
   renderCostosModule();
   scheduleAutosave('costos');
@@ -5400,7 +5469,7 @@ function onVentasVelocityChange() {
 }
 
 const MONTHLY_FORMULA_TOKENS = [
-  '_unidades_promesadas_mes', '_unidades_escrituradas_mes', '_unidades_promesadas_escrituradas_mes',
+  '_unidades_promesadas_mes', '_unidades_escrituradas_mes', '_unidades_no_vendidas_mes', '_unidades_promesadas_escrituradas_mes',
   '_ingresos_promesa_mes', '_ingresos_escrituracion_mes', '_ingresos_promesa_escrituracion_mes', '_ingresos_mes',
 ];
 
@@ -5481,6 +5550,7 @@ function agregarPartidaLinea(categoryName) {
   category.partidas.push({
     id: makeClientId('cost'),
     nombre: 'Nueva subpartida',
+    isDefault: false,
     formula_tipo: 'expr',
     formula_valor: 0,
     formula_referencia: '',

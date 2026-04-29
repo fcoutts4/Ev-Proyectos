@@ -73,6 +73,7 @@ tbody tr:hover{background:#f8fafc}
 .payment-plan-stack{display:flex;flex-direction:column;gap:18px}
 .payment-plan-grid-head{display:grid;grid-template-columns:100px 1fr 90px 1fr 90px 40px;gap:8px;font-size:10px;color:#64748b;text-transform:uppercase;margin-bottom:8px}
 .payment-plan-grid-head.hitos{grid-template-columns:100px 1fr 90px 40px}
+.payment-plan-grid-head.periodicos{grid-template-columns:1fr 90px 1fr 90px 90px 120px 40px}
 .cat-total-cell{font-size:10px;font-weight:800;color:#334155;text-align:center;background:#f8fafc}
 .cat-total-cell strong{display:block;font-size:11px;color:#0f172a}
 @media (max-width: 1180px){
@@ -1860,6 +1861,23 @@ table:not(.gantt-table) .tfoot-dark td,
             <div></div>
           </div>
           <div id="payment-plan-hitos"></div>
+        </div>
+
+        <div class="payment-section" style="margin-bottom:0">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+            <div class="sec-title" style="margin-bottom:0">3. Entre dos fechas con periodicidad</div>
+            <button class="btn-dark" type="button" onclick="addPaymentPlanItem('periodico')">+ Agregar periodicidad</button>
+          </div>
+          <div class="payment-plan-grid-head periodicos">
+            <div>Inicio</div>
+            <div>Desfase</div>
+            <div>Término</div>
+            <div>Desfase</div>
+            <div>Cada (meses)</div>
+            <div>Monto UF</div>
+            <div></div>
+          </div>
+          <div id="payment-plan-periodicos"></div>
         </div>
       </div>
 
