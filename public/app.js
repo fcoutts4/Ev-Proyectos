@@ -328,8 +328,7 @@ function getMonthlyIvaCredito() {
     (category.partidas || []).forEach((partida) => {
       if (!partida.tiene_iva) return;
       if (category.nombre === 'GASTOS FINANCIEROS' && /Linea aprobada|Pago de linea/i.test(partida.nombre || '')) return;
-      const total = evaluateCostPartida(partida, context);
-      const dist = normalizeDistribution(partida.distribucion_mensual, total, partida.plan_pago);
+      const dist = getMonthlyDistributionForPartida(partida, monthCount);
       dist.forEach((v, i) => { if (i < monthly.length) monthly[i] += toNumber(v) * 0.19; });
     });
   });
@@ -3142,9 +3141,42 @@ function buildCostContext() {
     ventas_brutas: toNumber(state.calculos.ventas_brutas),
   };
 }
+function convertSiToTernary(expression) {
+  let result = String(expression || '');
+  let iterations = 0;
+  while (iterations++ < 20) {
+    const match = result.match(/\bSI\s*\(/i);
+    if (!match) break;
+    const openParenIdx = match.index + match[0].length - 1;
+    const args = [];
+    let depth = 1;
+    let argStart = openParenIdx + 1;
+    let i = openParenIdx + 1;
+    while (i < result.length && depth > 0) {
+      const c = result[i];
+      if (c === '(') depth++;
+      else if (c === ')') {
+        depth--;
+        if (depth === 0) { args.push(result.slice(argStart, i).trim()); break; }
+      } else if (c === ',' && depth === 1) {
+        args.push(result.slice(argStart, i).trim());
+        argStart = i + 1;
+      }
+      i++;
+    }
+    if (args.length >= 2) {
+      const [cond, valTrue, valFalse = '0'] = args;
+      result = result.slice(0, match.index) + `((${cond}) ? (${valTrue}) : (${valFalse}))` + result.slice(i + 1);
+    } else {
+      break;
+    }
+  }
+  return result;
+}
+
 function evaluateExpressionFormula(expression, context) {
   if (!expression) return 0;
-  let normalized = String(expression);
+  let normalized = convertSiToTernary(String(expression));
   getCostFormulaCatalog().forEach(({ label, value, token }) => {
     const bracketToken = `[${label}]`;
     normalized = normalized.replace(new RegExp(bracketToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), String(toNumber(value)));
@@ -3167,18 +3199,66 @@ function evaluateExpressionFormula(expression, context) {
   Object.entries(context).forEach(([key, value]) => {
     expr = expr.replace(new RegExp(`\\b${key}\\b`, 'g'), String(toNumber(value)));
   });
-  expr = expr.replace(/[^0-9+\-*/(). ]/g, '');
+  // Permite operadores de comparación y ternario además de aritméticos
+  expr = expr.replace(/[^0-9+\-*/(). ,<>=!?:]/g, '');
   if (!expr.trim()) return 0;
   try {
+    // eslint-disable-next-line no-new-func
     return Function(`"use strict"; return (${expr});`)();
   } catch {
     return 0;
   }
 }
 
+function buildMonthlyContext(monthIndex, monthCount) {
+  const baseContext = buildCostContext();
+  const { promesas, escrituras } = getPromesasEscrituracionUnidades(monthCount);
+  const income = getProjectMonthlyIncome(monthCount);
+  const totals = getTotalSalesMetrics();
+  const settings = getGlobalPaymentSettings();
+  const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct));
+  const escrituraPct = Math.max(0, 100 - piePct);
+  const pieUnidad = totals.precioPromedio * piePct / 100;
+  const escrituraUnidad = totals.precioPromedio * escrituraPct / 100;
+  const unidadesPromesa = toNumber(promesas[monthIndex]);
+  const unidadesEscritura = toNumber(escrituras[monthIndex]);
+  return {
+    ...baseContext,
+    unidades_promesadas_mes: unidadesPromesa,
+    unidades_escrituradas_mes: unidadesEscritura,
+    ingresos_promesa_mes: unidadesPromesa * pieUnidad,
+    ingresos_escrituracion_mes: unidadesEscritura * escrituraUnidad,
+    ingresos_mes: toNumber(income[monthIndex]),
+    mes: monthIndex,
+  };
+}
+
+function evaluateMonthlyExpressionFormula(expression, monthCount) {
+  return Array.from({ length: monthCount }, (_, month) => {
+    const ctx = buildMonthlyContext(month, monthCount);
+    return toNumber(evaluateExpressionFormula(expression, ctx));
+  });
+}
+
+function getMonthlyDistributionForPartida(partida, monthCount) {
+  if (partida.formula_tipo === 'expr_mensual' && partida.formula_referencia) {
+    const monthly = evaluateMonthlyExpressionFormula(partida.formula_referencia, monthCount);
+    if (monthly.length < monthCount) {
+      return [...monthly, ...Array(monthCount - monthly.length).fill(0)];
+    }
+    return monthly;
+  }
+  const total = evaluateCostPartida(partida, buildCostContext());
+  return normalizeDistribution(partida.distribucion_mensual, total, partida.plan_pago);
+}
+
 function evaluateCostPartida(partida, context) {
   if (partida.auto_origen) return toNumber(partida.total_neto);
   if (partida.formula_tipo === 'expr') return evaluateExpressionFormula(partida.formula_referencia, context);
+  if (partida.formula_tipo === 'expr_mensual') {
+    const monthly = evaluateMonthlyExpressionFormula(partida.formula_referencia, getCostMonthCount());
+    return monthly.reduce((a, b) => a + toNumber(b), 0);
+  }
   if (partida.formula_tipo === 'manual') return toNumber(partida.formula_valor || partida.total_neto);
   if (partida.formula_tipo === 'pct_ventas' || partida.formula_tipo === 'pct_ventas_mensual') return toNumber(context.ventas_brutas) * toNumber(partida.formula_valor);
   if (partida.formula_tipo === 'curva_s') return toNumber(context.total_construccion);
@@ -3574,7 +3654,7 @@ function renderCostPlanilla() {
     (categoria.partidas || []).forEach((partida) => {
       const t = evaluateCostPartida(partida, context);
       partida.total_neto = t;
-      partida.distribucion_mensual = normalizeDistribution(partida.distribucion_mensual, t, partida.plan_pago);
+      partida.distribucion_mensual = getMonthlyDistributionForPartida(partida, monthCount);
     });
   });
 
@@ -3617,7 +3697,7 @@ function renderCostPlanilla() {
       }
 
       const total = evaluateCostPartida(partida, context);
-      const distribucion = normalizeDistribution(partida.distribucion_mensual, total, partida.plan_pago);
+      const distribucion = getMonthlyDistributionForPartida(partida, monthCount);
       partida.total_neto = total;
       partida.distribucion_mensual = distribucion;
       totalNeto += total;
@@ -3692,8 +3772,7 @@ function getProjectMonthlyCosts(includeFinancial = true) {
     if (!includeFinancial && category.nombre === 'GASTOS FINANCIEROS') return;
     (category.partidas || []).forEach((partida) => {
       if (category.nombre === 'GASTOS FINANCIEROS' && /Linea aprobada|Pago de linea/i.test(partida.nombre || '')) return;
-      const total = evaluateCostPartida(partida, context);
-      const distribution = normalizeDistribution(partida.distribucion_mensual, total, partida.plan_pago);
+      const distribution = getMonthlyDistributionForPartida(partida, monthCount);
       distribution.forEach((value, index) => {
         if (index < monthly.length) monthly[index] += toNumber(value);
       });
@@ -3847,6 +3926,14 @@ function getCostFormulaCatalog() {
   const mesesVenta = Math.max(0, ...getCronogramaByType('VENTA').map((row) => toNumber(row.duracion)));
   const mesesEscrituracion = Math.max(0, ...getCronogramaByType('ESCRITURACION').map((row) => toNumber(row.duracion)));
   const rawCatalog = [
+    // Variables mensuales (se usan en expr_mensual, varían por mes)
+    { label: 'Unidades promesadas mes', token: '_unidades_promesadas_mes', value: 0, unit: 'un' },
+    { label: 'Unidades escrituradas mes', token: '_unidades_escrituradas_mes', value: 0, unit: 'un' },
+    { label: 'Ingresos promesa mes', token: '_ingresos_promesa_mes', value: 0, unit: 'UF' },
+    { label: 'Ingresos escrituracion mes', token: '_ingresos_escrituracion_mes', value: 0, unit: 'UF' },
+    { label: 'Ingresos totales mes', token: '_ingresos_mes', value: 0, unit: 'UF' },
+    // Alias convenientes
+    { label: 'm2 construccion total', token: '_m2_construccion_total', value: context.m2_losa_total, unit: 'm2' },
     { label: 'Meses construccion (alias)', token: '_tiempo_construccion', value: context.meses_construccion, unit: 'mes' },
     { label: 'Meses construccion', token: '_meses_construccion', value: context.meses_construccion, unit: 'mes' },
     { label: 'Meses preventa (alias)', token: '_meses_preventa', value: mesesPreventa, unit: 'mes' },
@@ -3985,17 +4072,23 @@ function renderCostFormulaPreviewContent(rawValue, formulaType = 'expr', isAuto 
     ? 'formula-status formula-status-auto'
     : formulaType === 'manual'
       ? 'formula-status formula-status-manual'
-      : 'formula-status formula-status-expr';
+      : formulaType === 'expr_mensual'
+        ? 'formula-status formula-status-mensual'
+        : 'formula-status formula-status-expr';
   const statusText = isAuto
     ? 'Automatico'
     : formulaType === 'manual'
       ? 'Manual'
-      : 'Formula';
+      : formulaType === 'expr_mensual'
+        ? 'Formula mensual'
+        : 'Formula';
   const note = isAuto
     ? 'Origen calculado automaticamente por el modelo.'
     : formulaType === 'manual'
       ? 'Monto fijo editable para esta subpartida.'
-      : 'Expresion editable con referencias y operadores del modelo.';
+      : formulaType === 'expr_mensual'
+        ? 'Formula calculada mes a mes con variables mensuales (unidades, ingresos). El total es la suma de todos los meses.'
+        : 'Expresion editable con referencias y operadores del modelo.';
 
   return `
     <div class="formula-preview-head">
@@ -4020,22 +4113,33 @@ function updateCostFormulaModalPreview() {
   const input = $('cost-formula-modal-input');
   const preview = $('cost-formula-modal-preview');
   const resultEl = $('cost-formula-modal-result');
+  const modeBadge = $('cost-formula-mode-badge');
   if (!input || !preview) return;
   const isAuto = !!input.dataset.auto;
   const rawValue = input.value || '';
   const parsed = parseFormulaInput(rawValue);
+  const isMensual = !isAuto && parsed.formula_tipo === 'expr_mensual';
   preview.innerHTML = renderCostFormulaPreviewContent(
     rawValue,
     isAuto ? 'expr' : parsed.formula_tipo,
     isAuto
   );
 
-  // Calcular resultado
+  if (modeBadge) {
+    modeBadge.textContent = isMensual ? 'MENSUAL ∑' : 'GLOBAL';
+    modeBadge.className = `formula-mode-badge ${isMensual ? 'formula-mode-mensual' : 'formula-mode-global'}`;
+  }
+
   if (resultEl) {
     try {
       if (rawValue && !isAuto) {
-        const context = buildCostContext();
-        const result = evaluateExpressionFormula(rawValue, context);
+        let result;
+        if (isMensual) {
+          const monthly = evaluateMonthlyExpressionFormula(rawValue, getCostMonthCount());
+          result = monthly.reduce((a, b) => a + toNumber(b), 0);
+        } else {
+          result = evaluateExpressionFormula(rawValue, buildCostContext());
+        }
         resultEl.textContent = `= UF ${fmtNumber(result)}`;
         resultEl.style.color = '#0f172a';
       } else {
@@ -4084,6 +4188,110 @@ function scrollFinancialPlanilla(containerId, offset) {
   scrollTableById(containerId, offset);
 }
 
+const FORMULA_REF_GROUPS = [
+  {
+    label: 'Variables mensuales',
+    monthly: true,
+    tokens: ['_unidades_promesadas_mes', '_unidades_escrituradas_mes', '_ingresos_promesa_mes', '_ingresos_escrituracion_mes', '_ingresos_mes'],
+  },
+  {
+    label: 'm² Construcción',
+    tokens: ['_m2_construccion_total', '_m2_losa_total', '_m2_utiles', '_m2_municipales', '_m2_sobre_cota_0', '_m2_subterraneo', '_m2_interior_total', '_m2_terrazas_total', '_m2_vendible_deptos'],
+  },
+  {
+    label: 'Tiempo',
+    tokens: ['_meses_construccion', '_meses_preventa', '_meses_escrituracion'],
+  },
+  {
+    label: 'Precios y Unidades',
+    tokens: ['_precio_promedio_unidad', '_precio_estacionamiento', '_precio_bodega', '_unidades_totales'],
+  },
+  {
+    label: 'Ingresos globales',
+    tokens: ['_ventas_totales', '_ventas_brutas', '_ingresos_promesas_total', '_ingresos_escrituracion_total', '_ventas_totales_deptos', '_ventas_totales_accesorios'],
+  },
+  {
+    label: 'Terreno',
+    tokens: ['_terreno_m2_bruto', '_terreno_m2_neto', '_terreno_precio_uf_m2', '_terreno_total_calculado', '_total_terreno'],
+  },
+  {
+    label: 'Construcción',
+    tokens: ['_total_construccion', '_construccion_uf_m2_sobre_tierra', '_construccion_uf_m2_bajo_tierra', '_construccion_uf_m2_promedio'],
+  },
+  {
+    label: 'Porcentajes',
+    tokens: ['_pct_pie_promesa', '_pct_escrituracion'],
+  },
+  {
+    label: 'Categorías de costo',
+    tokenPrefix: '_total_categoria_',
+  },
+  {
+    label: 'Subpartidas individuales',
+    tokenPrefix: '_total_partida_',
+  },
+];
+
+function renderFormulaRefPanel() {
+  const panel = $('cost-formula-ref-panel');
+  if (!panel) return;
+  const catalog = getCostFormulaCatalog();
+  const catalogMap = new Map(catalog.map((e) => [e.token, e]));
+
+  const html = FORMULA_REF_GROUPS.map((group, groupIdx) => {
+    let entries;
+    if (group.tokens) {
+      entries = group.tokens.map((t) => catalogMap.get(t)).filter(Boolean);
+    } else if (group.tokenPrefix) {
+      entries = catalog.filter((e) => String(e.token || '').startsWith(group.tokenPrefix));
+    } else {
+      entries = [];
+    }
+    if (!entries.length) return '';
+
+    const isMonthly = !!group.monthly;
+    const itemsHtml = entries.map((entry) => {
+      const shortLabel = String(entry.label || '').replace(/^Total (partida|categoria) /i, '');
+      return `<button type="button" class="formula-ref-item" onmousedown="event.preventDefault(); insertCostFormulaReference($('cost-formula-modal-input'), '${escapeHtml(entry.token)}'); updateCostFormulaModalPreview(); autosaveCostFormulaModal()">
+        <span class="ref-label" title="${escapeHtml(entry.label)}">${escapeHtml(shortLabel)}</span>
+        ${isMonthly ? '<span class="ref-monthly-badge">∑mes</span>' : ''}
+        <span class="ref-value">${escapeHtml(formatFormulaCatalogValue(entry))}</span>
+      </button>`;
+    }).join('');
+
+    return `<div class="formula-ref-group">
+      <button type="button" class="formula-ref-group-title" onclick="toggleFormulaRefGroup(${groupIdx})">
+        <span>${escapeHtml(group.label)}</span>
+        <span style="font-weight:400;color:#94a3b8">${entries.length}</span>
+      </button>
+      <div class="formula-ref-items" id="formula-ref-group-${groupIdx}"${groupIdx === 0 ? '' : ' style="display:none"'}>${itemsHtml}</div>
+    </div>`;
+  }).filter(Boolean).join('');
+
+  panel.innerHTML = html || '<div style="padding:12px;font-size:11px;color:#94a3b8">Sin referencias disponibles</div>';
+}
+
+function toggleFormulaRefGroup(groupIdx) {
+  const items = $(`formula-ref-group-${groupIdx}`);
+  if (!items) return;
+  items.style.display = items.style.display === 'none' ? '' : 'none';
+}
+
+function insertFormulaTemplate(type) {
+  const input = $('cost-formula-modal-input');
+  if (!input) return;
+  const templates = { SI: 'SI(_ingresos_mes > 0, , 0)' };
+  const template = templates[type];
+  if (!template) return;
+  const start = input.selectionStart ?? input.value.length;
+  const end = input.selectionEnd ?? input.value.length;
+  input.value = input.value.slice(0, start) + template + input.value.slice(end);
+  const cursorPos = start + template.indexOf(', ,') + 2;
+  input.focus();
+  input.setSelectionRange(cursorPos, cursorPos);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
 function openCostFormulaModal(categoryName, index) {
   readCostosEditor();
   const category = state.costos.find((item) => item.nombre === categoryName);
@@ -4109,6 +4317,7 @@ function openCostFormulaModal(categoryName, index) {
     : 'Edita la fórmula. Los cambios se guardan automáticamente.';
   updateCostFormulaModalPreview();
   $('cost-formula-modal').style.display = 'flex';
+  renderFormulaRefPanel();
 }
 
 function closeCostFormulaModal() {
@@ -4936,11 +5145,17 @@ function onVentasVelocityChange() {
   scheduleAutosave('costos');
 }
 
+const MONTHLY_FORMULA_TOKENS = [
+  '_unidades_promesadas_mes', '_unidades_escrituradas_mes',
+  '_ingresos_promesa_mes', '_ingresos_escrituracion_mes', '_ingresos_mes',
+];
+
 function parseFormulaInput(value) {
   const raw = String(value || '').trim();
   if (!raw) return { formula_tipo: 'manual', formula_valor: 0, formula_referencia: '' };
   if (/^[0-9.,]+$/.test(raw)) return { formula_tipo: 'manual', formula_valor: toNumber(raw.replace(',', '.')), formula_referencia: '' };
-  return { formula_tipo: 'expr', formula_valor: 0, formula_referencia: raw };
+  const isMensual = MONTHLY_FORMULA_TOKENS.some((token) => raw.toLowerCase().includes(token));
+  return { formula_tipo: isMensual ? 'expr_mensual' : 'expr', formula_valor: 0, formula_referencia: raw };
 }
 
 function readCostosEditor() {
@@ -4975,11 +5190,7 @@ function readCostosEditor() {
       target.distribucion_mensual = monthInputs.map((input) => toNumber(input.value));
     }
     target.total_neto = evaluateCostPartida(target, buildCostContext());
-    target.distribucion_mensual = normalizeDistribution(
-      target.distribucion_mensual,
-      target.total_neto,
-      target.plan_pago
-    );
+    target.distribucion_mensual = getMonthlyDistributionForPartida(target, getCostMonthCount());
   });
 
   state.costos = categories;
@@ -5020,10 +5231,16 @@ function redistribuirPartida(button) {
   const partida = category?.partidas?.[toNumber(row.dataset.index)];
   const planText = partida?.plan_pago || '';
   const parsed = parseFormulaInput(formulaText);
-  const total = parsed.formula_tipo === 'manual'
-    ? toNumber(parsed.formula_valor)
-    : evaluateExpressionFormula(parsed.formula_referencia || formulaText, buildCostContext()) || 0;
-  const normalized = normalizeDistribution([], total, planText);
+  const monthCount = getCostMonthCount();
+  let normalized;
+  if (parsed.formula_tipo === 'expr_mensual') {
+    normalized = evaluateMonthlyExpressionFormula(parsed.formula_referencia || formulaText, monthCount);
+  } else {
+    const total = parsed.formula_tipo === 'manual'
+      ? toNumber(parsed.formula_valor)
+      : evaluateExpressionFormula(parsed.formula_referencia || formulaText, buildCostContext()) || 0;
+    normalized = normalizeDistribution([], total, planText);
+  }
   row.querySelectorAll('[data-month]').forEach((input, index) => {
     input.value = toNumber(normalized[index]);
   });
@@ -5393,6 +5610,9 @@ window.setCostFlowMode = setCostFlowMode;
 window.scrollCostPlanilla = scrollCostPlanilla;
 window.scrollFinancialPlanilla = scrollFinancialPlanilla;
 window.openCostFormulaModal = openCostFormulaModal;
+window.renderFormulaRefPanel = renderFormulaRefPanel;
+window.toggleFormulaRefGroup = toggleFormulaRefGroup;
+window.insertFormulaTemplate = insertFormulaTemplate;
 window.closeCostFormulaModal = closeCostFormulaModal;
 window.saveCostFormulaModal = saveCostFormulaModal;
 window.toggleCostCategoryCollapse = toggleCostCategoryCollapse;
