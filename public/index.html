@@ -14,21 +14,21 @@ body{font-family:'Inter',system-ui,sans-serif;background:#f1f5f9;color:#1e293b}
 .topnav{position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid #e2e8f0;min-height:60px;display:flex;align-items:center;padding:8px 24px;justify-content:space-between;gap:14px}
 .logo-box{width:28px;height:28px;background:#0f172a;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:12px}
 /* PROJECT HEADER */
-.proj-header{position:sticky;top:60px;z-index:40;background:#fff;border-bottom:1px solid #e2e8f0;padding:8px 24px;display:flex;justify-content:flex-end}
+.proj-header{position:sticky;top:60px;z-index:40;background:#fff;border-bottom:1px solid #e2e8f0;padding:8px 24px;display:flex;justify-content:flex-start}
 .topnav-left{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
 .topnav-right{display:flex;align-items:center;gap:12px;min-width:0}
 .topnav-sync{display:flex;align-items:center;gap:10px;min-width:0}
 .topnav-sync-detail{font-size:11px;color:#64748b;white-space:nowrap}
 /* TABS */
-.tab-dock{display:flex;flex-direction:column;align-items:flex-end;gap:8px;min-width:0}
+.tab-dock{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-width:0}
 .tab-dock-toggle{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border:1px solid #dbe4ee;background:#fff;border-radius:999px;font-size:12px;font-weight:700;color:#334155;cursor:pointer;box-shadow:0 8px 18px rgba(15,23,42,.08)}
 .tab-dock-toggle:hover{background:#f8fafc}
 .tab-dock-toggle-caret{font-size:11px;color:#64748b}
-.tab-nav-wrap{max-width:min(1060px,calc(100vw - 90px));max-height:78px;overflow:hidden;transition:max-height .2s ease,opacity .2s ease,transform .2s ease;transform-origin:top right}
+.tab-nav-wrap{max-width:min(1120px,calc(100vw - 90px));max-height:260px;overflow:hidden;transition:max-height .2s ease,opacity .2s ease,transform .2s ease;transform-origin:top left}
 .tab-dock.is-collapsed .tab-nav-wrap{max-height:0;opacity:0;transform:translateY(-4px);pointer-events:none}
-.tab-nav{display:flex;gap:0;overflow-x:auto;white-space:nowrap;background:#fff;border:1px solid #dbe4ee;border-radius:999px;padding:4px 6px;box-shadow:0 10px 22px rgba(15,23,42,.08)}
+.tab-nav{display:flex;flex-direction:column;gap:4px;overflow:auto;white-space:normal;background:#fff;border:1px solid #dbe4ee;border-radius:12px;padding:8px;box-shadow:0 10px 22px rgba(15,23,42,.08);min-width:220px}
 .tab-nav::-webkit-scrollbar{display:none}
-.tab-btn{padding:7px 11px;font-size:12px;font-weight:600;color:#64748b;border:1px solid transparent;cursor:pointer;background:none;border-radius:999px;transition:all .15s}
+.tab-btn{padding:8px 10px;font-size:12px;font-weight:600;color:#64748b;border:1px solid transparent;cursor:pointer;background:none;border-radius:8px;transition:all .15s;text-align:left;width:100%}
 .tab-btn:hover{color:#1e293b}
 .tab-btn.active{color:#0f172a;font-weight:700;background:#f1f5f9;border-color:#dbe4ee}
 /* TAB CONTENT */
@@ -739,7 +739,7 @@ table:not(.gantt-table) .tfoot-dark td,
 @media (max-width: 900px){
   .topnav{padding:6px 12px!important}
   .proj-header{padding-left:12px!important;padding-right:12px!important}
-  .tab-dock{width:100%;align-items:flex-end}
+  .tab-dock{width:100%;align-items:flex-start}
   .tab-nav-wrap{max-width:100%}
   main{padding:12px!important}
   .card,.card-dark,.kpi-card,.req-kpi{padding:14px!important}
@@ -752,7 +752,7 @@ table:not(.gantt-table) .tfoot-dark td,
   .topnav-sync-detail{display:none}
   .kpi-value{font-size:1.28rem!important}
   .sec-title{font-size:10px!important;letter-spacing:.06em}
-  .tab-btn{padding:10px 9px!important}
+  .tab-btn{padding:8px 9px!important}
 }
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}
