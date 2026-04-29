@@ -2188,7 +2188,7 @@ function renderVentasCashflow() {
 }
 
 function renderCostStructure() {
-  const visibleCategories = (state.costos || []).filter((categoria) => !['TERRENO', 'CONSTRUCCIÓN', 'CONSTRUCCION', 'GASTOS FINANCIEROS'].includes(String(categoria.nombre || '').toUpperCase().trim()));
+  const visibleCategories = (state.costos || []).filter(isCostPlanillaCategory);
   const total = visibleCategories
     .flatMap((categoria) => categoria.partidas || [])
     .reduce((sum, partida) => sum + toNumber(partida.total_neto), 0);
@@ -2891,6 +2891,26 @@ const COST_CATEGORY_ORDER = [
   'GASTOS FINANCIEROS',
   'OTROS EGRESOS',
 ];
+
+function getCostCategoryKey(name) {
+  return String(name || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .trim();
+}
+
+function isCostSourceCategory(name) {
+  const key = getCostCategoryKey(name);
+  return key === 'TERRENO'
+    || key === 'GASTOS FINANCIEROS'
+    || key === 'CONSTRUCCION'
+    || key.includes('CONSTRUCCI');
+}
+
+function isCostPlanillaCategory(categoria) {
+  return !isCostSourceCategory(categoria?.nombre || categoria);
+}
 
 function getConstructionStartMonth() {
   const hito = getConstructionMilestone();
@@ -3751,12 +3771,18 @@ function ensureCostosState() {
 
 function renderCostFlow(monthlyTotals) {
   const labels = getCostMonthLabels();
-  const total = monthlyTotals.reduce((sum, value) => sum + value, 0);
+  const monthlyValues = monthlyTotals.map((value) => toNumber(value));
+  const total = monthlyValues.reduce((sum, value) => sum + value, 0);
   const mode = state.costosUi?.costFlowMode || 'both';
-  const cumulativeValues = monthlyTotals.reduce((acc, value, index) => {
+  const cumulativeValues = monthlyValues.reduce((acc, value, index) => {
     acc.push((acc[index - 1] || 0) + toNumber(value));
     return acc;
   }, []);
+  const maxMonthly = Math.max(...monthlyValues.map((value) => Math.abs(value)), 0);
+  const maxCumulative = Math.max(...cumulativeValues.map((value) => Math.abs(value)), 0);
+  const monthlyAxisMax = maxMonthly > 0 ? maxMonthly * 1.18 : 1;
+  const cumulativeAxisMax = maxCumulative > 0 ? maxCumulative * 1.08 : 1;
+  const showDualAxis = mode === 'both';
 
   setHtml('flujoEgresos-legend', '');
   const monthlyBtn = $('cost-flow-monthly-btn');
@@ -3784,11 +3810,12 @@ function renderCostFlow(monthlyTotals) {
     datasets.push({
       type: 'bar',
       label: 'Egresos mensuales',
-      data: monthlyTotals,
+      data: monthlyValues,
       backgroundColor: '#fca5a5',
       borderColor: '#dc2626',
       borderWidth: 1,
       borderRadius: 4,
+      yAxisID: 'yMonthly',
       order: 2,
     });
   }
@@ -3805,7 +3832,7 @@ function renderCostFlow(monthlyTotals) {
       pointHoverRadius: 0,
       tension: 0.25,
       fill: false,
-      yAxisID: 'y',
+      yAxisID: showDualAxis ? 'yCumulative' : 'yMonthly',
       order: 1,
     });
   }
@@ -3826,7 +3853,7 @@ function renderCostFlow(monthlyTotals) {
           callbacks: {
             label(contextTooltip) {
               const rawValue = toNumber(contextTooltip.raw);
-              const monthValue = toNumber(monthlyTotals[contextTooltip.dataIndex]);
+              const monthValue = toNumber(monthlyValues[contextTooltip.dataIndex]);
               const pct = total ? (monthValue / total) * 100 : 0;
               return contextTooltip.dataset.type === 'line'
                 ? `Acumulado ${fmtUf(rawValue)} | Mes ${fmtUf(monthValue)} | ${fmtPct(pct)}`
@@ -3837,7 +3864,37 @@ function renderCostFlow(monthlyTotals) {
       },
       scales: {
         x: { ticks: { maxRotation: 0, autoSkip: true } },
-        y: { beginAtZero: true },
+        yMonthly: {
+          beginAtZero: true,
+          suggestedMax: showDualAxis || mode === 'monthly' ? monthlyAxisMax : cumulativeAxisMax,
+          position: 'left',
+          title: {
+            display: true,
+            text: mode === 'cumulative' ? 'UF acumulado' : 'UF mensual',
+          },
+          ticks: {
+            callback(value) {
+              return fmtNumber(value, 0);
+            },
+          },
+        },
+        ...(showDualAxis ? {
+          yCumulative: {
+            beginAtZero: true,
+            suggestedMax: cumulativeAxisMax,
+            position: 'right',
+            grid: { drawOnChartArea: false },
+            title: {
+              display: true,
+              text: 'UF acumulado',
+            },
+            ticks: {
+              callback(value) {
+                return fmtNumber(value, 0);
+              },
+            },
+          },
+        } : {}),
       },
     },
   });
@@ -3869,9 +3926,8 @@ function renderCostPlanilla() {
   // TERRENO, CONSTRUCCIÓN y GASTOS FINANCIEROS se gestionan en sus propias pestañas
   // y no se muestran en la planilla de costos general.
   // Sin embargo, sus total_neto SÍ se actualizan para que las fórmulas cruzadas funcionen.
-  const HIDDEN_CATEGORIES = new Set(['TERRENO', 'CONSTRUCCIÓN', 'CONSTRUCCION', 'GASTOS FINANCIEROS']);
   categorias.forEach((categoria) => {
-    if (!HIDDEN_CATEGORIES.has(String(categoria.nombre || '').toUpperCase().trim())) return;
+    if (!isCostSourceCategory(categoria.nombre)) return;
     (categoria.partidas || []).forEach((partida) => {
       const t = evaluateCostPartida(partida, context);
       partida.total_neto = t;
@@ -3880,7 +3936,7 @@ function renderCostPlanilla() {
   });
 
   setHtml('planilla-tbody', categorias.map((categoria) => {
-    if (HIDDEN_CATEGORIES.has(String(categoria.nombre || '').toUpperCase().trim())) return '';
+    if (!isCostPlanillaCategory(categoria)) return '';
     const isCollapsed = Object.prototype.hasOwnProperty.call(collapsedState, categoria.nombre)
       ? !!collapsedState[categoria.nombre]
       : true;
@@ -3950,13 +4006,13 @@ function renderCostPlanilla() {
             <div class="cost-category-title">
               <button class="btn-collapse-cost" type="button" onclick="${hasSubpartidas ? `toggleCostCategoryCollapse('${escapeHtml(categoria.nombre)}')` : ''}" title="${hasSubpartidas ? 'Expandir o colapsar' : 'Sin subpartidas'}" ${hasSubpartidas ? '' : 'disabled style="opacity:.45;cursor:not-allowed"'}>${hasSubpartidas ? (isCollapsed ? '&#9656;' : '&#9662;') : '&middot;'}</button>
               <span class="cost-category-name">${escapeHtml(categoria.nombre)}</span>
-              ${categoryReadOnly ? '' : `<button class="btn-add-cost" type="button" onclick="agregarPartidaLinea('${escapeHtml(categoria.nombre)}')" title="Agregar partida">+ Agregar partida</button>`}
+              ${categoryReadOnly ? '' : `<button class="btn-add-cost" type="button" onclick="agregarPartidaLinea('${escapeHtml(categoria.nombre)}')" title="Agregar subpartida">+ Subpartida</button>`}
             </div>
             <div class="cost-category-actions">
             </div>
           </div>
         </td>
-        <td class="cat-total-cell"><strong>${fmtTableAmount(categoryTotalNeto, { kind: 'cost', total: true })}</strong></td>
+        <td class="cat-total-cell cat-total-neto"><strong>${fmtTableAmount(categoryTotalNeto, { kind: 'cost', total: true })}</strong></td>
         <td class="cat-total-cell"><strong>${fmtTableAmount(categoryTotalIva, { kind: 'cost', total: true })}</strong></td>
         ${categoryMonthlyTotals.map((value) => `<td class="cat-total-cell"><strong>${fmtTableAmount(value, { kind: 'cost', total: true })}</strong></td>`).join('')}
       </tr>
