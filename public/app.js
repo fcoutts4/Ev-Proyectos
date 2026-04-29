@@ -51,18 +51,31 @@ function showTab(tabId, button) {
   const pane = document.getElementById(`tab-${tabId}`);
   if (pane) pane.classList.add('active');
   if (button) button.classList.add('active');
-  if (window.innerWidth <= 1100) toggleTabDock(true);
+  closeTabDock();
 }
 
-function toggleTabDock(forceCollapsed = null) {
+function closeTabDock() {
   const dock = $('tabDock');
   const toggle = $('tabDockToggle');
-  const caret = $('tabDockCaret');
   if (!dock) return;
-  const shouldCollapse = forceCollapsed == null ? !dock.classList.contains('is-collapsed') : !!forceCollapsed;
-  dock.classList.toggle('is-collapsed', shouldCollapse);
-  if (toggle) toggle.setAttribute('aria-expanded', shouldCollapse ? 'false' : 'true');
-  if (caret) caret.innerHTML = shouldCollapse ? '&#9656;' : '&#9662;';
+  dock.classList.remove('is-open');
+  if (toggle) toggle.setAttribute('aria-expanded', 'false');
+}
+
+function openTabDock() {
+  const dock = $('tabDock');
+  const toggle = $('tabDockToggle');
+  if (!dock) return;
+  dock.classList.add('is-open');
+  if (toggle) toggle.setAttribute('aria-expanded', 'true');
+}
+
+function toggleTabDock(forceOpen = null) {
+  const dock = $('tabDock');
+  if (!dock) return;
+  const shouldOpen = forceOpen == null ? !dock.classList.contains('is-open') : !!forceOpen;
+  if (shouldOpen) openTabDock();
+  else closeTabDock();
 }
 
 function createPendingAction(name) {
@@ -5974,6 +5987,8 @@ function agregarUso(defaultLabel = 'Departamento') {
 
 window.showTab = showTab;
 window.toggleTabDock = toggleTabDock;
+window.openTabDock = openTabDock;
+window.closeTabDock = closeTabDock;
 window.onCabidaInputChange = onCabidaInputChange;
 window.onTerrenoInputChange = onTerrenoInputChange;
 window.guardarFormulaOverrides = guardarFormulaOverrides;
@@ -6040,12 +6055,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupLocalizedNumberInputs();
   setupAutosaveListeners();
   renderSyncStatus();
-  if (window.innerWidth <= 1100) toggleTabDock(true);
+  const tabDock = $('tabDock');
+  if (tabDock) {
+    tabDock.addEventListener('mouseenter', () => openTabDock());
+    tabDock.addEventListener('mouseleave', () => closeTabDock());
+    tabDock.addEventListener('focusin', () => openTabDock());
+    tabDock.addEventListener('focusout', () => {
+      window.setTimeout(() => {
+        if (!tabDock.contains(document.activeElement)) closeTabDock();
+      }, 80);
+    });
+  }
+  const tabDockToggle = $('tabDockToggle');
+  if (tabDockToggle) {
+    tabDockToggle.addEventListener('click', (event) => {
+      event.preventDefault();
+      toggleTabDock();
+    });
+  }
   document.addEventListener('click', (event) => {
     const dock = $('tabDock');
-    if (!dock || window.innerWidth > 1100) return;
+    if (!dock) return;
     if (dock.contains(event.target)) return;
-    if (!dock.classList.contains('is-collapsed')) toggleTabDock(true);
+    closeTabDock();
   });
 
   const activeTab = document.querySelector('.tab-btn.active');
