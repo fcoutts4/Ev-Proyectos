@@ -4726,6 +4726,11 @@ function insertCostFormulaReference(input, token) {
   const match = beforeCursor.match(/(?:_|[a-z])[a-z0-9_]*$/i);
   const replaceStart = match ? match.index : start;
   input.value = `${value.slice(0, replaceStart)}${token}${value.slice(end)}`;
+  if (input.id === 'cost-config-formula-inline') {
+    commitCostConfigFormulaInlineInput(input, true);
+    hideCostFormulaSuggestionsLater();
+    return;
+  }
   const cursor = replaceStart + String(token).length;
   input.focus();
   input.setSelectionRange(cursor, cursor);
@@ -4794,7 +4799,7 @@ function pickCostFormulaSuggestion(button) {
   if (!input) return;
   insertCostFormulaReference(input, button.dataset.token);
   if (input.id === 'cost-formula-modal-input') updateCostFormulaModalPreview();
-  if (input.id === 'cost-config-formula') updateCostConfigPreview();
+  if (input.id === 'cost-config-formula' || input.id === 'cost-config-formula-inline') updateCostConfigPreview();
   hideCostFormulaSuggestionsLater();
 }
 
@@ -4958,6 +4963,9 @@ function normalizeCostConfig(rawConfig) {
     method,
     amount: toNumber(parsed.amount),
     formula: String(parsed.formula || ''),
+    total_source: ['amount', 'formula'].includes(String(parsed.total_source || '').trim())
+      ? String(parsed.total_source || '').trim()
+      : (String(parsed.formula || '').trim() ? 'formula' : 'amount'),
     periodicity: Math.max(1, Math.round(toNumber(parsed.periodicity) || 1)),
     payment_count: Math.max(0, Math.round(toNumber(parsed.payment_count ?? parsed.repetitions ?? parsed.count ?? parsed.cantidad_pagos))),
     start: makeCostPoint(parsed.start),
@@ -5042,7 +5050,9 @@ function migrateLegacyCostConfig(partida) {
 function evaluateCostConfigBaseAmount(config, context = buildCostContext()) {
   const safeConfig = normalizeCostConfig(config);
   if (!safeConfig) return 0;
-  if (safeConfig.method !== 'milestones' && safeConfig.formula) return toNumber(evaluateExpressionFormula(safeConfig.formula, context));
+  if (safeConfig.method !== 'milestones' && safeConfig.total_source === 'formula' && safeConfig.formula) {
+    return toNumber(evaluateExpressionFormula(safeConfig.formula, context));
+  }
   return toNumber(safeConfig.amount);
 }
 
@@ -5417,6 +5427,20 @@ function renderCostConfigAmountField({ id = 'cost-config-amount', label = 'Monto
   `;
 }
 
+function renderCostConfigTotalSourceControl(selectedValue = 'amount') {
+  const source = selectedValue === 'formula' ? 'formula' : 'amount';
+  return `
+    <div class="cost-config-panel">
+      ${renderCostConfigField('Origen del total', `
+        <select id="cost-config-total-source" class="inp" onchange="renderCostConfigFields(); updateCostConfigPreview()">
+          <option value="amount" ${source === 'amount' ? 'selected' : ''}>Monto total</option>
+          <option value="formula" ${source === 'formula' ? 'selected' : ''}>Total por fórmula</option>
+        </select>
+      `)}
+    </div>
+  `;
+}
+
 function renderCostPointControls(name, label, point = makeCostPoint()) {
   const safePoint = makeCostPoint(point);
   const mode = safePoint.mode || 'ref';
@@ -5497,7 +5521,111 @@ function updateCostConfigPctWarning(config) {
   warning.className = `cost-config-warning ${validation.ok ? 'is-ok' : (summary.pct > 100 ? 'is-error' : 'is-warn')}`;
 }
 
+function getCostConfigFormulaValueFromEditor() {
+  const editor = $('cost-config-formula-editor');
+  const hidden = $('cost-config-formula');
+  if (!editor || !hidden) return hidden?.value || '';
+  const inline = $('cost-config-formula-inline');
+  const base = editor.dataset.baseFormula || '';
+  const pending = inline?.value || '';
+  hidden.value = `${base}${pending}`;
+  return hidden.value;
+}
+
+function renderCostConfigFormulaChips(rawValue = '') {
+  const value = String(rawValue || '').trim();
+  if (!value) return '';
+  return splitFormulaTokens(value).map((token) => renderFormulaToken(token)).join('');
+}
+
+function refreshCostConfigFormulaEditor(rawValue = '', focusInline = false) {
+  const editor = $('cost-config-formula-editor');
+  const hidden = $('cost-config-formula');
+  if (!editor || !hidden) return;
+  const value = String(rawValue || '');
+  hidden.value = value;
+  editor.dataset.baseFormula = value;
+  editor.innerHTML = `
+    ${renderCostConfigFormulaChips(value)}
+    <input id="cost-config-formula-inline" class="cost-config-formula-inline" value="" placeholder="${value ? ' +, -, *, /, %, número...' : 'Escribe o selecciona una referencia'}" oninput="handleCostConfigFormulaInlineInput(this)" onfocus="handleCostFormulaInput(this)" onkeydown="handleCostConfigFormulaInlineKeydown(event, this)" onblur="commitCostConfigFormulaInlineLater(this)">
+  `;
+  if (focusInline) focusCostConfigFormulaInline();
+}
+
+function focusCostConfigFormulaInline() {
+  const input = $('cost-config-formula-inline');
+  if (!input) return;
+  input.focus();
+  const cursor = String(input.value || '').length;
+  input.setSelectionRange(cursor, cursor);
+}
+
+function handleCostConfigFormulaInlineInput(input) {
+  getCostConfigFormulaValueFromEditor();
+  handleCostFormulaInput(input);
+  updateCostConfigPreview();
+}
+
+function commitCostConfigFormulaInlineInput(input = $('cost-config-formula-inline'), focusInline = false) {
+  const editor = $('cost-config-formula-editor');
+  const hidden = $('cost-config-formula');
+  if (!editor || !hidden || !input) return;
+  if (input.id === 'cost-config-formula-inline' && input !== $('cost-config-formula-inline')) return;
+  const nextValue = `${editor.dataset.baseFormula || ''}${input.value || ''}`;
+  refreshCostConfigFormulaEditor(nextValue, focusInline);
+  updateCostConfigPreview();
+}
+
+function commitCostConfigFormulaInlineLater(input) {
+  window.setTimeout(() => {
+    commitCostConfigFormulaInlineInput(input, false);
+    hideCostFormulaSuggestionsLater();
+  }, 130);
+}
+
+function removeLastCostConfigFormulaToken() {
+  const editor = $('cost-config-formula-editor');
+  if (!editor) return;
+  const base = editor.dataset.baseFormula || '';
+  const tokens = splitFormulaTokens(base);
+  if (!tokens.length) return;
+  const lastToken = tokens[tokens.length - 1];
+  const lastIndex = base.lastIndexOf(lastToken);
+  const nextValue = lastIndex >= 0 ? base.slice(0, lastIndex).trimEnd() : '';
+  refreshCostConfigFormulaEditor(nextValue, true);
+  updateCostConfigPreview();
+}
+
+function handleCostConfigFormulaInlineKeydown(event, input) {
+  if (event.key === 'Backspace' && !input.value) {
+    event.preventDefault();
+    removeLastCostConfigFormulaToken();
+  }
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    commitCostConfigFormulaInlineInput(input, true);
+  }
+}
+
+function clearCostConfigFormula() {
+  refreshCostConfigFormulaEditor('', true);
+  updateCostConfigPreview();
+}
+
+function insertCostConfigFormulaReference(token) {
+  const inline = $('cost-config-formula-inline');
+  if (inline) {
+    insertCostFormulaReference(inline, token);
+    return;
+  }
+  const input = $('cost-config-formula');
+  if (!input) return;
+  insertCostFormulaReference(input, token);
+  updateCostConfigPreview();
+}
+
 function readCostConfigForm() {
+  getCostConfigFormulaValueFromEditor();
   const draft = normalizeCostConfig(state.costosUi.costConfigDraft) || { method: 'manual', start: makeCostPoint(), end: makeCostPoint() };
   const method = $('cost-config-method')?.value || draft.method || 'manual';
   const common = {
@@ -5505,6 +5633,7 @@ function readCostConfigForm() {
     method,
     amount: toNumber($('cost-config-amount')?.value ?? draft.amount),
     formula: $('cost-config-formula')?.value ?? draft.formula ?? '',
+    total_source: $('cost-config-total-source')?.value || draft.total_source || (draft.formula ? 'formula' : 'amount'),
     periodicity: Math.max(1, Math.round(toNumber($('cost-config-periodicity')?.value ?? draft.periodicity) || 1)),
     payment_count: Math.max(0, Math.round(toNumber($('cost-config-payment-count')?.value ?? draft.payment_count))),
   };
@@ -5547,11 +5676,29 @@ function readCostConfigForm() {
   return state.costosUi.costConfigDraft;
 }
 
-function renderCostConfigFormulaInput(value = '', label = 'Fórmula') {
+function renderCostConfigFormulaInput(value = '', label = 'Fórmula', options = {}) {
+  const rawValue = String(value || '');
+  if (options.chipEditor) {
+    return `
+      <div class="cost-config-panel formula-cell">
+        <div class="cost-config-label">${escapeHtml(label)}</div>
+        <input id="cost-config-formula" type="hidden" value="${escapeHtml(rawValue)}">
+        <div id="cost-config-formula-editor" class="formula-chip-editor cost-config-formula-editor" data-base-formula="${escapeHtml(rawValue)}" onclick="focusCostConfigFormulaInline()">
+          ${renderCostConfigFormulaChips(rawValue)}
+          <input id="cost-config-formula-inline" class="cost-config-formula-inline" value="" placeholder="${rawValue ? ' +, -, *, /, %, número...' : 'Escribe o selecciona una referencia'}" oninput="handleCostConfigFormulaInlineInput(this)" onfocus="handleCostFormulaInput(this)" onkeydown="handleCostConfigFormulaInlineKeydown(event, this)" onblur="commitCostConfigFormulaInlineLater(this)">
+        </div>
+        <div class="formula-suggest"></div>
+        <div class="cost-config-formula-actions">
+          <span class="cost-config-formula-hint">Selecciona una referencia para insertarla como chip y continúa escribiendo a la derecha.</span>
+          <button class="cost-config-link-btn" type="button" onclick="clearCostConfigFormula()">Limpiar</button>
+        </div>
+      </div>
+    `;
+  }
   return `
     <div class="cost-config-panel formula-cell">
       <div class="cost-config-label">${escapeHtml(label)}</div>
-      <input id="cost-config-formula" class="inp" value="${escapeHtml(value || '')}" placeholder="Ej: ingresos_promesas_mes * 4.5%" oninput="handleCostFormulaInput(this); updateCostConfigPreview()" onfocus="handleCostFormulaInput(this)" onblur="hideCostFormulaSuggestionsLater()">
+      <input id="cost-config-formula" class="inp" value="${escapeHtml(rawValue)}" placeholder="Ej: ingresos_promesas_mes * 4.5%" oninput="handleCostFormulaInput(this); updateCostConfigPreview()" onfocus="handleCostFormulaInput(this)" onblur="hideCostFormulaSuggestionsLater()">
       <div class="formula-suggest"></div>
     </div>
   `;
@@ -5584,10 +5731,13 @@ function renderCostConfigFields() {
   } else if (method === 'monthly_formula') {
     html = renderCostConfigFormulaInput(config.formula, 'Fórmula mensual');
   } else if (method === 'global_formula') {
+    const totalSource = config.total_source === 'formula' ? 'formula' : 'amount';
     html = `
       <div class="cost-config-grid">
-        ${renderCostConfigAmountField({ label: 'Monto total UF', value: config.amount, placeholder: 'Monto total' })}
-        ${renderCostConfigFormulaInput(config.formula, 'Fórmula total opcional')}
+        ${renderCostConfigTotalSourceControl(totalSource)}
+        ${totalSource === 'formula'
+          ? renderCostConfigFormulaInput(config.formula, 'Total por fórmula', { chipEditor: true })
+          : renderCostConfigAmountField({ label: 'Monto total UF', value: config.amount, placeholder: 'Monto total' })}
       </div>
       <div class="cost-config-grid">
         ${renderCostPointControls('start', 'Distribuir desde', config.start)}
@@ -5691,7 +5841,7 @@ function renderCostConfigRefPanel() {
       : catalog.filter((entry) => String(entry.token || '').startsWith(group.tokenPrefix || ''));
     if (!entries.length) return '';
     const items = entries.map((entry) => `
-      <button type="button" class="formula-ref-item" onmousedown="event.preventDefault(); insertCostFormulaReference($('cost-config-formula'), '${escapeHtml(entry.token)}'); updateCostConfigPreview()">
+      <button type="button" class="formula-ref-item" onmousedown="event.preventDefault(); insertCostConfigFormulaReference('${escapeHtml(entry.token)}')">
         <span class="ref-label" title="${escapeHtml(entry.label)}">${escapeHtml(String(entry.label || '').replace(/^Total (partida|categoria) /i, ''))}</span>
         ${entry.monthly ? '<span class="ref-monthly-badge">mes</span>' : ''}
         <span class="ref-value">${escapeHtml(formatFormulaCatalogValue(entry))}</span>
@@ -5787,11 +5937,12 @@ function saveCostConfigModal() {
   partida.total_neto = total;
   partida.distribucion_mensual = monthly;
   partida.plan_pago = '';
+  const usesFormulaTotal = config.method === 'global_formula' && config.total_source === 'formula' && config.formula;
   partida.formula_valor = config.method === 'manual' ? toNumber(config.amount) : total;
-  partida.formula_referencia = ['monthly_formula', 'global_formula'].includes(config.method) ? config.formula : '';
+  partida.formula_referencia = config.method === 'monthly_formula' || usesFormulaTotal ? config.formula : '';
   partida.formula_tipo = config.method === 'monthly_formula'
     ? 'expr_mensual'
-    : (config.method === 'global_formula' && config.formula ? 'expr' : 'manual');
+    : (usesFormulaTotal ? 'expr' : 'manual');
   if (partida.editable_source === 'terreno') partida.auto_origen = false;
   closeCostConfigModal();
   if (partida.editable_source === 'terreno') renderTerrainModule();
@@ -6810,6 +6961,12 @@ window.saveCostConfigModal = saveCostConfigModal;
 window.addCostConfigLine = addCostConfigLine;
 window.removeCostConfigLine = removeCostConfigLine;
 window.insertCostConfigFormulaTemplate = insertCostConfigFormulaTemplate;
+window.insertCostConfigFormulaReference = insertCostConfigFormulaReference;
+window.focusCostConfigFormulaInline = focusCostConfigFormulaInline;
+window.handleCostConfigFormulaInlineInput = handleCostConfigFormulaInlineInput;
+window.handleCostConfigFormulaInlineKeydown = handleCostConfigFormulaInlineKeydown;
+window.commitCostConfigFormulaInlineLater = commitCostConfigFormulaInlineLater;
+window.clearCostConfigFormula = clearCostConfigFormula;
 window.removeCostPartida = removeCostPartida;
 window.startCostDrag = startCostDrag;
 window.allowCostDrop = allowCostDrop;
