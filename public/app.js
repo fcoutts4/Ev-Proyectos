@@ -4593,7 +4593,12 @@ function renderFormulaRefPanel() {
 function toggleFormulaRefGroup(groupIdx) {
   const items = $(`formula-ref-group-${groupIdx}`);
   if (!items) return;
-  items.style.display = items.style.display === 'none' ? '' : 'none';
+  const shouldOpen = items.style.display === 'none';
+  const panel = items.closest('.formula-ref-panel');
+  panel?.querySelectorAll('.formula-ref-items').forEach((groupItems) => {
+    if (groupItems !== items) groupItems.style.display = 'none';
+  });
+  items.style.display = shouldOpen ? '' : 'none';
 }
 
 function insertFormulaTemplate(type) {
@@ -5729,7 +5734,7 @@ function renderCostConfigFields() {
       </div>
     `;
   } else if (method === 'monthly_formula') {
-    html = renderCostConfigFormulaInput(config.formula, 'Fórmula mensual');
+    html = renderCostConfigFormulaInput(config.formula, 'Fórmula mensual', { chipEditor: true });
   } else if (method === 'global_formula') {
     const totalSource = config.total_source === 'formula' ? 'formula' : 'amount';
     html = `
