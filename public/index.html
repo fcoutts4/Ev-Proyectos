@@ -326,6 +326,26 @@ tbody tr:hover{background:#f8fafc}
 #tab-resumen #kpi-grid{gap:10px;margin-bottom:16px}
 #tab-resumen .resumen-main-grid{display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:16px}
 #tab-resumen .resumen-secondary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px}
+#tab-resumen{overflow-x:hidden}
+#tab-resumen .resumen-cabida-card{padding:14px;overflow:hidden}
+#tab-resumen .resumen-cabida-card .sec-title{margin-bottom:10px}
+#tab-resumen .resumen-cabida-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;align-items:start}
+#tab-resumen .resumen-cabida-panel{min-width:0;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px}
+#tab-resumen .resumen-cabida-panel-title{font-size:10px;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:.06em;margin:0 0 7px}
+#tab-resumen .resumen-cabida-card .res-table-scroll{overflow:visible;max-width:100%;border-radius:0}
+#tab-resumen .resumen-cabida-card .res-table-scroll table{min-width:0;width:100%;table-layout:auto}
+#tab-resumen .resumen-cabida-card thead th{font-size:9px;line-height:1.15;padding:6px 6px;letter-spacing:.04em;white-space:normal}
+#tab-resumen .resumen-cabida-card tbody td{font-size:11px;line-height:1.2;padding:6px;border-bottom:1px solid #eef2f7}
+#tab-resumen .resumen-cabida-card tfoot td{background:#f8fafc!important;color:#0f172a!important;font-size:11px;font-weight:800;padding:7px 6px;border-top:1px solid #d7e0ea}
+#tab-resumen .resumen-cabida-card th:first-child,
+#tab-resumen .resumen-cabida-card td:first-child{text-align:left!important;overflow-wrap:anywhere}
+#tab-resumen .resumen-cabida-card th:not(:first-child),
+#tab-resumen .resumen-cabida-card td:not(:first-child){text-align:right!important}
+#tab-resumen .resumen-cabida-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:10px}
+#tab-resumen .resumen-cabida-metric{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 9px;min-width:0}
+#tab-resumen .resumen-cabida-metric span{display:block;font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+#tab-resumen .resumen-cabida-metric strong{display:block;font-size:13px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#tab-resumen .resumen-cabida-note{font-size:10px;color:#64748b;margin-top:8px;line-height:1.35}
 
 @media (max-width: 1440px){
   .sheet-layout{max-width:1260px}
@@ -341,6 +361,8 @@ tbody tr:hover{background:#f8fafc}
   .sheet-layout{max-width:100%}
   #tab-resumen .resumen-secondary-grid{grid-template-columns:1fr}
   .res-table-scroll table{min-width:520px}
+  #tab-resumen .resumen-cabida-grid{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+  #tab-resumen .resumen-cabida-card .res-table-scroll table{min-width:0}
 }
 /* DISTRIBUCIÓN DE COSTOS */
 .dist-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
@@ -929,8 +951,7 @@ table:not(.gantt-table) .tfoot-dark td,
 
   <!-- Banner -->
   <div class="card-dark resumen-banner" style="display:flex;justify-content:space-between;align-items:center;border-radius:12px">
-    <div style="display:flex;align-items:center;gap:14px">
-      <div style="width:42px;height:42px;background:#22c55e;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px"></div>
+    <div style="display:flex;align-items:center;gap:10px;min-width:0">
       <div>
         <div style="font-size:18px;font-weight:900;letter-spacing:.05em">RESUMEN</div>
         <div style="font-size:11px;color:#94a3b8;letter-spacing:.1em">COMITÉ DE INVERSIONES</div>
@@ -985,43 +1006,43 @@ table:not(.gantt-table) .tfoot-dark td,
   <div class="resumen-secondary-grid">
 
     <!-- Cabida -->
-    <div class="card">
+    <div class="card resumen-cabida-card">
       <div class="sec-title"> CABIDA Y SUPERFICIES</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px">
+      <div class="resumen-cabida-grid">
         <!-- Unidades -->
-        <div>
-          <p style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px">Unidades</p>
+        <div class="resumen-cabida-panel">
+          <p class="resumen-cabida-panel-title">Unidades</p>
           <div class="res-table-scroll"><table>
-            <thead><tr><th style="text-align:left">Tipo</th><th>Cant.</th><th>Interior/Un</th><th>Terraza/Un</th><th style="color:#3b82f6">Vendible/Un</th></tr></thead>
+            <thead><tr><th>Tipo</th><th>Un.</th><th>Vend./un</th><th>Total vend.</th></tr></thead>
             <tbody id="res-cabida-tbody"></tbody>
             <tfoot><tr class="tfoot-green" id="res-cabida-tfoot"></tr></tfoot>
           </table></div>
-          <div style="font-size:10px;color:#64748b;margin-top:6px">Vendible considera <strong id="res-cabida-vendible-pct">50,0%</strong> de terraza.</div>
       </div>
         <!-- Superficies -->
-        <div>
-          <p style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px">Superficies</p>
+        <div class="resumen-cabida-panel">
+          <p class="resumen-cabida-panel-title">Superficies</p>
           <div class="res-table-scroll"><table>
-            <thead><tr><th style="text-align:left">Tipo</th><th>M2 útiles</th><th style="color:#3b82f6">M2 vendibles</th></tr></thead>
+            <thead><tr><th>Tipo</th><th>Útiles</th><th>Vendibles</th></tr></thead>
             <tbody id="res-sup-tbody"></tbody>
-            <tfoot><tr class="tfoot-dark" id="res-sup-tfoot"></tr></tfoot>
             <tbody id="res-sup-extra"></tbody>
+            <tfoot><tr class="tfoot-dark" id="res-sup-tfoot"></tr></tfoot>
           </table></div>
-          <div style="display:flex;gap:16px;font-size:10px;color:#64748b;margin-top:6px">
-            <div>M2 útiles totales: <strong id="res-cabida-util-total">0 m2</strong></div>
-            <div>M2 comunes totales: <strong id="res-cabida-common-total">0 m2</strong></div>
-            <div>M2 vendibles totales: <strong id="res-cabida-vendible-total">0 m2</strong></div>
-          </div>
       </div>
-        <div>
-          <p style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:8px">Estacionamientos y Bodegas</p>
+        <div class="resumen-cabida-panel">
+          <p class="resumen-cabida-panel-title">Estac. y Bodegas</p>
           <div class="res-table-scroll"><table>
-            <thead><tr><th style="text-align:left">Concepto</th><th>Cantidad</th></tr></thead>
+            <thead><tr><th>Concepto</th><th>Cant.</th></tr></thead>
             <tbody id="res-acc-tbody"></tbody>
             <tfoot><tr class="tfoot-green" id="res-acc-tfoot"></tr></tfoot>
           </table></div>
       </div>
     </div>
+      <div class="resumen-cabida-metrics">
+        <div class="resumen-cabida-metric"><span>Útiles</span><strong id="res-cabida-util-total">0 m2</strong></div>
+        <div class="resumen-cabida-metric"><span>Comunes</span><strong id="res-cabida-common-total">0 m2</strong></div>
+        <div class="resumen-cabida-metric"><span>Vendibles</span><strong id="res-cabida-vendible-total">0 m2</strong></div>
+      </div>
+      <div class="resumen-cabida-note">Vendible considera <strong id="res-cabida-vendible-pct">50,0%</strong> de terraza.</div>
   </div>
 
 </div>

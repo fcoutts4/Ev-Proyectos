@@ -987,24 +987,25 @@ function renderCabidaTables(rows) {
     <td style="text-align:center;color:#16a34a;font-weight:700">${fmtNumber(totals.vendible, 1)}</td>
   `);
 
-  // Tablas resumen (sin cambios)
-  const unitRows = displayRows.map((row) => `
+  const unitRows = displayRows.map((row) => {
+    const cantidad = toNumber(row.cantidad);
+    const vendiblePorUnidad = getSellableAreaPerUnit(row.sup_interior, row.sup_terrazas);
+    const vendibleTotal = vendiblePorUnidad * cantidad;
+    return `
     <tr>
       <td>${escapeHtml(row.uso)}</td>
-      <td style="text-align:center">${fmtNumber(row.cantidad)}</td>
-      <td style="text-align:center">${fmtNumber(row.sup_interior, 1)}</td>
-      <td style="text-align:center">${fmtNumber(row.sup_terrazas, 1)}</td>
-      <td style="text-align:center;color:#2563eb">${fmtNumber(getSellableAreaPerUnit(row.sup_interior, row.sup_terrazas), 1)}</td>
+      <td style="text-align:center">${fmtNumber(cantidad)}</td>
+      <td style="text-align:center;color:#2563eb">${fmtNumber(vendiblePorUnidad, 1)}</td>
+      <td style="text-align:center;font-weight:700">${fmtNumber(vendibleTotal, 1)}</td>
     </tr>
-  `).join('');
+  `; }).join('');
 
   setHtml('res-cabida-tbody', unitRows);
   setHtml('res-cabida-tfoot', `
     <td>Total</td>
     <td style="text-align:center">${fmtNumber(totals.unidades)}</td>
-    <td style="text-align:center">${fmtNumber(totals.unidades ? totals.interior / totals.unidades : 0, 1)}</td>
-    <td style="text-align:center">${fmtNumber(totals.unidades ? totals.terrazas / totals.unidades : 0, 1)}</td>
     <td style="text-align:center">${fmtNumber(totals.unidades ? totals.vendible / totals.unidades : 0, 1)}</td>
+    <td style="text-align:center">${fmtNumber(totals.vendible, 1)}</td>
   `);
 
   setHtml('res-sup-tbody', displayRows.map((row) => {
