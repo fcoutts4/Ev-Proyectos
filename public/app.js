@@ -650,16 +650,23 @@ function getConstructionMetrics() {
   };
 }
 
+function normalizeDisplayNumber(value, decimals = 0) {
+  const numeric = toNumber(value);
+  const precision = Math.max(0, toNumber(decimals));
+  const zeroThreshold = 0.5 * (10 ** -precision);
+  return Math.abs(numeric) < zeroThreshold ? 0 : numeric;
+}
+
 function fmtNumber(value, decimals = 0) {
   return new Intl.NumberFormat('es-CL', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
-  }).format(toNumber(value));
+  }).format(normalizeDisplayNumber(value, decimals));
 }
 
 function fmtInputNumber(value, decimals = 2, options = {}) {
   if (value == null || value === '') return '';
-  const numeric = toNumber(value);
+  const numeric = normalizeDisplayNumber(value, decimals);
   if (options.blankZero && !numeric) return '';
   return new Intl.NumberFormat('es-CL', {
     minimumFractionDigits: 0,
