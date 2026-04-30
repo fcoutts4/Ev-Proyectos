@@ -1089,15 +1089,20 @@ async function saveNow() {
     btn.textContent = 'Guardando...';
   }
   try {
-    if (typeof prepareStateForSave === 'function') {
-      try { prepareStateForSave({ includeCostos: true }); } catch (_) { /* readers may not be ready */ }
+    if (!state.proyectoId) return;
+    const pending = getPendingAutosaveScopes();
+    if (pending.length) {
+      await flushPendingAutosaves();
+      setSyncStatus('ok', 'GUARDADO', `Guardado manual ${new Date().toLocaleTimeString()}`);
+      return;
     }
-    const allScopes = Object.keys(AUTOSAVE_SCOPE_LABELS);
-    allScopes.forEach((scope) => {
+    try { prepareStateForSave({ includeCostos: true }); } catch (_) { /* readers may not be ready */ }
+    const scopes = Object.keys(AUTOSAVE_SCOPE_LABELS);
+    scopes.forEach((scope) => {
       state.autosave.queued[scope] = true;
       state.autosave.dirty[scope] = true;
     });
-    await flushPendingAutosaves();
+    await runAutosaveBatch(scopes);
     setSyncStatus('ok', 'GUARDADO', `Guardado manual ${new Date().toLocaleTimeString()}`);
   } catch (error) {
     console.error('saveNow', error);
@@ -1190,27 +1195,10 @@ function setupAutosaveListeners() {
 
   if (!document.body.dataset.costAutosaveBound) {
     let costEditorSyncTimer = null;
-    const updateSinglePartidaName = (row) => {
-      const category = state.costos?.find?.((item) => item.nombre === row.dataset.category);
-      if (!category) return false;
-      const target = row.dataset.costId
-        ? category.partidas?.find((partida) => String(partida.id || '') === row.dataset.costId)
-        : category.partidas?.[toNumber(row.dataset.index)];
-      if (!target) return false;
-      target.nombre = row.querySelector('[data-field="nombre"]')?.value?.trim() || 'Nueva subpartida';
-      delete target.isNewDraft;
-      return true;
-    };
     const syncCostDraftChange = (event, immediate = false) => {
-      const row = event.target.closest('#planilla-table [data-cost-row]');
-      if (!row) return;
-      const isNameOnly = event.target.matches?.('[data-field="nombre"]');
+      if (!event.target.closest('#planilla-table [data-cost-row]')) return;
       const run = () => {
         costEditorSyncTimer = null;
-        if (isNameOnly && updateSinglePartidaName(row)) {
-          scheduleAutosave('costos');
-          return;
-        }
         readCostosEditor();
         scheduleAutosave('costos');
         if (event.target.matches('[data-field="tiene_iva"]')) renderCostosModule();
