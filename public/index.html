@@ -652,8 +652,22 @@ tbody tr:hover{background:#f3f7fb!important}
 .flow-row-iva td{background:#f8fafc!important;font-weight:700!important}
 .flow-row-muted td{color:#475569!important}
 .flow-value-cost,.amount-cost,.flow-value-negative,.amount-negative{color:#334155!important}
+.iva-debito-panel{margin-bottom:16px;overflow:hidden}
+.iva-debito-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:12px;flex-wrap:wrap}
+.iva-debito-formulas{font-size:10px;color:#64748b;line-height:1.5;text-align:right}
+.iva-debito-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin-bottom:12px}
+.iva-debito-metric{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:9px 10px}
+.iva-debito-metric span{display:block;font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+.iva-debito-metric strong{display:block;font-size:14px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iva-debito-metric.factor strong{color:#1d4ed8}
+.iva-debito-table-wrap{overflow-x:auto;border:1px solid #e2e8f0;border-radius:8px}
+.iva-debito-table{min-width:680px}
+.iva-debito-table th,.iva-debito-table td{text-align:right}
+.iva-debito-table th:first-child,.iva-debito-table td:first-child{text-align:left}
+.iva-debito-table tfoot td{background:#0f172a;color:#fff;font-weight:800}
 .gf-param-panel{background:#f8fafc;border:1px solid var(--border-strong);border-radius:10px;padding:12px;margin-bottom:12px}
 .gf-param-panel .inp{font-weight:700}
+#tab-reportes.reportes-blank{min-height:calc(100vh - 160px);background:#fff;border:1px solid #e2e8f0;border-radius:10px}
 #kpi-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))!important}
 .flow-kpi-grid{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))!important}
 .ventas-crono-table{width:100%;table-layout:fixed}
@@ -936,8 +950,7 @@ table:not(.gantt-table) .tfoot-dark td,
         <button class="tab-btn" type="button" data-tab-target="gantt" onclick="showTab('gantt',this)">Carta Gantt</button>
         <button class="tab-btn" type="button" data-tab-target="costos" onclick="showTab('costos',this)">Costos del Proyecto</button>
         <button class="tab-btn" type="button" data-tab-target="flujo" onclick="showTab('flujo',this)">Flujo de Caja</button>
-        <button class="tab-btn" type="button" data-tab-target="flujo" data-tab-alias="resultados" onclick="showTab('flujo',this)">Resultados</button>
-        <button class="tab-btn" type="button" data-tab-target="resumen" data-tab-alias="reportes" onclick="showTab('resumen',this)">Reportes</button>
+        <button class="tab-btn" type="button" data-tab-target="reportes" onclick="showTab('reportes',this)">Reportes</button>
       </div>
     </div>
   </div>
@@ -1809,8 +1822,36 @@ table:not(.gantt-table) .tfoot-dark td,
           <div style="font-size:1.3rem;font-weight:900;color:#7c3aed" id="flujo-tir-con">18.8%</div>
       </div>
     </div>
-  </div>
 </div>
+</div>
+
+  <div class="card iva-debito-panel">
+    <div class="iva-debito-head">
+      <div>
+        <div class="sec-title" style="margin-bottom:4px">IVA DÉBITO VENTAS</div>
+        <div style="font-size:11px;color:#64748b">Panel auxiliar para validar el factor aplicado sobre ingresos brutos escriturados.</div>
+      </div>
+      <div class="iva-debito-formulas">
+        <div>IN = (IB + 0,19 × T) / 1,19</div>
+        <div>IVA = IB - IN</div>
+        <div>Factor = IVA / IB</div>
+      </div>
+    </div>
+    <div class="iva-debito-metrics">
+      <div class="iva-debito-metric"><span>IB Ingresos brutos</span><strong id="iva-debito-ib">0 UF</strong></div>
+      <div class="iva-debito-metric"><span>T Terreno</span><strong id="iva-debito-terreno">0 UF</strong></div>
+      <div class="iva-debito-metric"><span>IN Ingresos netos</span><strong id="iva-debito-in">0 UF</strong></div>
+      <div class="iva-debito-metric"><span>IVA Débito</span><strong id="iva-debito-iva">0 UF</strong></div>
+      <div class="iva-debito-metric factor"><span>Factor IVA Débito</span><strong id="iva-debito-factor">0,0000</strong></div>
+    </div>
+    <div class="iva-debito-table-wrap">
+      <table class="iva-debito-table">
+        <thead><tr><th>Concepto</th><th>UF Bruto</th><th>% Participación</th><th>IVA</th><th>Neto</th></tr></thead>
+        <tbody id="iva-debito-productos-tbody"></tbody>
+        <tfoot id="iva-debito-productos-tfoot"></tfoot>
+      </table>
+    </div>
+  </div>
 
   <!-- Tabla Flujo de Caja Completo -->
   <div style="margin-bottom:16px">
@@ -1828,6 +1869,8 @@ table:not(.gantt-table) .tfoot-dark td,
   </div>
 </div>
 </div><!-- end tab flujo -->
+
+<div id="tab-reportes" class="tab-pane reportes-blank"></div><!-- end tab reportes -->
 
 <div id="tab-capital" class="tab-pane" style="display:none">
   <!-- KPIs -->
@@ -2734,8 +2777,10 @@ table:not(.gantt-table) .tfoot-dark td,
       const financialTotal = sumMonthlySeries([interestTotal, stampTotal, commissions], monthCount);
       const subtotalEgresos = sumMonthlySeries([costStructure.total, financialTotal], monthCount);
       const ivaCreditoSource = getCostIvaCreditoForCashflow(monthCount);
+      const ivaDebitoSource = normalizeMonthlySeries(getMonthlyIvaDebito(incomeSource), monthCount);
+      if (typeof renderIvaDebitoPanel === 'function') renderIvaDebitoPanel();
       const flujoSinIva = incomeSource.map((value, index) => toNumber(value) - toNumber(subtotalEgresos[index]));
-      const flujoConIva = flujoSinIva.map((value, index) => value + toNumber(ivaCreditoSource[index]));
+      const flujoConIva = flujoSinIva.map((value, index) => value + toNumber(ivaCreditoSource[index]) - toNumber(ivaDebitoSource[index]));
       const cumulativeSin = cumulativeSeries(flujoSinIva);
       const cumulativeCon = cumulativeSeries(flujoConIva);
       const totalIncome = total(incomeSource);
@@ -2762,6 +2807,7 @@ table:not(.gantt-table) .tfoot-dark td,
         ['Gastos financieros', totalFinancial, '#f59e0b'],
         ['Subtotal egresos neto', totalSubtotal, '#0f766e'],
         ['IVA crédito', total(ivaCreditoSource), '#2563eb'],
+        ['IVA débito', total(ivaDebitoSource), '#7c3aed'],
       ].map(([label, value, color]) => {
         const pct = totalIncome ? toNumber(value) / totalIncome * 100 : 0;
         return `<div class="dist-row"><div class="dist-label">${escapeHtml(label)}</div><div class="dist-bar-wrap"><div class="dist-bar" style="width:${Math.max(2, Math.min(100, Math.abs(pct)))}%;background:${color}"></div></div><div class="dist-pct">${fmtPct(pct)}</div></div>`;
@@ -2910,6 +2956,15 @@ table:not(.gantt-table) .tfoot-dark td,
         values: ivaCreditoSource,
         mode: 'signed',
         sign: '+',
+        iva: true,
+      });
+      pushRow({
+        key: 'iva_debito',
+        label: 'IVA Débito',
+        origin: 'Ingresos brutos escriturados × Factor IVA Débito (IVA / IB)',
+        values: ivaDebitoSource,
+        mode: 'cost',
+        sign: '-',
         iva: true,
       });
 

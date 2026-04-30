@@ -405,21 +405,105 @@ function getMonthlyIvaCredito() {
   return monthly;
 }
 
-function getMonthlyIvaDebito(monthlyIncome) {
-  // IVA débito sobre ventas escrituradas (al momento de la escrituración)
-  const monthCount = getCostMonthCount();
-  const monthly = createMonthlyArray(monthCount, 0);
+function getIvaDebitoTerrainCost() {
+  const terrainRows = (state.costos.find((category) => category.nombre === 'TERRENO')?.partidas || [])
+    .filter((partida) => partida.es_terreno);
+  const rowsTotal = terrainRows.reduce((sum, partida) => sum + toNumber(partida.total_neto), 0);
+  if (rowsTotal > 0) return rowsTotal;
+  return typeof getTerrainBaseCost === 'function' ? getTerrainBaseCost() : toNumber(state.proyecto?.terreno_precio_total);
+}
+
+function getIvaDebitoProductType(uso) {
+  return /local|comercial|oficina/i.test(String(uso || '')) ? 'Local' : 'Departamento';
+}
+
+function getIvaDebitoAnalysis() {
   const totals = getTotalSalesMetrics();
-  const settings = getGlobalPaymentSettings();
-  const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct));
-  const escrituraPct = Math.max(0, 100 - piePct);
-  const escrituraUnidad = totals.precioPromedio * escrituraPct / 100;
-  const { escrituras } = getPromesasEscrituracionUnidades(monthCount);
-  Array.from({ length: monthCount }, (_, m) => {
-    const unidades = escrituras[m];
-    monthly[m] = unidades * escrituraUnidad * 0.19;
+  const addons = totals.addons || getAddonSalesMetrics();
+  const grossByProduct = {
+    Departamento: 0,
+    Bodega: toNumber(addons.bodegas?.total),
+    Local: 0,
+    Estacionamiento: toNumber(addons.estacionamientos?.total),
+  };
+
+  state.ventasConfig.forEach((row) => {
+    const productType = getIvaDebitoProductType(row.uso);
+    grossByProduct[productType] += toNumber(getUsoSaleMetrics(row.uso).total);
   });
-  return monthly;
+
+  const ib = Object.values(grossByProduct).reduce((sum, value) => sum + toNumber(value), 0);
+  const terreno = getIvaDebitoTerrainCost();
+  const ingresoNeto = ib > 0 ? (ib + (0.19 * terreno)) / 1.19 : 0;
+  const iva = ib > 0 ? ib - ingresoNeto : 0;
+  const factor = ib ? iva / ib : 0;
+  const totalUnits = Math.max(0, toNumber(totals.totalUnidades));
+  const productRows = ['Departamento', 'Bodega', 'Local', 'Estacionamiento'].map((label) => {
+    const gross = toNumber(grossByProduct[label]);
+    const participation = ib ? gross / ib : 0;
+    const productIva = iva * participation;
+    return {
+      label,
+      gross,
+      participation,
+      iva: productIva,
+      neto: gross - productIva,
+    };
+  });
+
+  return {
+    ib,
+    terreno,
+    ingresoNeto,
+    iva,
+    factor,
+    productRows,
+    grossAverageUnit: totalUnits ? ib / totalUnits : 0,
+    totalUnits,
+  };
+}
+
+function getMonthlyGrossEscrituras(monthCount = getCostMonthCount()) {
+  const analysis = getIvaDebitoAnalysis();
+  const { escrituras } = getPromesasEscrituracionUnidades(monthCount);
+  return createMonthlyArray(monthCount, 0).map((_, index) => (
+    Math.max(0, toNumber(escrituras[index])) * analysis.grossAverageUnit
+  ));
+}
+
+function getMonthlyIvaDebito(monthlyIncome) {
+  const monthCount = getCostMonthCount();
+  const analysis = getIvaDebitoAnalysis();
+  return getMonthlyGrossEscrituras(monthCount).map((gross) => toNumber(gross) * analysis.factor);
+}
+
+function renderIvaDebitoPanel() {
+  if (!$('iva-debito-productos-tbody')) return;
+  const analysis = getIvaDebitoAnalysis();
+  setText('iva-debito-ib', fmtUf(analysis.ib));
+  setText('iva-debito-terreno', fmtUf(analysis.terreno));
+  setText('iva-debito-in', fmtUf(analysis.ingresoNeto));
+  setText('iva-debito-iva', fmtUf(analysis.iva));
+  setText('iva-debito-factor', fmtNumber(analysis.factor, 4));
+
+  setHtml('iva-debito-productos-tbody', analysis.productRows.map((row) => `
+    <tr>
+      <td>${escapeHtml(row.label)}</td>
+      <td>${fmtUf(row.gross)}</td>
+      <td>${fmtPct(row.participation * 100)}</td>
+      <td>${fmtUf(row.iva)}</td>
+      <td>${fmtUf(row.neto)}</td>
+    </tr>
+  `).join(''));
+  setHtml('iva-debito-productos-tfoot', `
+    <tr>
+      <td>Total</td>
+      <td>${fmtUf(analysis.ib)}</td>
+      <td>${fmtPct(analysis.ib ? 100 : 0)}</td>
+      <td>${fmtUf(analysis.iva)}</td>
+      <td>${fmtUf(analysis.ingresoNeto)}</td>
+    </tr>
+  `);
 }
 
 function getMonthlyPPM(monthlyIncome) {
@@ -4292,6 +4376,7 @@ function renderProjectCashflow() {
   // IVA
   const ivaCredito = getMonthlyIvaCredito();
   const ivaDebito = getMonthlyIvaDebito(income);
+  renderIvaDebitoPanel();
 
   // Flujo antes de impuestos = operativo + iva_credito - iva_debito
   const flujoAntesImpuestos = flujoOperativoBruto.map((v, i) => v + toNumber(ivaCredito[i]) - toNumber(ivaDebito[i]));
@@ -4352,7 +4437,7 @@ function renderProjectCashflow() {
     { label: 'Gastos financieros', values: financialCosts.map((v) => -v), sign: '-', formula: 'Intereses + Timbres + Alzamiento', refs: [{ label: 'Total GF', value: fmtUf(totalFinancial) }] },
     { label: 'Flujo operativo bruto', values: flujoOperativoBruto, sign: '=', bold: true, formula: 'Ingresos - Costos - Gastos financieros', refs: [{ label: 'Total', value: fmtUf(totalFlujoBruto) }] },
     { label: 'IVA crédito', values: ivaCredito, sign: '+', formula: 'SUMA(Egresos con check IVA × 19%)', refs: [{ label: 'Total IVA crédito', value: fmtUf(ivaCredito.reduce((a, b) => a + b, 0)) }] },
-    { label: 'IVA débito', values: ivaDebito.map((v) => -v), sign: '-', formula: 'Ventas escrituradas × 19%', refs: [{ label: 'Total IVA débito', value: fmtUf(ivaDebito.reduce((a, b) => a + b, 0)) }] },
+    { label: 'IVA débito', values: ivaDebito.map((v) => -v), sign: '-', formula: 'Ingresos brutos escriturados × Factor IVA débito (IVA / IB)', refs: [{ label: 'Total IVA débito', value: fmtUf(ivaDebito.reduce((a, b) => a + b, 0)) }, { label: 'Factor IVA débito', value: fmtNumber(getIvaDebitoAnalysis().factor, 4) }] },
     { label: 'Flujo antes de impuestos', values: flujoAntesImpuestos, sign: '=', bold: true, formula: 'Flujo operativo bruto + IVA crédito - IVA débito', refs: [{ label: 'Total', value: fmtUf(totalFlujoAntes) }] },
     { label: 'PPM', values: ppm, sign: '-', formula: '-1% × Ingresos escrituración / (1 + factor_IVA)', refs: [{ label: 'Total PPM', value: fmtUf(ppm.reduce((a, b) => a + b, 0)) }] },
     { label: 'Impuesto Renta', values: impRenta, sign: '-', formula: `-${getGlobalFinancialParams().pct_impuesto_renta}% × (Escrituras año × Valor prom. × Margen). Pago abril año siguiente`, refs: [{ label: 'Total Renta', value: fmtUf(impRenta.reduce((a, b) => a + b, 0)) }] },
