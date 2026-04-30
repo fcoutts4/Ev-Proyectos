@@ -143,6 +143,8 @@ async function initDb() {
         sup_bajo_tierra DOUBLE PRECISION DEFAULT 0,
         pct_bajo_tierra_sobre_cota_0 DOUBLE PRECISION DEFAULT 0,
         costo_uf_m2_bajo_tierra DOUBLE PRECISION DEFAULT 0,
+        gastos_generales_mensual DOUBLE PRECISION DEFAULT 0,
+        utilidad_pct DOUBLE PRECISION DEFAULT 0,
         plazo_meses INTEGER DEFAULT 0,
         anticipo_pct DOUBLE PRECISION DEFAULT 0,
         retencion_pct DOUBLE PRECISION DEFAULT 0,
@@ -242,6 +244,8 @@ async function initDb() {
     await query("ALTER TABLE ventas_config ADD COLUMN IF NOT EXISTS forma_pago_promesa TEXT DEFAULT 'unico'");
     await query('ALTER TABLE ventas_cronograma ADD COLUMN IF NOT EXISTS velocidad DOUBLE PRECISION DEFAULT 0');
     await query('ALTER TABLE construccion ADD COLUMN IF NOT EXISTS pct_bajo_tierra_sobre_cota_0 DOUBLE PRECISION DEFAULT 0');
+    await query('ALTER TABLE construccion ADD COLUMN IF NOT EXISTS gastos_generales_mensual DOUBLE PRECISION DEFAULT 0');
+    await query('ALTER TABLE construccion ADD COLUMN IF NOT EXISTS utilidad_pct DOUBLE PRECISION DEFAULT 0');
     await query('ALTER TABLE construccion ADD COLUMN IF NOT EXISTS pct_inicio_construccion DOUBLE PRECISION DEFAULT 25');
     await query('ALTER TABLE financiamiento ADD COLUMN IF NOT EXISTS pct_alzamiento DOUBLE PRECISION DEFAULT 90');
     await query('ALTER TABLE costos_partidas ADD COLUMN IF NOT EXISTS plan_pago TEXT');
@@ -607,6 +611,8 @@ const construccion = {
       sup_bajo_tierra: data.sup_bajo_tierra || 0,
       pct_bajo_tierra_sobre_cota_0: data.pct_bajo_tierra_sobre_cota_0 || 0,
       costo_uf_m2_bajo_tierra: data.costo_uf_m2_bajo_tierra || 0,
+      gastos_generales_mensual: data.gastos_generales_mensual || 0,
+      utilidad_pct: data.utilidad_pct || 0,
       plazo_meses: data.plazo_meses || 0,
       anticipo_pct: data.anticipo_pct || 0,
       retencion_pct: data.retencion_pct || 0,
