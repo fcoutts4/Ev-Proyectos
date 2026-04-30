@@ -479,37 +479,7 @@ function getMonthlyIvaDebito(monthlyIncome) {
 }
 
 function renderIvaDebitoPanel() {
-  if (!$('iva-debito-productos-tbody')) return;
-  const analysis = getIvaDebitoAnalysis();
-  setText('iva-debito-ib', fmtUf(analysis.ib));
-  setText('iva-debito-terreno', fmtUf(analysis.terreno));
-  setText('iva-debito-in', fmtUf(analysis.ingresoNeto));
-  setText('iva-debito-iva', fmtUf(analysis.iva));
-  setText('iva-debito-factor', fmtNumber(analysis.factor, 4));
-  setText('iva-debito-calc-ib', fmtUf(analysis.ib));
-  setText('iva-debito-calc-terreno', fmtUf(analysis.terreno));
-  setText('iva-debito-calc-in', fmtUf(analysis.ingresoNeto));
-  setText('iva-debito-calc-iva', fmtUf(analysis.iva));
-  setText('iva-debito-calc-factor', fmtNumber(analysis.factor, 4));
-
-  setHtml('iva-debito-productos-tbody', analysis.productRows.map((row) => `
-    <tr>
-      <td>${escapeHtml(row.label)}</td>
-      <td>${fmtUf(row.gross)}</td>
-      <td>${fmtPct(row.participation * 100)}</td>
-      <td>${fmtUf(row.iva)}</td>
-      <td>${fmtUf(row.neto)}</td>
-    </tr>
-  `).join(''));
-  setHtml('iva-debito-productos-tfoot', `
-    <tr>
-      <td>Total</td>
-      <td>${fmtUf(analysis.ib)}</td>
-      <td>${fmtPct(analysis.ib ? 100 : 0)}</td>
-      <td>${fmtUf(analysis.iva)}</td>
-      <td>${fmtUf(analysis.ingresoNeto)}</td>
-    </tr>
-  `);
+  // El detalle de IVA débito se renderiza inline en la fila del flujo de caja.
 }
 
 function getMonthlyPPM(monthlyIncome) {
