@@ -2662,6 +2662,17 @@ table:not(.gantt-table) .tfoot-dark td,
             values,
             origin: 'Pago del terreno en fecha de compra',
           }];
+          (category.partidas || [])
+            .filter((partida) => !(typeof isLinkedTerrainBasePartida === 'function' ? isLinkedTerrainBasePartida(partida) : partida?.source === 'terreno'))
+            .forEach((partida, partidaIndex) => {
+              const partidaValues = normalizeMonthlySeries(getMonthlyDistributionForPartida(partida, monthCount), monthCount);
+              partidas.push({
+                key: `${categoryKey}_manual_${partidaIndex}`,
+                label: partida.nombre || `Subpartida ${partidaIndex + 1}`,
+                values: partidaValues,
+                origin: partida.tiene_iva ? 'Neto sin IVA · IVA activo' : 'Neto sin IVA',
+              });
+            });
           return {
             key: categoryKey,
             label: typeof getCostCategoryDisplayName === 'function' ? getCostCategoryDisplayName(category.nombre) : (category.nombre || 'TERRENO'),
@@ -2677,6 +2688,17 @@ table:not(.gantt-table) .tfoot-dark td,
             values,
             origin: 'EP + anticipo de construcción',
           }];
+          (category.partidas || [])
+            .filter((partida) => !(typeof isLinkedConstructionBasePartida === 'function' ? isLinkedConstructionBasePartida(partida) : partida?.source === 'construccion'))
+            .forEach((partida, partidaIndex) => {
+              const partidaValues = normalizeMonthlySeries(getMonthlyDistributionForPartida(partida, monthCount), monthCount);
+              partidas.push({
+                key: `${categoryKey}_manual_${partidaIndex}`,
+                label: partida.nombre || `Subpartida ${partidaIndex + 1}`,
+                values: partidaValues,
+                origin: partida.tiene_iva ? 'Neto sin IVA · IVA activo' : 'Neto sin IVA',
+              });
+            });
           return {
             key: categoryKey,
             label: typeof getCostCategoryDisplayName === 'function' ? getCostCategoryDisplayName(category.nombre) : (category.nombre || 'CONSTRUCCION'),

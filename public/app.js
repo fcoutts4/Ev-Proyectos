@@ -3080,6 +3080,24 @@ function isLinkedConstructionBasePartida(partida = {}) {
     || key === 'ANTICIPO MAS ESTADOS DE PAGO';
 }
 
+function isEmptyNewCostPartida(partida = {}) {
+  if (partida.isNewDraft) return false;
+  if (getCostNameMatchKey(partida.nombre) !== 'NUEVA SUBPARTIDA') return false;
+  const total = toNumber(partida.total_neto)
+    || toNumber(partida.formula_valor)
+    || toNumber(partida.cost_config?.amount)
+    || toNumber(partida.cost_config?.amount_value)
+    || toNumber(partida.cost_config?.totalValue);
+  const hasMonthly = Array.isArray(partida.distribucion_mensual)
+    && partida.distribucion_mensual.some((value) => Math.abs(toNumber(value)) > 0.0001);
+  const hasFormula = String(partida.formula_referencia || partida.cost_config?.formula || '').trim();
+  const plan = parseInteractivePaymentPlan(partida.plan_pago);
+  const hasPlan = (plan.tramos.length + plan.hitos.length + plan.periodicos.length) > 0;
+  const hasConfigPayments = Array.isArray(partida.cost_config?.payments)
+    && partida.cost_config.payments.some((payment) => Math.abs(toNumber(payment.amount)) > 0.0001);
+  return !total && !hasMonthly && !hasFormula && !hasPlan && !hasConfigPayments;
+}
+
 function isCostSourceCategory(name) {
   const key = getCostCategoryKey(name);
   return key === 'GASTOS FINANCIEROS';
@@ -3240,6 +3258,9 @@ function buildTerrainCostRows(manualRows = []) {
 
   return [
     linkedBase,
+    ...manualRows
+      .filter((partida) => !isLinkedTerrainBasePartida(partida) && !isEmptyNewCostPartida(partida))
+      .map((partida) => ({ ...partida, auto_origen: false })),
   ];
 }
 
@@ -3278,6 +3299,9 @@ function buildConstructionCostRows(manualRows = []) {
 
   return [
     linkedBase,
+    ...manualRows
+      .filter((partida) => !isLinkedConstructionBasePartida(partida) && !isEmptyNewCostPartida(partida))
+      .map((partida) => ({ ...partida, auto_origen: false })),
   ];
 }
 
@@ -4191,7 +4215,7 @@ function ensureCostosState() {
 
   state.costos = COST_CATEGORY_ORDER.map((name) => {
     const category = byCategory.get(name);
-    const manualRows = (category.partidas || []).filter((row) => row.nombre && !(
+    const manualRows = (category.partidas || []).filter((row) => row.nombre && !isEmptyNewCostPartida(row) && !(
       row.auto_origen && !row.isLinked
     ));
     let partidas = manualRows;
@@ -4493,7 +4517,7 @@ function renderCostPlanilla() {
       : true;
     const hasSubpartidas = (categoria.partidas || []).length > 0;
     const categoryReadOnly = categoria.nombre === 'GASTOS FINANCIEROS';
-    const canAddSubpartida = !categoryReadOnly && categoria.nombre !== 'TERRENO';
+    const canAddSubpartida = !categoryReadOnly;
     const categoryDisplayName = getCostCategoryDisplayName(categoria.nombre);
     const categoryRows = [];
     const categoryMonthlyTotals = createMonthlyArray(monthCount, 0);
@@ -7308,8 +7332,14 @@ function readCostosEditor() {
     }
     target.total_neto = evaluateCostPartida(target, buildCostContext());
     target.distribucion_mensual = getMonthlyDistributionForPartida(target, getCostMonthCount());
+    if (!isEmptyNewCostPartida({ ...target, isNewDraft: false })) {
+      delete target.isNewDraft;
+    }
   });
 
+  categories.forEach((category) => {
+    category.partidas = (category.partidas || []).filter((partida) => !isEmptyNewCostPartida(partida));
+  });
   state.costos = categories;
   return categories;
 }
@@ -7330,6 +7360,7 @@ function agregarPartidaLinea(categoryName) {
     id: newPartidaId,
     nombre: 'Nueva subpartida',
     isDefault: false,
+    isNewDraft: true,
     formula_tipo: 'expr',
     formula_valor: 0,
     formula_referencia: '',
