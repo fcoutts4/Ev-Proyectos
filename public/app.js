@@ -3082,20 +3082,28 @@ function isLinkedConstructionBasePartida(partida = {}) {
 
 function isEmptyNewCostPartida(partida = {}) {
   if (partida.isNewDraft) return false;
-  if (getCostNameMatchKey(partida.nombre) !== 'NUEVA SUBPARTIDA') return false;
-  const total = toNumber(partida.total_neto)
-    || toNumber(partida.formula_valor)
-    || toNumber(partida.cost_config?.amount)
-    || toNumber(partida.cost_config?.amount_value)
-    || toNumber(partida.cost_config?.totalValue);
-  const hasMonthly = Array.isArray(partida.distribucion_mensual)
-    && partida.distribucion_mensual.some((value) => Math.abs(toNumber(value)) > 0.0001);
-  const hasFormula = String(partida.formula_referencia || partida.cost_config?.formula || '').trim();
-  const plan = parseInteractivePaymentPlan(partida.plan_pago);
-  const hasPlan = (plan.tramos.length + plan.hitos.length + plan.periodicos.length) > 0;
-  const hasConfigPayments = Array.isArray(partida.cost_config?.payments)
-    && partida.cost_config.payments.some((payment) => Math.abs(toNumber(payment.amount)) > 0.0001);
-  return !total && !hasMonthly && !hasFormula && !hasPlan && !hasConfigPayments;
+  if (getCostNameMatchKey(partida.nombre) === 'NUEVA SUBPARTIDA') return true;
+  return false;
+}
+
+function isLegacySourceCategoryPartida(categoryName, partida = {}) {
+  const categoryKey = getCostCategoryKey(categoryName);
+  const nameKey = getCostNameMatchKey(partida.nombre);
+  if (categoryKey === 'CONSTRUCCION') {
+    return nameKey === 'CONSTRUCCION LINEA APROBADA'
+      || nameKey === 'CONSTRUCCION INTERES'
+      || nameKey === 'CONSTRUCCION IMPUESTO DE TIMBRE'
+      || nameKey === 'CONSTRUCCION ALZAMIENTO'
+      || nameKey === 'CONSTRUCCION PAGO DE LINEA';
+  }
+  if (categoryKey === 'TERRENO') {
+    return nameKey === 'TERRENO LINEA APROBADA'
+      || nameKey === 'TERRENO INTERES'
+      || nameKey === 'TERRENO PAGO DE LINEA'
+      || nameKey === 'CONTRIBUCIONES TERRENOS'
+      || nameKey === 'CONTRIBUCIONES TERRENO';
+  }
+  return false;
 }
 
 function isCostSourceCategory(name) {
@@ -3259,7 +3267,9 @@ function buildTerrainCostRows(manualRows = []) {
   return [
     linkedBase,
     ...manualRows
-      .filter((partida) => !isLinkedTerrainBasePartida(partida) && !isEmptyNewCostPartida(partida))
+      .filter((partida) => !isLinkedTerrainBasePartida(partida)
+        && !isEmptyNewCostPartida(partida)
+        && !isLegacySourceCategoryPartida('TERRENO', partida))
       .map((partida) => ({ ...partida, auto_origen: false })),
   ];
 }
@@ -3300,7 +3310,9 @@ function buildConstructionCostRows(manualRows = []) {
   return [
     linkedBase,
     ...manualRows
-      .filter((partida) => !isLinkedConstructionBasePartida(partida) && !isEmptyNewCostPartida(partida))
+      .filter((partida) => !isLinkedConstructionBasePartida(partida)
+        && !isEmptyNewCostPartida(partida)
+        && !isLegacySourceCategoryPartida('CONSTRUCCION', partida))
       .map((partida) => ({ ...partida, auto_origen: false })),
   ];
 }
@@ -4215,7 +4227,10 @@ function ensureCostosState() {
 
   state.costos = COST_CATEGORY_ORDER.map((name) => {
     const category = byCategory.get(name);
-    const manualRows = (category.partidas || []).filter((row) => row.nombre && !isEmptyNewCostPartida(row) && !(
+    const manualRows = (category.partidas || []).filter((row) => row.nombre
+      && !isEmptyNewCostPartida(row)
+      && !isLegacySourceCategoryPartida(name, row)
+      && !(
       row.auto_origen && !row.isLinked
     ));
     let partidas = manualRows;
