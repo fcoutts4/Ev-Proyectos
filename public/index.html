@@ -2605,10 +2605,61 @@ table:not(.gantt-table) .tfoot-dark td,
     return !!defaultCollapsed;
   }
 
+  function getTerrainPaymentFlowForCashflow(monthCount) {
+    const values = createMonthlyArray(monthCount, 0);
+    if (!monthCount) return values;
+    const maxMonth = Math.max(0, monthCount - 1);
+    const terrainMilestone = typeof getTerrainMilestone === 'function' ? getTerrainMilestone() : null;
+    const purchaseMonth = Math.max(0, Math.min(maxMonth, toNumber(terrainMilestone?.inicio || 0)));
+    values[purchaseMonth] = typeof getTerrainBaseCost === 'function'
+      ? getTerrainBaseCost()
+      : toNumber(state.proyecto?.terreno_precio_total);
+    return values;
+  }
+
+  function getBuildingPaymentFlowForCashflow(monthCount) {
+    const data = typeof computeConstructionEP === 'function' ? computeConstructionEP() : null;
+    const ep = normalizeMonthlySeries(data?.ep || [], monthCount);
+    const anticipo = normalizeMonthlySeries(data?.anticipo || [], monthCount);
+    return ep.map((value, index) => toNumber(value) + toNumber(anticipo[index]));
+  }
+
   function getCostFlowStructure(monthCount) {
     const categories = (typeof ensureCostosState === 'function' ? ensureCostosState() : [])
       .filter((category) => category.nombre !== 'GASTOS FINANCIEROS')
       .map((category, categoryIndex) => {
+        const categoryName = String(category.nombre || '').trim().toUpperCase();
+        const categoryKey = `flow_gastos_cat_${normToken(category.nombre) || categoryIndex}`;
+        if (categoryName === 'TERRENO') {
+          const values = getTerrainPaymentFlowForCashflow(monthCount);
+          const partidas = [{
+            key: `${categoryKey}_pagos_terreno`,
+            label: 'Cuotas/Pagos de Terreno',
+            values,
+            origin: 'Pago del terreno en fecha de compra',
+          }];
+          return {
+            key: categoryKey,
+            label: category.nombre || 'TERRENO',
+            values,
+            partidas,
+          };
+        }
+        if (categoryName === 'CONSTRUCCION') {
+          const values = getBuildingPaymentFlowForCashflow(monthCount);
+          const partidas = [{
+            key: `${categoryKey}_edificacion`,
+            label: 'Edificación',
+            values,
+            origin: 'EP + anticipo de construcción',
+          }];
+          return {
+            key: categoryKey,
+            label: category.nombre || 'CONSTRUCCION',
+            values,
+            partidas,
+          };
+        }
         const partidas = (category.partidas || []).map((partida, partidaIndex) => {
           const values = normalizeMonthlySeries(getMonthlyDistributionForPartida(partida, monthCount), monthCount);
           return {
@@ -2619,7 +2670,7 @@ table:not(.gantt-table) .tfoot-dark td,
           };
         });
         return {
-          key: `flow_gastos_cat_${normToken(category.nombre) || categoryIndex}`,
+          key: categoryKey,
           label: category.nombre || `Categoria ${categoryIndex + 1}`,
           values: sumMonthlySeries(partidas.map((partida) => partida.values), monthCount),
           partidas,
