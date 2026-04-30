@@ -1080,6 +1080,38 @@ window.addEventListener('beforeunload', (event) => {
   event.returnValue = '';
 });
 
+async function saveNow() {
+  const btn = document.getElementById('btn-save-now');
+  if (btn?.dataset.saving === '1') return;
+  if (btn) {
+    btn.dataset.saving = '1';
+    btn.disabled = true;
+    btn.textContent = 'Guardando...';
+  }
+  try {
+    if (typeof prepareStateForSave === 'function') {
+      try { prepareStateForSave({ includeCostos: true }); } catch (_) { /* readers may not be ready */ }
+    }
+    const allScopes = Object.keys(AUTOSAVE_SCOPE_LABELS);
+    allScopes.forEach((scope) => {
+      state.autosave.queued[scope] = true;
+      state.autosave.dirty[scope] = true;
+    });
+    await flushPendingAutosaves();
+    setSyncStatus('ok', 'GUARDADO', `Guardado manual ${new Date().toLocaleTimeString()}`);
+  } catch (error) {
+    console.error('saveNow', error);
+    setSyncStatus('error', 'SIN CONEXION', error.message || 'Error al guardar');
+  } finally {
+    if (btn) {
+      btn.dataset.saving = '';
+      btn.disabled = false;
+      btn.textContent = 'Guardar ahora';
+    }
+  }
+}
+window.saveNow = saveNow;
+
 async function api(path, options = {}) {
   const headers = {
     'Content-Type': 'application/json',
@@ -4765,7 +4797,7 @@ function renderCostPlanilla() {
 
         if (sectionLabel && sectionLabel !== previousLabel) {
           categoryRows.push(`
-            <tr class="subcat-row">
+            <tr class="subcat-row" data-cost-cat-row="${escapeHtml(categoria.nombre)}"${isCollapsed ? ' style="display:none"' : ''}>
               <td colspan="${5 + monthCount}">${escapeHtml(sectionLabel)}</td>
             </tr>
           `);
@@ -4792,7 +4824,7 @@ function renderCostPlanilla() {
         && Number.parseInt(costosUi.activeIvaIndex, 10) === index;
 
       categoryRows.push(`
-        <tr class="partida-row is-subpartida" data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" data-cost-id="${escapeHtml(partida.id || '')}" ${rowReadOnly ? 'data-auto="1" data-readonly="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
+        <tr class="partida-row is-subpartida" data-cost-cat-row="${escapeHtml(categoria.nombre)}"${isCollapsed ? ' style="display:none"' : ''} data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" data-cost-id="${escapeHtml(partida.id || '')}" ${rowReadOnly ? 'data-auto="1" data-readonly="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
           <td style="text-align:center">${rowReadOnly ? '' : `<span class="row-tools">${isProtectedDefault ? '<button class="btn-outline btn-delete-inline" type="button" title="Subpartida base protegida" disabled>&times;</button>' : `<button class="btn-outline btn-delete-inline" type="button" title="Eliminar subpartida" onclick="removeCostPartida('${escapeHtml(categoria.nombre)}', ${index})">&times;</button>`}<span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span></span>`}</td>
           <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${rowReadOnly ? 'disabled' : ''}/></td>
           <td class="cost-config-cell">${planEditable ? `<span class="cost-config-pill ${estadoCosto.className}" onclick="openCostConfigModal('${escapeHtml(categoria.nombre)}', ${index})" title="Configurar costo">${escapeHtml(estadoCosto.label)}</span>` : '<span class="badge badge-yellow">AUTO</span>'}</td>
@@ -4825,7 +4857,7 @@ function renderCostPlanilla() {
         <td class="cat-total-cell"><strong>${fmtTableAmount(categoryTotalIva, { kind: 'cost' })}</strong></td>
         ${categoryMonthlyTotals.map((value) => `<td class="cat-total-cell"><strong>${fmtTableAmount(value, { kind: 'cost' })}</strong></td>`).join('')}
       </tr>
-      ${isCollapsed ? '' : categoryRows.join('')}
+      ${categoryRows.join('')}
     `;
   }).join(''));
 
@@ -5323,8 +5355,23 @@ function toggleCostCategoryCollapse(categoryName) {
   const currentValue = Object.prototype.hasOwnProperty.call(collapsedState, categoryName)
     ? !!collapsedState[categoryName]
     : true;
-  state.costosUi.collapsed[categoryName] = !currentValue;
-  renderCostosModule();
+  const newCollapsed = !currentValue;
+  state.costosUi.collapsed[categoryName] = newCollapsed;
+
+  const tbody = document.getElementById('planilla-tbody');
+  const safeName = (window.CSS && CSS.escape) ? CSS.escape(categoryName) : categoryName.replace(/"/g, '\\"');
+  const catRow = tbody?.querySelector(`tr.cat-row[data-cost-category="${safeName}"]`);
+  if (!tbody || !catRow) {
+    renderCostosModule();
+    return;
+  }
+
+  catRow.classList.toggle('is-expanded', !newCollapsed);
+  const arrow = catRow.querySelector('.btn-collapse-cost');
+  if (arrow && !arrow.disabled) arrow.innerHTML = newCollapsed ? '&#9656;' : '&#9662;';
+
+  const childRows = tbody.querySelectorAll(`tr[data-cost-cat-row="${safeName}"]`);
+  childRows.forEach((row) => { row.style.display = newCollapsed ? 'none' : ''; });
 }
 
 function setCostFlowMode(mode) {
