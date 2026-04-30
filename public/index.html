@@ -656,7 +656,17 @@ tbody tr:hover{background:#f3f7fb!important}
 .flow-value-cost,.amount-cost,.flow-value-negative,.amount-negative{color:#334155!important}
 .iva-debito-panel{margin-bottom:16px;overflow:hidden}
 .iva-debito-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:12px;flex-wrap:wrap}
-.iva-debito-formulas{font-size:10px;color:#64748b;line-height:1.5;text-align:right}
+.iva-debito-disclosure{min-width:260px;max-width:420px;margin-left:auto;border:1px solid #dbeafe;background:#eff6ff;border-radius:9px;color:#1e3a8a}
+.iva-debito-disclosure summary{list-style:none;cursor:pointer;padding:8px 10px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.iva-debito-disclosure summary::-webkit-details-marker{display:none}
+.iva-debito-disclosure summary::after{content:'+';width:18px;height:18px;border-radius:999px;background:#dbeafe;color:#1d4ed8;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;line-height:1;flex:0 0 auto}
+.iva-debito-disclosure[open] summary::after{content:'-'}
+.iva-debito-calc{border-top:1px solid #bfdbfe;padding:9px 10px 10px;font-size:11px;line-height:1.45;color:#334155;background:#fff;border-radius:0 0 9px 9px}
+.iva-debito-calc .formula-line{font-family:'Courier New',monospace;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:6px 7px;margin-bottom:7px;color:#0f172a}
+.iva-debito-calc-grid{display:grid;grid-template-columns:1fr auto;gap:5px 12px;align-items:center}
+.iva-debito-calc-grid span:nth-child(odd){color:#64748b}
+.iva-debito-calc-grid strong{text-align:right;color:#0f172a;white-space:nowrap}
+.iva-debito-calc-note{margin-top:8px;color:#64748b;font-size:10px}
 .iva-debito-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin-bottom:12px}
 .iva-debito-metric{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:9px 10px}
 .iva-debito-metric span{display:block;font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
@@ -1833,11 +1843,22 @@ table:not(.gantt-table) .tfoot-dark td,
         <div class="sec-title" style="margin-bottom:4px">IVA DÉBITO VENTAS</div>
         <div style="font-size:11px;color:#64748b">Panel auxiliar para validar el factor aplicado sobre ingresos brutos escriturados.</div>
       </div>
-      <div class="iva-debito-formulas">
-        <div>IN = (IB + 0,19 × T) / 1,19</div>
-        <div>IVA = IB - IN</div>
-        <div>Factor = IVA / IB</div>
-      </div>
+      <details class="iva-debito-disclosure">
+        <summary>Ver cálculo del factor</summary>
+        <div class="iva-debito-calc">
+          <div class="formula-line">IN = (IB + 0,19 × T) / 1,19</div>
+          <div class="formula-line">IVA = IB - IN</div>
+          <div class="formula-line">Factor IVA Débito = IVA / IB</div>
+          <div class="iva-debito-calc-grid">
+            <span>IB ingresos brutos</span><strong id="iva-debito-calc-ib">0 UF</strong>
+            <span>T terreno</span><strong id="iva-debito-calc-terreno">0 UF</strong>
+            <span>IN ingresos netos</span><strong id="iva-debito-calc-in">0 UF</strong>
+            <span>IVA débito</span><strong id="iva-debito-calc-iva">0 UF</strong>
+            <span>Factor aplicado</span><strong id="iva-debito-calc-factor">0,0000</strong>
+          </div>
+          <div class="iva-debito-calc-note">El factor se aplica sobre los ingresos brutos escriturados de cada mes.</div>
+        </div>
+      </details>
     </div>
     <div class="iva-debito-metrics">
       <div class="iva-debito-metric"><span>IB Ingresos brutos</span><strong id="iva-debito-ib">0 UF</strong></div>

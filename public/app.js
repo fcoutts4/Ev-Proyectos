@@ -486,6 +486,11 @@ function renderIvaDebitoPanel() {
   setText('iva-debito-in', fmtUf(analysis.ingresoNeto));
   setText('iva-debito-iva', fmtUf(analysis.iva));
   setText('iva-debito-factor', fmtNumber(analysis.factor, 4));
+  setText('iva-debito-calc-ib', fmtUf(analysis.ib));
+  setText('iva-debito-calc-terreno', fmtUf(analysis.terreno));
+  setText('iva-debito-calc-in', fmtUf(analysis.ingresoNeto));
+  setText('iva-debito-calc-iva', fmtUf(analysis.iva));
+  setText('iva-debito-calc-factor', fmtNumber(analysis.factor, 4));
 
   setHtml('iva-debito-productos-tbody', analysis.productRows.map((row) => `
     <tr>
