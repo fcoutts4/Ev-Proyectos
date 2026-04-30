@@ -2464,11 +2464,11 @@ function computeConstructionEP() {
   // Anticipo: desembolso completo un mes antes del inicio de construcción
   anticipo[anticipoMonth] += anticipoTotal;
 
-  // Durante la obra: EDPP neto, descuento anticipo mensual neto, retencion mensual neta
+  // Durante la obra: EDPP neto del saldo de contrato despues de anticipo.
   for (let i = 0; i < meses; i += 1) {
     const m = Math.min(monthCount - 1, startMonth + i);
     ep[m] += toNumber(dist.monthlyCosts[i]); // EDPP neto del mes
-    anticipo[m] -= toNumber(dist.monthlyAnticipoRecovery[i]); // descuento del anticipo
+    anticipo[m] -= toNumber(dist.monthlyAnticipoRecovery[i]); // compatibilidad: normalmente 0, el EP ya descuenta anticipo
     retenciones[m] -= toNumber(dist.monthlyRetention[i]); // retención del mes
   }
 
@@ -2515,8 +2515,8 @@ function renderConstructionEP() {
 
   const total = (arr) => arr.reduce((a, b) => a + toNumber(b), 0);
   const rows = [
-    { label: 'EP (EDPP neto)', values: data.ep, formula: 'EDPP_neto(t) desde curva S', color: '#fff' },
-    { label: 'Anticipo neto', values: data.anticipo, formula: `+Anticipo neto total un mes antes de construccion y recuperacion neta durante la obra  (Total = ${fmtUf(data.anticipoTotal)})`, color: '#fbbf24' },
+    { label: 'EP (EDPP neto)', values: data.ep, formula: 'EDPP_neto(t) = saldo neto contrato despues de anticipo distribuido por curva S', color: '#fff' },
+    { label: 'Anticipo neto', values: data.anticipo, formula: `+Anticipo neto total un mes antes de construccion; los EDPP reparten el saldo neto del contrato  (Total = ${fmtUf(data.anticipoTotal)})`, color: '#fbbf24' },
     { label: 'Retenciones netas', values: data.retenciones, formula: 'Retencion neta mensual y devolucion neta total al final de obra.', color: '#fbbf24' },
     { label: 'Subtotal neto', values: data.subtotal, formula: 'EDPP neto + Anticipo neto + Retenciones netas', bold: true, color: '#22c55e' },
     { label: 'IVA bruto (19%)', values: data.ivaBruto, formula: 'Subtotal neto × 19%', color: '#94a3b8' },
@@ -2659,6 +2659,8 @@ function buildConstructionSCurve(metrics, meses) {
   const peak = Math.min(0.92, Math.max(0.08, toNumber(metrics.peak_gasto || 0.5)));
   const anticipoPct = Math.max(0, toNumber(metrics.anticipo_pct)) / 100;
   const retencionPct = Math.max(0, toNumber(metrics.retencion_pct)) / 100;
+  const anticipoAmount = metrics.total_neto * anticipoPct;
+  const epBaseNeta = Math.max(0, metrics.total_neto - anticipoAmount);
   const weights = Array.from({ length: meses }, (_, index) => {
     const x = meses === 1 ? 1 : index / (meses - 1);
     const gaussian = Math.exp(-((x - peak) ** 2) / (2 * (width ** 2)));
@@ -2667,8 +2669,8 @@ function buildConstructionSCurve(metrics, meses) {
     return Math.max(0.001, gaussian * rampIn * rampOut);
   });
   const weightTotal = weights.reduce((sum, value) => sum + value, 0) || 1;
-  const monthlyCosts = weights.map((weight) => (metrics.total_neto * weight) / weightTotal);
-  const monthlyAnticipoRecovery = monthlyCosts.map((value) => value * anticipoPct);
+  const monthlyCosts = weights.map((weight) => (epBaseNeta * weight) / weightTotal);
+  const monthlyAnticipoRecovery = monthlyCosts.map(() => 0);
   const monthlyRetention = monthlyCosts.map((value, index) => Math.max(0, value - monthlyAnticipoRecovery[index]) * retencionPct);
   const monthlyEdppNet = monthlyCosts.map((value, index) => Math.max(0, value - monthlyAnticipoRecovery[index] - monthlyRetention[index]));
   const cumulativeCosts = monthlyCosts.reduce((acc, value, index) => {
@@ -2683,7 +2685,7 @@ function buildConstructionSCurve(metrics, meses) {
     monthlyEdppNet,
     cumulativeCosts,
     cumulativePct,
-    anticipoAmount: monthlyAnticipoRecovery.reduce((sum, value) => sum + value, 0),
+    anticipoAmount,
     retentionAmount: monthlyRetention.reduce((sum, value) => sum + value, 0),
   };
 }
@@ -2774,7 +2776,7 @@ function renderConstructionSCurveChart(metrics, distribution) {
               if (!items?.length || items[0].dataset?.yAxisID === 'y1') return [];
               const index = items[0].dataIndex;
               return [
-                `Descuento anticipo: ${fmtUf(distribution.monthlyAnticipoRecovery[index])}`,
+                `Anticipo ya descontado del saldo EP: ${fmtUf(distribution.anticipoAmount)}`,
                 `Retención: ${fmtUf(distribution.monthlyRetention[index])}`,
               ];
             },

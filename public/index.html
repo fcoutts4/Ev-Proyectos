@@ -2406,6 +2406,8 @@ table:not(.gantt-table) .tfoot-dark td,
       const peak = Math.min(0.92, Math.max(0.08, toNumber(metrics.peak_gasto || 0.5)));
       const anticipoPct = Math.max(0, toNumber(metrics.anticipo_pct)) / 100;
       const retencionPct = Math.max(0, toNumber(metrics.retencion_pct)) / 100;
+      const anticipoAmount = metrics.total_neto * anticipoPct;
+      const epBaseNeta = Math.max(0, metrics.total_neto - anticipoAmount);
       const weights = Array.from({ length: meses }, (_, index) => {
         const x = meses === 1 ? 1 : index / (meses - 1);
         const gaussian = Math.exp(-((x - peak) ** 2) / (2 * (width ** 2)));
@@ -2414,7 +2416,7 @@ table:not(.gantt-table) .tfoot-dark td,
         return Math.max(0.001, gaussian * rampIn * rampOut);
       });
       const weightTotal = weights.reduce((sum, value) => sum + value, 0) || 1;
-      const monthlyCosts = weights.map((weight) => (metrics.total_neto * weight) / weightTotal);
+      const monthlyCosts = weights.map((weight) => (epBaseNeta * weight) / weightTotal);
       const monthlyAnticipoRecovery = monthlyCosts.map(() => 0);
       const monthlyRetention = monthlyCosts.map((value) => Math.max(0, value) * retencionPct);
       const monthlyEdppNet = monthlyCosts.map((value, index) => Math.max(0, value - monthlyRetention[index]));
@@ -2430,7 +2432,7 @@ table:not(.gantt-table) .tfoot-dark td,
         monthlyEdppNet,
         cumulativeCosts,
         cumulativePct,
-        anticipoAmount: metrics.total_neto * anticipoPct,
+        anticipoAmount,
         retentionAmount: monthlyRetention.reduce((sum, value) => sum + value, 0),
       };
     };
