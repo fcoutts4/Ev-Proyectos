@@ -3240,9 +3240,6 @@ function buildTerrainCostRows(manualRows = []) {
 
   return [
     linkedBase,
-    ...manualRows
-      .filter((partida) => !isLinkedTerrainBasePartida(partida))
-      .map((partida) => ({ ...partida, auto_origen: false })),
   ];
 }
 
@@ -3281,9 +3278,6 @@ function buildConstructionCostRows(manualRows = []) {
 
   return [
     linkedBase,
-    ...manualRows
-      .filter((partida) => !isLinkedConstructionBasePartida(partida))
-      .map((partida) => ({ ...partida, auto_origen: false })),
   ];
 }
 
