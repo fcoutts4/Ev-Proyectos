@@ -2134,6 +2134,7 @@ table:not(.gantt-table) .tfoot-dark td,
     flowCollapsed: {},
     formulaOverrides: { flow: {}, ep: {}, gf: {} },
   };
+  let formulaPersistTimer = null;
 
   function normalizeFormulaOverrides(value) {
     const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -2146,7 +2147,7 @@ table:not(.gantt-table) .tfoot-dark td,
 
   function applyFormulaOverrides(value, persistLocal = true) {
     patchState.formulaOverrides = normalizeFormulaOverrides(value);
-    if (persistLocal) persistFormulaOverrides();
+    if (persistLocal) schedulePersistFormulaOverrides();
   }
 
   try {
@@ -2168,6 +2169,7 @@ table:not(.gantt-table) .tfoot-dark td,
   };
 
   function persistFormulaOverrides() {
+    formulaPersistTimer = null;
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(patchState.formulaOverrides));
     } catch (error) {
@@ -2175,6 +2177,17 @@ table:not(.gantt-table) .tfoot-dark td,
       // Ignore storage errors in private/incognito contexts.
     }
   }
+
+  function schedulePersistFormulaOverrides(delay = 500) {
+    window.clearTimeout(formulaPersistTimer);
+    formulaPersistTimer = window.setTimeout(persistFormulaOverrides, delay);
+  }
+
+  window.addEventListener('beforeunload', () => {
+    if (!formulaPersistTimer) return;
+    window.clearTimeout(formulaPersistTimer);
+    persistFormulaOverrides();
+  });
 
   function normToken(value) {
     return String(value || '')
@@ -2202,7 +2215,7 @@ table:not(.gantt-table) .tfoot-dark td,
   function setFormula(scope, key, value) {
     if (!patchState.formulaOverrides[scope]) patchState.formulaOverrides[scope] = {};
     patchState.formulaOverrides[scope][key] = String(value || '');
-    persistFormulaOverrides();
+    schedulePersistFormulaOverrides();
     if (typeof scheduleAutosave === 'function') scheduleAutosave('proyecto');
   }
 

@@ -25,6 +25,8 @@ const state = {
     activeFormulaIndex: null,
     formulaInputId: null,
     costFlowMode: 'monthly',
+    formulaAutosaveTimer: null,
+    paymentPlanAutosaveTimer: null,
   },
   sync: {
     status: 'loading',
@@ -37,8 +39,16 @@ const state = {
     inFlight: {},
     queued: {},
     dirty: {},
+    batchTimer: null,
+    batchInFlight: false,
+    batchQueued: false,
   },
+  renderJobs: {},
 };
+
+const DEBUG_PERFORMANCE = false;
+const DEFAULT_AUTOSAVE_DELAY = 700;
+const INPUT_RENDER_DEBOUNCE_MS = 180;
 
 const USER_STORAGE_KEYS = [
   'evproyectos.userName',
@@ -152,6 +162,40 @@ function setText(id, value) {
 function setHtml(id, value) {
   const el = $(id);
   if (el) el.innerHTML = value;
+}
+
+function perfLog(label, data = {}) {
+  if (!DEBUG_PERFORMANCE) return;
+  console.info(`[perf] ${label}`, data);
+}
+
+function scheduleRenderJob(key, callback, delay = INPUT_RENDER_DEBOUNCE_MS) {
+  if (!key || typeof callback !== 'function') return;
+  const current = state.renderJobs[key];
+  if (current?.timer) window.clearTimeout(current.timer);
+  state.renderJobs[key] = {
+    timer: window.setTimeout(() => {
+      window.requestAnimationFrame(() => {
+        const startedAt = performance.now();
+        try {
+          callback();
+        } finally {
+          delete state.renderJobs[key];
+          perfLog(`render:${key}`, { ms: Math.round(performance.now() - startedAt) });
+        }
+      });
+    }, delay),
+  };
+}
+
+function cancelRenderJob(key) {
+  const current = state.renderJobs[key];
+  if (current?.timer) window.clearTimeout(current.timer);
+  delete state.renderJobs[key];
+}
+
+function cancelAllRenderJobs() {
+  Object.keys(state.renderJobs).forEach(cancelRenderJob);
 }
 
 function makeClientId(prefix = 'tmp') {
@@ -833,55 +877,175 @@ function renderSyncStatus() {
   detail.textContent = getSyncDetailText();
 }
 
-function scheduleAutosave(scope, delay = 300) {
-  if (!state.proyectoId || !scope) return;
+function queueAutosaveRequest(requests, key, path, method, body) {
+  requests.set(key, {
+    path,
+    options: {
+      method,
+      body: JSON.stringify(body ?? {}),
+    },
+  });
+}
+
+async function persistAutosaveScopes(scopes, { silent = true } = {}) {
+  const scopeSet = new Set((scopes || []).filter((scope) => AUTOSAVE_SCOPE_LABELS[scope]));
+  if (!state.proyectoId || !scopeSet.size) return;
+  const startedAt = performance.now();
+  const includeCostos = scopeSet.has('costos');
+  const onlyFormulaOverrides = scopeSet.size === 1 && scopeSet.has('proyecto');
+  if (onlyFormulaOverrides) state.proyecto = getProjectSavePayload();
+  else prepareStateForSave({ includeCostos });
+  if (scopeSet.has('capital')) state.capital = readCapitalFromEditor();
+
+  const requests = new Map();
+  const proyecto = getProjectSavePayload();
+
+  if (scopeSet.has('proyecto')) {
+    queueAutosaveRequest(
+      requests,
+      'formula-overrides',
+      `/api/proyectos/${state.proyectoId}/formula-overrides`,
+      'POST',
+      proyecto.formula_overrides || {}
+    );
+  }
+
+  if (scopeSet.has('cabida') || scopeSet.has('terreno') || scopeSet.has('construccion')) {
+    queueAutosaveRequest(requests, 'proyecto', `/api/proyectos/${state.proyectoId}`, 'PUT', proyecto);
+  }
+  if (scopeSet.has('cabida')) {
+    queueAutosaveRequest(
+      requests,
+      'cabida',
+      `/api/proyectos/${state.proyectoId}/cabida`,
+      'POST',
+      state.cabida.filter((row) => row.uso)
+    );
+  }
+  if (scopeSet.has('terreno') || scopeSet.has('construccion')) {
+    queueAutosaveRequest(
+      requests,
+      'financiamiento',
+      `/api/proyectos/${state.proyectoId}/financiamiento`,
+      'POST',
+      state.financiamiento
+    );
+  }
+  if (scopeSet.has('construccion')) {
+    queueAutosaveRequest(
+      requests,
+      'construccion',
+      `/api/proyectos/${state.proyectoId}/construccion`,
+      'POST',
+      { ...state.construccion }
+    );
+  }
+  if (scopeSet.has('terreno') || scopeSet.has('construccion') || scopeSet.has('gantt')) {
+    queueAutosaveRequest(requests, 'gantt', `/api/proyectos/${state.proyectoId}/gantt`, 'POST', state.gantt);
+  }
+  if (scopeSet.has('terreno') || scopeSet.has('ventas')) {
+    queueAutosaveRequest(
+      requests,
+      'ventas-cronograma',
+      `/api/proyectos/${state.proyectoId}/ventas/cronograma`,
+      'POST',
+      state.ventasCronograma || []
+    );
+  }
+  if (scopeSet.has('ventas')) {
+    queueAutosaveRequest(
+      requests,
+      'ventas-config',
+      `/api/proyectos/${state.proyectoId}/ventas/config`,
+      'POST',
+      state.ventasConfig
+    );
+  }
+  if (scopeSet.has('costos')) {
+    queueAutosaveRequest(requests, 'costos', `/api/proyectos/${state.proyectoId}/costos`, 'POST', state.costos);
+  }
+  if (scopeSet.has('capital')) {
+    queueAutosaveRequest(requests, 'capital', `/api/proyectos/${state.proyectoId}/capital`, 'POST', state.capital);
+  }
+
+  setSyncStatus('saving', 'GUARDANDO', `Persistiendo ${scopeSet.size} cambio(s) agrupados`);
+  await Promise.all(Array.from(requests.values()).map(({ path, options }) => api(path, options)));
+  perfLog('autosave:batch', {
+    scopes: Array.from(scopeSet),
+    requests: requests.size,
+    ms: Math.round(performance.now() - startedAt),
+  });
+  await finishSave({ silent });
+}
+
+function scheduleAutosave(scope, delay = DEFAULT_AUTOSAVE_DELAY) {
+  if (!state.proyectoId || !scope || !AUTOSAVE_SCOPE_LABELS[scope]) return;
+  const hadPending = getPendingAutosaveScopes().length > 0;
   window.clearTimeout(state.autosave.timers[scope]);
   state.autosave.timers[scope] = null;
   state.autosave.queued[scope] = true;
   state.autosave.dirty[scope] = true;
-  setSyncStatus('saving', 'GUARDANDO', `Cambios pendientes en ${AUTOSAVE_SCOPE_LABELS[scope] || scope}`);
-  state.autosave.timers[scope] = window.setTimeout(() => {
-    runAutosave(scope);
-  }, delay);
+  if (!hadPending) {
+    setSyncStatus('saving', 'GUARDANDO', `Cambios pendientes en ${AUTOSAVE_SCOPE_LABELS[scope] || scope}`);
+  }
+  window.clearTimeout(state.autosave.batchTimer);
+  state.autosave.batchTimer = window.setTimeout(() => {
+    runAutosaveBatch();
+  }, Math.max(0, delay));
 }
 
-async function runAutosave(scope) {
-  if (!state.proyectoId || !scope) return;
-  window.clearTimeout(state.autosave.timers[scope]);
-  state.autosave.timers[scope] = null;
+async function runAutosaveBatch(scopes = null) {
+  if (!state.proyectoId) return;
+  window.clearTimeout(state.autosave.batchTimer);
+  state.autosave.batchTimer = null;
+  const scopeList = (scopes && scopes.length ? scopes : Object.keys(AUTOSAVE_SCOPE_LABELS).filter((scope) => (
+    state.autosave.queued[scope] || state.autosave.dirty[scope]
+  ))).filter((scope, index, arr) => AUTOSAVE_SCOPE_LABELS[scope] && arr.indexOf(scope) === index);
+  if (!scopeList.length) return;
 
-  if (state.autosave.inFlight[scope]) {
-    state.autosave.queued[scope] = true;
+  if (state.autosave.batchInFlight) {
+    scopeList.forEach((scope) => {
+      state.autosave.queued[scope] = true;
+      state.autosave.dirty[scope] = true;
+    });
+    state.autosave.batchQueued = true;
     return;
   }
 
-  const handlers = {
-    proyecto: guardarFormulaOverrides,
-    cabida: guardarCabida,
-    terreno: guardarTerreno,
-    construccion: guardarConstruccion,
-    gantt: guardarGantt,
-    ventas: guardarVentas,
-    costos: guardarCostos,
-    capital: guardarCapital,
-  };
-  const handler = handlers[scope];
-  if (!handler) return;
+  state.autosave.batchInFlight = true;
+  scopeList.forEach((scope) => {
+    window.clearTimeout(state.autosave.timers[scope]);
+    state.autosave.timers[scope] = null;
+    state.autosave.queued[scope] = false;
+    state.autosave.inFlight[scope] = true;
+  });
 
-  state.autosave.inFlight[scope] = true;
-  state.autosave.queued[scope] = false;
   try {
-    await handler({ silent: true });
-    state.autosave.dirty[scope] = false;
+    await persistAutosaveScopes(scopeList, { silent: true });
+    scopeList.forEach((scope) => {
+      state.autosave.dirty[scope] = false;
+    });
   } catch (error) {
     console.error(error);
+    scopeList.forEach((scope) => {
+      state.autosave.dirty[scope] = true;
+    });
     setSyncStatus('error', 'SIN CONEXION', error.message);
   } finally {
-    state.autosave.inFlight[scope] = false;
-    if (state.autosave.queued[scope]) {
-      runAutosave(scope);
+    scopeList.forEach((scope) => {
+      state.autosave.inFlight[scope] = false;
+    });
+    state.autosave.batchInFlight = false;
+    if (state.autosave.batchQueued) {
+      state.autosave.batchQueued = false;
+      runAutosaveBatch();
     }
   }
+}
+
+async function runAutosave(scope) {
+  if (!scope) return;
+  await runAutosaveBatch([scope]);
 }
 window.scheduleAutosave = scheduleAutosave;
 
@@ -896,18 +1060,18 @@ function getPendingAutosaveScopes() {
 
 async function flushPendingAutosaves() {
   const scopes = getPendingAutosaveScopes();
+  window.clearTimeout(state.autosave.batchTimer);
+  state.autosave.batchTimer = null;
   scopes.forEach((scope) => {
     window.clearTimeout(state.autosave.timers[scope]);
     state.autosave.timers[scope] = null;
   });
-  for (const scope of scopes) {
-    let guard = 0;
-    while (state.autosave.inFlight[scope] && guard < 50) {
-      await new Promise((resolve) => window.setTimeout(resolve, 100));
-      guard += 1;
-    }
-    if (state.autosave.queued[scope] || state.autosave.dirty[scope]) await runAutosave(scope);
+  let guard = 0;
+  while (state.autosave.batchInFlight && guard < 50) {
+    await new Promise((resolve) => window.setTimeout(resolve, 100));
+    guard += 1;
   }
+  if (scopes.length) await runAutosaveBatch(scopes);
 }
 
 window.addEventListener('beforeunload', (event) => {
@@ -993,14 +1157,21 @@ function setupAutosaveListeners() {
   }
 
   if (!document.body.dataset.costAutosaveBound) {
-    const onCostDraftChange = (event) => {
+    let costEditorSyncTimer = null;
+    const syncCostDraftChange = (event, immediate = false) => {
       if (!event.target.closest('#planilla-table [data-cost-row]')) return;
-      readCostosEditor();
-      scheduleAutosave('costos');
-      if (event.target.matches('[data-field="tiene_iva"]')) renderCostosModule();
+      const run = () => {
+        costEditorSyncTimer = null;
+        readCostosEditor();
+        scheduleAutosave('costos');
+        if (event.target.matches('[data-field="tiene_iva"]')) renderCostosModule();
+      };
+      window.clearTimeout(costEditorSyncTimer);
+      if (immediate) run();
+      else costEditorSyncTimer = window.setTimeout(run, 250);
     };
-    document.addEventListener('input', onCostDraftChange);
-    document.addEventListener('change', onCostDraftChange);
+    document.addEventListener('input', (event) => syncCostDraftChange(event, false));
+    document.addEventListener('change', (event) => syncCostDraftChange(event, true));
     document.body.dataset.costAutosaveBound = '1';
   }
 }
@@ -5317,8 +5488,9 @@ function openCostFormulaModal(categoryName, index) {
   renderFormulaRefPanel();
 }
 
-function closeCostFormulaModal() {
+function closeCostFormulaModal(options = {}) {
   const wasActive = state.costosUi.activeFormulaCategory != null;
+  if (wasActive) flushCostFormulaModalAutosave();
   state.costosUi.activeFormulaCategory = null;
   state.costosUi.activeFormulaIndex = null;
   const input = $('cost-formula-modal-input');
@@ -5333,7 +5505,7 @@ function closeCostFormulaModal() {
     modeSelect.disabled = false;
   }
   $('cost-formula-modal').style.display = 'none';
-  if (wasActive && typeof renderCostosModule === 'function') {
+  if (wasActive && options.render !== false && typeof renderCostosModule === 'function') {
     renderCostosModule();
   }
 }
@@ -5363,6 +5535,8 @@ function validateCostFormulaText(rawValue, mode = '') {
 }
 
 function saveCostFormulaModal() {
+  window.clearTimeout(state.costosUi.formulaAutosaveTimer);
+  state.costosUi.formulaAutosaveTimer = null;
   const categoryName = state.costosUi.activeFormulaCategory;
   const index = state.costosUi.activeFormulaIndex;
   const input = $('cost-formula-modal-input');
@@ -5384,13 +5558,13 @@ function saveCostFormulaModal() {
   partida.total_neto = evaluateCostPartida(partida, buildCostContext());
   partida.distribucion_mensual = getMonthlyDistributionForPartida(partida, getCostMonthCount());
   syncCostFormulaRowFields(categoryName, index, partida);
-  closeCostFormulaModal();
+  closeCostFormulaModal({ render: false });
   if (partida.editable_source === 'terreno') renderTerrainModule();
   renderCostosModule();
   scheduleAutosave(partida.editable_source === 'terreno' ? 'terreno' : 'costos');
 }
 
-function autosaveCostFormulaModal() {
+function applyCostFormulaModalAutosave() {
   const categoryName = state.costosUi.activeFormulaCategory;
   const index = state.costosUi.activeFormulaIndex;
   const input = $('cost-formula-modal-input');
@@ -5412,6 +5586,21 @@ function autosaveCostFormulaModal() {
   partida.distribucion_mensual = getMonthlyDistributionForPartida(partida, getCostMonthCount());
   syncCostFormulaRowFields(categoryName, index, partida);
   scheduleAutosave(partida.editable_source === 'terreno' ? 'terreno' : 'costos');
+}
+
+function autosaveCostFormulaModal(delay = 500) {
+  window.clearTimeout(state.costosUi.formulaAutosaveTimer);
+  state.costosUi.formulaAutosaveTimer = window.setTimeout(() => {
+    state.costosUi.formulaAutosaveTimer = null;
+    applyCostFormulaModalAutosave();
+  }, delay);
+}
+
+function flushCostFormulaModalAutosave() {
+  if (!state.costosUi.formulaAutosaveTimer) return;
+  window.clearTimeout(state.costosUi.formulaAutosaveTimer);
+  state.costosUi.formulaAutosaveTimer = null;
+  applyCostFormulaModalAutosave();
 }
 
 function insertCostFormulaReference(input, token) {
@@ -6095,6 +6284,7 @@ function openPaymentPlanModal(categoryName, index) {
 }
 
 function closePaymentPlanModal() {
+  flushPaymentPlanAutosave();
   $('payment-plan-modal').style.display = 'none';
 }
 
@@ -6202,6 +6392,8 @@ function removePaymentPlanItem(type, index) {
 }
 
 function savePaymentPlanModal() {
+  window.clearTimeout(state.costosUi.paymentPlanAutosaveTimer);
+  state.costosUi.paymentPlanAutosaveTimer = null;
   const category = state.costos.find((item) => item.nombre === state.costosUi.activePaymentCategory);
   const partida = category?.partidas?.[state.costosUi.activePaymentIndex];
   if (!partida) return;
@@ -6243,7 +6435,7 @@ function savePaymentPlanModal() {
   scheduleAutosave(partida.editable_source === 'terreno' ? 'terreno' : 'costos');
 }
 
-function autosavePaymentPlanModal() {
+function applyPaymentPlanAutosave() {
   const category = state.costos.find((item) => item.nombre === state.costosUi.activePaymentCategory);
   const partida = category?.partidas?.[state.costosUi.activePaymentIndex];
   if (!partida) return;
@@ -6276,6 +6468,21 @@ function autosavePaymentPlanModal() {
   partida.plan_pago = serializeInteractivePaymentPlan({ tramos, hitos, periodicos });
   if (partida.editable_source === 'terreno') partida.auto_origen = false;
   scheduleAutosave(partida.editable_source === 'terreno' ? 'terreno' : 'costos');
+}
+
+function autosavePaymentPlanModal(delay = 500) {
+  window.clearTimeout(state.costosUi.paymentPlanAutosaveTimer);
+  state.costosUi.paymentPlanAutosaveTimer = window.setTimeout(() => {
+    state.costosUi.paymentPlanAutosaveTimer = null;
+    applyPaymentPlanAutosave();
+  }, delay);
+}
+
+function flushPaymentPlanAutosave() {
+  if (!state.costosUi.paymentPlanAutosaveTimer) return;
+  window.clearTimeout(state.costosUi.paymentPlanAutosaveTimer);
+  state.costosUi.paymentPlanAutosaveTimer = null;
+  applyPaymentPlanAutosave();
 }
 
 function getCostConfigReferenceOptions(selectedValue = 'MANUAL_0') {
@@ -7001,14 +7208,14 @@ function openCostConfigModal(categoryName, index) {
   $('cost-config-modal').style.display = 'flex';
 }
 
-function closeCostConfigModal() {
+function closeCostConfigModal(options = {}) {
   const wasActive = state.costosUi.activeConfigCategory != null;
   state.costosUi.activeConfigCategory = null;
   state.costosUi.activeConfigIndex = null;
   state.costosUi.costConfigDraft = null;
   const modal = $('cost-config-modal');
   if (modal) modal.style.display = 'none';
-  if (wasActive && typeof renderCostosModule === 'function') renderCostosModule();
+  if (wasActive && options.render !== false && typeof renderCostosModule === 'function') renderCostosModule();
 }
 
 function saveCostConfigModal() {
@@ -7037,7 +7244,7 @@ function saveCostConfigModal() {
     ? 'expr_mensual'
     : (usesFormulaTotal ? 'expr' : 'manual');
   if (partida.editable_source === 'terreno') partida.auto_origen = false;
-  closeCostConfigModal();
+  closeCostConfigModal({ render: false });
   if (partida.editable_source === 'terreno') renderTerrainModule();
   renderCostosModule();
   scheduleAutosave(partida.editable_source === 'terreno' ? 'terreno' : 'costos');
@@ -7133,6 +7340,7 @@ function renderCapitalModule() {
 }
 
 function renderAll() {
+  cancelAllRenderJobs();
   syncConstructionMilestone(state.construccion?.plazo_meses || 1);
   renderProjectSelector();
   renderProjectHeader();
@@ -7301,11 +7509,14 @@ function onTerrenoInputChange() {
     tasa_interes_terreno: toNumber(state.financiamiento.credito_terreno_tasa),
   });
   syncTerrainPurchaseMilestone();
-  renderGanttEditor(state.gantt);
-  renderTerrainModule();
-  renderCostosModule();
-  renderProjectCashflow();
-  renderKpis();
+  scheduleRenderJob('terreno-dependencies', () => {
+    renderGanttEditor(state.gantt);
+    renderTerrainModule();
+    renderCostosModule();
+    renderProjectCashflow();
+    renderKpis();
+    localizeNumberInputs($('tab-terreno') || document);
+  });
   scheduleAutosave('terreno');
   scheduleAutosave('costos');
 }
@@ -7334,11 +7545,14 @@ function updateConstrParams() {
   state.financiamiento = readConstruccionFinanciamientoFromEditor();
   syncConstructionMilestone(state.construccion.plazo_meses);
   syncSalesDrivenMilestones();
-  renderGanttEditor(state.gantt);
-  renderConstruccion();
-  renderCostosModule();
-  renderProjectCashflow();
-  renderKpis();
+  scheduleRenderJob('construccion-dependencies', () => {
+    renderGanttEditor(state.gantt);
+    renderConstruccion();
+    renderCostosModule();
+    renderProjectCashflow();
+    renderKpis();
+    localizeNumberInputs($('tab-construccion') || document);
+  });
   scheduleAutosave('construccion');
   scheduleAutosave('gantt');
   scheduleAutosave('costos');
@@ -7526,12 +7740,15 @@ function onVentasInputChange() {
 function onVentasVelocityChange() {
   state.ventasCronograma = readVentasCronogramaEditor();
   syncSalesDrivenMilestones();
-  renderGanttEditor(state.gantt);
-  renderVentasSchedules();
-  renderVentasSummaryCards();
-  renderVentasCashflow();
-  renderCostosModule();
-  renderProjectCashflow();
+  scheduleRenderJob('ventas-velocity-dependencies', () => {
+    renderGanttEditor(state.gantt);
+    renderVentasSchedules();
+    renderVentasSummaryCards();
+    renderVentasCashflow();
+    renderCostosModule();
+    renderProjectCashflow();
+    localizeNumberInputs($('tab-ventas') || document);
+  });
   scheduleAutosave('ventas');
   scheduleAutosave('gantt');
   scheduleAutosave('costos');
