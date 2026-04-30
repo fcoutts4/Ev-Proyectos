@@ -1190,10 +1190,27 @@ function setupAutosaveListeners() {
 
   if (!document.body.dataset.costAutosaveBound) {
     let costEditorSyncTimer = null;
+    const updateSinglePartidaName = (row) => {
+      const category = state.costos?.find?.((item) => item.nombre === row.dataset.category);
+      if (!category) return false;
+      const target = row.dataset.costId
+        ? category.partidas?.find((partida) => String(partida.id || '') === row.dataset.costId)
+        : category.partidas?.[toNumber(row.dataset.index)];
+      if (!target) return false;
+      target.nombre = row.querySelector('[data-field="nombre"]')?.value?.trim() || 'Nueva subpartida';
+      delete target.isNewDraft;
+      return true;
+    };
     const syncCostDraftChange = (event, immediate = false) => {
-      if (!event.target.closest('#planilla-table [data-cost-row]')) return;
+      const row = event.target.closest('#planilla-table [data-cost-row]');
+      if (!row) return;
+      const isNameOnly = event.target.matches?.('[data-field="nombre"]');
       const run = () => {
         costEditorSyncTimer = null;
+        if (isNameOnly && updateSinglePartidaName(row)) {
+          scheduleAutosave('costos');
+          return;
+        }
         readCostosEditor();
         scheduleAutosave('costos');
         if (event.target.matches('[data-field="tiene_iva"]')) renderCostosModule();
@@ -4176,7 +4193,7 @@ function calcularFlujoMensualPorFormula(subpartida, meses = getCostMonthCount())
   return monthly;
 }
 
-function getMonthlyDistributionForPartida(partida, monthCount) {
+function getMonthlyDistributionForPartida(partida, monthCount, context) {
   const costConfig = migrateLegacyCostConfig(partida);
   if (costConfig) {
     const monthly = buildDistributionFromCostConfig(costConfig, monthCount);
@@ -4196,7 +4213,7 @@ function getMonthlyDistributionForPartida(partida, monthCount) {
     }
     return monthly;
   }
-  const total = evaluateCostPartida(partida, buildCostContext());
+  const total = evaluateCostPartida(partida, context || buildCostContext());
   return normalizeDistribution(partida.distribucion_mensual, total, partida.plan_pago);
 }
 
@@ -7838,6 +7855,8 @@ function readCostosEditor() {
     partidas: (category.partidas || []).map((partida) => ({ ...partida })),
   }));
   const categoryMap = new Map(categories.map((category) => [category.nombre, category]));
+  const sharedContext = buildCostContext();
+  const monthCount = getCostMonthCount();
 
   document.querySelectorAll('[data-cost-row]').forEach((row) => {
     if (row.dataset.auto === '1' || row.dataset.readonly === '1') return;
@@ -7866,8 +7885,8 @@ function readCostosEditor() {
     if (monthInputs.length) {
       target.distribucion_mensual = monthInputs.map((input) => toNumber(input.value));
     }
-    target.total_neto = evaluateCostPartida(target, buildCostContext());
-    target.distribucion_mensual = getMonthlyDistributionForPartida(target, getCostMonthCount());
+    target.total_neto = evaluateCostPartida(target, sharedContext);
+    target.distribucion_mensual = getMonthlyDistributionForPartida(target, monthCount, sharedContext);
     if (!isEmptyNewCostPartida({ ...target, isNewDraft: false })) {
       delete target.isNewDraft;
     }
@@ -7885,7 +7904,6 @@ function agregarPartidaLinea(categoryName) {
   if (!normalizedCategoryName || normalizedCategoryName === 'GASTOS FINANCIEROS') return;
   const costosUi = ensureCostosUiState();
   readCostosEditor();
-  ensureCostosState();
   let category = state.costos.find((item) => item.nombre === normalizedCategoryName);
   if (!category) {
     category = { id: makeClientId('cat'), nombre: normalizedCategoryName, partidas: [] };
@@ -7908,7 +7926,8 @@ function agregarPartidaLinea(categoryName) {
     distribucion_mensual: createMonthlyArray(),
   });
   costosUi.collapsed[normalizedCategoryName] = false;
-  renderCostosModule();
+  renderCostPlanilla();
+  renderCostStructure();
   scheduleAutosave('costos');
 }
 
