@@ -2634,9 +2634,8 @@ table:not(.gantt-table) .tfoot-dark td,
     const data = typeof computeConstructionEP === 'function' ? computeConstructionEP() : null;
     const ep = normalizeMonthlySeries(data?.ep || [], monthCount);
     const anticipo = normalizeMonthlySeries(data?.anticipo || [], monthCount);
-    const retenciones = normalizeMonthlySeries(data?.retenciones || [], monthCount);
     return ep.map((value, index) => (
-      toNumber(value) + toNumber(anticipo[index]) + toNumber(retenciones[index])
+      toNumber(value) + toNumber(anticipo[index])
     ));
   }
 
@@ -2667,7 +2666,7 @@ table:not(.gantt-table) .tfoot-dark td,
             key: `${categoryKey}_edificacion`,
             label: 'Edificación',
             values,
-            origin: 'EP + anticipo + retenciones de construcción',
+            origin: 'EP + anticipo de construcción',
           }];
           return {
             key: categoryKey,
