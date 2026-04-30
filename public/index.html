@@ -3048,6 +3048,65 @@ table:not(.gantt-table) .tfoot-dark td,
         subtotal: true,
       });
       pushRow({
+        key: 'iva_pago',
+        label: 'Pago IVA',
+        origin: 'Pago al SII solo por saldo positivo luego de aplicar remanente',
+        values: ivaSettlement.pagoIva,
+        mode: 'cost',
+        sign: '-',
+        iva: true,
+        toggleKey: 'flow_pago_iva',
+        defaultCollapsed: true,
+        collapsed: isFlowCollapsedKey('flow_pago_iva', true),
+      });
+      pushGroupChildren('flow_pago_iva', true, () => {
+        pushRow({
+          key: 'iva_credito',
+          label: 'IVA Crédito',
+          origin: '19% solo sobre costos con IVA activado',
+          values: ivaCreditoSource,
+          mode: 'cost',
+          sign: '-',
+          level: 1,
+          iva: true,
+          muted: true,
+        });
+        pushRow({
+          key: 'iva_debito',
+          label: 'IVA Débito',
+          origin: 'Ingresos brutos escriturados × Factor IVA Débito (IVA / IB)',
+          originHtml: renderIvaDebitoFlowCalcDetails(),
+          values: ivaDebitoSource,
+          mode: 'signed',
+          sign: '+',
+          level: 1,
+          iva: true,
+          muted: true,
+        });
+        pushRow({
+          key: 'iva_mensual',
+          label: 'IVA mensual',
+          origin: 'IVA Débito + IVA Crédito (crédito como egreso negativo)',
+          values: ivaSettlement.ivaMensual,
+          mode: 'signed',
+          sign: '=',
+          level: 1,
+          iva: true,
+          muted: true,
+        });
+        pushRow({
+          key: 'iva_remanente',
+          label: 'Remanente IVA mensual',
+          origin: 'MIN(Remanente anterior + IVA mensual, 0)',
+          values: ivaSettlement.remanente,
+          mode: 'signed',
+          sign: '=',
+          level: 1,
+          iva: true,
+          muted: true,
+        });
+      });
+      pushRow({
         key: 'total_egresos_brutos',
         label: 'Total Egresos Brutos',
         origin: 'Subtotal Egresos Neto + IVA Crédito + Pago IVA',
@@ -3065,52 +3124,6 @@ table:not(.gantt-table) .tfoot-dark td,
         sign: '=',
         total: true,
       });
-      pushRow({
-        key: 'iva_credito',
-        label: 'IVA Crédito',
-        origin: '19% solo sobre costos con IVA activado',
-        values: ivaCreditoSource,
-        mode: 'cost',
-        sign: '-',
-        iva: true,
-      });
-      pushRow({
-        key: 'iva_debito',
-        label: 'IVA Débito',
-        origin: 'Ingresos brutos escriturados × Factor IVA Débito (IVA / IB)',
-        originHtml: renderIvaDebitoFlowCalcDetails(),
-        values: ivaDebitoSource,
-        mode: 'signed',
-        sign: '+',
-        iva: true,
-      });
-      pushRow({
-        key: 'iva_mensual',
-        label: 'IVA mensual',
-        origin: 'IVA Débito + IVA Crédito (crédito como egreso negativo)',
-        values: ivaSettlement.ivaMensual,
-        mode: 'signed',
-        sign: '=',
-        iva: true,
-      });
-      pushRow({
-        key: 'iva_remanente',
-        label: 'Remanente IVA mensual',
-        origin: 'MIN(Remanente anterior + IVA mensual, 0)',
-        values: ivaSettlement.remanente,
-        mode: 'signed',
-        sign: '=',
-        iva: true,
-      });
-      pushRow({
-        key: 'iva_pago',
-        label: 'Pago IVA',
-        origin: 'Pago al SII solo por saldo positivo luego de aplicar remanente',
-        values: ivaSettlement.pagoIva,
-        mode: 'cost',
-        sign: '-',
-        iva: true,
-      });
 
       function renderToggle(row) {
         if (!row.toggleKey) return '';
@@ -3126,12 +3139,11 @@ table:not(.gantt-table) .tfoot-dark td,
           row.iva ? 'flow-row-iva' : '',
           row.muted ? 'flow-row-muted' : '',
         ].filter(Boolean).join(' ');
-        const sign = row.sign ? `<span style="color:#64748b;font-weight:800;flex:0 0 auto">${escapeHtml(row.sign)}</span>` : '';
         const originHtml = row.originHtml || `<div class="flow-origin">${escapeHtml(row.origin || '')}</div>`;
         return `
           <tr class="${className}" data-flow-row="${escapeHtml(row.key)}">
             <td style="text-align:left;font-weight:${row.total || row.subtotal || row.iva ? 800 : 600};color:#0f172a">
-              <div class="flow-row-label">${renderToggle(row)}${sign}<span>${escapeHtml(row.label)}</span></div>
+              <div class="flow-row-label">${renderToggle(row)}<span>${escapeHtml(row.label)}</span></div>
             </td>
             <td>${originHtml}</td>
             <td class="flow-total-col">${formatAmount(total(row.values), row.mode, true)}</td>

@@ -4579,11 +4579,10 @@ function renderProjectCashflow() {
     const popId = `fpop-flow-${Math.random().toString(36).slice(2, 9)}`;
     const refsHtml = (row.refs || []).map((r) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:2px 0"><span style="color:#94a3b8">${escapeHtml(String(r.label))}</span><strong>${escapeHtml(String(r.value))}</strong></div>`).join('');
     const bgRow = row.bold ? 'background:#0f172a' : '';
-    const sign = row.sign ? `<span style="color:#94a3b8;font-weight:600;margin-right:4px">${row.sign}</span>` : '';
     const rowTotal = row.values.reduce((sum, value) => sum + toNumber(value), 0);
     return `
       <tr style="${bgRow}">
-        <td style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.bold ? '#22c55e' : '#fff'}">${sign}${escapeHtml(row.label)}</td>
+        <td style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.bold ? '#22c55e' : '#fff'}">${escapeHtml(row.label)}</td>
         <td style="text-align:center;position:relative" class="formula-host">
           <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #475569;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">ƒx</button>
           <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;left:0;top:100%;margin-top:4px;background:#fff;color:#0f172a;border:1px solid #cbd5e1;border-radius:8px;padding:10px 12px;min-width:260px;max-width:380px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">
