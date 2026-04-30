@@ -69,6 +69,7 @@ function scrollTabPaneBelowSticky(pane) {
 }
 
 function showTab(tabId, button) {
+  if (getPendingAutosaveScopes().length) flushPendingAutosaves();
   const targetTabId = String(tabId || '').trim();
   const targetPaneId = `tab-${targetTabId}`;
   let activePane = null;
@@ -596,6 +597,7 @@ function normalizeConstruccion(data = {}) {
 
 function normalizeFinanciamiento(data = {}) {
   return {
+    ...data,
     credito_terreno_activo: data.credito_terreno_activo ?? true,
     credito_terreno_pct: data.credito_terreno_pct ?? 70,
     credito_terreno_tasa: data.credito_terreno_tasa ?? 3.5,
@@ -607,7 +609,6 @@ function normalizeFinanciamiento(data = {}) {
     linea_construccion_pago_intereses: data.linea_construccion_pago_intereses || 'Anual',
     linea_construccion_pago_capital: data.linea_construccion_pago_capital || 'Contra Escrituraciones',
     pct_alzamiento: data.pct_alzamiento ?? 90,
-    ...data,
   };
 }
 
@@ -830,7 +831,7 @@ function renderSyncStatus() {
   detail.textContent = getSyncDetailText();
 }
 
-function scheduleAutosave(scope, delay = 900) {
+function scheduleAutosave(scope, delay = 300) {
   if (!state.proyectoId || !scope) return;
   window.clearTimeout(state.autosave.timers[scope]);
   state.autosave.timers[scope] = null;
@@ -4045,10 +4046,12 @@ function ensureCostosState() {
     (category.partidas || []).forEach((partida) => {
       const target = mapLegacyCategoryName(category.nombre, partida.nombre);
       const current = byCategory.get(target);
+      const restoredCostConfig = normalizeCostConfig(partida.cost_config) || normalizeCostConfig(partida.plan_pago);
       current.partidas.push({
         ...partida,
         id: partida.id || makeClientId('cost'),
         isDefault: typeof partida.isDefault === 'boolean' ? partida.isDefault : true,
+        cost_config: restoredCostConfig || partida.cost_config,
         plan_pago: partida.plan_pago || '',
         distribucion_mensual: Array.isArray(partida.distribucion_mensual) ? partida.distribucion_mensual : [],
       });
@@ -5592,6 +5595,12 @@ function migrateLegacyCostConfig(partida) {
   const current = normalizeCostConfig(partida.cost_config);
   if (current) return current;
 
+  const planAsCostConfig = normalizeCostConfig(partida.plan_pago);
+  if (planAsCostConfig) {
+    partida.cost_config = planAsCostConfig;
+    return planAsCostConfig;
+  }
+
   const plan = parseInteractivePaymentPlan(partida.plan_pago);
   const hasPlan = plan.tramos.length || plan.hitos.length || plan.periodicos.length;
   let config = null;
@@ -6581,7 +6590,7 @@ function saveCostConfigModal() {
   partida.cost_config = normalizeCostConfig(config);
   partida.total_neto = total;
   partida.distribucion_mensual = monthly;
-  partida.plan_pago = '';
+  partida.plan_pago = JSON.stringify(partida.cost_config);
   const usesFormulaTotal = config.method === 'global_formula' && config.total_source === 'formula' && config.formula;
   partida.formula_valor = config.method === 'manual' ? toNumber(config.amount) : total;
   partida.formula_referencia = config.method === 'monthly_formula' || usesFormulaTotal ? config.formula : '';
