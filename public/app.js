@@ -4182,7 +4182,7 @@ function calcularFlujoMensualPorFormula(subpartida, meses = getCostMonthCount())
 }
 
 function getMonthlyDistributionForPartida(partida, monthCount, context) {
-  const costConfig = migrateLegacyCostConfig(partida);
+  const costConfig = migrateLegacyCostConfig(partida, context);
   if (costConfig) {
     const monthly = buildDistributionFromCostConfig(costConfig, monthCount, context);
     if (Array.isArray(monthly)) {
@@ -4207,7 +4207,7 @@ function getMonthlyDistributionForPartida(partida, monthCount, context) {
 
 function evaluateCostPartida(partida, context) {
   if (partida.auto_origen) return toNumber(partida.total_neto);
-  const costConfig = migrateLegacyCostConfig(partida);
+  const costConfig = migrateLegacyCostConfig(partida, context);
   if (costConfig) return evaluateCostConfigTotal(costConfig, getCostMonthCount(), context);
   if (partida.formula_tipo === 'expr') return evaluateExpressionFormula(partida.formula_referencia, context);
   if (partida.formula_tipo === 'expr_mensual') {
@@ -4740,8 +4740,6 @@ function renderCostPlanilla() {
   const collapsedState = costosUi.collapsed || {};
   let totalNeto = 0;
   let totalIva = 0;
-
-  renderCostFormulaOptions();
 
   setHtml('planilla-head', `
     <tr>
@@ -6059,7 +6057,7 @@ function resolveCostConfigPoint(point) {
   return resolvePaymentReference(safePoint.ref, safePoint.offset);
 }
 
-function normalizeCostConfig(rawConfig) {
+function normalizeCostConfig(rawConfig, context) {
   if (!rawConfig) return null;
   const parsed = typeof rawConfig === 'string'
     ? (() => { try { return JSON.parse(rawConfig); } catch { return null; } })()
@@ -6067,9 +6065,11 @@ function normalizeCostConfig(rawConfig) {
   if (!parsed || typeof parsed !== 'object') return null;
   const method = String(parsed.method || '').trim();
   if (!method) return null;
+  let ctx = context;
+  const ensureCtx = () => (ctx || (ctx = buildCostContext()));
   const amountMeta = evaluateCostAmountInput(
     getCostAmountRawInput(parsed, 'amount'),
-    buildCostContext(),
+    ensureCtx(),
     parsed.amount_value ?? parsed.amount_calculated ?? parsed.amount
   );
   return {
@@ -6110,7 +6110,7 @@ function normalizeCostConfig(rawConfig) {
       amount: toNumber(item.amount),
     })) : [],
     payments: Array.isArray(parsed.payments) ? parsed.payments.map((item) => {
-      const itemAmount = evaluateCostAmountInput(getCostAmountRawInput(item, 'amount'), buildCostContext(), item.amount);
+      const itemAmount = evaluateCostAmountInput(getCostAmountRawInput(item, 'amount'), ensureCtx(), item.amount);
       return applyCostAmountMeta({
         ref: item.ref || item.point?.ref || 'MANUAL_0',
         offset: toNumber(item.offset ?? item.point?.offset),
@@ -6119,12 +6119,12 @@ function normalizeCostConfig(rawConfig) {
   };
 }
 
-function migrateLegacyCostConfig(partida) {
+function migrateLegacyCostConfig(partida, context) {
   if (!partida || (partida.auto_origen && !partida.editable_source)) return null;
-  const current = normalizeCostConfig(partida.cost_config);
+  const current = normalizeCostConfig(partida.cost_config, context);
   if (current) return current;
 
-  const planAsCostConfig = normalizeCostConfig(partida.plan_pago);
+  const planAsCostConfig = normalizeCostConfig(partida.plan_pago, context);
   if (planAsCostConfig) {
     partida.cost_config = planAsCostConfig;
     return planAsCostConfig;
