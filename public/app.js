@@ -717,21 +717,29 @@ function normalizeDisplayNumber(value, decimals = 0) {
   return Math.abs(numeric) < zeroThreshold ? 0 : numeric;
 }
 
+const FMT_NUMBER_CACHE = new Map();
+function getNumberFormatter(minDecimals, maxDecimals) {
+  const key = `${minDecimals}|${maxDecimals}`;
+  let formatter = FMT_NUMBER_CACHE.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat('es-CL', {
+      minimumFractionDigits: minDecimals,
+      maximumFractionDigits: maxDecimals,
+    });
+    FMT_NUMBER_CACHE.set(key, formatter);
+  }
+  return formatter;
+}
+
 function fmtNumber(value, decimals = 0) {
-  return new Intl.NumberFormat('es-CL', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(normalizeDisplayNumber(value, decimals));
+  return getNumberFormatter(decimals, decimals).format(normalizeDisplayNumber(value, decimals));
 }
 
 function fmtInputNumber(value, decimals = 2, options = {}) {
   if (value == null || value === '') return '';
   const numeric = normalizeDisplayNumber(value, decimals);
   if (options.blankZero && !numeric) return '';
-  return new Intl.NumberFormat('es-CL', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: decimals,
-  }).format(numeric);
+  return getNumberFormatter(0, decimals).format(numeric);
 }
 
 function getLocalizedInputDecimals(input) {
@@ -1197,11 +1205,12 @@ function setupAutosaveListeners() {
     let costEditorSyncTimer = null;
     const syncCostDraftChange = (event, immediate = false) => {
       if (!event.target.closest('#planilla-table [data-cost-row]')) return;
+      const isIvaToggle = event.target.matches('[data-field="tiene_iva"]');
       const run = () => {
         costEditorSyncTimer = null;
-        readCostosEditor();
+        readCostosEditor({ recompute: isIvaToggle });
         scheduleAutosave('costos');
-        if (event.target.matches('[data-field="tiene_iva"]')) renderCostosModule();
+        if (isIvaToggle) renderCostosModule();
       };
       window.clearTimeout(costEditorSyncTimer);
       if (immediate) run();
@@ -7837,14 +7846,15 @@ function parseFormulaInput(value, forcedMode = '') {
   return { formula_tipo: isMensual ? 'expr_mensual' : 'expr', formula_valor: 0, formula_referencia: raw };
 }
 
-function readCostosEditor() {
+function readCostosEditor(options = {}) {
+  const { recompute = true } = options;
   const categories = ensureCostosState().map((category) => ({
     ...category,
     partidas: (category.partidas || []).map((partida) => ({ ...partida })),
   }));
   const categoryMap = new Map(categories.map((category) => [category.nombre, category]));
-  const sharedContext = buildCostContext();
-  const monthCount = getCostMonthCount();
+  const sharedContext = recompute ? buildCostContext() : null;
+  const monthCount = recompute ? getCostMonthCount() : 0;
 
   document.querySelectorAll('[data-cost-row]').forEach((row) => {
     if (row.dataset.auto === '1' || row.dataset.readonly === '1') return;
@@ -7873,8 +7883,10 @@ function readCostosEditor() {
     if (monthInputs.length) {
       target.distribucion_mensual = monthInputs.map((input) => toNumber(input.value));
     }
-    target.total_neto = evaluateCostPartida(target, sharedContext);
-    target.distribucion_mensual = getMonthlyDistributionForPartida(target, monthCount, sharedContext);
+    if (recompute) {
+      target.total_neto = evaluateCostPartida(target, sharedContext);
+      target.distribucion_mensual = getMonthlyDistributionForPartida(target, monthCount, sharedContext);
+    }
     if (!isEmptyNewCostPartida({ ...target, isNewDraft: false })) {
       delete target.isNewDraft;
     }
@@ -7891,7 +7903,7 @@ function agregarPartidaLinea(categoryName) {
   const normalizedCategoryName = String(categoryName || '').trim();
   if (!normalizedCategoryName || normalizedCategoryName === 'GASTOS FINANCIEROS') return;
   const costosUi = ensureCostosUiState();
-  readCostosEditor();
+  readCostosEditor({ recompute: false });
   let category = state.costos.find((item) => item.nombre === normalizedCategoryName);
   if (!category) {
     category = { id: makeClientId('cat'), nombre: normalizedCategoryName, partidas: [] };
