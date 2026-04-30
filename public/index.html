@@ -2621,7 +2621,10 @@ table:not(.gantt-table) .tfoot-dark td,
     const data = typeof computeConstructionEP === 'function' ? computeConstructionEP() : null;
     const ep = normalizeMonthlySeries(data?.ep || [], monthCount);
     const anticipo = normalizeMonthlySeries(data?.anticipo || [], monthCount);
-    return ep.map((value, index) => toNumber(value) + toNumber(anticipo[index]));
+    const retenciones = normalizeMonthlySeries(data?.retenciones || [], monthCount);
+    return ep.map((value, index) => (
+      toNumber(value) + toNumber(anticipo[index]) + toNumber(retenciones[index])
+    ));
   }
 
   function getCostFlowStructure(monthCount) {
@@ -2651,7 +2654,7 @@ table:not(.gantt-table) .tfoot-dark td,
             key: `${categoryKey}_edificacion`,
             label: 'Edificación',
             values,
-            origin: 'EP + anticipo de construcción',
+            origin: 'EP + anticipo + retenciones de construcción',
           }];
           return {
             key: categoryKey,
