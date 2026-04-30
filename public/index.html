@@ -675,12 +675,13 @@ tbody tr:hover{background:#f3f7fb!important}
 .flow-row-muted td{color:#475569!important}
 .flow-value-cost,.amount-cost,.flow-value-negative,.amount-negative{color:#334155!important}
 .flow-origin-stack{display:flex;flex-direction:column;gap:7px;align-items:flex-start}
-.flow-calc-details{width:min(560px,70vw);max-width:100%;border:1px solid #bfdbfe;background:#eff6ff;border-radius:9px;color:#1e3a8a}
-.flow-calc-details summary{list-style:none;cursor:pointer;padding:7px 9px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.flow-calc-details{width:auto;max-width:100%;border:0;background:transparent;border-radius:0;color:#1e3a8a}
+.flow-calc-details[open]{width:min(460px,70vw)}
+.flow-calc-details summary{list-style:none;cursor:pointer;height:22px;min-height:22px;width:max-content;padding:0 8px;font-size:9px;font-weight:800;line-height:1;letter-spacing:0;text-transform:none;display:inline-flex;align-items:center;justify-content:center;gap:5px;background:#ecfdf5;color:#166534;border:1px solid #86efac;border-radius:6px;white-space:nowrap}
 .flow-calc-details summary::-webkit-details-marker{display:none}
-.flow-calc-details summary::after{content:'+';width:18px;height:18px;border-radius:999px;background:#dbeafe;color:#1d4ed8;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;line-height:1;flex:0 0 auto}
+.flow-calc-details summary::after{content:'+';width:13px;height:13px;border-radius:999px;background:#dcfce7;color:#166534;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;line-height:1;flex:0 0 auto}
 .flow-calc-details[open] summary::after{content:'-'}
-.flow-calc-panel{border-top:1px solid #bfdbfe;padding:9px 10px 10px;font-size:11px;line-height:1.45;color:#334155;background:#fff;border-radius:0 0 9px 9px}
+.flow-calc-panel{margin-top:6px;border:1px solid #bfdbfe;padding:9px 10px 10px;font-size:11px;line-height:1.45;color:#334155;background:#fff;border-radius:8px}
 .flow-calc-formula{font-family:'Courier New',monospace;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:6px 7px;margin-bottom:7px;color:#0f172a}
 .flow-calc-grid{display:grid;grid-template-columns:1fr auto;gap:5px 12px;align-items:center;margin-bottom:9px}
 .flow-calc-grid span:nth-child(odd){color:#64748b}
@@ -2342,15 +2343,6 @@ table:not(.gantt-table) .tfoot-dark td,
     const analysis = typeof getIvaDebitoAnalysis === 'function'
       ? getIvaDebitoAnalysis()
       : { ib: 0, terreno: 0, ingresoNeto: 0, iva: 0, factor: 0, productRows: [] };
-    const productRows = (analysis.productRows || []).map((row) => `
-      <tr>
-        <td>${escapeHtml(row.label)}</td>
-        <td>${fmtUf(row.gross)}</td>
-        <td>${fmtPct(toNumber(row.participation) * 100)}</td>
-        <td>${fmtUf(row.iva)}</td>
-        <td>${fmtUf(row.neto)}</td>
-      </tr>
-    `).join('');
     return `
       <div class="flow-origin-stack">
         <div class="flow-origin">Ingresos brutos escriturados × Factor IVA Débito (IVA / IB)</div>
@@ -2366,13 +2358,6 @@ table:not(.gantt-table) .tfoot-dark td,
               <span>IN ingresos netos</span><strong>${fmtUf(analysis.ingresoNeto)}</strong>
               <span>IVA débito</span><strong>${fmtUf(analysis.iva)}</strong>
               <span>Factor aplicado</span><strong>${fmtNumber(analysis.factor, 4)}</strong>
-            </div>
-            <div class="flow-calc-table-wrap">
-              <table class="flow-calc-table">
-                <thead><tr><th>Concepto</th><th>UF Bruto</th><th>% Part.</th><th>IVA</th><th>Neto</th></tr></thead>
-                <tbody>${productRows}</tbody>
-                <tfoot><tr><td>Total</td><td>${fmtUf(analysis.ib)}</td><td>${fmtPct(analysis.ib ? 100 : 0)}</td><td>${fmtUf(analysis.iva)}</td><td>${fmtUf(analysis.ingresoNeto)}</td></tr></tfoot>
-              </table>
             </div>
             <div class="flow-calc-note">El factor se aplica sobre los ingresos brutos escriturados de cada mes.</div>
           </div>
