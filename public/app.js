@@ -2430,7 +2430,7 @@ function renderConstructionFinancing() {
 }
 
 function computeConstructionEP() {
-  // Devuelve arrays mensuales: { ep, anticipo, retenciones, subtotal, ivaBruto, ceec, ivaEfectivo, totalPago }
+  // Devuelve arrays mensuales netos: { ep, anticipo, retenciones, subtotal, ivaBruto, ceec, ivaEfectivo, totalPago }
   const metrics = getConstructionMetrics();
   const meses = Math.max(1, metrics.plazo_meses);
   const monthCount = getCostMonthCount();
@@ -2449,10 +2449,10 @@ function computeConstructionEP() {
   // Anticipo: desembolso completo un mes antes del inicio de construcción
   anticipo[anticipoMonth] += anticipoTotal;
 
-  // Durante la obra: EP bruto, descuento anticipo mensual, retención mensual
+  // Durante la obra: EDPP neto, descuento anticipo mensual neto, retencion mensual neta
   for (let i = 0; i < meses; i += 1) {
     const m = Math.min(monthCount - 1, startMonth + i);
-    ep[m] += toNumber(dist.monthlyCosts[i]); // EDPP bruto del mes
+    ep[m] += toNumber(dist.monthlyCosts[i]); // EDPP neto del mes
     anticipo[m] -= toNumber(dist.monthlyAnticipoRecovery[i]); // descuento del anticipo
     retenciones[m] -= toNumber(dist.monthlyRetention[i]); // retención del mes
   }
@@ -2500,10 +2500,10 @@ function renderConstructionEP() {
 
   const total = (arr) => arr.reduce((a, b) => a + toNumber(b), 0);
   const rows = [
-    { label: 'EP (EDPP bruto)', values: data.ep, formula: 'EDPP_bruto(t) desde curva S (sin descontar anticipo ni retención)', color: '#fff' },
-    { label: 'Anticipo', values: data.anticipo, formula: `+Anticipo total un mes antes de construcción · −Anticipo% × EDPP(t) durante la obra  (Total = ${fmtUf(data.anticipoTotal)})`, color: '#fbbf24' },
-    { label: 'Retenciones', values: data.retenciones, formula: '−Retención% × (EDPP − Anticipo). Devolución total al final de obra.', color: '#fbbf24' },
-    { label: 'Subtotal neto', values: data.subtotal, formula: 'EP + Anticipo + Retenciones', bold: true, color: '#22c55e' },
+    { label: 'EP (EDPP neto)', values: data.ep, formula: 'EDPP_neto(t) desde curva S', color: '#fff' },
+    { label: 'Anticipo neto', values: data.anticipo, formula: `+Anticipo neto total un mes antes de construccion y recuperacion neta durante la obra  (Total = ${fmtUf(data.anticipoTotal)})`, color: '#fbbf24' },
+    { label: 'Retenciones netas', values: data.retenciones, formula: 'Retencion neta mensual y devolucion neta total al final de obra.', color: '#fbbf24' },
+    { label: 'Subtotal neto', values: data.subtotal, formula: 'EDPP neto + Anticipo neto + Retenciones netas', bold: true, color: '#22c55e' },
     { label: 'IVA bruto (19%)', values: data.ivaBruto, formula: 'Subtotal neto × 19%', color: '#94a3b8' },
     { label: `CEEC (${cfg.pct_ceec}%)`, values: data.ceec, formula: `IVA bruto × ${cfg.pct_ceec}%  ·  Beneficio que reduce el IVA`, color: '#a855f7' },
     { label: 'IVA efectivo', values: data.ivaEfectivo, formula: 'IVA bruto − CEEC', color: '#94a3b8' },
@@ -2697,7 +2697,7 @@ function renderConstructionSCurveChart(metrics, distribution) {
         },
         {
           type: 'line',
-          label: 'EDPP bruto',
+          label: 'EDPP neto base',
           data: distribution.monthlyCosts,
           borderColor: '#f59e0b',
           backgroundColor: 'rgba(245,158,11,.12)',

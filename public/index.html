@@ -1654,7 +1654,7 @@ table:not(.gantt-table) .tfoot-dark td,
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div>
         <div class="sec-title" style="margin-bottom:4px">📋 ESTADOS DE PAGO (EP)</div>
-        <div style="font-size:11px;color:#94a3b8">Subtotal_neto = EP + Anticipo + Retenciones. IVA efectivo = IVA bruto − CEEC. El TOTAL_A_PAGO alimenta los GIROS de la tabla siguiente.</div>
+        <div style="font-size:11px;color:#94a3b8">Subtotal_neto = EDPP neto + Anticipo neto + Retenciones netas. IVA efectivo = IVA bruto − CEEC. El TOTAL_A_PAGO alimenta los GIROS de la tabla siguiente.</div>
       </div>
       <div class="planilla-nav">
         <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-ep-scroll', -480)">← Mes</button>
@@ -1731,7 +1731,7 @@ table:not(.gantt-table) .tfoot-dark td,
   <!-- Curva S -->
   <div class="card" style="border-radius:12px;margin-bottom:16px">
     <div class="sec-title"> CURVA S DE CONSTRUCCIÓN</div>
-    <div style="font-size:11px;color:#64748b;margin-bottom:12px">EDPP bruto, EDPP neto luego de anticipo y avance acumulado de obra sobre el plazo de construcción.</div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:12px">EDPP, anticipo y retenciones expresados netos; avance acumulado de obra sobre el plazo de construcción.</div>
     <div class="chart-shell" style="height:320px;max-height:320px">
       <canvas id="curvaS-chart"></canvas>
     </div>
@@ -2452,6 +2452,9 @@ table:not(.gantt-table) .tfoot-dark td,
       const series = {};
       const scalars = { CEEC: cfg.pct_ceec };
 
+      addSeries(series, 'EDPP neto fuente', data.ep, 'edpp_neto_fuente');
+      addSeries(series, 'Anticipo neto fuente', data.anticipo, 'anticipo_neto_fuente');
+      addSeries(series, 'Retenciones netas fuente', data.retenciones, 'retenciones_netas_fuente');
       addSeries(series, 'EDPP bruto fuente', data.ep, 'edpp_bruto_fuente');
       addSeries(series, 'Anticipo unico fuente', data.anticipo, 'anticipo_unico_fuente');
       addSeries(series, 'Retenciones fuente', data.retenciones, 'retenciones_fuente');
@@ -2465,10 +2468,13 @@ table:not(.gantt-table) .tfoot-dark td,
         return values;
       }
 
-      pushRow({ key: 'ep_bruto', label: 'EP (EDPP bruto)', fallback: data.ep, formula: '[EDPP bruto fuente]', mode: 'cost' });
-      pushRow({ key: 'anticipo', label: 'Anticipo', fallback: data.anticipo, formula: '[Anticipo unico fuente]', mode: 'cost' });
-      pushRow({ key: 'retenciones', label: 'Retenciones', fallback: data.retenciones, formula: '[Retenciones fuente]', mode: 'signed' });
-      pushRow({ key: 'subtotal', label: 'Subtotal neto', fallback: data.subtotal, formula: '[EP (EDPP bruto)] + [Anticipo] + [Retenciones]', mode: 'cost', bold: true });
+      const epNeto = pushRow({ key: 'ep_bruto', label: 'EP (EDPP neto)', fallback: data.ep, formula: '[EDPP neto fuente]', mode: 'cost' });
+      addSeries(series, 'EP (EDPP bruto)', epNeto, 'ep_bruto_alias');
+      const anticipoNeto = pushRow({ key: 'anticipo', label: 'Anticipo neto', fallback: data.anticipo, formula: '[Anticipo neto fuente]', mode: 'cost' });
+      addSeries(series, 'Anticipo', anticipoNeto, 'anticipo_alias');
+      const retencionesNetas = pushRow({ key: 'retenciones', label: 'Retenciones netas', fallback: data.retenciones, formula: '[Retenciones netas fuente]', mode: 'signed' });
+      addSeries(series, 'Retenciones', retencionesNetas, 'retenciones_alias');
+      pushRow({ key: 'subtotal', label: 'Subtotal neto', fallback: data.subtotal, formula: '[EP (EDPP neto)] + [Anticipo neto] + [Retenciones netas]', mode: 'cost', bold: true });
       pushRow({ key: 'iva_bruto', label: 'IVA bruto (19%)', fallback: data.ivaBruto, formula: '[Subtotal neto] * 0.19', mode: 'cost' });
       pushRow({ key: 'ceec', label: `CEEC (${fmtInputNumber(cfg.pct_ceec, 2)}%)`, fallback: data.ceec, formula: '[IVA bruto (19%)] * [CEEC] / 100', mode: 'signed' });
       pushRow({ key: 'iva_efectivo', label: 'IVA efectivo', fallback: data.ivaEfectivo, formula: '[IVA bruto (19%)] - [CEEC]', mode: 'cost' });
@@ -2742,6 +2748,9 @@ table:not(.gantt-table) .tfoot-dark td,
     const series = {};
     const scalars = { CEEC: cfg.pct_ceec };
 
+    addSeries(series, 'EDPP neto fuente', normalizeMonthlySeries(data.ep, monthCount), 'edpp_neto_fuente');
+    addSeries(series, 'Anticipo neto fuente', normalizeMonthlySeries(data.anticipo, monthCount), 'anticipo_neto_fuente');
+    addSeries(series, 'Retenciones netas fuente', normalizeMonthlySeries(data.retenciones, monthCount), 'retenciones_netas_fuente');
     addSeries(series, 'EDPP bruto fuente', normalizeMonthlySeries(data.ep, monthCount), 'edpp_bruto_fuente');
     addSeries(series, 'Anticipo unico fuente', normalizeMonthlySeries(data.anticipo, monthCount), 'anticipo_unico_fuente');
     addSeries(series, 'Retenciones fuente', normalizeMonthlySeries(data.retenciones, monthCount), 'retenciones_fuente');
@@ -2752,10 +2761,13 @@ table:not(.gantt-table) .tfoot-dark td,
       return values;
     }
 
-    evaluateEpRow('ep_bruto', 'EP (EDPP bruto)', data.ep, '[EDPP bruto fuente]');
-    evaluateEpRow('anticipo', 'Anticipo', data.anticipo, '[Anticipo unico fuente]');
-    evaluateEpRow('retenciones', 'Retenciones', data.retenciones, '[Retenciones fuente]');
-    const subtotal = evaluateEpRow('subtotal', 'Subtotal neto', data.subtotal, '[EP (EDPP bruto)] + [Anticipo] + [Retenciones]');
+    const epNeto = evaluateEpRow('ep_bruto', 'EP (EDPP neto)', data.ep, '[EDPP neto fuente]');
+    addSeries(series, 'EP (EDPP bruto)', epNeto, 'ep_bruto_alias');
+    const anticipoNeto = evaluateEpRow('anticipo', 'Anticipo neto', data.anticipo, '[Anticipo neto fuente]');
+    addSeries(series, 'Anticipo', anticipoNeto, 'anticipo_alias');
+    const retencionesNetas = evaluateEpRow('retenciones', 'Retenciones netas', data.retenciones, '[Retenciones netas fuente]');
+    addSeries(series, 'Retenciones', retencionesNetas, 'retenciones_alias');
+    const subtotal = evaluateEpRow('subtotal', 'Subtotal neto', data.subtotal, '[EP (EDPP neto)] + [Anticipo neto] + [Retenciones netas]');
     evaluateEpRow('iva_bruto', 'IVA bruto (19%)', data.ivaBruto, '[Subtotal neto] * 0.19');
     evaluateEpRow('ceec', `CEEC (${fmtInputNumber(cfg.pct_ceec, 2)}%)`, data.ceec, '[IVA bruto (19%)] * [CEEC] / 100');
     const ivaEfectivo = evaluateEpRow('iva_efectivo', 'IVA efectivo', data.ivaEfectivo, '[IVA bruto (19%)] - [CEEC]', {});
