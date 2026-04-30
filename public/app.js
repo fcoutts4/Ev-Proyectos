@@ -4376,8 +4376,8 @@ function renderProjectCashflow() {
   const ivaDebito = getMonthlyIvaDebito(income);
   renderIvaDebitoPanel();
 
-  // Flujo antes de impuestos = operativo + iva_credito - iva_debito
-  const flujoAntesImpuestos = flujoOperativoBruto.map((v, i) => v + toNumber(ivaCredito[i]) - toNumber(ivaDebito[i]));
+  // Flujo antes de impuestos = operativo - IVA credito + IVA debito
+  const flujoAntesImpuestos = flujoOperativoBruto.map((v, i) => v - toNumber(ivaCredito[i]) + toNumber(ivaDebito[i]));
 
   // PPM + Impuesto Renta
   const ppm = getMonthlyPPM(income);
@@ -4434,9 +4434,9 @@ function renderProjectCashflow() {
     { label: 'Costos base', values: costs.map((v) => -v), sign: '-', formula: 'SUMA(Costos proyecto sin gastos financieros)', refs: [{ label: 'Total costos', value: fmtUf(totalCosts) }] },
     { label: 'Gastos financieros', values: financialCosts.map((v) => -v), sign: '-', formula: 'Intereses + Timbres + Alzamiento', refs: [{ label: 'Total GF', value: fmtUf(totalFinancial) }] },
     { label: 'Flujo operativo bruto', values: flujoOperativoBruto, sign: '=', bold: true, formula: 'Ingresos - Costos - Gastos financieros', refs: [{ label: 'Total', value: fmtUf(totalFlujoBruto) }] },
-    { label: 'IVA crédito', values: ivaCredito, sign: '+', formula: 'SUMA(Egresos con check IVA × 19%)', refs: [{ label: 'Total IVA crédito', value: fmtUf(ivaCredito.reduce((a, b) => a + b, 0)) }] },
-    { label: 'IVA débito', values: ivaDebito.map((v) => -v), sign: '-', formula: 'Ingresos brutos escriturados × Factor IVA débito (IVA / IB)', refs: [{ label: 'Total IVA débito', value: fmtUf(ivaDebito.reduce((a, b) => a + b, 0)) }, { label: 'Factor IVA débito', value: fmtNumber(getIvaDebitoAnalysis().factor, 4) }] },
-    { label: 'Flujo antes de impuestos', values: flujoAntesImpuestos, sign: '=', bold: true, formula: 'Flujo operativo bruto + IVA crédito - IVA débito', refs: [{ label: 'Total', value: fmtUf(totalFlujoAntes) }] },
+    { label: 'IVA crédito', values: ivaCredito.map((v) => -v), sign: '-', formula: '-SUMA(Egresos con check IVA × 19%)', refs: [{ label: 'Total IVA crédito', value: fmtUf(ivaCredito.reduce((a, b) => a + b, 0)) }] },
+    { label: 'IVA débito', values: ivaDebito, sign: '+', formula: 'Ingresos brutos escriturados × Factor IVA débito (IVA / IB)', refs: [{ label: 'Total IVA débito', value: fmtUf(ivaDebito.reduce((a, b) => a + b, 0)) }, { label: 'Factor IVA débito', value: fmtNumber(getIvaDebitoAnalysis().factor, 4) }] },
+    { label: 'Flujo antes de impuestos', values: flujoAntesImpuestos, sign: '=', bold: true, formula: 'Flujo operativo bruto - IVA crédito + IVA débito', refs: [{ label: 'Total', value: fmtUf(totalFlujoAntes) }] },
     { label: 'PPM', values: ppm, sign: '-', formula: '-1% × Ingresos escrituración / (1 + factor_IVA)', refs: [{ label: 'Total PPM', value: fmtUf(ppm.reduce((a, b) => a + b, 0)) }] },
     { label: 'Impuesto Renta', values: impRenta, sign: '-', formula: `-${getGlobalFinancialParams().pct_impuesto_renta}% × (Escrituras año × Valor prom. × Margen). Pago abril año siguiente`, refs: [{ label: 'Total Renta', value: fmtUf(impRenta.reduce((a, b) => a + b, 0)) }] },
     { label: 'Flujo después de impuestos', values: flujoDespuesImpuestos, sign: '=', bold: true, formula: 'Flujo antes de impuestos + PPM + Impuesto Renta', refs: [{ label: 'Total', value: fmtUf(totalFlujoDespues) }] },

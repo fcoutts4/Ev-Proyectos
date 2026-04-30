@@ -2802,7 +2802,7 @@ table:not(.gantt-table) .tfoot-dark td,
       const ivaDebitoSource = normalizeMonthlySeries(getMonthlyIvaDebito(incomeSource), monthCount);
       if (typeof renderIvaDebitoPanel === 'function') renderIvaDebitoPanel();
       const flujoSinIva = incomeSource.map((value, index) => toNumber(value) - toNumber(subtotalEgresos[index]));
-      const flujoConIva = flujoSinIva.map((value, index) => value + toNumber(ivaCreditoSource[index]) - toNumber(ivaDebitoSource[index]));
+      const flujoConIva = flujoSinIva.map((value, index) => value - toNumber(ivaCreditoSource[index]) + toNumber(ivaDebitoSource[index]));
       const cumulativeSin = cumulativeSeries(flujoSinIva);
       const cumulativeCon = cumulativeSeries(flujoConIva);
       const totalIncome = total(incomeSource);
@@ -2828,7 +2828,7 @@ table:not(.gantt-table) .tfoot-dark td,
         ['Gastos', totalGastos, '#ef4444'],
         ['Gastos financieros', totalFinancial, '#f59e0b'],
         ['Subtotal egresos neto', totalSubtotal, '#0f766e'],
-        ['IVA crédito', total(ivaCreditoSource), '#2563eb'],
+        ['IVA crédito', -total(ivaCreditoSource), '#2563eb'],
         ['IVA débito', total(ivaDebitoSource), '#7c3aed'],
       ].map(([label, value, color]) => {
         const pct = totalIncome ? toNumber(value) / totalIncome * 100 : 0;
@@ -2974,8 +2974,8 @@ table:not(.gantt-table) .tfoot-dark td,
         label: 'IVA Crédito',
         origin: '19% solo sobre costos con IVA activado',
         values: ivaCreditoSource,
-        mode: 'signed',
-        sign: '+',
+        mode: 'cost',
+        sign: '-',
         iva: true,
       });
       pushRow({
@@ -2984,8 +2984,8 @@ table:not(.gantt-table) .tfoot-dark td,
         origin: 'Ingresos brutos escriturados × Factor IVA Débito (IVA / IB)',
         originHtml: renderIvaDebitoFlowCalcDetails(),
         values: ivaDebitoSource,
-        mode: 'cost',
-        sign: '-',
+        mode: 'signed',
+        sign: '+',
         iva: true,
       });
 
