@@ -3743,6 +3743,16 @@ function evaluateExpressionFormulaDetailed(expression, context = {}) {
     .replace(/m2 subterraneo/gi, 'm2_subterraneo')
     .replace(/ventas brutas/gi, 'ventas_brutas');
   const { values, bracketValues } = buildFormulaReferenceMaps(context);
+  const catalogEntries = getCostFormulaCatalog()
+    .filter((entry) => entry.visible !== false)
+    .map((entry) => ({
+      ...entry,
+      bareToken: normalizeFormulaIdentifier(entry.token).replace(/^_+/, ''),
+      labelKey: normalizeFormulaIdentifier(entry.label),
+      shortPartidaKey: normalizeFormulaIdentifier(entry.token).replace(/^total_partida_/, ''),
+      shortCategoriaKey: normalizeFormulaIdentifier(entry.token).replace(/^total_categoria_/, ''),
+    }))
+    .sort((a, b) => Math.max(b.bareToken.length, b.labelKey.length) - Math.max(a.bareToken.length, a.labelKey.length));
   const references = [];
   const missing = [];
   const seen = new Set();
@@ -3757,6 +3767,30 @@ function evaluateExpressionFormulaDetailed(expression, context = {}) {
     }
     missing.push(label || match);
     return '0';
+  });
+
+  catalogEntries.forEach((entry) => {
+    [
+      { key: entry.labelKey, display: entry.label },
+      { key: entry.bareToken, display: entry.label || entry.token },
+      { key: entry.shortPartidaKey, display: entry.label || entry.token },
+      { key: entry.shortCategoriaKey, display: entry.label || entry.token },
+    ].forEach(({ key, display }) => {
+      if (!key || key.length < 3) return;
+      const phrasePattern = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/_/g, '[\\s_]+');
+      const pattern = new RegExp(`(^|[^_A-Za-z0-9\\u00C0-\\u017F])${phrasePattern}(?=$|[^_A-Za-z0-9\\u00C0-\\u017F])`, 'gi');
+      expr = expr.replace(pattern, (match, prefix = '') => {
+        const normalized = normalizeFormulaIdentifier(entry.token);
+        const numericValue = values.has(normalized)
+          ? values.get(normalized)
+          : values.get(`_${entry.bareToken}`);
+        if (!seen.has(normalized)) {
+          seen.add(normalized);
+          references.push(display);
+        }
+        return `${prefix}${toNumber(numericValue)}`;
+      });
+    });
   });
 
   expr = expr.replace(/[_A-Za-zÀ-ÿ][_A-Za-z0-9À-ÿ]*/g, (token) => {
@@ -5394,6 +5428,14 @@ function insertCostFormulaReference(input, token) {
     hideCostFormulaSuggestionsLater();
     return;
   }
+  if (String(input.id || '').endsWith('-inline')) {
+    const targetId = String(input.id).replace(/-inline$/, '');
+    if ($(targetId)) {
+      commitInlineFormulaEditorInput(input, targetId, true);
+      hideCostFormulaSuggestionsLater();
+      return;
+    }
+  }
   const cursor = replaceStart + String(token).length;
   input.focus();
   input.setSelectionRange(cursor, cursor);
@@ -5403,13 +5445,13 @@ function insertCostFormulaReference(input, token) {
 function renderCostFormulaSuggestions(input, query = '') {
   const panel = input?.closest('.formula-cell')?.querySelector('.formula-suggest');
   if (!panel) return;
-  const normalizedQuery = String(query || '').toLowerCase().replace(/^_/, '');
+  const normalizedQuery = normalizeFormulaIdentifier(query).replace(/^_/, '');
   const options = getCostFormulaCatalog().filter(({ label, token, visible }) => (
     visible !== false
     && (!normalizedQuery
-      || label.toLowerCase().includes(normalizedQuery)
-      || token.toLowerCase().includes(`_${normalizedQuery}`)
-      || token.toLowerCase().replace(/^_+/, '').includes(normalizedQuery))
+      || normalizeFormulaIdentifier(label).includes(normalizedQuery)
+      || normalizeFormulaIdentifier(token).includes(normalizedQuery)
+      || String(token || '').toLowerCase().replace(/^_+/, '').includes(normalizedQuery))
   )).slice(0, 12);
 
   if (!options.length) {
@@ -5657,39 +5699,100 @@ function evaluateCostAmountInput(rawValue, context = buildCostContext(), fallbac
   if (!input) {
     return { ok: true, input: '', formula: '', value: 0, calculated: 0, references: [], error: '' };
   }
-  const formulaLike = !isPlainFormulaNumber(input);
+  const canonicalInput = canonicalizeFormulaReferenceText(input);
+  const formulaLike = !isPlainFormulaNumber(canonicalInput);
   if (!formulaLike) {
-    const value = toNumber(input);
-    return { ok: true, input, formula: '', value, calculated: value, references: [], error: '' };
+    const value = toNumber(canonicalInput);
+    return { ok: true, input: canonicalInput, formula: '', value, calculated: value, references: [], error: '' };
   }
-  const result = evaluateExpressionFormulaDetailed(input, context);
+  const result = evaluateExpressionFormulaDetailed(canonicalInput, context);
   if (!result.ok) {
     const fallback = toNumber(fallbackValue);
     return {
       ok: false,
-      input,
-      formula: input,
+      input: canonicalInput,
+      formula: canonicalInput,
       value: fallback,
       calculated: fallback,
-      references: result.references || extractFormulaReferences(input),
+      references: result.references || extractFormulaReferences(canonicalInput),
       error: result.error || 'Formula incompleta o mal escrita.',
     };
   }
   return {
     ok: true,
-    input,
-    formula: input,
+    input: canonicalInput,
+    formula: canonicalInput,
     value: result.value,
     calculated: result.value,
-    references: result.references || extractFormulaReferences(input),
+    references: result.references || extractFormulaReferences(canonicalInput),
     error: '',
   };
+}
+
+function getFormulaDisplayText(rawValue = '') {
+  return splitFormulaTokens(rawValue).map((token) => {
+    const entry = findFormulaCatalogEntry(token);
+    return entry ? `[${entry.label}]` : token;
+  }).join(' ');
+}
+
+function buildFormulaTokenMeta(rawValue = '') {
+  return splitFormulaTokens(rawValue).map((token) => {
+    const entry = findFormulaCatalogEntry(token);
+    if (entry) {
+      return {
+        type: 'reference',
+        key: normalizeFormulaIdentifier(entry.token),
+        label: entry.label,
+        value: entry.token,
+      };
+    }
+    if (/^[+\-*/()%]$/.test(token)) return { type: 'operator', value: token };
+    if (isPlainFormulaNumber(token)) return { type: 'number', value: token };
+    return { type: 'text', value: token };
+  });
+}
+
+function canonicalizeFormulaReferenceText(rawValue = '') {
+  let value = String(rawValue || '');
+  const entries = getCostFormulaCatalog()
+    .filter((entry) => entry.visible !== false)
+    .map((entry) => ({
+      ...entry,
+      bareToken: normalizeFormulaIdentifier(entry.token).replace(/^_+/, ''),
+      labelKey: normalizeFormulaIdentifier(entry.label),
+      shortPartidaKey: normalizeFormulaIdentifier(entry.token).replace(/^total_partida_/, ''),
+      shortCategoriaKey: normalizeFormulaIdentifier(entry.token).replace(/^total_categoria_/, ''),
+    }))
+    .sort((a, b) => Math.max(b.bareToken.length, b.labelKey.length) - Math.max(a.bareToken.length, a.labelKey.length));
+  value = value.replace(/\[([^\]]+)\]/g, (match, label) => {
+    const key = normalizeFormulaIdentifier(label);
+    const entry = entries.find((item) => item.labelKey === key || item.bareToken === key);
+    return entry ? entry.token : match;
+  });
+  entries.forEach((entry) => {
+    [
+      entry.labelKey,
+      entry.bareToken,
+      entry.shortPartidaKey,
+      entry.shortCategoriaKey,
+    ].forEach((key) => {
+      if (!key || key.length < 3) return;
+      const phrasePattern = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/_/g, '[\\s_]+');
+      const pattern = new RegExp(`(^|[^_A-Za-z0-9\\u00C0-\\u017F])${phrasePattern}(?=$|[^_A-Za-z0-9\\u00C0-\\u017F])`, 'gi');
+      value = value.replace(pattern, (match, prefix = '') => `${prefix}${entry.token}`);
+    });
+  });
+  return value;
 }
 
 function applyCostAmountMeta(target, meta, key = 'amount') {
   target[key] = toNumber(meta.value);
   target[`${key}_input`] = meta.input;
   target[`${key}_formula`] = meta.formula;
+  target[`${key}_display_formula`] = getFormulaDisplayText(meta.input);
+  target[`${key}_formula_tokens`] = buildFormulaTokenMeta(meta.input);
+  target[`${key}_raw_formula`] = meta.formula || meta.input;
   target[`${key}_calculated`] = toNumber(meta.calculated);
   target[`${key}_value`] = toNumber(meta.value);
   target[`${key}_references`] = Array.isArray(meta.references) ? meta.references : [];
@@ -5698,6 +5801,9 @@ function applyCostAmountMeta(target, meta, key = 'amount') {
   if (key === 'amount') {
     target.totalInput = meta.input;
     target.totalFormula = meta.formula;
+    target.totalDisplayFormula = getFormulaDisplayText(meta.input);
+    target.totalFormulaTokens = buildFormulaTokenMeta(meta.input);
+    target.totalRawFormula = meta.formula || meta.input;
     target.totalCalculated = toNumber(meta.calculated);
     target.totalValue = toNumber(meta.value);
     target.totalReferences = Array.isArray(meta.references) ? meta.references : [];
@@ -6196,7 +6302,7 @@ function renderCostConfigAmountField({ id = 'cost-config-amount', label = 'Monto
   return `
     <div class="cost-config-panel formula-cell">
       ${renderCostConfigField(label, `
-        <input id="${escapeHtml(id)}" class="inp" type="text" inputmode="text" data-formula-amount="1" value="${escapeHtml(rawValue)}" placeholder="${escapeHtml(placeholder || 'Monto o formula, ej: 2500 o 15*_meses_preventa')}" oninput="handleCostFormulaInput(this); updateCostConfigPreview()" onchange="updateCostConfigPreview()" onfocus="handleCostFormulaInput(this)" onblur="hideCostFormulaSuggestionsLater()">
+        ${renderInlineFormulaAmountEditor({ id, value: rawValue, placeholder: placeholder || 'Monto o formula, ej: 2500 o 15 * meses preventa' })}
         <div id="${escapeHtml(id)}-feedback" class="cost-inline-result"></div>
       `)}
       <div class="formula-suggest"></div>
@@ -6313,8 +6419,10 @@ function updateCostConfigPctWarning(config) {
 function updateCostAmountFeedback(input, meta) {
   if (!input) return;
   const field = input.closest('.cost-config-field');
+  const editor = input.closest('.formula-cell')?.querySelector(`[data-formula-editor-target="${escapeHtml(input.id)}"]`);
   const feedback = $(`${input.id}-feedback`) || field?.querySelector('.cost-inline-result');
   field?.classList.toggle('has-error', !!meta?.error);
+  editor?.classList.toggle('has-error', !!meta?.error);
   if (!feedback) return;
   if (meta?.error) {
     feedback.textContent = meta.error;
@@ -6330,6 +6438,134 @@ function updateCostAmountFeedback(input, meta) {
   feedback.className = 'cost-inline-result';
 }
 
+function renderFormulaEditorToken(token, editorTargetId = '', tokenIndex = 0) {
+  const value = String(token || '').trim();
+  if (!value) return '';
+  const catalogEntry = findFormulaCatalogEntry(value);
+  if (catalogEntry) {
+    return `<span class="formula-token reference" data-tech-token="${escapeHtml(catalogEntry.token)}" title="${escapeHtml(`${catalogEntry.label} = ${formatFormulaCatalogValue(catalogEntry)}`)}">${escapeHtml(String(catalogEntry.label || value).replace(/^_+/, ''))}<button type="button" class="formula-token-remove" onclick="removeFormulaEditorToken('${escapeHtml(editorTargetId)}', ${tokenIndex}); return false;" aria-label="Eliminar referencia">&times;</button></span>`;
+  }
+  return renderFormulaToken(token);
+}
+
+function renderFormulaEditorChips(rawValue = '', editorTargetId = '') {
+  const value = String(rawValue || '').trim();
+  if (!value) return '';
+  return splitFormulaTokens(value).map((token, index) => renderFormulaEditorToken(token, editorTargetId, index)).join('');
+}
+
+function renderInlineFormulaAmountEditor({
+  id,
+  value = '',
+  placeholder = 'Monto o formula, ej: 2500 o 15 * meses preventa',
+  dataField = '',
+} = {}) {
+  const rawValue = canonicalizeFormulaReferenceText(value || '');
+  const dataFieldAttr = dataField ? `data-field="${escapeHtml(dataField)}"` : '';
+  return `
+    <div class="formula-cell inline-formula-host">
+      <input id="${escapeHtml(id)}" ${dataFieldAttr} type="hidden" data-formula-amount="1" value="${escapeHtml(rawValue)}">
+      <div id="${escapeHtml(id)}-editor" class="formula-chip-editor cost-config-formula-editor" data-formula-editor-target="${escapeHtml(id)}" data-base-formula="${escapeHtml(rawValue)}" onclick="focusInlineFormulaEditor('${escapeHtml(id)}')">
+        ${renderFormulaEditorChips(rawValue, id)}
+        <input id="${escapeHtml(id)}-inline" class="cost-config-formula-inline" value="" placeholder="${escapeHtml(rawValue ? ' +, -, *, /, %, número...' : placeholder)}" oninput="handleInlineFormulaEditorInput(this, '${escapeHtml(id)}')" onfocus="handleCostFormulaInput(this)" onkeydown="handleInlineFormulaEditorKeydown(event, this, '${escapeHtml(id)}')" onblur="commitInlineFormulaEditorLater(this, '${escapeHtml(id)}')">
+      </div>
+      <div class="formula-suggest"></div>
+    </div>
+  `;
+}
+
+function getInlineFormulaEditorValue(targetId) {
+  const hidden = $(targetId);
+  const editor = $(`${targetId}-editor`);
+  if (!hidden || !editor) return hidden?.value || '';
+  const inline = $(`${targetId}-inline`);
+  hidden.value = `${editor.dataset.baseFormula || ''}${inline?.value || ''}`;
+  return hidden.value;
+}
+
+function syncInlineFormulaAmountEditors(root = document) {
+  root.querySelectorAll('[data-formula-editor-target]').forEach((editor) => {
+    const targetId = editor.dataset.formulaEditorTarget;
+    if (targetId) getInlineFormulaEditorValue(targetId);
+  });
+}
+
+function refreshInlineFormulaEditor(targetId, rawValue = '', focusInline = false) {
+  const hidden = $(targetId);
+  const editor = $(`${targetId}-editor`);
+  if (!hidden || !editor) return;
+  const value = String(rawValue || '');
+  hidden.value = value;
+  editor.dataset.baseFormula = value;
+  editor.innerHTML = `
+    ${renderFormulaEditorChips(value, targetId)}
+    <input id="${escapeHtml(targetId)}-inline" class="cost-config-formula-inline" value="" placeholder="${escapeHtml(value ? ' +, -, *, /, %, número...' : 'Escribe monto o referencia')}" oninput="handleInlineFormulaEditorInput(this, '${escapeHtml(targetId)}')" onfocus="handleCostFormulaInput(this)" onkeydown="handleInlineFormulaEditorKeydown(event, this, '${escapeHtml(targetId)}')" onblur="commitInlineFormulaEditorLater(this, '${escapeHtml(targetId)}')">
+  `;
+  if (focusInline) focusInlineFormulaEditor(targetId);
+}
+
+function focusInlineFormulaEditor(targetId) {
+  const input = $(`${targetId}-inline`);
+  if (!input) return;
+  input.focus();
+  const cursor = String(input.value || '').length;
+  input.setSelectionRange(cursor, cursor);
+}
+
+function commitInlineFormulaEditorInput(input, targetId, focusInline = false) {
+  const editor = $(`${targetId}-editor`);
+  const hidden = $(targetId);
+  if (!editor || !hidden || !input) return;
+  const nextValue = canonicalizeFormulaReferenceText(`${editor.dataset.baseFormula || ''}${input.value || ''}`);
+  refreshInlineFormulaEditor(targetId, nextValue, focusInline);
+  updateCostConfigPreview();
+}
+
+function commitInlineFormulaEditorLater(input, targetId) {
+  window.setTimeout(() => {
+    commitInlineFormulaEditorInput(input, targetId, false);
+    hideCostFormulaSuggestionsLater();
+  }, 130);
+}
+
+function handleInlineFormulaEditorInput(input, targetId) {
+  getInlineFormulaEditorValue(targetId);
+  handleCostFormulaInput(input);
+  updateCostConfigPreview();
+}
+
+function removeFormulaEditorToken(targetId, tokenIndex) {
+  const editor = $(`${targetId}-editor`);
+  const hidden = $(targetId);
+  if (!editor || !hidden) return;
+  const tokens = splitFormulaTokens(editor.dataset.baseFormula || hidden.value || '');
+  tokens.splice(tokenIndex, 1);
+  refreshInlineFormulaEditor(targetId, tokens.join(' '), true);
+  updateCostConfigPreview();
+}
+
+function removeLastInlineFormulaEditorToken(targetId) {
+  const editor = $(`${targetId}-editor`);
+  const hidden = $(targetId);
+  if (!editor || !hidden) return;
+  const tokens = splitFormulaTokens(editor.dataset.baseFormula || hidden.value || '');
+  if (!tokens.length) return;
+  tokens.pop();
+  refreshInlineFormulaEditor(targetId, tokens.join(' '), true);
+  updateCostConfigPreview();
+}
+
+function handleInlineFormulaEditorKeydown(event, input, targetId) {
+  if (event.key === 'Backspace' && !input.value) {
+    event.preventDefault();
+    removeLastInlineFormulaEditorToken(targetId);
+  }
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    commitInlineFormulaEditorInput(input, targetId, true);
+  }
+}
+
 function getCostConfigFormulaValueFromEditor() {
   const editor = $('cost-config-formula-editor');
   const hidden = $('cost-config-formula');
@@ -6341,10 +6577,17 @@ function getCostConfigFormulaValueFromEditor() {
   return hidden.value;
 }
 
+function renderCostConfigFormulaToken(token, tokenIndex = 0) {
+  const value = String(token || '').trim();
+  const entry = findFormulaCatalogEntry(value);
+  if (!entry) return renderFormulaToken(token);
+  return `<span class="formula-token reference" data-tech-token="${escapeHtml(entry.token)}" title="${escapeHtml(`${entry.label} = ${formatFormulaCatalogValue(entry)}`)}">${escapeHtml(String(entry.label || value).replace(/^_+/, ''))}<button type="button" class="formula-token-remove" onclick="removeCostConfigFormulaToken(${tokenIndex}); return false;" aria-label="Eliminar referencia">&times;</button></span>`;
+}
+
 function renderCostConfigFormulaChips(rawValue = '') {
   const value = String(rawValue || '').trim();
   if (!value) return '';
-  return splitFormulaTokens(value).map((token) => renderFormulaToken(token)).join('');
+  return splitFormulaTokens(value).map((token, index) => renderCostConfigFormulaToken(token, index)).join('');
 }
 
 function refreshCostConfigFormulaEditor(rawValue = '', focusInline = false) {
@@ -6380,7 +6623,7 @@ function commitCostConfigFormulaInlineInput(input = $('cost-config-formula-inlin
   const hidden = $('cost-config-formula');
   if (!editor || !hidden || !input) return;
   if (input.id === 'cost-config-formula-inline' && input !== $('cost-config-formula-inline')) return;
-  const nextValue = `${editor.dataset.baseFormula || ''}${input.value || ''}`;
+  const nextValue = canonicalizeFormulaReferenceText(`${editor.dataset.baseFormula || ''}${input.value || ''}`);
   refreshCostConfigFormulaEditor(nextValue, focusInline);
   updateCostConfigPreview();
 }
@@ -6402,6 +6645,16 @@ function removeLastCostConfigFormulaToken() {
   const lastIndex = base.lastIndexOf(lastToken);
   const nextValue = lastIndex >= 0 ? base.slice(0, lastIndex).trimEnd() : '';
   refreshCostConfigFormulaEditor(nextValue, true);
+  updateCostConfigPreview();
+}
+
+function removeCostConfigFormulaToken(tokenIndex) {
+  const editor = $('cost-config-formula-editor');
+  const hidden = $('cost-config-formula');
+  if (!editor || !hidden) return;
+  const tokens = splitFormulaTokens(editor.dataset.baseFormula || hidden.value || '');
+  tokens.splice(tokenIndex, 1);
+  refreshCostConfigFormulaEditor(tokens.join(' '), true);
   updateCostConfigPreview();
 }
 
@@ -6440,6 +6693,7 @@ function insertCostConfigFormulaReference(token) {
 }
 
 function readCostConfigForm() {
+  syncInlineFormulaAmountEditors($('cost-config-fields') || document);
   getCostConfigFormulaValueFromEditor();
   const draft = normalizeCostConfig(state.costosUi.costConfigDraft) || { method: 'manual', start: makeCostPoint(), end: makeCostPoint() };
   const method = $('cost-config-method')?.value || draft.method || 'manual';
@@ -6451,7 +6705,7 @@ function readCostConfigForm() {
   const common = {
     ...draft,
     method,
-    formula: $('cost-config-formula')?.value ?? draft.formula ?? '',
+    formula: canonicalizeFormulaReferenceText($('cost-config-formula')?.value ?? draft.formula ?? ''),
     total_source: $('cost-config-total-source')?.value || draft.total_source || (draft.formula ? 'formula' : 'amount'),
     periodicity: Math.max(1, Math.round(toNumber($('cost-config-periodicity')?.value ?? draft.periodicity) || 1)),
     payment_count: Math.max(0, Math.round(toNumber($('cost-config-payment-count')?.value ?? draft.payment_count))),
@@ -6504,7 +6758,7 @@ function readCostConfigForm() {
 }
 
 function renderCostConfigFormulaInput(value = '', label = 'Fórmula', options = {}) {
-  const rawValue = String(value || '');
+  const rawValue = canonicalizeFormulaReferenceText(value || '');
   if (options.chipEditor) {
     return `
       <div class="cost-config-panel formula-cell">
@@ -6546,14 +6800,14 @@ function renderCostConfigFields(options = {}) {
   if (method === 'manual') {
     html = `
       <div class="cost-config-grid">
-        ${renderCostConfigAmountField({ label: 'Monto único UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula, ej: 2500 o 15*_meses_preventa' })}
+        ${renderCostConfigAmountField({ label: 'Monto único UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula, ej: 2500 o 15 * meses preventa' })}
         ${renderCostPointControls('start', 'Fecha de imputación', config.start)}
       </div>
     `;
   } else if (method === 'monthly_amount') {
     html = `
       <div class="cost-config-grid three">
-        ${renderCostConfigAmountField({ label: 'Monto mensual UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula mensual, ej: 2500 o 15*_meses_preventa' })}
+        ${renderCostConfigAmountField({ label: 'Monto mensual UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula mensual, ej: 2500 o 15 * meses preventa' })}
         ${renderCostPointControls('start', 'Desde', config.start)}
         ${renderCostPointControls('end', 'Hasta', config.end)}
       </div>
@@ -6567,7 +6821,7 @@ function renderCostConfigFields(options = {}) {
         ${renderCostConfigTotalSourceControl(totalSource)}
         ${totalSource === 'formula'
           ? renderCostConfigFormulaInput(config.formula, 'Total por fórmula', { chipEditor: true })
-          : renderCostConfigAmountField({ label: 'Monto total UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula, ej: 2500 o 15*_meses_preventa' })}
+          : renderCostConfigAmountField({ label: 'Monto total UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula, ej: 2500 o 15 * meses preventa' })}
       </div>
       <div class="cost-config-grid">
         ${renderCostPointControls('start', 'Distribuir desde', config.start)}
@@ -6577,7 +6831,7 @@ function renderCostConfigFields(options = {}) {
   } else if (method === 'periodic') {
     html = `
       <div class="cost-config-grid three">
-        ${renderCostConfigAmountField({ label: 'Monto por pago UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula, ej: 2500 o 15*_meses_preventa' })}
+        ${renderCostConfigAmountField({ label: 'Monto por pago UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula, ej: 2500 o 15 * meses preventa' })}
         <div class="cost-config-panel">
           ${renderCostConfigField('Repetir cada X meses', `<input id="cost-config-periodicity" class="inp" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(config.periodicity || 1, 0)}" placeholder="Ej: 3" oninput="updateCostConfigPreview()" onchange="updateCostConfigPreview()">`)}
         </div>
@@ -6615,7 +6869,7 @@ function renderCostConfigFields(options = {}) {
     `).join('');
     html = `
       <div class="cost-config-grid">
-        ${renderCostConfigAmountField({ label: 'Monto total UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula, ej: 2500 o 15*_meses_preventa' })}
+        ${renderCostConfigAmountField({ label: 'Monto total UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula, ej: 2500 o 15 * meses preventa' })}
         <div class="cost-config-panel">
           <div class="cost-config-label">Validación de porcentajes</div>
           <div id="cost-config-pct-warning" class="cost-config-warning">Total asignado: 0%</div>
@@ -6639,7 +6893,7 @@ function renderCostConfigFields(options = {}) {
     const rows = payments.map((item, idx) => `
       <div class="cost-config-line payment">
         ${renderCostConfigField('Fecha/Hito', `<select class="inp" data-field="ref" onchange="updateCostConfigPreview()">${renderCostConfigRefOptions(item.ref)}</select>`)}
-        ${renderCostConfigField('Monto UF', `<input class="inp" data-field="amount" data-formula-amount="1" type="text" inputmode="text" value="${escapeHtml(getCostAmountRawInput(item, 'amount'))}" placeholder="Monto o formula, ej: 2500 o 15*_meses_preventa" oninput="handleCostFormulaInput(this); updateCostConfigPreview()" onfocus="handleCostFormulaInput(this)" onblur="hideCostFormulaSuggestionsLater()">`)}
+        ${renderCostConfigField('Monto UF', renderInlineFormulaAmountEditor({ id: `cost-config-payment-amount-${idx}`, dataField: 'amount', value: getCostAmountRawInput(item, 'amount'), placeholder: 'Monto o formula, ej: 2500 o 15 * meses preventa' }))}
         ${renderCostConfigField('Desfase en meses', `<input class="inp" data-field="offset" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(item.offset, 0)}" placeholder="-1, 0, +1" oninput="updateCostConfigPreview()">`)}
         ${deleteButton('payment', idx, 'Eliminar pago')}
       </div>
@@ -6694,6 +6948,9 @@ function updateCostConfigPreview() {
   const config = readCostConfigForm();
   const monthCount = getCostMonthCount();
   updateCostAmountFeedback($('cost-config-amount'), config);
+  document.querySelectorAll('#cost-config-payments [data-formula-amount]').forEach((input, index) => {
+    updateCostAmountFeedback(input, config.payments?.[index]);
+  });
   const monthly = buildDistributionFromCostConfig(config, monthCount) || createMonthlyArray(monthCount, 0);
   const total = monthly.reduce((sum, value) => sum + toNumber(value), 0);
   const validation = getCostConfigValidation(config);
@@ -7824,6 +8081,12 @@ window.focusCostConfigFormulaInline = focusCostConfigFormulaInline;
 window.handleCostConfigFormulaInlineInput = handleCostConfigFormulaInlineInput;
 window.handleCostConfigFormulaInlineKeydown = handleCostConfigFormulaInlineKeydown;
 window.commitCostConfigFormulaInlineLater = commitCostConfigFormulaInlineLater;
+window.removeCostConfigFormulaToken = removeCostConfigFormulaToken;
+window.focusInlineFormulaEditor = focusInlineFormulaEditor;
+window.handleInlineFormulaEditorInput = handleInlineFormulaEditorInput;
+window.handleInlineFormulaEditorKeydown = handleInlineFormulaEditorKeydown;
+window.commitInlineFormulaEditorLater = commitInlineFormulaEditorLater;
+window.removeFormulaEditorToken = removeFormulaEditorToken;
 window.clearCostConfigFormula = clearCostConfigFormula;
 window.removeCostPartida = removeCostPartida;
 window.startCostDrag = startCostDrag;
