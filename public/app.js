@@ -583,6 +583,7 @@ function normalizeConstruccion(data = {}) {
     sup_bajo_tierra: data.sup_bajo_tierra ?? 0,
     pct_bajo_tierra_sobre_cota_0: data.pct_bajo_tierra_sobre_cota_0 ?? 0,
     costo_uf_m2_bajo_tierra: data.costo_uf_m2_bajo_tierra ?? 0,
+    gastos_generales_mensual: data.gastos_generales_mensual ?? data.gastos_generales ?? 0,
     plazo_meses: data.plazo_meses ?? 0,
     anticipo_pct: data.anticipo_pct ?? 0,
     retencion_pct: data.retencion_pct ?? 0,
@@ -629,9 +630,12 @@ function getConstructionMetrics() {
   const source = normalizeConstruccion(state.construccion);
   const supSobreTierra = toNumber(source.sup_sobre_tierra);
   const supBajoTierra = toNumber(source.sup_bajo_tierra);
+  const plazoMeses = getConstructionDuration();
   const totalSt = supSobreTierra * toNumber(source.costo_uf_m2_sobre_tierra);
   const totalBt = supBajoTierra * toNumber(source.costo_uf_m2_bajo_tierra);
-  const totalNeto = totalSt + totalBt;
+  const gastosGeneralesMensual = Math.max(0, toNumber(source.gastos_generales_mensual));
+  const totalGastosGenerales = gastosGeneralesMensual * plazoMeses;
+  const totalNeto = totalSt + totalBt + totalGastosGenerales;
   const totalBruto = totalNeto * 1.19;
   const supTotal = supSobreTierra + supBajoTierra;
 
@@ -641,12 +645,14 @@ function getConstructionMetrics() {
     sup_bajo_tierra: supBajoTierra,
     total_st: totalSt,
     total_bt: totalBt,
+    gastos_generales_mensual: gastosGeneralesMensual,
+    total_gastos_generales: totalGastosGenerales,
     total_neto: totalNeto,
     total_bruto: totalBruto,
     sup_total: supTotal,
     uf_prom: supTotal ? totalNeto / supTotal : 0,
     uf_bruto: supTotal ? totalBruto / supTotal : 0,
-    plazo_meses: getConstructionDuration(),
+    plazo_meses: plazoMeses,
   };
 }
 
@@ -2339,6 +2345,7 @@ function renderConstruccion() {
   setLocalizedInputValue('constr-sup-bt', state.construccion?.sup_bajo_tierra, 0, { blankZero: true });
   setText('constr-total-st', fmtTableAmount(metrics.total_st, { kind: 'cost' }));
   setText('constr-total-bt', fmtTableAmount(metrics.total_bt, { kind: 'cost' }));
+  setText('constr-total-gg', fmtTableAmount(metrics.total_gastos_generales, { kind: 'cost' }));
   setText('constr-sup-total', `${fmtNumber(metrics.sup_total, 1)} m2`);
   setText('constr-uf-prom', `${fmtNumber(metrics.uf_prom, 2)} /m2`);
   setText('constr-ratio-bt', fmtPct(metrics.pct_bajo_tierra_sobre_cota_0));
@@ -2352,6 +2359,7 @@ function renderConstruccion() {
 
   setLocalizedInputValue('constr-uf-st', metrics.costo_uf_m2_sobre_tierra, 2);
   setLocalizedInputValue('constr-uf-bt', metrics.costo_uf_m2_bajo_tierra, 2);
+  setLocalizedInputValue('constr-gastos-generales', metrics.gastos_generales_mensual, 2, { blankZero: true });
   if ($('constr-pct-bt')) $('constr-pct-bt').value = toNumber(metrics.pct_bajo_tierra_sobre_cota_0);
   setLocalizedInputValue('constr-plazo-meses', metrics.plazo_meses, 0);
   setLocalizedInputValue('anticipo-slider', metrics.anticipo_pct, 1);
@@ -6851,6 +6859,7 @@ function readConstruccionFromEditor() {
     costo_uf_m2_sobre_tierra: toNumber($('constr-uf-st')?.value),
     pct_bajo_tierra_sobre_cota_0: toNumber($('constr-pct-bt')?.value),
     costo_uf_m2_bajo_tierra: toNumber($('constr-uf-bt')?.value),
+    gastos_generales_mensual: Math.max(0, toNumber($('constr-gastos-generales')?.value)),
     plazo_meses: Math.max(1, toNumber($('constr-plazo-meses')?.value || getConstructionDuration())),
     anticipo_pct: toNumber($('anticipo-slider')?.value),
     retencion_pct: toNumber($('retencion-slider')?.value),
