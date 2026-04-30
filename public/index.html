@@ -2806,15 +2806,19 @@ table:not(.gantt-table) .tfoot-dark td,
       const ivaCreditoSource = getCostIvaCreditoForCashflow(monthCount);
       const ivaDebitoSource = normalizeMonthlySeries(getMonthlyIvaDebito(incomeSource), monthCount);
       const ivaSettlement = getIvaSettlementSeries(ivaCreditoSource, ivaDebitoSource, monthCount);
+      const totalEgresosBrutos = subtotalEgresos.map((value, index) => (
+        toNumber(value) + toNumber(ivaCreditoSource[index]) + toNumber(ivaSettlement.pagoIva[index])
+      ));
       if (typeof renderIvaDebitoPanel === 'function') renderIvaDebitoPanel();
       const flujoSinIva = incomeSource.map((value, index) => toNumber(value) - toNumber(subtotalEgresos[index]));
-      const flujoConIva = flujoSinIva.map((value, index) => value - toNumber(ivaSettlement.pagoIva[index]));
+      const flujoConIva = incomeSource.map((value, index) => toNumber(value) - toNumber(totalEgresosBrutos[index]));
       const cumulativeSin = cumulativeSeries(flujoSinIva);
       const cumulativeCon = cumulativeSeries(flujoConIva);
       const totalIncome = total(incomeSource);
       const totalGastos = total(costStructure.total);
       const totalFinancial = total(financialTotal);
       const totalSubtotal = total(subtotalEgresos);
+      const totalEgresosBrutosValue = total(totalEgresosBrutos);
       const totalFlujoSin = total(flujoSinIva);
       const totalFlujoCon = total(flujoConIva);
       const capitalNeedSin = Math.abs(cumulativeSin.reduce((min, value) => Math.min(min, toNumber(value)), 0));
@@ -2834,6 +2838,7 @@ table:not(.gantt-table) .tfoot-dark td,
         ['Gastos', totalGastos, '#ef4444'],
         ['Gastos financieros', totalFinancial, '#f59e0b'],
         ['Subtotal egresos neto', totalSubtotal, '#0f766e'],
+        ['Total egresos brutos', -totalEgresosBrutosValue, '#dc2626'],
         ['IVA crédito', -total(ivaCreditoSource), '#2563eb'],
         ['IVA débito', total(ivaDebitoSource), '#7c3aed'],
         ['Pago IVA', -total(ivaSettlement.pagoIva), '#0ea5e9'],
@@ -2975,6 +2980,24 @@ table:not(.gantt-table) .tfoot-dark td,
         mode: 'cost',
         sign: '-',
         subtotal: true,
+      });
+      pushRow({
+        key: 'total_egresos_brutos',
+        label: 'Total Egresos Brutos',
+        origin: 'Subtotal Egresos Neto + IVA Crédito + Pago IVA',
+        values: totalEgresosBrutos,
+        mode: 'cost',
+        sign: '-',
+        total: true,
+      });
+      pushRow({
+        key: 'flujo_mensual_bruto',
+        label: 'Flujo mensual bruto',
+        origin: 'Ingresos brutos - Total Egresos Brutos',
+        values: flujoConIva,
+        mode: 'signed',
+        sign: '=',
+        total: true,
       });
       pushRow({
         key: 'iva_credito',
