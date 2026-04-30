@@ -4457,7 +4457,7 @@ function renderProjectCashflow() {
     return `<div class="dist-row"><div class="dist-label">${escapeHtml(label)}</div><div class="dist-bar-wrap"><div class="dist-bar" style="width:${Math.max(2, Math.min(100, Math.abs(pct)))}%;background:${color}"></div></div><div class="dist-pct">${fmtPct(pct)}</div></div>`;
   }).join(''));
 
-  setHtml('flujo-tabla-header', `<tr><th style="text-align:left;min-width:220px">Concepto</th><th style="text-align:center;min-width:90px">Fórmula</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}</tr>`);
+  setHtml('flujo-tabla-header', `<tr><th style="text-align:left;min-width:220px">Concepto</th><th style="text-align:center;min-width:90px">Fórmula</th><th class="flow-total-col">Total</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}</tr>`);
 
   const rows = [
     { label: 'Ingresos (Ventas)', values: income, sign: '+', formula: 'SUMA(Ventas por mes)', refs: [{ label: 'Total ingresos', value: fmtUf(totalIncome) }] },
@@ -4478,6 +4478,7 @@ function renderProjectCashflow() {
     const refsHtml = (row.refs || []).map((r) => `<div style="display:flex;justify-content:space-between;gap:12px;padding:2px 0"><span style="color:#94a3b8">${escapeHtml(String(r.label))}</span><strong>${escapeHtml(String(r.value))}</strong></div>`).join('');
     const bgRow = row.bold ? 'background:#0f172a' : '';
     const sign = row.sign ? `<span style="color:#94a3b8;font-weight:600;margin-right:4px">${row.sign}</span>` : '';
+    const rowTotal = row.values.reduce((sum, value) => sum + toNumber(value), 0);
     return `
       <tr style="${bgRow}">
         <td style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.bold ? '#22c55e' : '#fff'}">${sign}${escapeHtml(row.label)}</td>
@@ -4489,6 +4490,7 @@ function renderProjectCashflow() {
             ${refsHtml}
           </div>
         </td>
+        <td class="flow-total-col">${fmtTableAmount(rowTotal, { kind: 'income', total: true })}</td>
         ${row.values.map((value) => `<td style="text-align:center;color:${row.bold ? '#22c55e' : '#fff'}">${fmtTableAmount(value, { kind: 'income' })}</td>`).join('')}
       </tr>`;
   }).join(''));

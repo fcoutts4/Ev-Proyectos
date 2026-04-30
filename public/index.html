@@ -638,7 +638,7 @@ tbody tr:hover{background:#f3f7fb!important}
 .formula-inline-input,.flow-formula-input{min-width:260px;font-family:"Courier New",monospace;font-size:11px}
 .formula-inline-input{background:#fff!important}
 .flow-planilla{background:#fff;border:1px solid var(--border-strong);border-top:none;border-radius:0 0 10px 10px;overflow:auto}
-.flow-planilla table{min-width:1400px}
+.flow-planilla table{min-width:1520px}
 .flow-planilla thead th{position:sticky;top:0;z-index:2}
 .flow-category-row td{background:var(--bg-soft)!important;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#334155!important;border-bottom:2px solid var(--border-strong)!important;padding:7px 8px}
 .flow-category-title{display:flex;align-items:center;gap:8px}
@@ -647,6 +647,7 @@ tbody tr:hover{background:#f3f7fb!important}
 .flow-toggle{width:22px;height:22px;min-height:22px!important;border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:6px;font-size:11px;font-weight:800;line-height:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}
 .flow-toggle:hover{background:#eef3f8}
 .flow-origin{font-size:10px;color:#64748b;font-weight:700;line-height:1.25;max-width:320px}
+.flow-total-col{text-align:right!important;min-width:110px;background:#f8fafc!important;font-weight:800!important;color:#0f172a!important}
 .flow-row-level-1 td:first-child{padding-left:24px!important}
 .flow-row-level-2 td:first-child{padding-left:44px!important}
 .flow-row-total td{background:#eef3f8!important;font-weight:700!important}
@@ -2836,7 +2837,7 @@ table:not(.gantt-table) .tfoot-dark td,
         return `<div class="dist-row"><div class="dist-label">${escapeHtml(label)}</div><div class="dist-bar-wrap"><div class="dist-bar" style="width:${Math.max(2, Math.min(100, Math.abs(pct)))}%;background:${color}"></div></div><div class="dist-pct">${fmtPct(pct)}</div></div>`;
       }).join(''));
 
-      setHtml('flujo-tabla-header', `<tr><th style="text-align:left;min-width:280px">Concepto</th><th style="text-align:left;min-width:260px">Origen / lógica</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}</tr>`);
+      setHtml('flujo-tabla-header', `<tr><th style="text-align:left;min-width:280px">Concepto</th><th style="text-align:left;min-width:260px">Origen / lógica</th><th class="flow-total-col">Total</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}</tr>`);
 
       const rows = [];
       function pushRow(row) {
@@ -2855,7 +2856,7 @@ table:not(.gantt-table) .tfoot-dark td,
         sign: '+',
       });
 
-      const gastosCollapsed = isFlowCollapsedKey('flow_gastos', false);
+      const gastosCollapsed = isFlowCollapsedKey('flow_gastos', true);
       pushRow({
         key: 'gastos',
         label: 'Gastos',
@@ -2864,11 +2865,11 @@ table:not(.gantt-table) .tfoot-dark td,
         mode: 'cost',
         sign: '-',
         toggleKey: 'flow_gastos',
-        defaultCollapsed: false,
+        defaultCollapsed: true,
         collapsed: gastosCollapsed,
         total: true,
       });
-      pushGroupChildren('flow_gastos', false, () => {
+      pushGroupChildren('flow_gastos', true, () => {
         costStructure.categories.forEach((category) => {
           const categoryCollapsed = isFlowCollapsedKey(category.key, true);
           pushRow({
@@ -2900,7 +2901,7 @@ table:not(.gantt-table) .tfoot-dark td,
         });
       });
 
-      const gfCollapsed = isFlowCollapsedKey('flow_gastos_financieros', false);
+      const gfCollapsed = isFlowCollapsedKey('flow_gastos_financieros', true);
       pushRow({
         key: 'gastos_financieros',
         label: 'Gastos financieros',
@@ -2909,11 +2910,11 @@ table:not(.gantt-table) .tfoot-dark td,
         mode: 'cost',
         sign: '-',
         toggleKey: 'flow_gastos_financieros',
-        defaultCollapsed: false,
+        defaultCollapsed: true,
         collapsed: gfCollapsed,
         total: true,
       });
-      pushGroupChildren('flow_gastos_financieros', false, () => {
+      pushGroupChildren('flow_gastos_financieros', true, () => {
         const interestCollapsed = isFlowCollapsedKey('flow_gf_intereses', true);
         pushRow({
           key: 'gf_intereses',
@@ -2930,7 +2931,6 @@ table:not(.gantt-table) .tfoot-dark td,
         pushGroupChildren('flow_gf_intereses', true, () => {
           pushRow({ key: 'gf_intereses_terreno', label: 'Intereses Crédito Banco - Terreno', origin: 'Hoja Terreno', values: terrainFinancial.interest, mode: 'cost', sign: '-', level: 2, muted: true });
           pushRow({ key: 'gf_intereses_construccion', label: 'Intereses Crédito Banco - Construcción', origin: 'Hoja Construcción', values: constructionFinancial.interest, mode: 'cost', sign: '-', level: 2, muted: true });
-          pushRow({ key: 'gf_intereses_total', label: 'Total Intereses Crédito Banco', origin: 'Suma Terreno + Construcción', values: interestTotal, mode: 'cost', sign: '-', level: 2, total: true });
         });
 
         const stampCollapsed = isFlowCollapsedKey('flow_gf_timbres', true);
@@ -2949,7 +2949,6 @@ table:not(.gantt-table) .tfoot-dark td,
         pushGroupChildren('flow_gf_timbres', true, () => {
           pushRow({ key: 'gf_timbres_terreno', label: 'Impto. Timbre Y Estampillas - Terreno', origin: 'Hoja Terreno', values: terrainFinancial.stamp, mode: 'cost', sign: '-', level: 2, muted: true });
           pushRow({ key: 'gf_timbres_construccion', label: 'Impto. Timbre Y Estampillas - Construcción', origin: 'Hoja Construcción', values: constructionFinancial.stamp, mode: 'cost', sign: '-', level: 2, muted: true });
-          pushRow({ key: 'gf_timbres_total', label: 'Total Impto. Timbre Y Estampillas', origin: 'Suma Terreno + Construcción', values: stampTotal, mode: 'cost', sign: '-', level: 2, total: true });
         });
 
         pushRow({
@@ -3012,6 +3011,7 @@ table:not(.gantt-table) .tfoot-dark td,
               <div class="flow-row-label">${renderToggle(row)}${sign}<span>${escapeHtml(row.label)}</span></div>
             </td>
             <td><div class="flow-origin">${escapeHtml(row.origin || '')}</div></td>
+            <td class="flow-total-col">${formatAmount(total(row.values), row.mode, true)}</td>
             ${row.values.map((value) => `<td data-flow-value style="text-align:center;${row.total || row.subtotal || row.iva ? 'font-weight:700' : ''}">${formatAmount(value, row.mode)}</td>`).join('')}
           </tr>
         `;
