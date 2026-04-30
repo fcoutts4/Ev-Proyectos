@@ -252,37 +252,38 @@ function normalizeFormulaOverrides(value = {}) {
 }
 
 function normalizeProject(project = {}) {
-  const terrenoM2Bruto = project.terreno_m2_bruto ?? project.terreno_m2_bruto_afecto ?? 0;
-  const terrenoM2Afectacion = project.terreno_m2_afectacion
-    ?? Math.max(0, toNumber(terrenoM2Bruto) - toNumber(project.terreno_m2_neto ?? terrenoM2Bruto));
-  const terrenoM2Neto = project.terreno_m2_neto ?? Math.max(0, toNumber(terrenoM2Bruto) - toNumber(terrenoM2Afectacion));
-  const terrenoPrecioTotal = project.terreno_precio_total ?? 0;
-  const terrenoPrecioUfM2 = project.terreno_precio_uf_m2
+  const source = project && typeof project === 'object' ? project : {};
+  const terrenoM2Bruto = source.terreno_m2_bruto ?? source.terreno_m2_bruto_afecto ?? 0;
+  const terrenoM2Afectacion = source.terreno_m2_afectacion
+    ?? Math.max(0, toNumber(terrenoM2Bruto) - toNumber(source.terreno_m2_neto ?? terrenoM2Bruto));
+  const terrenoM2Neto = source.terreno_m2_neto ?? Math.max(0, toNumber(terrenoM2Bruto) - toNumber(terrenoM2Afectacion));
+  const terrenoPrecioTotal = source.terreno_precio_total ?? 0;
+  const terrenoPrecioUfM2 = source.terreno_precio_uf_m2
     ?? (terrenoM2Neto > 0 ? terrenoPrecioTotal / terrenoM2Neto : 0);
   return {
-    ...project,
-    compra_terreno_fecha: project.compra_terreno_fecha || '',
+    ...source,
+    compra_terreno_fecha: source.compra_terreno_fecha || '',
     terreno_m2_bruto: terrenoM2Bruto,
     terreno_m2_bruto_afecto: terrenoM2Bruto,
     terreno_m2_afectacion: terrenoM2Afectacion,
     terreno_m2_neto: terrenoM2Neto,
     terreno_precio_uf_m2: terrenoPrecioUfM2,
     terreno_precio_total: terrenoPrecioTotal || (terrenoM2Neto * terrenoPrecioUfM2),
-    terraza_util_pct: project.terraza_util_pct ?? 50,
-    comunes_tipo: project.comunes_tipo || 'porcentaje',
-    comunes_valor: project.comunes_valor ?? 0,
-    estacionamientos_cantidad: project.estacionamientos_cantidad ?? 0,
-    estacionamientos_sup_interior: project.estacionamientos_sup_interior ?? 0,
-    estacionamientos_sup_terrazas: project.estacionamientos_sup_terrazas ?? 0,
-    bodegas_cantidad: project.bodegas_cantidad ?? 0,
-    bodegas_sup_interior: project.bodegas_sup_interior ?? 0,
-    bodegas_sup_terrazas: project.bodegas_sup_terrazas ?? 0,
-    tasa_interes_terreno: project.tasa_interes_terreno ?? 3.5,
-    tasa_interes_construccion: project.tasa_interes_construccion ?? 3.5,
-    pct_timbres: project.pct_timbres ?? 0.8,
-    pct_ceec: project.pct_ceec ?? 65,
-    pct_impuesto_renta: project.pct_impuesto_renta ?? 27,
-    formula_overrides: normalizeFormulaOverrides(project.formula_overrides),
+    terraza_util_pct: source.terraza_util_pct ?? 50,
+    comunes_tipo: source.comunes_tipo || 'porcentaje',
+    comunes_valor: source.comunes_valor ?? 0,
+    estacionamientos_cantidad: source.estacionamientos_cantidad ?? 0,
+    estacionamientos_sup_interior: source.estacionamientos_sup_interior ?? 0,
+    estacionamientos_sup_terrazas: source.estacionamientos_sup_terrazas ?? 0,
+    bodegas_cantidad: source.bodegas_cantidad ?? 0,
+    bodegas_sup_interior: source.bodegas_sup_interior ?? 0,
+    bodegas_sup_terrazas: source.bodegas_sup_terrazas ?? 0,
+    tasa_interes_terreno: source.tasa_interes_terreno ?? 3.5,
+    tasa_interes_construccion: source.tasa_interes_construccion ?? 3.5,
+    pct_timbres: source.pct_timbres ?? 0.8,
+    pct_ceec: source.pct_ceec ?? 65,
+    pct_impuesto_renta: source.pct_impuesto_renta ?? 27,
+    formula_overrides: normalizeFormulaOverrides(source.formula_overrides),
   };
 }
 
@@ -4064,11 +4065,32 @@ function ensureCostosState() {
   return state.costos;
 }
 
+function ensureCostosUiState() {
+  const current = state.costosUi && typeof state.costosUi === 'object' ? state.costosUi : {};
+  state.costosUi = {
+    collapsed: {},
+    activePaymentCategory: null,
+    activePaymentIndex: null,
+    activeFormulaCategory: null,
+    activeFormulaIndex: null,
+    activeConfigCategory: null,
+    activeConfigIndex: null,
+    formulaInputId: null,
+    costConfigDraft: null,
+    costFlowMode: 'monthly',
+    ...current,
+  };
+  if (!state.costosUi.collapsed || typeof state.costosUi.collapsed !== 'object') {
+    state.costosUi.collapsed = {};
+  }
+  return state.costosUi;
+}
+
 function renderCostFlow(monthlyTotals) {
   const labels = getCostMonthLabels();
   const monthlyValues = monthlyTotals.map((value) => toNumber(value));
   const total = monthlyValues.reduce((sum, value) => sum + value, 0);
-  const mode = state.costosUi?.costFlowMode || 'both';
+  const mode = ensureCostosUiState().costFlowMode || 'both';
   const cumulativeValues = monthlyValues.reduce((acc, value, index) => {
     acc.push((acc[index - 1] || 0) + toNumber(value));
     return acc;
@@ -4197,11 +4219,12 @@ function renderCostFlow(monthlyTotals) {
 
 function renderCostPlanilla() {
   const categorias = ensureCostosState();
+  const costosUi = ensureCostosUiState();
   const context = buildCostContext();
   const monthCount = getCostMonthCount();
   const monthLabels = getCostMonthLabels();
   const monthlyTotals = createMonthlyArray(monthCount, 0);
-  const collapsedState = state.costosUi?.collapsed || {};
+  const collapsedState = costosUi.collapsed || {};
   let totalNeto = 0;
   let totalIva = 0;
 
@@ -4295,13 +4318,13 @@ function renderCostPlanilla() {
     });
 
     return `
-      <tr class="cat-row ${!isCollapsed ? 'is-expanded' : ''}">
+      <tr class="cat-row ${!isCollapsed ? 'is-expanded' : ''}" data-cost-category="${escapeHtml(categoria.nombre)}">
         <td colspan="3" style="padding:2px 6px">
           <div class="cost-category-header">
             <div class="cost-category-title">
               <button class="btn-collapse-cost" type="button" onclick="${hasSubpartidas ? `toggleCostCategoryCollapse('${escapeHtml(categoria.nombre)}')` : ''}" title="${hasSubpartidas ? 'Expandir o colapsar' : 'Sin subpartidas'}" ${hasSubpartidas ? '' : 'disabled style="opacity:.45;cursor:not-allowed"'}>${hasSubpartidas ? (isCollapsed ? '&#9656;' : '&#9662;') : '&middot;'}</button>
               <span class="cost-category-name">${escapeHtml(categoria.nombre)}</span>
-              ${categoryReadOnly ? '' : `<button class="btn-add-cost" type="button" onclick="agregarPartidaLinea('${escapeHtml(categoria.nombre)}')" title="Agregar subpartida">+ Subpartida</button>`}
+              ${categoryReadOnly ? '' : `<button class="btn-add-cost btn-subpartida" type="button" data-category="${escapeHtml(categoria.nombre)}" onclick="addCostPartidaFromButton(this); return false;" title="Agregar subpartida" aria-label="Agregar subpartida a ${escapeHtml(categoria.nombre)}"><span class="btn-add-icon" aria-hidden="true">+</span><span>Subpartida</span></button>`}
             </div>
             <div class="cost-category-actions">
             </div>
@@ -4772,7 +4795,7 @@ function renderCostFormulaOptions() {
 }
 
 function toggleCostCategoryCollapse(categoryName) {
-  const collapsedState = state.costosUi.collapsed || {};
+  const collapsedState = ensureCostosUiState().collapsed || {};
   const currentValue = Object.prototype.hasOwnProperty.call(collapsedState, categoryName)
     ? !!collapsedState[categoryName]
     : true;
@@ -4781,7 +4804,7 @@ function toggleCostCategoryCollapse(categoryName) {
 }
 
 function setCostFlowMode(mode) {
-  state.costosUi.costFlowMode = ['monthly', 'cumulative', 'both'].includes(mode) ? mode : 'both';
+  ensureCostosUiState().costFlowMode = ['monthly', 'cumulative', 'both'].includes(mode) ? mode : 'both';
   renderCostosModule();
 }
 
@@ -7004,16 +7027,19 @@ function readCostosEditor() {
 }
 
 function agregarPartidaLinea(categoryName) {
-  if (categoryName === 'GASTOS FINANCIEROS') return;
+  const normalizedCategoryName = String(categoryName || '').trim();
+  if (!normalizedCategoryName || normalizedCategoryName === 'GASTOS FINANCIEROS') return;
+  const costosUi = ensureCostosUiState();
   readCostosEditor();
   ensureCostosState();
-  let category = state.costos.find((item) => item.nombre === categoryName);
+  let category = state.costos.find((item) => item.nombre === normalizedCategoryName);
   if (!category) {
-    category = { id: makeClientId('cat'), nombre: categoryName, partidas: [] };
+    category = { id: makeClientId('cat'), nombre: normalizedCategoryName, partidas: [] };
     state.costos.push(category);
   }
+  const newPartidaId = makeClientId('cost');
   category.partidas.push({
-    id: makeClientId('cost'),
+    id: newPartidaId,
     nombre: 'Nueva subpartida',
     isDefault: false,
     formula_tipo: 'expr',
@@ -7022,13 +7048,20 @@ function agregarPartidaLinea(categoryName) {
     cost_config: normalizeCostConfig({ method: 'manual', amount: 0, start: makeCostPoint(), end: makeCostPoint() }),
     plan_pago: '',
     tiene_iva: true,
-    es_terreno: categoryName === 'TERRENO',
+    es_terreno: normalizedCategoryName === 'TERRENO',
     total_neto: 0,
     distribucion_mensual: createMonthlyArray(),
   });
-  state.costosUi.collapsed[categoryName] = false;
+  costosUi.collapsed[normalizedCategoryName] = false;
   renderCostosModule();
   scheduleAutosave('costos');
+}
+
+function addCostPartidaFromButton(button) {
+  const categoryName = button?.dataset?.category
+    || button?.closest?.('[data-cost-category]')?.dataset?.costCategory
+    || '';
+  agregarPartidaLinea(categoryName);
 }
 
 function redistribuirPartida(button) {
@@ -7416,6 +7449,7 @@ window.calcularCapital = calcularCapital;
 window.updateConstrParams = updateConstrParams;
 window.guardarCostos = guardarCostos;
 window.agregarPartidaLinea = agregarPartidaLinea;
+window.addCostPartidaFromButton = addCostPartidaFromButton;
 window.redistribuirPartida = redistribuirPartida;
 window.aplicarPlanPagoFila = aplicarPlanPagoFila;
 window.setCostFlowMode = setCostFlowMode;
