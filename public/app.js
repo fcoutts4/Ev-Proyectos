@@ -4184,7 +4184,7 @@ function calcularFlujoMensualPorFormula(subpartida, meses = getCostMonthCount())
 function getMonthlyDistributionForPartida(partida, monthCount, context) {
   const costConfig = migrateLegacyCostConfig(partida);
   if (costConfig) {
-    const monthly = buildDistributionFromCostConfig(costConfig, monthCount);
+    const monthly = buildDistributionFromCostConfig(costConfig, monthCount, context);
     if (Array.isArray(monthly)) {
       const padded = monthly.length < monthCount
         ? [...monthly, ...Array(monthCount - monthly.length).fill(0)]
@@ -4761,7 +4761,7 @@ function renderCostPlanilla() {
     (categoria.partidas || []).forEach((partida) => {
       const t = evaluateCostPartida(partida, context);
       partida.total_neto = t;
-      partida.distribucion_mensual = getMonthlyDistributionForPartida(partida, monthCount);
+      partida.distribucion_mensual = getMonthlyDistributionForPartida(partida, monthCount, context);
     });
   });
 
@@ -4810,7 +4810,7 @@ function renderCostPlanilla() {
       }
 
       const total = evaluateCostPartida(partida, context);
-      const distribucion = getMonthlyDistributionForPartida(partida, monthCount);
+      const distribucion = getMonthlyDistributionForPartida(partida, monthCount, context);
       const estadoCosto = getEstadoCosto(partida, total, monthCount);
       const linkedSourceHint = partida.isLinked && partida.source === 'terreno'
         ? 'Viene desde la hoja Terreno: monto y fecha de compra'
@@ -4892,7 +4892,7 @@ function getProjectMonthlyCosts(includeFinancial = true) {
     if (!includeFinancial && category.nombre === 'GASTOS FINANCIEROS') return;
     (category.partidas || []).forEach((partida) => {
       if (category.nombre === 'GASTOS FINANCIEROS' && /Linea aprobada|Pago de linea/i.test(partida.nombre || '')) return;
-      const distribution = getMonthlyDistributionForPartida(partida, monthCount);
+      const distribution = getMonthlyDistributionForPartida(partida, monthCount, context);
       distribution.forEach((value, index) => {
         if (index < monthly.length) monthly[index] += toNumber(value);
       });
@@ -5935,7 +5935,7 @@ function getCostAmountRawInput(source = {}, key = 'amount') {
   return value == null || value === '' ? '' : fmtInputNumber(value, 2);
 }
 
-function evaluateCostAmountInput(rawValue, context = buildCostContext(), fallbackValue = 0) {
+function evaluateCostAmountInput(rawValue, context, fallbackValue = 0) {
   const input = String(rawValue ?? '').trim();
   if (!input) {
     return { ok: true, input: '', formula: '', value: 0, calculated: 0, references: [], error: '' };
@@ -5946,7 +5946,7 @@ function evaluateCostAmountInput(rawValue, context = buildCostContext(), fallbac
     const value = toNumber(canonicalInput);
     return { ok: true, input: canonicalInput, formula: '', value, calculated: value, references: [], error: '' };
   }
-  const result = evaluateExpressionFormulaDetailed(canonicalInput, context);
+  const result = evaluateExpressionFormulaDetailed(canonicalInput, context || buildCostContext());
   if (!result.ok) {
     const fallback = toNumber(fallbackValue);
     return {
@@ -6179,16 +6179,16 @@ function migrateLegacyCostConfig(partida) {
   return partida.cost_config;
 }
 
-function evaluateCostConfigBaseAmount(config, context = buildCostContext()) {
+function evaluateCostConfigBaseAmount(config, context) {
   const safeConfig = normalizeCostConfig(config);
   if (!safeConfig) return 0;
   if (safeConfig.method !== 'milestones' && safeConfig.total_source === 'formula' && safeConfig.formula) {
-    return toNumber(evaluateExpressionFormula(safeConfig.formula, context));
+    return toNumber(evaluateExpressionFormula(safeConfig.formula, context || buildCostContext()));
   }
   return toNumber(safeConfig.amount);
 }
 
-function buildDistributionFromCostConfig(config, monthCount = getCostMonthCount(), context = buildCostContext()) {
+function buildDistributionFromCostConfig(config, monthCount = getCostMonthCount(), context) {
   const safeConfig = normalizeCostConfig(config);
   if (!safeConfig) return null;
   const months = createMonthlyArray(monthCount, 0);
@@ -6263,7 +6263,7 @@ function buildDistributionFromCostConfig(config, monthCount = getCostMonthCount(
   return null;
 }
 
-function evaluateCostConfigTotal(config, monthCount = getCostMonthCount(), context = buildCostContext()) {
+function evaluateCostConfigTotal(config, monthCount = getCostMonthCount(), context) {
   const monthly = buildDistributionFromCostConfig(config, monthCount, context);
   return Array.isArray(monthly) ? monthly.reduce((sum, value) => sum + toNumber(value), 0) : 0;
 }
@@ -7915,7 +7915,6 @@ function agregarPartidaLinea(categoryName) {
   });
   costosUi.collapsed[normalizedCategoryName] = false;
   renderCostPlanilla();
-  renderCostStructure();
   scheduleAutosave('costos');
 }
 
