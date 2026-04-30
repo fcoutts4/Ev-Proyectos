@@ -2628,7 +2628,9 @@ table:not(.gantt-table) .tfoot-dark td,
     if (!monthCount) return values;
     const maxMonth = Math.max(0, monthCount - 1);
     const terrainMilestone = typeof getTerrainMilestone === 'function' ? getTerrainMilestone() : null;
-    const purchaseMonth = Math.max(0, Math.min(maxMonth, toNumber(terrainMilestone?.inicio || 0)));
+    const purchaseMonth = typeof getTerrainPurchaseMonthIndex === 'function'
+      ? getTerrainPurchaseMonthIndex(monthCount)
+      : Math.max(0, Math.min(maxMonth, toNumber(terrainMilestone?.inicio || 0)));
     values[purchaseMonth] = typeof getTerrainBaseCost === 'function'
       ? getTerrainBaseCost()
       : toNumber(state.proyecto?.terreno_precio_total);
@@ -2648,20 +2650,33 @@ table:not(.gantt-table) .tfoot-dark td,
     const categories = (typeof ensureCostosState === 'function' ? ensureCostosState() : [])
       .filter((category) => category.nombre !== 'GASTOS FINANCIEROS')
       .map((category, categoryIndex) => {
-        const categoryName = String(category.nombre || '').trim().toUpperCase();
+        const categoryName = typeof getCostCategoryKey === 'function'
+          ? getCostCategoryKey(category.nombre)
+          : String(category.nombre || '').trim().toUpperCase();
         const categoryKey = `flow_gastos_cat_${normToken(category.nombre) || categoryIndex}`;
         if (categoryName === 'TERRENO') {
           const values = getTerrainPaymentFlowForCashflow(monthCount);
           const partidas = [{
             key: `${categoryKey}_pagos_terreno`,
-            label: 'Cuotas/Pagos de Terreno',
+            label: 'Cuotas o Pago Terrenos',
             values,
             origin: 'Pago del terreno en fecha de compra',
           }];
+          (category.partidas || [])
+            .filter((partida) => !(typeof isLinkedTerrainBasePartida === 'function' ? isLinkedTerrainBasePartida(partida) : partida?.source === 'terreno'))
+            .forEach((partida, partidaIndex) => {
+              const partidaValues = normalizeMonthlySeries(getMonthlyDistributionForPartida(partida, monthCount), monthCount);
+              partidas.push({
+                key: `${categoryKey}_manual_${partidaIndex}`,
+                label: partida.nombre || `Subpartida ${partidaIndex + 1}`,
+                values: partidaValues,
+                origin: partida.tiene_iva ? 'Neto sin IVA · IVA activo' : 'Neto sin IVA',
+              });
+            });
           return {
             key: categoryKey,
-            label: category.nombre || 'TERRENO',
-            values,
+            label: typeof getCostCategoryDisplayName === 'function' ? getCostCategoryDisplayName(category.nombre) : (category.nombre || 'TERRENO'),
+            values: sumMonthlySeries(partidas.map((partida) => partida.values), monthCount),
             partidas,
           };
         }
@@ -2673,10 +2688,21 @@ table:not(.gantt-table) .tfoot-dark td,
             values,
             origin: 'EP + anticipo de construcción',
           }];
+          (category.partidas || [])
+            .filter((partida) => !(typeof isLinkedConstructionBasePartida === 'function' ? isLinkedConstructionBasePartida(partida) : partida?.source === 'construccion'))
+            .forEach((partida, partidaIndex) => {
+              const partidaValues = normalizeMonthlySeries(getMonthlyDistributionForPartida(partida, monthCount), monthCount);
+              partidas.push({
+                key: `${categoryKey}_manual_${partidaIndex}`,
+                label: partida.nombre || `Subpartida ${partidaIndex + 1}`,
+                values: partidaValues,
+                origin: partida.tiene_iva ? 'Neto sin IVA · IVA activo' : 'Neto sin IVA',
+              });
+            });
           return {
             key: categoryKey,
-            label: category.nombre || 'CONSTRUCCION',
-            values,
+            label: typeof getCostCategoryDisplayName === 'function' ? getCostCategoryDisplayName(category.nombre) : (category.nombre || 'CONSTRUCCION'),
+            values: sumMonthlySeries(partidas.map((partida) => partida.values), monthCount),
             partidas,
           };
         }

@@ -411,8 +411,10 @@ function getMonthlyIvaCredito() {
 }
 
 function getIvaDebitoTerrainCost() {
-  const terrainRows = (state.costos.find((category) => category.nombre === 'TERRENO')?.partidas || [])
+  const terrainRows = (state.costos.find((category) => getCostCategoryKey(category.nombre) === 'TERRENO')?.partidas || [])
     .filter((partida) => partida.es_terreno);
+  const linkedTerrain = terrainRows.find(isLinkedTerrainBasePartida);
+  if (linkedTerrain && toNumber(linkedTerrain.total_neto) > 0) return toNumber(linkedTerrain.total_neto);
   const rowsTotal = terrainRows.reduce((sum, partida) => sum + toNumber(partida.total_neto), 0);
   if (rowsTotal > 0) return rowsTotal;
   return typeof getTerrainBaseCost === 'function' ? getTerrainBaseCost() : toNumber(state.proyecto?.terreno_precio_total);
@@ -2333,7 +2335,7 @@ function renderCostStructure() {
     const pct = total ? (subtotal / total) * 100 : 0;
     return `
       <div class="dist-row">
-        <div class="dist-label">${escapeHtml(categoria.nombre)}</div>
+        <div class="dist-label">${escapeHtml(getCostCategoryDisplayName(categoria.nombre))}</div>
         <div class="dist-bar-wrap"><div class="dist-bar" style="width:${pct}%;background:${colors[index % colors.length]}"></div></div>
         <div class="dist-pct">${fmtPct(pct)}</div>
       </div>
@@ -3037,12 +3039,50 @@ function getCostCategoryKey(name) {
     .trim();
 }
 
+function getCostNameMatchKey(name) {
+  return getCostCategoryKey(name)
+    .replace(/[^A-Z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function getCanonicalCostCategoryName(name) {
+  const key = getCostCategoryKey(name);
+  return COST_CATEGORY_ORDER.find((categoryName) => getCostCategoryKey(categoryName) === key) || '';
+}
+
+function getCostCategoryDisplayName(name) {
+  const key = getCostCategoryKey(name);
+  if (key === 'CONSTRUCCION' || key.includes('CONSTRUCCI')) return 'CONSTRUCCI\u00d3N';
+  return String(name || '');
+}
+
+function isLinkedTerrainBasePartida(partida = {}) {
+  if (partida.isLinked && partida.source === 'terreno') return true;
+  const key = getCostNameMatchKey(partida.nombre);
+  return key === 'CUOTAS O PAGO TERRENOS'
+    || key === 'CUOTAS O PAGO TERRENO'
+    || key === 'CUOTAS PAGOS DE TERRENO'
+    || key === 'CUOTAS O PAGOS DE TERRENO'
+    || key === 'PAGO TERRENOS'
+    || key === 'PAGO TERRENO'
+    || key === 'COMPRA TERRENO'
+    || key === 'COMPRA DE TERRENO';
+}
+
+function isLinkedConstructionBasePartida(partida = {}) {
+  if (partida.isLinked && partida.source === 'construccion') return true;
+  const key = getCostNameMatchKey(partida.nombre);
+  return key === 'EDIFICACION'
+    || key === 'EDIFICACIONES'
+    || key === 'ANTICIPO ESTADOS DE PAGO'
+    || key === 'ANTICIPO Y ESTADOS DE PAGO'
+    || key === 'ANTICIPO MAS ESTADOS DE PAGO';
+}
+
 function isCostSourceCategory(name) {
   const key = getCostCategoryKey(name);
-  return key === 'TERRENO'
-    || key === 'GASTOS FINANCIEROS'
-    || key === 'CONSTRUCCION'
-    || key.includes('CONSTRUCCI');
+  return key === 'GASTOS FINANCIEROS';
 }
 
 function isCostPlanillaCategory(categoria) {
@@ -3127,8 +3167,12 @@ function getTerrainMilestone() {
 function getTerrainBaseCost() {
   const explicitTotal = toNumber(state.proyecto?.terreno_precio_total);
   if (explicitTotal > 0) return explicitTotal;
-  return (state.costos.find((category) => category.nombre === 'TERRENO')?.partidas || [])
-    .reduce((sum, partida) => sum + (partida.es_terreno ? toNumber(partida.total_neto) : 0), 0);
+  const purchaseMetrics = getTerrainPurchaseMetrics();
+  if (toNumber(purchaseMetrics.precioTotal) > 0) return toNumber(purchaseMetrics.precioTotal);
+  const terrainRows = state.costos.find((category) => getCostCategoryKey(category.nombre) === 'TERRENO')?.partidas || [];
+  const linkedTerrain = terrainRows.find(isLinkedTerrainBasePartida);
+  if (linkedTerrain && toNumber(linkedTerrain.total_neto) > 0) return toNumber(linkedTerrain.total_neto);
+  return terrainRows.reduce((sum, partida) => sum + (partida.es_terreno ? toNumber(partida.total_neto) : 0), 0);
 }
 
 function getTerrainPurchaseMetrics(project = state.proyecto) {
@@ -3145,6 +3189,102 @@ function getTerrainPurchaseMetrics(project = state.proyecto) {
     precioUfM2,
     precioTotal,
   };
+}
+
+function getTerrainPurchaseMonthIndex(monthCount = getCostMonthCount()) {
+  const monthValue = toMonthInputValue(state.proyecto?.compra_terreno_fecha || '');
+  if (monthValue) return Math.max(0, Math.min(monthCount - 1, monthDiffFromProjectStart(monthValue)));
+  const milestone = getTerrainMilestone();
+  return Math.max(0, Math.min(monthCount - 1, toNumber(milestone?.inicio)));
+}
+
+function getTerrainPurchaseCostFromRows(rows = []) {
+  const purchaseMetrics = getTerrainPurchaseMetrics();
+  const projectTotal = toNumber(state.proyecto?.terreno_precio_total);
+  if (projectTotal > 0) return projectTotal;
+  if (toNumber(purchaseMetrics.precioTotal) > 0) return toNumber(purchaseMetrics.precioTotal);
+  const linkedRow = rows.find(isLinkedTerrainBasePartida);
+  if (linkedRow && toNumber(linkedRow.total_neto) > 0) return toNumber(linkedRow.total_neto);
+  return rows
+    .filter((partida) => partida.es_terreno && !isLinkedTerrainBasePartida(partida))
+    .reduce((sum, partida) => sum + toNumber(partida.total_neto), 0);
+}
+
+function buildTerrainCostRows(manualRows = []) {
+  const monthCount = getCostMonthCount();
+  const existingBase = manualRows.find(isLinkedTerrainBasePartida) || {};
+  const purchaseAmount = getTerrainPurchaseCostFromRows(manualRows);
+  const distribution = createMonthlyArray(monthCount, 0);
+  distribution[getTerrainPurchaseMonthIndex(monthCount)] = purchaseAmount;
+
+  const linkedBase = {
+    id: existingBase.id || 'linked-terreno-cuotas-pago',
+    nombre: 'Cuotas o Pago Terrenos',
+    source: 'terreno',
+    source_label: 'Hoja Terreno',
+    source_detail: 'Monto y fecha de compra del terreno',
+    isDefault: true,
+    isLinked: true,
+    auto_origen: true,
+    formula_tipo: 'calculado',
+    formula_valor: purchaseAmount,
+    formula_referencia: '',
+    formula_display: 'Hoja Terreno: compra del terreno',
+    cost_config: null,
+    plan_pago: '',
+    tiene_iva: false,
+    es_terreno: true,
+    total_neto: purchaseAmount,
+    distribucion_mensual: distribution,
+  };
+
+  return [
+    linkedBase,
+    ...manualRows
+      .filter((partida) => !isLinkedTerrainBasePartida(partida))
+      .map((partida) => ({ ...partida, auto_origen: false })),
+  ];
+}
+
+function getConstructionEdificacionMonthly(monthCount = getCostMonthCount()) {
+  const epData = computeConstructionEP();
+  const ep = createMonthlyArray(monthCount, 0).map((_, index) => toNumber(epData?.ep?.[index]));
+  const anticipo = createMonthlyArray(monthCount, 0).map((_, index) => toNumber(epData?.anticipo?.[index]));
+  return ep.map((value, index) => toNumber(value) + toNumber(anticipo[index]));
+}
+
+function buildConstructionCostRows(manualRows = []) {
+  const monthCount = getCostMonthCount();
+  const existingBase = manualRows.find(isLinkedConstructionBasePartida) || {};
+  const monthly = getConstructionEdificacionMonthly(monthCount);
+  const total = monthly.reduce((sum, value) => sum + toNumber(value), 0);
+  const linkedBase = {
+    id: existingBase.id || 'linked-construccion-edificacion',
+    nombre: 'Edificaci\u00f3n',
+    source: 'construccion',
+    source_label: 'Hoja Construccion',
+    source_detail: 'Anticipo + Estados de Pago de Construccion',
+    isDefault: true,
+    isLinked: true,
+    auto_origen: true,
+    formula_tipo: 'calculado',
+    formula_valor: total,
+    formula_referencia: '',
+    formula_display: 'Construccion: Anticipo + Estados de Pago',
+    cost_config: null,
+    plan_pago: '',
+    tiene_iva: true,
+    es_terreno: false,
+    total_neto: total,
+    distribucion_mensual: monthly,
+  };
+
+  return [
+    linkedBase,
+    ...manualRows
+      .filter((partida) => !isLinkedConstructionBasePartida(partida))
+      .map((partida) => ({ ...partida, auto_origen: false })),
+  ];
 }
 
 function syncTerrainPurchaseMilestone() {
@@ -3347,10 +3487,11 @@ function getPartidaFormulaText(partida) {
 }
 
 function mapLegacyCategoryName(name, partidaName = '') {
-  if (COST_CATEGORY_ORDER.includes(name)) return name;
-  const source = `${name} ${partidaName}`.toUpperCase();
+  const canonicalName = getCanonicalCostCategoryName(name);
+  if (canonicalName) return canonicalName;
+  const source = getCostCategoryKey(`${name} ${partidaName}`);
   if (source.includes('TERRENO')) return 'TERRENO';
-  if (source.includes('CONSTRUCCION')) return 'CONSTRUCCION';
+  if (source.includes('CONSTRUCCION') || source.includes('CONSTRUCCI')) return 'CONSTRUCCION';
   if (source.includes('SALA DE VENTAS') || source.includes('PILOTO')) return 'PILOTO Y SALA DE VENTA';
   if (source.includes('PUBLICIDAD') || source.includes('MARKETING') || source.includes('MATERIAL IMPRESO')) return 'PUBLICIDAD Y MARKETING';
   if (source.includes('VENTA')) return 'VENTAS';
@@ -3361,8 +3502,7 @@ function mapLegacyCategoryName(name, partidaName = '') {
 }
 
 function buildCostContext() {
-  const terrainCategory = state.costos.find((category) => category.nombre === 'TERRENO');
-  const terrenoBase = (terrainCategory?.partidas || []).reduce((sum, partida) => sum + (partida.es_terreno ? toNumber(partida.total_neto) : 0), 0);
+  const terrenoBase = getTerrainBaseCost();
   const proyecto = normalizeProject(state.proyecto);
   const construccionMetrics = getConstructionMetrics();
   const accessorySales = getAccessorySalesConfig();
@@ -3951,8 +4091,7 @@ function buildFinancialCostRows(manualRows = []) {
   const monthCount = getCostMonthCount();
   const terrainTermMonths = Math.max(1, getConstructionStartMonth());
   const constructionMonths = Math.max(1, getConstructionDuration());
-  const terrenoBase = (state.costos.find((category) => category.nombre === 'TERRENO')?.partidas || [])
-    .reduce((sum, partida) => sum + (partida.es_terreno ? toNumber(partida.total_neto) : 0), 0);
+  const terrenoBase = getTerrainBaseCost();
   const construccionMetrics = getConstructionMetrics();
 
   const terrenoAprobado = state.financiamiento.credito_terreno_activo
@@ -4037,9 +4176,7 @@ function buildFinancialCostRows(manualRows = []) {
 function ensureCostosState() {
   const byCategory = new Map(COST_CATEGORY_ORDER.map((name) => [name, { id: '', nombre: name, partidas: [] }]));
   (state.costos || []).forEach((category) => {
-    const normalizedCategoryName = COST_CATEGORY_ORDER.includes(category.nombre)
-      ? category.nombre
-      : null;
+    const normalizedCategoryName = getCanonicalCostCategoryName(category.nombre) || mapLegacyCategoryName(category.nombre);
     if (normalizedCategoryName && category.id && byCategory.get(normalizedCategoryName)) {
       byCategory.get(normalizedCategoryName).id = category.id;
     }
@@ -4060,13 +4197,19 @@ function ensureCostosState() {
 
   state.costos = COST_CATEGORY_ORDER.map((name) => {
     const category = byCategory.get(name);
-    const manualRows = (category.partidas || []).filter((row) => !row.auto_origen && row.nombre);
+    const manualRows = (category.partidas || []).filter((row) => row.nombre && !(
+      row.auto_origen && !row.isLinked
+    ));
+    let partidas = manualRows;
+    if (name === 'TERRENO') partidas = buildTerrainCostRows(manualRows);
+    if (name === 'CONSTRUCCION') partidas = buildConstructionCostRows(manualRows);
+    if (name === 'GASTOS FINANCIEROS') {
+      partidas = buildFinancialCostRows(manualRows.filter((row) => !row.auto_origen));
+    }
     return {
       ...category,
       nombre: name,
-      partidas: name === 'GASTOS FINANCIEROS'
-        ? buildFinancialCostRows(manualRows)
-        : manualRows,
+      partidas,
     };
   });
 
@@ -4336,9 +4479,8 @@ function renderCostPlanilla() {
     </tr>
   `);
 
-  // TERRENO, CONSTRUCCIÓN y GASTOS FINANCIEROS se gestionan en sus propias pestañas
-  // y no se muestran en la planilla de costos general.
-  // Sin embargo, sus total_neto SÍ se actualizan para que las fórmulas cruzadas funcionen.
+  // Gastos financieros se gestiona en sus propias pestañas y no se muestra
+  // en la planilla general. Terreno y Construccion quedan visibles con filas vinculadas.
   categorias.forEach((categoria) => {
     if (!isCostSourceCategory(categoria.nombre)) return;
     (categoria.partidas || []).forEach((partida) => {
@@ -4357,6 +4499,8 @@ function renderCostPlanilla() {
       : true;
     const hasSubpartidas = (categoria.partidas || []).length > 0;
     const categoryReadOnly = categoria.nombre === 'GASTOS FINANCIEROS';
+    const canAddSubpartida = !categoryReadOnly && categoria.nombre !== 'TERRENO';
+    const categoryDisplayName = getCostCategoryDisplayName(categoria.nombre);
     const categoryRows = [];
     const categoryMonthlyTotals = createMonthlyArray(monthCount, 0);
     let categoryTotalNeto = 0;
@@ -4393,6 +4537,11 @@ function renderCostPlanilla() {
       const total = evaluateCostPartida(partida, context);
       const distribucion = getMonthlyDistributionForPartida(partida, monthCount);
       const estadoCosto = getEstadoCosto(partida, total, monthCount);
+      const linkedSourceHint = partida.isLinked && partida.source === 'terreno'
+        ? 'Viene desde la hoja Terreno: monto y fecha de compra'
+        : partida.isLinked && partida.source === 'construccion'
+          ? 'Viene desde Construccion: Anticipo + Estados de Pago'
+          : 'Costo automatico';
       partida.total_neto = total;
       partida.distribucion_mensual = distribucion;
       totalNeto += total;
@@ -4409,7 +4558,7 @@ function renderCostPlanilla() {
           <td style="text-align:center">${rowReadOnly ? '' : `<span class="row-tools">${isProtectedDefault ? '<button class="btn-outline btn-delete-inline" type="button" title="Subpartida base protegida" disabled>&times;</button>' : `<button class="btn-outline btn-delete-inline" type="button" title="Eliminar subpartida" onclick="removeCostPartida('${escapeHtml(categoria.nombre)}', ${index})">&times;</button>`}<span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span></span>`}</td>
           <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${rowReadOnly ? 'disabled' : ''}/></td>
           <td class="cost-config-cell">${planEditable ? `<span class="cost-config-pill ${estadoCosto.className}" onclick="openCostConfigModal('${escapeHtml(categoria.nombre)}', ${index})" title="Configurar costo">${escapeHtml(estadoCosto.label)}</span>` : '<span class="badge badge-yellow">AUTO</span>'}</td>
-          <td style="text-align:center;color:#22c55e;font-weight:800"><span class="cost-total-cell" ${rowReadOnly ? '' : `onclick="openCostConfigModal('${escapeHtml(categoria.nombre)}', ${index})"`} title="${rowReadOnly ? 'Costo automático' : 'Configurar costo'}">${fmtTableAmount(total, { kind: 'cost' })}${partida.formula_tipo === 'expr_mensual' || estadoCosto.className === 'estado-monthly' ? '<span class="cost-total-badge">MES</span>' : ''}</span><input type="hidden" class="cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}"/><input type="hidden" data-field="formula_tipo" value="${escapeHtml(partida.formula_tipo || 'expr')}"/></td>
+          <td style="text-align:center;color:#22c55e;font-weight:800"><span class="cost-total-cell" ${rowReadOnly ? '' : `onclick="openCostConfigModal('${escapeHtml(categoria.nombre)}', ${index})"`} title="${rowReadOnly ? escapeHtml(linkedSourceHint) : 'Configurar costo'}">${fmtTableAmount(total, { kind: 'cost' })}${partida.formula_tipo === 'expr_mensual' || estadoCosto.className === 'estado-monthly' ? '<span class="cost-total-badge">MES</span>' : ''}</span><input type="hidden" class="cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}"/><input type="hidden" data-field="formula_tipo" value="${escapeHtml(partida.formula_tipo || 'expr')}"/></td>
           <td class="cost-iva-cell" style="text-align:center">
             <span class="cost-iva-actions">
               <input class="cost-iva-check" type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''} ${rowReadOnly ? 'disabled' : ''}/>
@@ -4427,8 +4576,8 @@ function renderCostPlanilla() {
           <div class="cost-category-header">
             <div class="cost-category-title">
               <button class="btn-collapse-cost" type="button" onclick="${hasSubpartidas ? `toggleCostCategoryCollapse('${escapeHtml(categoria.nombre)}')` : ''}" title="${hasSubpartidas ? 'Expandir o colapsar' : 'Sin subpartidas'}" ${hasSubpartidas ? '' : 'disabled style="opacity:.45;cursor:not-allowed"'}>${hasSubpartidas ? (isCollapsed ? '&#9656;' : '&#9662;') : '&middot;'}</button>
-              <span class="cost-category-name">${escapeHtml(categoria.nombre)}</span>
-              ${categoryReadOnly ? '' : `<button class="btn-add-cost btn-subpartida" type="button" data-category="${escapeHtml(categoria.nombre)}" onclick="addCostPartidaFromButton(this); return false;" title="Agregar subpartida" aria-label="Agregar subpartida a ${escapeHtml(categoria.nombre)}"><span class="btn-add-icon" aria-hidden="true">+</span><span>Subpartida</span></button>`}
+              <span class="cost-category-name">${escapeHtml(categoryDisplayName)}</span>
+              ${canAddSubpartida ? `<button class="btn-add-cost btn-subpartida" type="button" data-category="${escapeHtml(categoria.nombre)}" onclick="addCostPartidaFromButton(this); return false;" title="Agregar subpartida" aria-label="Agregar subpartida a ${escapeHtml(categoryDisplayName)}"><span class="btn-add-icon" aria-hidden="true">+</span><span>Subpartida</span></button>` : ''}
             </div>
             <div class="cost-category-actions">
             </div>
