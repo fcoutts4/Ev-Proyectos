@@ -18,6 +18,9 @@ const state = {
     collapsed: {},
     activePaymentCategory: null,
     activePaymentIndex: null,
+    activeIvaCategory: null,
+    activeIvaIndex: null,
+    activeIvaId: null,
     activeFormulaCategory: null,
     activeFormulaIndex: null,
     formulaInputId: null,
@@ -971,6 +974,7 @@ function setupAutosaveListeners() {
       if (!event.target.closest('#planilla-table [data-cost-row]')) return;
       readCostosEditor();
       scheduleAutosave('costos');
+      if (event.target.matches('[data-field="tiene_iva"]')) renderCostosModule();
     };
     document.addEventListener('input', onCostDraftChange);
     document.addEventListener('change', onCostDraftChange);
@@ -4046,6 +4050,9 @@ function ensureCostosUiState() {
     collapsed: {},
     activePaymentCategory: null,
     activePaymentIndex: null,
+    activeIvaCategory: null,
+    activeIvaIndex: null,
+    activeIvaId: null,
     activeFormulaCategory: null,
     activeFormulaIndex: null,
     activeConfigCategory: null,
@@ -4059,6 +4066,90 @@ function ensureCostosUiState() {
     state.costosUi.collapsed = {};
   }
   return state.costosUi;
+}
+
+function getCostIvaSelection(categorias = ensureCostosState()) {
+  const costosUi = ensureCostosUiState();
+  const categoryName = String(costosUi.activeIvaCategory || '');
+  if (!categoryName) return null;
+
+  const category = (categorias || []).find((item) => item.nombre === categoryName);
+  if (!category) return null;
+
+  let index = Number.parseInt(costosUi.activeIvaIndex, 10);
+  if (costosUi.activeIvaId) {
+    const indexById = (category.partidas || []).findIndex((partida) => String(partida.id || '') === String(costosUi.activeIvaId));
+    if (indexById >= 0) index = indexById;
+  }
+
+  if (!Number.isInteger(index) || index < 0) return null;
+  const partida = category.partidas?.[index];
+  return partida ? { category, partida, index } : null;
+}
+
+function clearCostIvaSelection(renderPanelOnly = true) {
+  const costosUi = ensureCostosUiState();
+  costosUi.activeIvaCategory = null;
+  costosUi.activeIvaIndex = null;
+  costosUi.activeIvaId = null;
+  if (renderPanelOnly) {
+    setHtml('cost-iva-panel', '');
+    document.querySelectorAll('.cost-iva-btn.is-active').forEach((button) => button.classList.remove('is-active'));
+  }
+}
+
+function renderCostIvaPanel(context = buildCostContext(), categorias = ensureCostosState()) {
+  const panel = $('cost-iva-panel');
+  if (!panel) return;
+
+  const selection = getCostIvaSelection(categorias);
+  if (!selection) {
+    clearCostIvaSelection(false);
+    setHtml('cost-iva-panel', '');
+    return;
+  }
+
+  const { category, partida, index } = selection;
+  const costosUi = ensureCostosUiState();
+  costosUi.activeIvaIndex = index;
+  costosUi.activeIvaId = partida.id || costosUi.activeIvaId || '';
+
+  const baseNeta = evaluateCostPartida(partida, context);
+  const ivaCalculado = partida.tiene_iva ? baseNeta * 0.19 : 0;
+  const totalConIva = baseNeta + ivaCalculado;
+  const stateLabel = partida.tiene_iva ? 'IVA activo 19%' : 'IVA no activo';
+  const partidaName = partida.nombre || 'Subpartida';
+  const panelName = `${category.nombre} / ${partidaName}`;
+
+  setHtml('cost-iva-panel', `
+    <div class="cost-iva-detail" role="region" aria-label="Calculo de IVA">
+      <div class="cost-iva-heading">
+        <span class="cost-iva-title">C&aacute;lculo de IVA</span>
+        <span class="cost-iva-name" title="${escapeHtml(panelName)}">${escapeHtml(panelName)}</span>
+      </div>
+      <span class="cost-iva-state">${escapeHtml(stateLabel)}</span>
+      <div class="cost-iva-metrics">
+        <div class="cost-iva-metric"><span>Base neta</span><strong>${fmtUf(baseNeta)}</strong></div>
+        <div class="cost-iva-metric"><span>IVA calculado</span><strong>${fmtUf(ivaCalculado)}</strong></div>
+        <div class="cost-iva-metric"><span>Total c/IVA</span><strong>${fmtUf(totalConIva)}</strong></div>
+      </div>
+      <button class="cost-iva-close" type="button" onclick="closeCostIvaPanel()" title="Cerrar calculo de IVA" aria-label="Cerrar calculo de IVA">&times;</button>
+    </div>
+  `);
+}
+
+function openCostIvaPanelFromButton(button) {
+  if (!button) return;
+  readCostosEditor();
+  const costosUi = ensureCostosUiState();
+  costosUi.activeIvaCategory = button.dataset.category || '';
+  costosUi.activeIvaIndex = Number.parseInt(button.dataset.index, 10);
+  costosUi.activeIvaId = button.dataset.costId || '';
+  renderCostosModule();
+}
+
+function closeCostIvaPanel() {
+  clearCostIvaSelection(true);
 }
 
 function renderCostFlow(monthlyTotals) {
@@ -4228,6 +4319,8 @@ function renderCostPlanilla() {
     });
   });
 
+  renderCostIvaPanel(context, categorias);
+
   setHtml('planilla-tbody', categorias.map((categoria) => {
     if (!isCostPlanillaCategory(categoria)) return '';
     const isCollapsed = Object.prototype.hasOwnProperty.call(collapsedState, categoria.nombre)
@@ -4279,6 +4372,8 @@ function renderCostPlanilla() {
       categoryTotalIva += partida.tiene_iva ? total * 0.19 : 0;
       distribucion.forEach((value, monthIndex) => { monthlyTotals[monthIndex] += value; });
       distribucion.forEach((value, monthIndex) => { categoryMonthlyTotals[monthIndex] += value; });
+      const isActiveIva = costosUi.activeIvaCategory === categoria.nombre
+        && Number.parseInt(costosUi.activeIvaIndex, 10) === index;
 
       categoryRows.push(`
         <tr class="partida-row is-subpartida" data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" data-cost-id="${escapeHtml(partida.id || '')}" ${rowReadOnly ? 'data-auto="1" data-readonly="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
@@ -4286,7 +4381,12 @@ function renderCostPlanilla() {
           <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${rowReadOnly ? 'disabled' : ''}/></td>
           <td class="cost-config-cell">${planEditable ? `<span class="cost-config-pill ${estadoCosto.className}" onclick="openCostConfigModal('${escapeHtml(categoria.nombre)}', ${index})" title="Configurar costo">${escapeHtml(estadoCosto.label)}</span>` : '<span class="badge badge-yellow">AUTO</span>'}</td>
           <td style="text-align:center;color:#22c55e;font-weight:800"><span class="cost-total-cell" ${rowReadOnly ? '' : `onclick="openCostConfigModal('${escapeHtml(categoria.nombre)}', ${index})"`} title="${rowReadOnly ? 'Costo automático' : 'Configurar costo'}">${fmtTableAmount(total, { kind: 'cost' })}${partida.formula_tipo === 'expr_mensual' || estadoCosto.className === 'estado-monthly' ? '<span class="cost-total-badge">MES</span>' : ''}</span><input type="hidden" class="cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}"/><input type="hidden" data-field="formula_tipo" value="${escapeHtml(partida.formula_tipo || 'expr')}"/></td>
-          <td style="text-align:center"><input type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''} ${rowReadOnly ? 'disabled' : ''}/></td>
+          <td class="cost-iva-cell" style="text-align:center">
+            <span class="cost-iva-actions">
+              <input class="cost-iva-check" type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''} ${rowReadOnly ? 'disabled' : ''}/>
+              <button class="cost-iva-btn ${isActiveIva ? 'is-active' : ''}" type="button" data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" data-cost-id="${escapeHtml(partida.id || '')}" onclick="openCostIvaPanelFromButton(this)" title="Ver calculo de IVA" aria-label="Ver calculo de IVA para ${escapeHtml(partida.nombre || 'Subpartida')}">IVA</button>
+            </span>
+          </td>
           ${distribucion.map((value) => `<td data-month-cell style="text-align:center">${fmtTableAmount(value, { kind: 'cost' })}</td>`).join('')}
         </tr>
       `);
@@ -4359,6 +4459,26 @@ function cumulativeSeries(values) {
   }, []);
 }
 
+function getIvaSettlementSeries(ivaCredito = [], ivaDebito = [], monthCount = Math.max(ivaCredito.length, ivaDebito.length)) {
+  const ivaMensual = createMonthlyArray(monthCount, 0);
+  const remanente = createMonthlyArray(monthCount, 0);
+  const pagoIva = createMonthlyArray(monthCount, 0);
+
+  for (let index = 0; index < monthCount; index += 1) {
+    const monthly = toNumber(ivaDebito[index]) - toNumber(ivaCredito[index]);
+    const previousRemainder = index > 0 ? toNumber(remanente[index - 1]) : 0;
+    ivaMensual[index] = monthly;
+    remanente[index] = Math.min(previousRemainder + monthly, 0);
+    pagoIva[index] = monthly > 0
+      ? (previousRemainder > 0
+        ? monthly
+        : Math.max(previousRemainder + monthly, 0))
+      : 0;
+  }
+
+  return { ivaMensual, remanente, pagoIva };
+}
+
 function renderProjectCashflow() {
   if (!$('flujo-tabla')) return;
   const monthCount = getCostMonthCount();
@@ -4374,10 +4494,11 @@ function renderProjectCashflow() {
   // IVA
   const ivaCredito = getMonthlyIvaCredito();
   const ivaDebito = getMonthlyIvaDebito(income);
+  const ivaSettlement = getIvaSettlementSeries(ivaCredito, ivaDebito, monthCount);
   renderIvaDebitoPanel();
 
-  // Flujo antes de impuestos = operativo - IVA credito + IVA debito
-  const flujoAntesImpuestos = flujoOperativoBruto.map((v, i) => v - toNumber(ivaCredito[i]) + toNumber(ivaDebito[i]));
+  // Flujo antes de impuestos = operativo - pago de IVA efectivo al SII
+  const flujoAntesImpuestos = flujoOperativoBruto.map((v, i) => v - toNumber(ivaSettlement.pagoIva[i]));
 
   // PPM + Impuesto Renta
   const ppm = getMonthlyPPM(income);
@@ -4436,7 +4557,10 @@ function renderProjectCashflow() {
     { label: 'Flujo operativo bruto', values: flujoOperativoBruto, sign: '=', bold: true, formula: 'Ingresos - Costos - Gastos financieros', refs: [{ label: 'Total', value: fmtUf(totalFlujoBruto) }] },
     { label: 'IVA crédito', values: ivaCredito.map((v) => -v), sign: '-', formula: '-SUMA(Egresos con check IVA × 19%)', refs: [{ label: 'Total IVA crédito', value: fmtUf(ivaCredito.reduce((a, b) => a + b, 0)) }] },
     { label: 'IVA débito', values: ivaDebito, sign: '+', formula: 'Ingresos brutos escriturados × Factor IVA débito (IVA / IB)', refs: [{ label: 'Total IVA débito', value: fmtUf(ivaDebito.reduce((a, b) => a + b, 0)) }, { label: 'Factor IVA débito', value: fmtNumber(getIvaDebitoAnalysis().factor, 4) }] },
-    { label: 'Flujo antes de impuestos', values: flujoAntesImpuestos, sign: '=', bold: true, formula: 'Flujo operativo bruto - IVA crédito + IVA débito', refs: [{ label: 'Total', value: fmtUf(totalFlujoAntes) }] },
+    { label: 'IVA mensual', values: ivaSettlement.ivaMensual, sign: '=', formula: 'IVA debito - IVA credito', refs: [{ label: 'Total IVA mensual', value: fmtUf(ivaSettlement.ivaMensual.reduce((a, b) => a + b, 0)) }] },
+    { label: 'Remanente IVA mensual', values: ivaSettlement.remanente, sign: '=', formula: 'MIN(Remanente anterior + IVA mensual, 0)', refs: [{ label: 'Remanente final', value: fmtUf(ivaSettlement.remanente[ivaSettlement.remanente.length - 1] || 0) }] },
+    { label: 'Pago IVA', values: ivaSettlement.pagoIva.map((v) => -v), sign: '-', formula: 'Si IVA mensual > 0: pago el exceso sobre remanente anterior; si no, 0', refs: [{ label: 'Total pago IVA', value: fmtUf(ivaSettlement.pagoIva.reduce((a, b) => a + b, 0)) }] },
+    { label: 'Flujo antes de impuestos', values: flujoAntesImpuestos, sign: '=', bold: true, formula: 'Flujo operativo bruto - Pago IVA', refs: [{ label: 'Total', value: fmtUf(totalFlujoAntes) }] },
     { label: 'PPM', values: ppm, sign: '-', formula: '-1% × Ingresos escrituración / (1 + factor_IVA)', refs: [{ label: 'Total PPM', value: fmtUf(ppm.reduce((a, b) => a + b, 0)) }] },
     { label: 'Impuesto Renta', values: impRenta, sign: '-', formula: `-${getGlobalFinancialParams().pct_impuesto_renta}% × (Escrituras año × Valor prom. × Margen). Pago abril año siguiente`, refs: [{ label: 'Total Renta', value: fmtUf(impRenta.reduce((a, b) => a + b, 0)) }] },
     { label: 'Flujo después de impuestos', values: flujoDespuesImpuestos, sign: '=', bold: true, formula: 'Flujo antes de impuestos + PPM + Impuesto Renta', refs: [{ label: 'Total', value: fmtUf(totalFlujoDespues) }] },
@@ -7427,6 +7551,8 @@ window.updateConstrParams = updateConstrParams;
 window.guardarCostos = guardarCostos;
 window.agregarPartidaLinea = agregarPartidaLinea;
 window.addCostPartidaFromButton = addCostPartidaFromButton;
+window.openCostIvaPanelFromButton = openCostIvaPanelFromButton;
+window.closeCostIvaPanel = closeCostIvaPanel;
 window.redistribuirPartida = redistribuirPartida;
 window.aplicarPlanPagoFila = aplicarPlanPagoFila;
 window.setCostFlowMode = setCostFlowMode;

@@ -71,6 +71,23 @@ tbody tr:hover{background:#f8fafc}
 .btn-add-cost{height:24px;min-height:24px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:5px;font-size:10px;font-weight:800;line-height:1;letter-spacing:0;text-transform:none;white-space:nowrap;background:#ecfdf5;color:#166534;border:1px solid #86efac;border-radius:7px;cursor:pointer;pointer-events:auto;transition:background .15s,border-color .15s,color .15s,box-shadow .15s,transform .15s}
 .btn-add-cost:hover{background:#dcfce7;border-color:#4ade80;color:#14532d;box-shadow:0 2px 6px rgba(22,101,52,.14);transform:translateY(-1px)}
 .btn-add-cost .btn-add-icon{font-size:13px;font-weight:900;line-height:1}
+.cost-iva-actions{display:inline-flex;align-items:center;justify-content:center;gap:4px;min-height:18px;white-space:nowrap}
+.cost-iva-check{margin:0;flex:0 0 auto}
+.cost-iva-btn{height:18px;min-height:18px;padding:0 6px;display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;line-height:1;letter-spacing:0;text-transform:none;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:6px;cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s,color .15s,box-shadow .15s}
+.cost-iva-btn:hover,.cost-iva-btn.is-active{background:#dbeafe;border-color:#60a5fa;color:#1e40af;box-shadow:0 1px 4px rgba(37,99,235,.14)}
+.cost-iva-panel-slot{border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;background:#fff;padding:8px 10px}
+.cost-iva-panel-slot:empty{display:none}
+.cost-iva-detail{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:7px 9px;border:1px solid #bfdbfe;border-radius:8px;background:#eff6ff;color:#1e3a8a}
+.cost-iva-heading{display:flex;align-items:center;gap:8px;min-width:190px;max-width:420px}
+.cost-iva-title{font-size:10px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:#1e40af;white-space:nowrap}
+.cost-iva-name{font-size:11px;font-weight:800;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cost-iva-state{display:inline-flex;align-items:center;justify-content:center;padding:2px 7px;border-radius:999px;background:#fff;color:#1d4ed8;border:1px solid #bfdbfe;font-size:9px;font-weight:800;white-space:nowrap}
+.cost-iva-metrics{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto}
+.cost-iva-metric{display:inline-flex;align-items:baseline;gap:4px;font-size:10px;white-space:nowrap}
+.cost-iva-metric span{color:#64748b;font-weight:800}
+.cost-iva-metric strong{color:#0f172a;font-size:11px;font-weight:900}
+.cost-iva-close{width:20px;height:20px;min-width:20px;min-height:20px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid #bfdbfe;border-radius:6px;background:#fff;color:#1d4ed8;font-size:13px;font-weight:900;line-height:1;cursor:pointer}
+.cost-iva-close:hover{background:#dbeafe;color:#1e40af}
 .drag-handle{display:inline-flex;align-items:center;justify-content:center;width:22px;color:#94a3b8;cursor:grab;font-size:14px;letter-spacing:-2px;user-select:none}
 .drag-handle:active{cursor:grabbing}
 .cost-plan-input{min-width:220px}
@@ -486,6 +503,8 @@ tbody tr:hover{background:#f8fafc}
 #planilla-table .btn-collapse-cost{width:18px!important;height:18px!important;min-width:18px!important;min-height:18px!important;font-size:10px!important;box-shadow:0 1px 2px rgba(15,23,42,.06)}
 #planilla-table .btn-add-cost{height:22px!important;min-height:22px!important;padding:0 8px!important;font-size:9px!important;border-radius:6px!important}
 #planilla-table .btn-add-cost .btn-add-icon{font-size:12px!important}
+#planilla-table .cost-iva-actions{height:18px;min-height:18px}
+#planilla-table .cost-iva-btn{height:17px;min-height:17px;padding:0 5px;font-size:8px;border-radius:5px}
 #planilla-table .btn-plus{width:18px;height:18px;font-size:11px}
 #planilla-table .btn-delete-inline{width:18px!important;height:18px!important;min-height:18px!important;font-size:11px!important}
 #planilla-table .drag-handle{width:14px;font-size:10px}
@@ -1775,6 +1794,7 @@ table:not(.gantt-table) .tfoot-dark td,
     </div>
   </div>
 
+    <div id="cost-iva-panel" class="cost-iva-panel-slot"></div>
     <div id="cost-planilla-scroll" class="tbl-scroll" style="border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px">
       <table id="planilla-table">
         <thead id="planilla-head"></thead>
@@ -2800,9 +2820,10 @@ table:not(.gantt-table) .tfoot-dark td,
       const subtotalEgresos = sumMonthlySeries([costStructure.total, financialTotal], monthCount);
       const ivaCreditoSource = getCostIvaCreditoForCashflow(monthCount);
       const ivaDebitoSource = normalizeMonthlySeries(getMonthlyIvaDebito(incomeSource), monthCount);
+      const ivaSettlement = getIvaSettlementSeries(ivaCreditoSource, ivaDebitoSource, monthCount);
       if (typeof renderIvaDebitoPanel === 'function') renderIvaDebitoPanel();
       const flujoSinIva = incomeSource.map((value, index) => toNumber(value) - toNumber(subtotalEgresos[index]));
-      const flujoConIva = flujoSinIva.map((value, index) => value - toNumber(ivaCreditoSource[index]) + toNumber(ivaDebitoSource[index]));
+      const flujoConIva = flujoSinIva.map((value, index) => value - toNumber(ivaSettlement.pagoIva[index]));
       const cumulativeSin = cumulativeSeries(flujoSinIva);
       const cumulativeCon = cumulativeSeries(flujoConIva);
       const totalIncome = total(incomeSource);
@@ -2830,6 +2851,7 @@ table:not(.gantt-table) .tfoot-dark td,
         ['Subtotal egresos neto', totalSubtotal, '#0f766e'],
         ['IVA crédito', -total(ivaCreditoSource), '#2563eb'],
         ['IVA débito', total(ivaDebitoSource), '#7c3aed'],
+        ['Pago IVA', -total(ivaSettlement.pagoIva), '#0ea5e9'],
       ].map(([label, value, color]) => {
         const pct = totalIncome ? toNumber(value) / totalIncome * 100 : 0;
         return `<div class="dist-row"><div class="dist-label">${escapeHtml(label)}</div><div class="dist-bar-wrap"><div class="dist-bar" style="width:${Math.max(2, Math.min(100, Math.abs(pct)))}%;background:${color}"></div></div><div class="dist-pct">${fmtPct(pct)}</div></div>`;
@@ -2986,6 +3008,33 @@ table:not(.gantt-table) .tfoot-dark td,
         values: ivaDebitoSource,
         mode: 'signed',
         sign: '+',
+        iva: true,
+      });
+      pushRow({
+        key: 'iva_mensual',
+        label: 'IVA mensual',
+        origin: 'IVA Débito + IVA Crédito (crédito como egreso negativo)',
+        values: ivaSettlement.ivaMensual,
+        mode: 'signed',
+        sign: '=',
+        iva: true,
+      });
+      pushRow({
+        key: 'iva_remanente',
+        label: 'Remanente IVA mensual',
+        origin: 'MIN(Remanente anterior + IVA mensual, 0)',
+        values: ivaSettlement.remanente,
+        mode: 'signed',
+        sign: '=',
+        iva: true,
+      });
+      pushRow({
+        key: 'iva_pago',
+        label: 'Pago IVA',
+        origin: 'Pago al SII solo por saldo positivo luego de aplicar remanente',
+        values: ivaSettlement.pagoIva,
+        mode: 'cost',
+        sign: '-',
         iva: true,
       });
 
