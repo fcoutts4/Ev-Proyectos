@@ -1483,6 +1483,12 @@ let _addrEditingMode = false;
 // Resets when: project is switched, name is saved/cancelled, or panel closes.
 let _nameEditingMode = false;
 
+const _projectDeleteState = {
+  projectId: '',
+  step: 0,
+  phrase: '',
+};
+
 const _addressSearchState = {
   project: { timer: null, controller: null, sequence: 0, results: [] },
   new: { timer: null, controller: null, sequence: 0, results: [] },
@@ -1492,6 +1498,16 @@ let _activeProjectAddressSelection = null;
 let _newProjectAddressSelection = null;
 let _googleAutocompleteService = null;
 let _googlePlacesService = null;
+
+function resetProjectDeleteState() {
+  _projectDeleteState.projectId = '';
+  _projectDeleteState.step = 0;
+  _projectDeleteState.phrase = '';
+}
+
+function isDeletePhraseValid(value) {
+  return String(value || '') === 'ELIMINAR';
+}
 
 function openProjectsPanel(showCreateForm = false) {
   renderProjectsPanel();
@@ -1529,6 +1545,7 @@ function closeProjectsPanel() {
   // Reset transient UI state
   _addrEditingMode = false;
   _nameEditingMode = false;
+  resetProjectDeleteState();
   _activeProjectAddressSelection = null;
   resetAddressSearchContext('project');
   _newProjAddrConfirmed = false;
@@ -1647,6 +1664,7 @@ function renderProjectsPanel() {
     // Address management section for the active card
     const showEditForm = isActive && (_addrEditingMode || !confirmed);
     const showProjectEditTools = isActive && (_nameEditingMode || showEditForm);
+    const projectId = String(proyecto.id || '');
     let addrSection = '';
     if (isActive) {
       const addrState = getAddressStateInfo(src);
@@ -1727,14 +1745,46 @@ function renderProjectsPanel() {
       }
     }
 
-    const deleteProjectSection = showProjectEditTools ? `
-        <div class="proj-card-actions" onclick="event.stopPropagation()">
-          <button class="btn-outline proj-delete-btn" type="button"
-                  onclick="event.stopPropagation();deleteCurrentProject()"
-                  title="Eliminar este proyecto de forma permanente">
-            Eliminar proyecto
-          </button>
-        </div>` : '';
+    let deleteProjectSection = '';
+    if (showProjectEditTools) {
+      if (_projectDeleteState.projectId === projectId && _projectDeleteState.step === 1) {
+        deleteProjectSection = `
+          <div class="proj-delete-flow" onclick="event.stopPropagation()">
+            <div class="proj-delete-copy">¿Seguro que quieres eliminar este proyecto?</div>
+            <div class="proj-delete-actions">
+              <button class="btn-outline" type="button" onclick="event.stopPropagation();cancelDeleteProject()">Cancelar</button>
+              <button class="btn-primary" type="button" onclick="event.stopPropagation();continueDeleteProject('${escapeHtml(projectId)}')">Continuar</button>
+            </div>
+          </div>`;
+      } else if (_projectDeleteState.projectId === projectId && _projectDeleteState.step === 2) {
+        const phrase = _projectDeleteState.phrase || '';
+        const canDelete = isDeletePhraseValid(phrase);
+        deleteProjectSection = `
+          <div class="proj-delete-flow is-danger" onclick="event.stopPropagation()">
+            <div class="proj-delete-copy"><strong>Esta acción no se puede deshacer.</strong> Para confirmar, escribe ELIMINAR.</div>
+            <input class="inp proj-delete-phrase" id="proj-delete-confirm-input" type="text"
+                   value="${escapeHtml(phrase)}"
+                   autocomplete="off"
+                   spellcheck="false"
+                   placeholder="Escribe ELIMINAR"
+                   oninput="updateDeleteProjectPhrase('${escapeHtml(projectId)}', this.value)">
+            <div class="proj-delete-actions">
+              <button class="btn-outline" type="button" onclick="event.stopPropagation();cancelDeleteProject()">Cancelar</button>
+              <button class="btn-primary proj-delete-final" id="proj-delete-confirm-btn" type="button" ${canDelete ? '' : 'disabled'}
+                      onclick="event.stopPropagation();deleteCurrentProject('${escapeHtml(projectId)}')">Eliminar definitivamente</button>
+            </div>
+          </div>`;
+      } else {
+        deleteProjectSection = `
+          <div class="proj-card-actions" onclick="event.stopPropagation()">
+            <button class="btn-outline proj-delete-btn" type="button"
+                    onclick="event.stopPropagation();startDeleteProject('${escapeHtml(projectId)}')"
+                    title="Eliminar este proyecto">
+              Eliminar proyecto
+            </button>
+          </div>`;
+      }
+    }
 
     return `
       <div class="proj-card ${isActive ? 'is-active' : ''}"
@@ -1760,6 +1810,7 @@ async function switchProject(projectId) {
   if (!projectId || projectId === state.proyectoId) return;
   _addrEditingMode = false; // reset edit mode when changing project
   _nameEditingMode = false;
+  resetProjectDeleteState();
   _activeProjectAddressSelection = null;
   resetAddressSearchContext('project');
   closeProjectsPanel();
@@ -1827,6 +1878,7 @@ async function submitNewProject() {
 
 function startEditAddress() {
   _addrEditingMode = true;
+  resetProjectDeleteState();
   _activeProjectAddressSelection = getStoredAddressSelection(state.proyecto);
   resetAddressSearchContext('project');
   renderProjectsPanel();
@@ -1835,6 +1887,7 @@ function startEditAddress() {
 
 function cancelEditAddress() {
   _addrEditingMode = false;
+  resetProjectDeleteState();
   _activeProjectAddressSelection = null;
   resetAddressSearchContext('project');
   renderProjectsPanel();
@@ -1842,6 +1895,7 @@ function cancelEditAddress() {
 
 function startEditName() {
   _nameEditingMode = true;
+  resetProjectDeleteState();
   renderProjectsPanel();
   window.setTimeout(() => {
     const input = $('proj-name-input');
@@ -1854,6 +1908,7 @@ function startEditName() {
 
 function cancelEditName() {
   _nameEditingMode = false;
+  resetProjectDeleteState();
   renderProjectsPanel();
 }
 
@@ -1882,6 +1937,7 @@ async function saveProjectName() {
   if (listEntry) Object.assign(listEntry, stampProjectUpdated({ ...listEntry, nombre }, fechaActualizacion));
   saveProjectLocalMeta(state.proyectoId, { nombre, fechaActualizacion, updated_at: fechaActualizacion });
   _nameEditingMode = false;
+  resetProjectDeleteState();
 
   renderProjectHeader();
   renderProjectsPanel();
@@ -1964,6 +2020,110 @@ async function deleteCurrentProject() {
   }
 }
 
+function startDeleteProject(projectId) {
+  if (!projectId || String(projectId) !== String(state.proyectoId || '')) return;
+  _projectDeleteState.projectId = String(projectId);
+  _projectDeleteState.step = 1;
+  _projectDeleteState.phrase = '';
+  renderProjectsPanel();
+}
+
+function continueDeleteProject(projectId) {
+  if (!projectId || String(projectId) !== String(state.proyectoId || '')) return;
+  if (_projectDeleteState.projectId !== String(projectId) || _projectDeleteState.step !== 1) return;
+  _projectDeleteState.step = 2;
+  _projectDeleteState.phrase = '';
+  renderProjectsPanel();
+  window.setTimeout(() => $('proj-delete-confirm-input')?.focus(), 30);
+}
+
+function updateDeleteProjectPhrase(projectId, value) {
+  if (!projectId || _projectDeleteState.projectId !== String(projectId)) return;
+  _projectDeleteState.phrase = String(value || '');
+  const confirmButton = $('proj-delete-confirm-btn');
+  if (confirmButton) confirmButton.disabled = !isDeletePhraseValid(_projectDeleteState.phrase);
+}
+
+function cancelDeleteProject() {
+  resetProjectDeleteState();
+  renderProjectsPanel();
+}
+
+async function deleteCurrentProject(projectId = '') {
+  const targetProjectId = String(projectId || '').trim();
+  if (!targetProjectId || !state.proyectoId) return;
+  if (targetProjectId !== String(state.proyectoId)) {
+    setSyncStatus('error', 'ERROR', 'El proyecto activo cambió. Intenta nuevamente.');
+    resetProjectDeleteState();
+    renderProjectsPanel();
+    return;
+  }
+  if (_projectDeleteState.projectId !== targetProjectId || _projectDeleteState.step !== 2 || !isDeletePhraseValid(_projectDeleteState.phrase)) return;
+
+  const currentIndex = state.proyectos.findIndex((project) => String(project.id) === targetProjectId);
+  if (currentIndex < 0) return;
+
+  const currentProject = state.proyectos[currentIndex] || {};
+  const projectName = String(state.proyecto?.nombre || currentProject.nombre || 'este proyecto').trim() || 'este proyecto';
+
+  try {
+    setSyncStatus('saving', 'GUARDANDO', `Eliminando ${projectName}...`);
+    await flushPendingAutosaves();
+    await api(`/api/proyectos/${targetProjectId}`, { method: 'DELETE' });
+    removeProjectLocalMeta(targetProjectId);
+    resetProjectDeleteState();
+
+    const remainingProjects = state.proyectos.filter((project) => String(project.id) !== targetProjectId);
+    state.proyectos = remainingProjects;
+    renderProjectSelector();
+
+    if (remainingProjects.length) {
+      const nextIndex = Math.min(currentIndex, remainingProjects.length - 1);
+      const nextProjectId = remainingProjects[nextIndex]?.id || remainingProjects[0].id;
+      setLoadingText('Cargando proyecto...', 'Seleccionando otro proyecto');
+      const overlay = $('app-loading-overlay');
+      if (overlay) {
+        overlay.style.display = '';
+        overlay.classList.remove('is-hidden');
+      }
+      try {
+        await loadProject(nextProjectId);
+      } finally {
+        hideLoadingOverlay();
+      }
+    } else {
+      state.proyectoId = null;
+      state.proyecto = null;
+      state.cabida = [];
+      state.gantt = [];
+      state.ventasConfig = [];
+      state.ventasCronograma = [];
+      state.construccion = {};
+      state.costos = [];
+      state.financiamiento = {};
+      state.capital = {};
+      state.calculos = {};
+      _addrEditingMode = false;
+      _nameEditingMode = false;
+      resetProjectDeleteState();
+      _activeProjectAddressSelection = null;
+      resetAddressSearchContext('project');
+      const url = new URL(window.location.href);
+      url.searchParams.delete('projectId');
+      window.history.replaceState({}, '', url);
+      renderProjectHeader();
+      renderProjectsPanel();
+      openProjectsPanel(true);
+    }
+
+    setSyncStatus('ok', 'GUARDADO', `Proyecto eliminado ${new Date().toLocaleTimeString()}`);
+  } catch (error) {
+    resetProjectDeleteState();
+    renderProjectsPanel();
+    setSyncStatus('error', 'ERROR', error.message || 'Error al eliminar proyecto');
+  }
+}
+
 function setAddressStatusIndicator(value, selection = null) {
   const indicator = $('addr-status-indicator');
   const msg = $('addr-validation-msg');
@@ -2034,6 +2194,7 @@ async function saveProjectAddress() {
       updated_at: fechaActualizacion,
     });
     _addrEditingMode = false;
+    resetProjectDeleteState();
     _activeProjectAddressSelection = null;
     resetAddressSearchContext('project');
 
@@ -3804,9 +3965,9 @@ function renderConstruccion() {
 
   const meses = Math.max(1, metrics.plazo_meses);
   const distribution = buildConstructionSCurve(metrics, meses);
-  setText('anticipo-meta', `${fmtNumber(metrics.anticipo_pct)}% del contrato | descuento proporcional en EDPP`);
+  setText('anticipo-meta', `${fmtNumber(metrics.anticipo_pct)}% del contrato`);
   setText('anticipo-monto', fmtUf(distribution.anticipoAmount));
-  setText('retencion-meta', `${fmtNumber(metrics.retencion_pct)}% retenido sobre cada EDPP | total estimado ${fmtUf(distribution.retentionAmount)}`);
+  setText('retencion-meta', `${fmtNumber(metrics.retencion_pct)}% retenido en EDPP`);
   setText('retencion-monto', fmtUf(distribution.retentionAmount));
   renderConstructionSCurveChart(metrics, distribution);
 
@@ -3844,11 +4005,11 @@ function renderTerrainModule() {
   if ($('cfg-tasa-terreno')) $('cfg-tasa-terreno').value = toNumber(state.financiamiento.credito_terreno_tasa);
   setText('fin-terreno-costo', fmtUf(terrainBase));
   setText('fin-terreno-monto', fmtUf(approved));
-  setText('fin-terreno-plazos', `Bloque Compra terreno en gantt | horizonte base ${fmtNumber(terrainTermMonths)} mes(es) hasta construcción`);
+  setText('fin-terreno-plazos', `Horizonte base: ${fmtNumber(terrainTermMonths)} mes(es)`);
   setHtml('fin-terreno-partidas', (state.costos.find((category) => category.nombre === 'TERRENO')?.partidas || [])
     .filter((partida) => partida.es_terreno)
     .map((partida) => `<div>${escapeHtml(partida.nombre)} <strong>${fmtUf(partida.total_neto)}</strong></div>`)
-    .join('') || '<div>Sin partidas de terreno marcadas.</div>');
+    .join('') || '<div>Sin partidas marcadas.</div>');
   renderFinancingSourcePlanilla('terreno');
 }
 
@@ -3864,8 +4025,8 @@ function renderConstructionFinancing() {
   setLocalizedInputValue('fin-constr-alzamiento', state.financiamiento.pct_alzamiento ?? 90, 0);
   setText('fin-constr-costo', fmtUf(metrics.total_neto));
   setText('fin-constr-monto', fmtUf(approved));
-  setText('fin-constr-plazos', `Plazo estimado: mes ${fmtNumber(start)} a mes ${fmtNumber(start + duration)}`);
-  setHtml('fin-constr-partidas', `<div>Base financiera tomada desde el total neto de construcción.</div>`);
+  setText('fin-constr-plazos', `Mes ${fmtNumber(start)} a ${fmtNumber(start + duration)}`);
+  setHtml('fin-constr-partidas', `<div>Base: total neto de construcción.</div>`);
 
   // Sync global config inputs
   const cfg = getGlobalFinancialParams();
@@ -9455,6 +9616,7 @@ async function loadProject(projectId) {
   flushProjectUiStateSave();
   _addrEditingMode = false;
   _nameEditingMode = false;
+  resetProjectDeleteState();
   _activeProjectAddressSelection = null;
   resetAddressSearchContext('project');
   state.proyectoId = projectId;
@@ -9764,6 +9926,10 @@ window.confirmNewProjectAddr = confirmNewProjectAddr;
 window.startEditName = startEditName;
 window.cancelEditName = cancelEditName;
 window.saveProjectName = saveProjectName;
+window.startDeleteProject = startDeleteProject;
+window.continueDeleteProject = continueDeleteProject;
+window.updateDeleteProjectPhrase = updateDeleteProjectPhrase;
+window.cancelDeleteProject = cancelDeleteProject;
 window.deleteCurrentProject = deleteCurrentProject;
 window.onCabidaInputChange = onCabidaInputChange;
 window.onTerrenoInputChange = onTerrenoInputChange;

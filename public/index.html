@@ -1065,8 +1065,41 @@ table:not(.gantt-table) .tfoot-dark td,
 .proj-name-error{font-size:11px;color:#b91c1c;font-weight:700;display:none;margin-top:2px}
 .proj-name-error.is-visible{display:block}
 .proj-card-actions{display:flex;justify-content:flex-end;margin-top:10px}
-.proj-delete-btn{min-height:30px;padding:6px 10px;font-size:11px;font-weight:800;color:#b91c1c!important;border-color:#fecaca!important;background:#fff1f2!important}
-.proj-delete-btn:hover{background:#ffe4e6!important;border-color:#fca5a5!important;color:#991b1b!important}
+.proj-delete-btn{min-height:24px;padding:3px 8px;font-size:10px;font-weight:700;color:#b91c1c!important;border-color:#fecaca!important;background:#fff7f7!important;border-radius:999px!important}
+.proj-delete-btn:hover{background:#ffeaea!important;border-color:#fda4af!important;color:#991b1b!important}
+.proj-delete-flow{margin-top:8px;padding:10px 11px;border:1px solid #fecdd3;border-radius:10px;background:#fff8f8}
+.proj-delete-flow.is-danger{border-color:#fca5a5;background:#fff1f2}
+.proj-delete-copy{font-size:11px;line-height:1.4;color:#7f1d1d}
+.proj-delete-phrase{margin-top:8px;min-height:32px;font-size:11px}
+.proj-delete-actions{display:flex;justify-content:flex-end;gap:6px;margin-top:8px}
+.proj-delete-actions .btn-outline,.proj-delete-actions .btn-primary{min-height:28px;padding:5px 10px;font-size:11px}
+.proj-delete-final[disabled]{opacity:.45;cursor:not-allowed}
+.compact-sheet-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.compact-sheet-head-title{font-size:15px;font-weight:800;color:#0f172a}
+.compact-sheet-head-sub{font-size:10px;color:#94a3b8;margin-top:1px}
+.compact-grid-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;align-items:start}
+.compact-grid-three{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;align-items:start}
+.compact-field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px 12px}
+.compact-metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px 10px}
+.compact-note{font-size:10px;color:#64748b;line-height:1.35}
+.compact-note.soft{color:#94a3b8}
+.compact-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px}
+.compact-box.accent{background:#eef6ff;border-color:#cfe2ff}
+.compact-box.success{background:#f0fdf4;border-color:#bbf7d0}
+.compact-box.warn{background:#fffbeb;border-color:#fde68a}
+.compact-box.danger{background:#fef2f2;border-color:#fecaca}
+.compact-label{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.compact-inline-input{display:flex;align-items:center;gap:4px}
+#tab-terreno .card,#tab-construccion .card{padding:14px!important}
+#tab-terreno .inp,#tab-construccion .inp{min-height:32px!important;padding:5px 8px!important;font-size:12px!important}
+#tab-terreno select.inp,#tab-construccion select.inp{padding-right:28px!important}
+#tab-terreno .btn-primary,#tab-terreno .btn-outline,#tab-construccion .btn-primary,#tab-construccion .btn-outline{min-height:32px!important;padding:5px 11px!important;font-size:11px!important}
+#tab-terreno .sec-title,#tab-construccion .sec-title{margin-bottom:10px!important;font-size:10px!important;letter-spacing:.08em}
+#tab-terreno table th,#tab-construccion table th{padding:7px 8px!important;font-size:9px!important}
+#tab-terreno table td,#tab-construccion table td{padding:7px 8px!important;font-size:11px!important}
+#tab-terreno .finance-date-table th,#tab-terreno .finance-date-table td,#tab-construccion .finance-date-table th,#tab-construccion .finance-date-table td{padding:6px 7px!important}
+#tab-terreno .planilla-nav,#tab-construccion .planilla-nav{gap:6px}
+#tab-terreno .badge,#tab-construccion .badge{font-size:9px!important;padding:3px 7px!important}
 
 </style>
 </head>
@@ -1295,75 +1328,71 @@ table:not(.gantt-table) .tfoot-dark td,
 </div><!-- end tab cabida -->
 
 <div id="tab-terreno" class="tab-pane">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+  <div class="compact-sheet-head">
     <div>
-      <div style="font-size:16px;font-weight:800;color:#0f172a"> TERRENO Y FINANCIAMIENTO TERRENO</div>
-      <div style="font-size:11px;color:#94a3b8">La compra del terreno se define por mes-año y se vincula directamente al bloque "Compra terreno" en la Carta Gantt.</div>
+      <div class="compact-sheet-head-title"> TERRENO Y FINANCIAMIENTO</div>
+      <div class="compact-sheet-head-sub">Compra, superficie y crédito.</div>
     </div>
     <button class="btn-primary" onclick="guardarTerreno()"> Guardar</button>
   </div>
 
-  <div style="display:grid;grid-template-columns:minmax(340px,460px) minmax(320px,520px);gap:16px;margin-bottom:16px;align-items:start;justify-content:start">
-    <div class="card" style="height:100%;min-height:400px">
+  <div class="compact-grid-two" style="margin-bottom:12px">
+    <div class="card" style="height:100%">
       <div class="sec-title"> COMPRA TERRENO</div>
-      <div style="display:grid;grid-template-columns:1fr;gap:10px">
+      <div style="display:grid;grid-template-columns:1fr;gap:8px">
         <div>
-          <div style="font-size:10px;color:#94a3b8;margin-bottom:3px">Compra terreno (mes-año)</div>
+          <div class="compact-label">Fecha compra</div>
           <input type="month" class="inp" id="terreno-fecha-compra" onchange="onTerrenoInputChange()">
         </div>
-        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px">
-          <div style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;margin-bottom:4px">Vínculo con Carta Gantt</div>
-          <div id="terreno-gantt-sync" style="font-size:11px;color:#64748b">Sincronizado con el bloque Compra terreno.</div>
+        <div class="compact-box">
+          <div class="compact-label">Carta Gantt</div>
+          <div id="terreno-gantt-sync" class="compact-note">Sincronizado.</div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div style="background:#f8fafc;border-radius:10px;padding:10px">
-            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">Superficie Bruta</div>
+        <div class="compact-field-grid">
+          <div class="compact-box">
+            <div class="compact-label">M2 bruto</div>
             <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="terreno-m2-bruto" step="0.01" oninput="onTerrenoInputChange()">
           </div>
-          <div style="background:#f8fafc;border-radius:10px;padding:10px">
-            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">Afectación</div>
+          <div class="compact-box">
+            <div class="compact-label">Afectación</div>
             <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="terreno-m2-afectacion" step="0.01" oninput="onTerrenoInputChange()">
           </div>
-          <div style="background:#f8fafc;border-radius:10px;padding:10px">
-            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">Superficie Neta</div>
+          <div class="compact-box">
+            <div class="compact-label">M2 neto</div>
             <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="terreno-m2-neto" step="0.01" readonly style="background:#fff;color:#0f172a;font-weight:700">
-            <div style="font-size:10px;color:#94a3b8;margin-top:3px">Bruta menos afectación</div>
           </div>
-          <div style="background:#f8fafc;border-radius:10px;padding:10px">
-            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">UF / m²</div>
+          <div class="compact-box">
+            <div class="compact-label">UF / m2</div>
             <input type="text" class="inp" id="terreno-precio-uf-m2" step="0.01" inputmode="decimal" data-localized-number="1" oninput="onTerrenoInputChange()">
           </div>
-          <div style="background:#eef6ff;border:1px solid #cfe2ff;border-radius:10px;padding:10px;grid-column:1 / -1">
-            <div style="font-size:10px;color:#64748b;text-transform:uppercase;margin-bottom:3px">Precio total</div>
+          <div class="compact-box accent" style="grid-column:1 / -1">
+            <div class="compact-label">Precio total</div>
             <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="terreno-precio-total" step="0.01" readonly style="background:#fff;color:#0f172a;font-weight:800">
-            <div style="font-size:10px;color:#64748b;margin-top:3px">Resultado de superficie neta por UF / m²</div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="card" style="border:2px solid #fde68a;height:100%;min-height:400px;max-width:520px;justify-self:start">
+    <div class="card" style="border:2px solid #fde68a;height:100%;max-width:520px;justify-self:start">
       <div class="sec-title" style="margin-bottom:12px;color:#b45309"> FINANCIAMIENTO TERRENO</div>
-      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px;margin-bottom:12px;font-size:11px;color:#92400e">
-        Este financiamiento se refleja automáticamente en los costos del proyecto dentro de la categoría de gastos financieros.
-      </div>
+      <div class="compact-box warn compact-note" style="margin-bottom:10px">Se replica en gastos financieros.</div>
       <div id="fin-terreno-partidas" style="margin-bottom:12px;font-size:11px;color:#475569"></div>
-      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px">
-        <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Costo</div><div style="font-weight:800;color:#b45309" id="fin-terreno-costo">0 UF</div></div>
-        <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Monto a financiar</div><div style="font-weight:800;color:#22c55e" id="fin-terreno-monto">0 UF</div></div>
+      <div class="compact-metric-grid" style="margin-bottom:8px">
+        <div><div class="compact-label">Costo</div><div style="font-weight:800;color:#b45309" id="fin-terreno-costo">0 UF</div></div>
+        <div><div class="compact-label">A financiar</div><div style="font-weight:800;color:#22c55e" id="fin-terreno-monto">0 UF</div></div>
       </div>
-      <div style="font-size:10px;color:#94a3b8;margin-bottom:10px" id="fin-terreno-plazos">Plazo vinculado al inicio de construcción</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div class="compact-note soft" style="margin-bottom:8px" id="fin-terreno-plazos">Plazo vinculado a construcción</div>
+      <div class="compact-field-grid">
         <div>
-          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">% a financiar</div>
-          <div style="display:flex;align-items:center;gap:4px"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="fin-terreno-pct" min="0" max="100" oninput="onTerrenoInputChange()"><span style="font-size:11px">%</span></div>
+          <div class="compact-label">% a financiar</div>
+          <div class="compact-inline-input"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="fin-terreno-pct" min="0" max="100" oninput="onTerrenoInputChange()"><span style="font-size:11px">%</span></div>
         </div>
         <div>
-          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Tasa interés</div>
-          <div style="display:flex;align-items:center;gap:4px"><input type="text" class="inp" id="fin-terreno-tasa" step="0.01" inputmode="decimal" data-localized-number="1" oninput="onTerrenoInputChange()" onchange="onTerrenoInputChange()" onblur="onTerrenoInputChange()"><span style="font-size:11px">anual</span></div>
+          <div class="compact-label">Tasa</div>
+          <div class="compact-inline-input"><input type="text" class="inp" id="fin-terreno-tasa" step="0.01" inputmode="decimal" data-localized-number="1" oninput="onTerrenoInputChange()" onchange="onTerrenoInputChange()" onblur="onTerrenoInputChange()"><span style="font-size:11px">anual</span></div>
         </div>
         <div>
-          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Pago intereses</div>
+          <div class="compact-label">Pago intereses</div>
           <select class="inp" id="fin-terreno-pago-int" onchange="onTerrenoInputChange()">
             <option>Semestral</option><option>Mensual</option><option>Anual</option><option>Contra Escrituraciones</option>
           </select>
@@ -1375,8 +1404,7 @@ table:not(.gantt-table) .tfoot-dark td,
   <div class="card" style="margin-bottom:16px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div>
-        <div class="sec-title" style="margin-bottom:4px"> GASTOS FINANCIEROS TERRENO</div>
-        <div style="font-size:11px;color:#94a3b8">Esta categoría se configura en Terreno y se replica automáticamente en Costos del Proyecto.</div>
+        <div class="sec-title" style="margin-bottom:2px"> GASTOS FINANCIEROS TERRENO</div>
       </div>
       <div class="planilla-nav">
         <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('terreno-fin-planilla-scroll', -480)">? Mes</button>
@@ -1534,7 +1562,7 @@ table:not(.gantt-table) .tfoot-dark td,
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px">
 
     <!-- Mix por Etapa -->
-    <div class="card" style="min-height:400px">
+    <div class="card">
       <div class="sec-title"> MIX DE VENTAS POR ETAPA</div>
       <div id="mix-ventas-list"></div>
   </div>
@@ -1650,18 +1678,18 @@ table:not(.gantt-table) .tfoot-dark td,
 </div><!-- end tab gantt -->
 
 <div id="tab-construccion" class="tab-pane">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+  <div class="compact-sheet-head">
     <div>
-      <div style="font-size:16px;font-weight:800;color:#0f172a"> CONTRATO DE CONSTRUCCIÓN</div>
-      <div style="font-size:11px;color:#94a3b8">Asegúrate de guardar tus cambios</div>
+      <div class="compact-sheet-head-title"> CONTRATO DE CONSTRUCCIÓN</div>
+      <div class="compact-sheet-head-sub">Costos, plazos y financiamiento.</div>
   </div>
     <button class="btn-primary" onclick="guardarConstruccion()"> Guardar</button>
 </div>
 
-  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-bottom:16px;align-items:start">
+  <div class="compact-grid-three" style="margin-bottom:12px">
 
     <!-- Superficies -->
-    <div class="card" style="min-height:430px">
+    <div class="card">
       <div class="sec-title"> SUPERFICIES</div>
       <table>
         <thead><tr>
@@ -1672,25 +1700,25 @@ table:not(.gantt-table) .tfoot-dark td,
       </tr></thead>
         <tbody>
           <tr>
-            <td style="font-weight:600">Superficie Sobre Tierra</td>
+            <td style="font-weight:600">Sobre tierra</td>
             <td style="text-align:center"><input type="text" inputmode="numeric" data-localized-number="1" class="inp" id="constr-sup-st" min="0" step="1" style="width:90px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">m²</span></td>
             <td style="text-align:center"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="constr-uf-st" value="27" style="width:80px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">/m²</span></td>
             <td style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-st">192.942 UF</td>
         </tr>
           <tr>
-            <td style="font-weight:600">Superficie Bajo Tierra</td>
+            <td style="font-weight:600">Bajo tierra</td>
             <td style="text-align:center"><input type="text" inputmode="numeric" data-localized-number="1" class="inp" id="constr-sup-bt" min="0" step="1" style="width:90px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">m²</span></td>
             <td style="text-align:center"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="constr-uf-bt" value="15" style="width:80px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">/m²</span></td>
             <td style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-bt">48.615 UF</td>
         </tr>
           <tr>
             <td style="font-weight:600">Gastos Generales</td>
-            <td colspan="2" style="text-align:center"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="constr-gastos-generales" min="0" step="0.01" style="width:120px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">UF netas/mes</span></td>
+            <td colspan="2" style="text-align:center"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="constr-gastos-generales" min="0" step="0.01" style="width:120px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">UF/mes</span></td>
             <td style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-gg">0 UF</td>
         </tr>
           <tr>
             <td style="font-weight:600">Utilidad</td>
-            <td colspan="2" style="text-align:center"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="constr-utilidad-pct" min="0" step="0.01" style="width:90px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">% sobre costo + GG</span></td>
+            <td colspan="2" style="text-align:center"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="constr-utilidad-pct" min="0" step="0.01" style="width:90px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">% costo + GG</span></td>
             <td style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-utilidad">0 UF</td>
         </tr>
       </tbody>
@@ -1715,10 +1743,10 @@ table:not(.gantt-table) .tfoot-dark td,
   </div>
 
     <!-- Plazos y Pagos -->
-    <div class="card" style="min-height:400px">
+    <div class="card">
       <div class="sec-title"> PLAZOS Y PAGOS</div>
 
-      <div style="margin-bottom:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px">
+      <div class="compact-box" style="margin-bottom:10px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
           <span style="font-size:12px;font-weight:700;color:#475569">PLAZO DE CONSTRUCCIÓN</span>
           <div style="display:flex;align-items:center;gap:6px">
@@ -1728,54 +1756,52 @@ table:not(.gantt-table) .tfoot-dark td,
           <span class="badge badge-green" style="font-size:10px">SINCRONIZADO GANTT</span>
       </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;gap:10px">
-          <div style="font-size:10px;color:#94a3b8">Sincronizado con el hito <strong>Construcción</strong> en Carta Gantt.</div>
+          <div class="compact-note soft">Ligado al hito Construcción.</div>
           <div style="font-size:12px;font-weight:800;color:#22c55e" id="plazo-label">20 MESES</div>
         </div>
     </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px">
+      <div class="compact-field-grid">
+        <div class="compact-box success">
           <div style="font-size:10px;font-weight:700;color:#15803d;margin-bottom:6px"> ANTICIPO</div>
           <div style="display:flex;align-items:center;gap:6px">
             <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="anticipo-slider" min="0" max="50" step="0.1" value="15" oninput="updateConstrParams()">
             <span style="font-weight:800;font-size:14px" id="anticipo-label">15%</span>
           </div>
-          <div style="font-size:10px;color:#166534;margin-top:6px" id="anticipo-meta">15% del contrato | pago único inicial, sin devolución ni descuento posterior</div>
+          <div style="font-size:10px;color:#166534;margin-top:6px" id="anticipo-meta">Pago inicial.</div>
           <div style="font-size:11px;font-weight:700;color:#15803d;margin-top:4px" id="anticipo-monto">0 UF</div>
       </div>
-        <div style="background:#fef2f2;border-radius:8px;padding:12px">
+        <div class="compact-box danger">
           <div style="font-size:10px;font-weight:700;color:#991b1b;margin-bottom:6px"> RETENCIONES</div>
           <div style="display:flex;align-items:center;gap:6px">
             <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="retencion-slider" min="0" max="20" step="0.1" value="5" oninput="updateConstrParams()">
             <span style="font-weight:800;font-size:14px" id="retencion-label">5%</span>
           </div>
-          <div style="font-size:10px;color:#991b1b;margin-top:6px" id="retencion-meta">Retención aplicada sobre cada EDPP</div>
+          <div style="font-size:10px;color:#991b1b;margin-top:6px" id="retencion-meta">Aplicada sobre cada EDPP.</div>
           <div style="font-size:11px;font-weight:700;color:#991b1b;margin-top:4px" id="retencion-monto">0 UF</div>
       </div>
     </div>
   </div>
 
-    <div class="card" style="border:2px solid #bbf7d0;min-height:400px">
+    <div class="card" style="border:2px solid #bbf7d0">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div class="sec-title" style="margin-bottom:0;color:#16a34a"> FINANCIAMIENTO</div>
       <span class="badge badge-green" style="font-size:10px">ACTIVO</span>
     </div>
-    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px;margin-bottom:12px;font-size:11px;color:#166534">
-      Este financiamiento se usa para las referencias automáticas de gastos financieros dentro de la planilla de costos.
-    </div>
+    <div class="compact-box success compact-note" style="margin-bottom:10px">Usado en gastos financieros.</div>
     <div id="fin-constr-partidas" style="margin-bottom:10px;font-size:11px;color:#475569"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-      <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Costo real</div><div style="font-weight:800;color:#22c55e" id="fin-constr-costo">0 UF</div></div>
+    <div class="compact-metric-grid" style="margin-bottom:8px">
+      <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Costo</div><div style="font-weight:800;color:#22c55e" id="fin-constr-costo">0 UF</div></div>
       <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">A financiar</div><div style="font-weight:800;color:#22c55e" id="fin-constr-monto">0 UF</div></div>
     </div>
-    <div style="font-size:10px;color:#94a3b8;margin-bottom:10px" id="fin-constr-plazos">Plazo vinculado al hito de construcción</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <div class="compact-note soft" style="margin-bottom:8px" id="fin-constr-plazos">Plazo vinculado a construcción</div>
+    <div class="compact-field-grid">
       <div>
         <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">% a financiar</div>
         <div style="display:flex;align-items:center;gap:4px"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="fin-constr-pct" min="0" max="100" oninput="updateConstrParams()"><span style="font-size:11px">%</span></div>
       </div>
       <div>
-        <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Tasa interés</div>
+        <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Tasa</div>
           <div style="display:flex;align-items:center;gap:4px"><input type="text" class="inp" id="fin-constr-tasa" step="0.01" inputmode="decimal" data-localized-number="1" onchange="updateConstrParams()" onblur="updateConstrParams()"><span style="font-size:11px">anual</span></div>
       </div>
       <div>
@@ -1785,9 +1811,8 @@ table:not(.gantt-table) .tfoot-dark td,
         </select>
       </div>
       <div style="grid-column:1/-1;border-top:1px solid #e2e8f0;padding-top:8px;margin-top:4px">
-        <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">% Alzamiento (pago línea)</div>
+        <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">% Alzamiento</div>
         <div style="display:flex;align-items:center;gap:4px"><input type="text" inputmode="numeric" data-localized-number="1" class="inp" id="fin-constr-alzamiento" value="90" min="0" max="100" step="1" oninput="updateConstrParams()"><span style="font-size:11px">%</span></div>
-        <div style="font-size:10px;color:#64748b;margin-top:4px">Pago línea = % alz. × escrituración mes ant. (100% valor)</div>
       </div>
     </div>
   </div>
@@ -1795,12 +1820,11 @@ table:not(.gantt-table) .tfoot-dark td,
 
   <!-- Parámetros globales de la tabla EP/GF -->
   <div class="card" style="margin-bottom:16px;background:#f8fafc">
-    <div class="sec-title" style="margin-bottom:8px">? PARÁMETROS FINANCIEROS GLOBALES</div>
+    <div class="sec-title" style="margin-bottom:8px"> PARÁMETROS FINANCIEROS GLOBALES</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
       <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">% Impuesto timbres</label><input type="text" inputmode="decimal" data-localized-number="1" step="0.01" class="inp" id="cfg-pct-timbres" oninput="onConfigParamChange(); syncGfParamMirror()"/></div>
       <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">% CEEC (beneficio IVA)</label><input type="text" inputmode="decimal" data-localized-number="1" step="0.01" class="inp" id="cfg-pct-ceec" oninput="onConfigParamChange()"/></div>
     </div>
-    <div style="font-size:10px;color:#94a3b8;margin-top:8px">Las tasas de interés se definen en cada bloque de financiamiento. El impuesto a la renta se configura en Flujo de Caja.</div>
     <!-- Hidden inputs to keep data binding working -->
     <input type="hidden" id="cfg-tasa-terreno"/><input type="hidden" id="cfg-tasa-construccion"/><input type="hidden" id="cfg-pct-renta"/>
   </div>
@@ -1809,8 +1833,7 @@ table:not(.gantt-table) .tfoot-dark td,
   <div class="card" style="margin-bottom:16px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div>
-        <div class="sec-title" style="margin-bottom:4px">?? ESTADOS DE PAGO (EP)</div>
-        <div style="font-size:11px;color:#94a3b8">Subtotal_neto = EDPP neto + Anticipo neto + Retenciones netas. IVA efectivo = IVA bruto - CEEC. El TOTAL_A_PAGO alimenta los GIROS de la tabla siguiente.</div>
+        <div class="sec-title" style="margin-bottom:2px"> ESTADOS DE PAGO (EP)</div>
       </div>
       <div class="planilla-nav">
         <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-ep-scroll', -480)">? Mes</button>
@@ -1839,8 +1862,7 @@ table:not(.gantt-table) .tfoot-dark td,
   <div class="card" style="margin-bottom:16px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div>
-        <div class="sec-title" style="margin-bottom:4px">?? GASTOS FINANCIEROS CONSTRUCCIÓN</div>
-        <div style="font-size:11px;color:#94a3b8">GIROS conectado dinámicamente al TOTAL_A_PAGO de Estados de Pago. El acumulado mantiene los pagos de línea en el cálculo interno.</div>
+        <div class="sec-title" style="margin-bottom:2px"> GASTOS FINANCIEROS CONSTRUCCIÓN</div>
       </div>
       <div class="planilla-nav">
         <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-fin-planilla-scroll', -480)">? Mes</button>
