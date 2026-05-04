@@ -3849,7 +3849,7 @@ function findGanttByName(name) {
 
 function getCronogramaComputed(item) {
   const ganttRef = findGanttByName(item.vinculo_gantt);
-  const base = isVentasCronogramaType(item, 'PREVENTA') ? toNumber(ganttRef?.inicio) : toNumber(ganttRef?.fin) + 1;
+  const base = toNumber(ganttRef?.inicio);
   const inicio = ganttRef ? base + toNumber(item.mes_inicio) : toNumber(item.mes_inicio);
 
   // DuraciÃ³n calculada automÃ¡ticamente basada en velocidad
@@ -5483,7 +5483,7 @@ function syncSalesDrivenMilestones() {
     if (isVentasCronogramaType(row, 'ESCRITURACION')) {
       return {
         ...row,
-        vinculo_gantt: receptionRow.nombre,
+        vinculo_gantt: escrituraRow.nombre,
         mes_inicio: 0,
         duracion: escrituraDuration,
       };

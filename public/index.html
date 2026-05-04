@@ -917,6 +917,11 @@ table:not(.gantt-table) .tfoot-dark td,
 .badge{min-height:22px;line-height:1.2}
 .dist-row{min-height:24px}
 .dist-label{line-height:1.2;overflow-wrap:anywhere}
+.ventas-inline-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+#ventas-precios-table tbody td{padding-top:5px!important;padding-bottom:5px!important;line-height:1.15}
+#ventas-precios-table .inp{min-height:28px!important;padding:3px 8px!important}
+#formas-pago-table tbody td{padding-top:5px!important;padding-bottom:5px!important;line-height:1.15}
+#formas-pago-table .inp{min-height:28px!important;padding:3px 8px!important}
 .modal-backdrop[style*="flex"] .modal-card{outline:1px solid rgba(15,23,42,.08)}
 .chart-shell{border-radius:var(--radius-md)}
 [aria-live]{min-height:1em}
@@ -928,6 +933,7 @@ table:not(.gantt-table) .tfoot-dark td,
   main{padding:12px!important}
   .card,.card-dark,.kpi-card,.req-kpi{padding:14px!important}
   .flow-kpi-grid{grid-template-columns:1fr!important}
+  .ventas-inline-grid{grid-template-columns:1fr!important}
   .payment-plan-grid-head{display:none}
   .planilla-header{align-items:flex-start!important}
 }
@@ -1517,8 +1523,9 @@ table:not(.gantt-table) .tfoot-dark td,
   </div>
 </div>
 
+  <div class="ventas-inline-grid">
   <!-- 2. Formas de Pago -->
-  <div class="card" style="margin-bottom:16px">
+  <div class="card" style="margin-bottom:0">
     <div class="sec-title">Forma de Pago</div>
     <div class="tbl-scroll">
       <table id="formas-pago-table" style="min-width:680px">
@@ -1532,11 +1539,10 @@ table:not(.gantt-table) .tfoot-dark td,
         <tbody id="formas-pago-tbody"></tbody>
     </table>
   </div>
-    <p style="font-size:10px;color:#94a3b8;margin-top:8px">El pie aplica igual para todos los departamentos. Su caja se muestra en Promesas UF segun el tipo de pago seleccionado; el saldo restante se paga al momento de escrituracion.</p>
 </div>
 
   <!-- 3. Fechas y Velocidades -->
-  <div class="card" style="margin-bottom:16px">
+  <div class="card" style="margin-bottom:0">
     <div style="text-align:center;margin-bottom:16px">
       <span style="font-size:18px"></span>
       <div class="sec-title" style="justify-content:center;margin-bottom:0">FECHAS Y VELOCIDADES DE VENTAS</div>
@@ -1611,6 +1617,7 @@ table:not(.gantt-table) .tfoot-dark td,
     </table>
   </div>
 </div>
+</div>
 
   <!-- 4. Mix de Ventas + Velocidad + Proceso -->
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px">
@@ -1623,7 +1630,7 @@ table:not(.gantt-table) .tfoot-dark td,
 
     <!-- Velocidad Comercial -->
     <div class="card" style="display:flex;flex-direction:column;align-items:center">
-      <div class="sec-title" style="width:100%">? VELOCIDAD GLOBAL COMERCIAL</div>
+      <div class="sec-title" style="width:100%">VELOCIDAD GLOBAL COMERCIAL</div>
       <canvas id="speedometer" width="200" height="130" class="speed-canvas"></canvas>
       <div style="font-size:2rem;font-weight:900;color:#0f172a" id="vel-global-uf">16.614</div>
       <div style="font-size:11px;color:#94a3b8">UF / mes</div>
@@ -1637,7 +1644,6 @@ table:not(.gantt-table) .tfoot-dark td,
     <!-- EscrituraciÃ³n -->
     <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px">
       <div class="sec-title" style="width:100%"> PROCESO DE ESCRITURACIÃ“N</div>
-      <div style="width:56px;height:56px;background:#f1f5f9;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px"></div>
       <div style="text-align:center">
         <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em">Velocidad real de escrituraciÃ³n</div>
         <div style="font-size:2.5rem;font-weight:900;color:#0f172a" id="vel-entregas">8</div>
