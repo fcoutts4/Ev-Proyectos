@@ -947,6 +947,18 @@ table:not(.gantt-table) .tfoot-dark td,
 #ventas-precios-table .inp{min-height:28px!important;padding:3px 8px!important}
 #formas-pago-table tbody td{padding-top:5px!important;padding-bottom:5px!important;line-height:1.15}
 #formas-pago-table .inp{min-height:28px!important;padding:3px 8px!important}
+.ventas-card{padding:14px!important}
+.ventas-section-gap{margin-bottom:12px!important}
+.ventas-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.ventas-subtle{font-size:11px;color:#94a3b8}
+.ventas-compact-title{margin-bottom:8px!important}
+.ventas-speed-grid{display:grid;grid-template-columns:repeat(2,minmax(210px,1fr));gap:10px;margin-bottom:12px;align-items:start}
+.ventas-speed-box{border-radius:10px;padding:10px}
+.ventas-crono-wrap{margin-bottom:10px}
+.ventas-kpi-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:12px}
+.ventas-kpi-card{padding:12px!important;display:flex;flex-direction:column;gap:8px;height:100%}
+.ventas-kpi-card .sec-title{margin-bottom:2px!important}
+.ventas-process-divider{width:100%;border-top:1px solid #f1f5f9;padding-top:8px}
 .modal-backdrop[style*="flex"] .modal-card{outline:1px solid rgba(15,23,42,.08)}
 .chart-shell{border-radius:var(--radius-md)}
 [aria-live]{min-height:1em}
@@ -959,6 +971,8 @@ table:not(.gantt-table) .tfoot-dark td,
   .card,.card-dark,.kpi-card,.req-kpi{padding:14px!important}
   .flow-kpi-grid{grid-template-columns:1fr!important}
   .ventas-inline-grid{grid-template-columns:1fr!important}
+  .ventas-speed-grid{grid-template-columns:1fr!important}
+  .ventas-kpi-grid{grid-template-columns:1fr!important}
   .payment-plan-grid-head{display:none}
   .planilla-header{align-items:flex-start!important}
 }
@@ -1516,17 +1530,17 @@ table:not(.gantt-table) .tfoot-dark td,
 </div><!-- end tab terreno -->
 
 <div id="tab-ventas" class="tab-pane">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+  <div class="ventas-head">
     <div>
       <div style="font-size:16px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:8px"> VENTAS E INGRESOS</div>
-      <div style="font-size:11px;color:#94a3b8">AsegÃºrate de guardar tus cambios</div>
+      <div class="ventas-subtle">AsegÃºrate de guardar tus cambios</div>
   </div>
     <button class="btn-primary" onclick="guardarVentas()"> Guardar</button>
 </div>
 
   <!-- 1. Precios -->
-  <div class="card" style="margin-bottom:16px">
-    <div class="sec-title">Precios</div>
+  <div class="card ventas-card ventas-section-gap">
+    <div class="sec-title ventas-compact-title">Precios</div>
     <div class="tbl-scroll">
       <table id="ventas-precios-table" style="min-width:880px">
         <thead><tr>
@@ -1548,10 +1562,10 @@ table:not(.gantt-table) .tfoot-dark td,
   </div>
 </div>
 
-  <div class="ventas-inline-grid">
+  <div class="ventas-inline-grid ventas-section-gap">
   <!-- 2. Formas de Pago -->
-  <div class="card" style="margin-bottom:0">
-    <div class="sec-title">Forma de Pago</div>
+  <div class="card ventas-card" style="margin-bottom:0">
+    <div class="sec-title ventas-compact-title">Forma de Pago</div>
     <div class="tbl-scroll">
       <table id="formas-pago-table" style="min-width:680px">
         <thead><tr>
@@ -1567,14 +1581,14 @@ table:not(.gantt-table) .tfoot-dark td,
 </div>
 
   <!-- 3. Fechas y Velocidades -->
-  <div class="card" style="margin-bottom:0">
-    <div style="text-align:center;margin-bottom:16px">
+  <div class="card ventas-card" style="margin-bottom:0">
+    <div style="text-align:center;margin-bottom:10px">
       <span style="font-size:18px"></span>
       <div class="sec-title" style="justify-content:center;margin-bottom:0">FECHAS Y VELOCIDADES DE VENTAS</div>
   </div>
 
-    <div style="display:grid;grid-template-columns:repeat(2,minmax(220px,320px));gap:12px;margin-bottom:16px;justify-content:start">
-      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px">
+    <div class="ventas-speed-grid">
+      <div class="ventas-speed-box" style="background:#eff6ff;border:1px solid #bfdbfe">
         <div style="font-size:10px;font-weight:700;color:#1d4ed8;text-transform:uppercase;margin-bottom:6px">Velocidad de promesas</div>
         <div style="display:flex;align-items:center;gap:6px">
           <input class="inp" id="ventas-velocidad-promesas" type="text" inputmode="numeric" data-localized-number="1" min="1" step="1" oninput="onVentasVelocityChange()">
@@ -1582,7 +1596,7 @@ table:not(.gantt-table) .tfoot-dark td,
         </div>
         <div style="font-size:10px;color:#64748b;margin-top:6px"></div>
       </div>
-      <div style="background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:12px">
+      <div class="ventas-speed-box" style="background:#fff7ed;border:1px solid #fdba74">
         <div style="font-size:10px;font-weight:700;color:#c2410c;text-transform:uppercase;margin-bottom:6px">Velocidad de escrituraciÃ³n</div>
         <div style="display:flex;align-items:center;gap:6px">
           <input class="inp" id="ventas-velocidad-escrituracion" type="text" inputmode="numeric" data-localized-number="1" min="1" step="1" oninput="onVentasVelocityChange()">
@@ -1593,7 +1607,7 @@ table:not(.gantt-table) .tfoot-dark td,
     </div>
 
     <!-- Cronograma de Promesas -->
-    <div style="margin-bottom:16px">
+    <div class="ventas-crono-wrap">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
         <div style="width:10px;height:10px;border-radius:50%;background:#3b82f6"></div>
         <span style="font-size:12px;font-weight:700;color:#475569">CRONOGRAMA DE PROMESAS</span>
@@ -1645,16 +1659,16 @@ table:not(.gantt-table) .tfoot-dark td,
 </div>
 
   <!-- 4. Mix de Ventas + Velocidad + Proceso -->
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px">
+  <div class="ventas-kpi-grid">
 
     <!-- Mix por Etapa -->
-    <div class="card">
+    <div class="card ventas-kpi-card">
       <div class="sec-title"> MIX DE VENTAS POR ETAPA</div>
       <div id="mix-ventas-list"></div>
   </div>
 
     <!-- Velocidad Comercial -->
-    <div class="card" style="display:flex;flex-direction:column;align-items:center">
+    <div class="card ventas-kpi-card" style="align-items:center">
       <div class="sec-title" style="width:100%">VELOCIDAD GLOBAL COMERCIAL</div>
       <canvas id="speedometer" width="200" height="130" class="speed-canvas"></canvas>
       <div style="font-size:2rem;font-weight:900;color:#0f172a" id="vel-global-uf">16.614</div>
@@ -1667,7 +1681,7 @@ table:not(.gantt-table) .tfoot-dark td,
   </div>
 
     <!-- EscrituraciÃ³n -->
-    <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px">
+    <div class="card ventas-kpi-card" style="align-items:center;justify-content:center">
       <div class="sec-title" style="width:100%"> PROCESO DE ESCRITURACIÃ“N</div>
       <div style="text-align:center">
         <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em">Velocidad real de escrituraciÃ³n</div>
@@ -1675,7 +1689,7 @@ table:not(.gantt-table) .tfoot-dark td,
         <div style="font-size:11px;color:#94a3b8">un/mes</div>
         <div style="margin-top:4px;font-size:10px;color:#64748b;letter-spacing:.02em" id="vel-promesas-mini">Vel. promesas: 0,0 un/mes</div>
     </div>
-      <div style="width:100%;border-top:1px solid #f1f5f9;padding-top:10px">
+      <div class="ventas-process-divider">
         <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:6px">Ciclo de EscrituraciÃ³n</div>
         <div style="display:flex;align-items:center;gap:8px;justify-content:center">
           <span style="font-size:1.1rem;font-weight:800" id="escrit-inicio">Mes 38</span>
@@ -1690,7 +1704,7 @@ table:not(.gantt-table) .tfoot-dark td,
 </div>
 
   <!-- 5. Flujo de Caja Ventas -->
-  <div style="margin-bottom:16px">
+  <div class="ventas-section-gap">
     <div class="planilla-header">
       <div>
         <div style="font-size:13px;font-weight:900;color:#fff;letter-spacing:.08em;text-transform:uppercase"> FLUJO DE CAJA DE VENTAS (UF)</div>
