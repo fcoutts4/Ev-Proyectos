@@ -955,13 +955,14 @@ table:not(.gantt-table) .tfoot-dark td,
 .ventas-speed-grid{display:grid;grid-template-columns:repeat(2,minmax(210px,1fr));gap:10px;margin-bottom:12px;align-items:start}
 .ventas-speed-box{border-radius:10px;padding:10px}
 .ventas-crono-wrap{margin-bottom:10px}
+.ventas-cronos-grid{display:grid;grid-template-columns:1fr;gap:10px}
 .ventas-kpi-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:12px}
 .ventas-kpi-card{padding:12px!important;display:flex;flex-direction:column;gap:8px;height:100%}
-.ventas-kpi-card .sec-title{margin-bottom:2px!important}
+.ventas-kpi-card .sec-title{margin-bottom:2px!important;text-align:left!important}
 .ventas-process-divider{width:100%;border-top:1px solid #f1f5f9;padding-top:8px}
 #tab-ventas>.ventas-head{margin-bottom:10px!important}
 #tab-ventas .ventas-section-gap{margin-bottom:10px!important}
-#tab-ventas .ventas-inline-grid{grid-template-columns:minmax(320px,.9fr) minmax(420px,1.1fr)!important;gap:12px!important}
+#tab-ventas .ventas-inline-grid{grid-template-columns:minmax(360px,1fr) minmax(460px,1.15fr)!important;gap:12px!important}
 #tab-ventas .ventas-kpi-grid{grid-template-columns:1fr 1fr 1fr;gap:10px!important}
 #tab-ventas .ventas-card{padding:12px!important}
 #tab-ventas .ventas-kpi-card{padding:10px!important}
@@ -1575,10 +1576,10 @@ table:not(.gantt-table) .tfoot-dark td,
 </div>
 
   <div class="ventas-inline-grid ventas-section-gap">
-  <!-- 2. Formas de Pago -->
+  <!-- 2. Forma de Pago + Velocidades -->
   <div class="card ventas-card" style="margin-bottom:0">
     <div class="sec-title ventas-compact-title">Forma de Pago</div>
-    <div class="tbl-scroll">
+    <div class="tbl-scroll ventas-section-gap" style="margin-bottom:10px">
       <table id="formas-pago-table" style="min-width:680px">
         <thead><tr>
           <th style="color:#3b82f6">PIE (%)</th>
@@ -1590,82 +1591,76 @@ table:not(.gantt-table) .tfoot-dark td,
         <tbody id="formas-pago-tbody"></tbody>
     </table>
   </div>
-</div>
-
-  <!-- 3. Fechas y Velocidades -->
-  <div class="card ventas-card" style="margin-bottom:0">
-    <div style="text-align:center;margin-bottom:10px">
-      <span style="font-size:18px"></span>
-      <div class="sec-title" style="justify-content:center;margin-bottom:0">FECHAS Y VELOCIDADES DE VENTAS</div>
-  </div>
-
-    <div class="ventas-speed-grid">
+    <div class="sec-title ventas-compact-title">FECHAS Y VELOCIDADES DE VENTAS</div>
+    <div class="ventas-speed-grid" style="margin-bottom:0">
       <div class="ventas-speed-box" style="background:#eff6ff;border:1px solid #bfdbfe">
         <div style="font-size:10px;font-weight:700;color:#1d4ed8;text-transform:uppercase;margin-bottom:6px">Velocidad de promesas</div>
         <div style="display:flex;align-items:center;gap:6px">
           <input class="inp" id="ventas-velocidad-promesas" type="text" inputmode="numeric" data-localized-number="1" min="1" step="1" oninput="onVentasVelocityChange()">
           <span style="font-size:11px;color:#64748b">un/mes</span>
         </div>
-        <div style="font-size:10px;color:#64748b;margin-top:6px"></div>
       </div>
       <div class="ventas-speed-box" style="background:#fff7ed;border:1px solid #fdba74">
-        <div style="font-size:10px;font-weight:700;color:#c2410c;text-transform:uppercase;margin-bottom:6px">Velocidad de escrituraciÃ³n</div>
+        <div style="font-size:10px;font-weight:700;color:#c2410c;text-transform:uppercase;margin-bottom:6px">Velocidad de escrituración</div>
         <div style="display:flex;align-items:center;gap:6px">
           <input class="inp" id="ventas-velocidad-escrituracion" type="text" inputmode="numeric" data-localized-number="1" min="1" step="1" oninput="onVentasVelocityChange()">
           <span style="font-size:11px;color:#64748b">un/mes</span>
         </div>
-        <div style="font-size:10px;color:#64748b;margin-top:6px"></div>
       </div>
     </div>
-
-    <!-- Cronograma de Promesas -->
-    <div class="ventas-crono-wrap">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-        <div style="width:10px;height:10px;border-radius:50%;background:#3b82f6"></div>
-        <span style="font-size:12px;font-weight:700;color:#475569">CRONOGRAMA DE PROMESAS</span>
-    </div>
-      <table class="ventas-crono-table">
-        <colgroup>
-          <col class="col-link">
-          <col class="col-num">
-          <col class="col-num">
-          <col class="col-num">
-          <col class="col-vel">
-        </colgroup>
-        <thead><tr>
-          <th style="text-align:left">VÃNCULO EN GANTT</th>
-          <th>INICIO (MES)</th>
-          <th style="color:#22c55e">FIN (AUTO)</th>
-          <th>TOTAL UNIDADES</th>
-          <th>VEL. (UN/MES)</th>
-      </tr></thead>
-        <tbody id="preventa-tbody"></tbody>
-    </table>
   </div>
 
-    <!-- Cronograma de EscrituraciÃ³n -->
-    <div>
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-        <div style="width:10px;height:10px;border-radius:50%;background:#f97316"></div>
-        <span style="font-size:12px;font-weight:700;color:#475569">CRONOGRAMA DE ESCRITURACIÃ“N</span>
+  <!-- 3. Cronogramas -->
+  <div class="card ventas-card" style="margin-bottom:0">
+    <div class="sec-title ventas-compact-title">CRONOGRAMAS DE VENTAS</div>
+    <div class="ventas-cronos-grid">
+      <div class="ventas-crono-wrap">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <div style="width:10px;height:10px;border-radius:50%;background:#3b82f6"></div>
+          <span style="font-size:12px;font-weight:700;color:#475569">CRONOGRAMA DE PROMESAS</span>
+      </div>
+        <table class="ventas-crono-table">
+          <colgroup>
+            <col class="col-link">
+            <col class="col-num">
+            <col class="col-num">
+            <col class="col-num">
+            <col class="col-vel">
+          </colgroup>
+          <thead><tr>
+            <th style="text-align:left">VÍNCULO EN GANTT</th>
+            <th>INICIO (MES)</th>
+            <th style="color:#22c55e">FIN (AUTO)</th>
+            <th>TOTAL UNIDADES</th>
+            <th>VEL. (UN/MES)</th>
+        </tr></thead>
+          <tbody id="preventa-tbody"></tbody>
+      </table>
     </div>
-      <table class="ventas-crono-table">
-        <colgroup>
-          <col class="col-link">
-          <col class="col-num">
-          <col class="col-num">
-          <col class="col-num">
-          <col class="col-vel">
-        </colgroup>
-        <thead><tr>
-          <th style="text-align:left">VÃNCULO EN GANTT</th>
-          <th>INICIO (MES)</th>
-          <th style="color:#22c55e">FIN (AUTO)</th>
-          <th>TOTAL UNIDADES</th>
-          <th>VEL. (UN/MES)</th>
-      </tr></thead>
-        <tbody id="escrituracion-tbody"></tbody>
-    </table>
+
+      <div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+          <div style="width:10px;height:10px;border-radius:50%;background:#f97316"></div>
+          <span style="font-size:12px;font-weight:700;color:#475569">CRONOGRAMA DE ESCRITURACIÓN</span>
+      </div>
+        <table class="ventas-crono-table">
+          <colgroup>
+            <col class="col-link">
+            <col class="col-num">
+            <col class="col-num">
+            <col class="col-num">
+            <col class="col-vel">
+          </colgroup>
+          <thead><tr>
+            <th style="text-align:left">VÍNCULO EN GANTT</th>
+            <th>INICIO (MES)</th>
+            <th style="color:#22c55e">FIN (AUTO)</th>
+            <th>TOTAL UNIDADES</th>
+            <th>VEL. (UN/MES)</th>
+        </tr></thead>
+          <tbody id="escrituracion-tbody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 </div>
@@ -1693,7 +1688,7 @@ table:not(.gantt-table) .tfoot-dark td,
   </div>
 
     <!-- EscrituraciÃ³n -->
-    <div class="card ventas-kpi-card" style="align-items:center;justify-content:center">
+    <div class="card ventas-kpi-card" style="align-items:stretch;justify-content:center">
       <div class="sec-title" style="width:100%"> PROCESO DE ESCRITURACIÃ“N</div>
       <div style="text-align:center">
         <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em">Velocidad real de escrituraciÃ³n</div>
