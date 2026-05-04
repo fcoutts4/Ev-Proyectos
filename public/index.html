@@ -724,7 +724,7 @@ table:not(.gantt-table) strong{color:#0b2545!important}
 .cat-total-cell,.cat-total-cell strong{background:#eef3f8!important;color:#0b2545!important}
 .amount-cost,.amount-negative{color:#334155!important}
 
-/* Menos negrita en celdas numéricas; énfasis reservado a totales/resultados */
+/* Menos negrita en celdas numéricas; énfasis reservado a totales finales */
 table tbody td[style*="font-weight:700"],
 table tbody td[style*="font-weight:800"],
 table tbody td[style*="font-weight:900"]{font-weight:600!important}
@@ -1886,7 +1886,7 @@ table:not(.gantt-table) .tfoot-dark td,
 
 <div id="tab-reportes" class="tab-pane reportes-blank"></div><!-- end tab reportes -->
 
-<div id="tab-capital" class="tab-pane" style="display:none">
+<div id="legacy-capital" class="legacy-pane" hidden aria-hidden="true" style="display:none">
   <!-- KPIs -->
   <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:16px">
     <div class="req-kpi">
@@ -2004,7 +2004,7 @@ table:not(.gantt-table) .tfoot-dark td,
 </div>
 </div><!-- end tab capital -->
 
-<div id="tab-dataroom" class="tab-pane" style="display:none">
+<div id="legacy-dataroom" class="legacy-pane" hidden aria-hidden="true" style="display:none">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
     <div>
       <div style="font-size:16px;font-weight:800;color:#0f172a"> DATA ROOM</div>
@@ -2131,11 +2131,14 @@ table:not(.gantt-table) .tfoot-dark td,
 <script>
 (function () {
   const STORAGE_KEY = 'evproyectos.formulaOverrides.v1';
+  const UI_STORAGE_KEY = 'evproyectos.uiState.v1';
   const patchState = {
     flowCollapsed: {},
     formulaOverrides: { flow: {}, ep: {}, gf: {} },
+    loadedFlowProjectId: null,
   };
   let formulaPersistTimer = null;
+  let uiPersistTimer = null;
 
   function normalizeFormulaOverrides(value) {
     const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -2184,10 +2187,69 @@ table:not(.gantt-table) .tfoot-dark td,
     formulaPersistTimer = window.setTimeout(persistFormulaOverrides, delay);
   }
 
+  function getCurrentProjectKey() {
+    return String((typeof state !== 'undefined' && state.proyectoId) || 'global');
+  }
+
+  function readUiStore() {
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(UI_STORAGE_KEY) || '{}');
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (error) {
+      void error;
+      return {};
+    }
+  }
+
+  function persistUiState() {
+    uiPersistTimer = null;
+    const store = readUiStore();
+    const projects = store.projects && typeof store.projects === 'object' ? store.projects : {};
+    const key = getCurrentProjectKey();
+    const current = projects[key] && typeof projects[key] === 'object' ? projects[key] : {};
+    projects[key] = {
+      ...current,
+      flowCollapsed: { ...patchState.flowCollapsed },
+    };
+    try {
+      window.localStorage.setItem(UI_STORAGE_KEY, JSON.stringify({ ...store, projects }));
+    } catch (error) {
+      void error;
+      // Ignore local UI-state persistence failures.
+    }
+  }
+
+  function schedulePersistUiState(delay = 350) {
+    window.clearTimeout(uiPersistTimer);
+    uiPersistTimer = window.setTimeout(persistUiState, delay);
+  }
+
+  function loadFlowUiStateForCurrentProject() {
+    const key = getCurrentProjectKey();
+    if (patchState.loadedFlowProjectId === key) return;
+    const store = readUiStore();
+    const projects = store.projects && typeof store.projects === 'object' ? store.projects : {};
+    const projectState = projects[key] && typeof projects[key] === 'object' ? projects[key] : {};
+    patchState.flowCollapsed = projectState.flowCollapsed && typeof projectState.flowCollapsed === 'object'
+      ? { ...projectState.flowCollapsed }
+      : {};
+    patchState.loadedFlowProjectId = key;
+  }
+
+  window.flushBricsaUiState = function flushBricsaUiState() {
+    if (!uiPersistTimer) return;
+    window.clearTimeout(uiPersistTimer);
+    persistUiState();
+  };
+
   window.addEventListener('beforeunload', () => {
-    if (!formulaPersistTimer) return;
-    window.clearTimeout(formulaPersistTimer);
-    persistFormulaOverrides();
+    if (formulaPersistTimer) {
+      window.clearTimeout(formulaPersistTimer);
+      persistFormulaOverrides();
+    }
+    if (uiPersistTimer) {
+      window.flushBricsaUiState();
+    }
   });
 
   function normToken(value) {
@@ -2912,6 +2974,7 @@ table:not(.gantt-table) .tfoot-dark td,
   if (typeof renderProjectCashflow === 'function') {
     renderProjectCashflow = function patchedRenderProjectCashflow() {
       if (!$('flujo-tabla')) return;
+      loadFlowUiStateForCurrentProject();
       const monthCount = getCostMonthCount();
       const labels = getCostMonthLabels();
       const incomeSource = normalizeMonthlySeries(getProjectMonthlyIncome(monthCount), monthCount);
@@ -2970,11 +3033,20 @@ table:not(.gantt-table) .tfoot-dark td,
       setHtml('flujo-tabla-header', `<tr><th style="text-align:left;min-width:280px">Concepto</th><th style="text-align:left;min-width:260px">Origen / lógica</th><th class="flow-total-col">Total</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}</tr>`);
 
       const rows = [];
+      const parentStack = [];
       function pushRow(row) {
-        rows.push(row);
+        const parents = parentStack.slice();
+        rows.push({
+          ...row,
+          parents,
+          collapsed: row.toggleKey ? isFlowCollapsedKey(row.toggleKey, row.defaultCollapsed) : false,
+          hidden: parents.some((parent) => isFlowCollapsedKey(parent.key, parent.defaultCollapsed)),
+        });
       }
       function pushGroupChildren(groupKey, defaultCollapsed, callback) {
-        if (!isFlowCollapsedKey(groupKey, defaultCollapsed)) callback();
+        parentStack.push({ key: groupKey, defaultCollapsed: !!defaultCollapsed });
+        callback();
+        parentStack.pop();
       }
 
       pushRow({
@@ -3194,8 +3266,9 @@ table:not(.gantt-table) .tfoot-dark td,
           row.muted ? 'flow-row-muted' : '',
         ].filter(Boolean).join(' ');
         const originHtml = row.originHtml || `<div class="flow-origin">${escapeHtml(row.origin || '')}</div>`;
+        const parentKeys = (row.parents || []).map((parent) => parent.key).join(' ');
         return `
-          <tr class="${className}" data-flow-row="${escapeHtml(row.key)}">
+          <tr class="${className}" data-flow-row="${escapeHtml(row.key)}" data-flow-label="${escapeHtml(row.label)}" data-flow-parents="${escapeHtml(parentKeys)}"${row.toggleKey ? ` data-flow-toggle-key="${escapeHtml(row.toggleKey)}" data-flow-default-collapsed="${row.defaultCollapsed ? '1' : '0'}"` : ''}${row.hidden ? ' style="display:none"' : ''}>
             <td style="text-align:left;font-weight:${row.total || row.subtotal || row.iva ? 800 : 600};color:#0f172a">
               <div class="flow-row-label">${renderToggle(row)}<span>${escapeHtml(row.label)}</span></div>
             </td>
@@ -3206,13 +3279,35 @@ table:not(.gantt-table) .tfoot-dark td,
         `;
       }).join('');
       setHtml('flujo-tabla-tbody', body);
+      applyFlowCollapseState();
     };
     window.renderProjectCashflow = renderProjectCashflow;
   }
 
+  function applyFlowCollapseState() {
+    const tbody = document.getElementById('flujo-tabla-tbody');
+    if (!tbody) return;
+    tbody.querySelectorAll('[data-flow-row]').forEach((row) => {
+      const parents = String(row.dataset.flowParents || '').split(/\s+/).filter(Boolean);
+      const shouldHide = parents.some((key) => isFlowCollapsedKey(key, true));
+      row.style.display = shouldHide ? 'none' : '';
+    });
+    tbody.querySelectorAll('[data-flow-toggle-key]').forEach((row) => {
+      const key = row.dataset.flowToggleKey;
+      const defaultCollapsed = row.dataset.flowDefaultCollapsed === '1';
+      const collapsed = isFlowCollapsedKey(key, defaultCollapsed);
+      const button = row.querySelector('.flow-toggle');
+      if (!button) return;
+      button.textContent = collapsed ? '+' : '-';
+      button.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      button.setAttribute('aria-label', `${collapsed ? 'Abrir' : 'Cerrar'} ${row.dataset.flowLabel || 'grupo'}`);
+    });
+  }
+
   window.toggleFlowCategory = function toggleFlowCategory(category, defaultCollapsed) {
     patchState.flowCollapsed[category] = !isFlowCollapsedKey(category, defaultCollapsed === true || defaultCollapsed === 'true' || defaultCollapsed === '1');
-    renderProjectCashflow();
+    applyFlowCollapseState();
+    schedulePersistUiState();
   };
 
   function enhanceCostFormulaInputs() {
@@ -3296,6 +3391,28 @@ table:not(.gantt-table) .tfoot-dark td,
     return String(field || 'Campo editable').replace(/[-_]+/g, ' ');
   }
 
+  function getA11yScope(root) {
+    if (!root || root === document || root === document.body || root === document.documentElement) return document;
+    const element = root.nodeType === 1 ? root : root.parentElement;
+    return element?.closest?.('.modal-backdrop,.tab-pane.active,table,.tbl-scroll,.flow-planilla,.resumen-gantt-scroll') || element || document;
+  }
+
+  function scopedQueryAll(scope, selector) {
+    const root = getA11yScope(scope);
+    if (root === document) return Array.from(document.querySelectorAll(selector));
+    const items = [];
+    if (root.matches?.(selector)) items.push(root);
+    root.querySelectorAll?.(selector).forEach((item) => items.push(item));
+    return Array.from(new Set(items));
+  }
+
+  function assignGeneratedId(element, prefix) {
+    if (!element || element.id) return;
+    let index = document.querySelectorAll(`[id^="${prefix}-"]`).length + 1;
+    while (document.getElementById(`${prefix}-${index}`)) index += 1;
+    element.id = `${prefix}-${index}`;
+  }
+
   function enhanceTabsAccessibility() {
     const tabBar = document.getElementById('tabBar');
     if (!tabBar) return;
@@ -3327,8 +3444,8 @@ table:not(.gantt-table) .tfoot-dark td,
     });
   }
 
-  function enhanceTablesAccessibility() {
-    document.querySelectorAll('table').forEach((table, tableIndex) => {
+  function enhanceTablesAccessibility(scope = document) {
+    scopedQueryAll(scope, 'table').forEach((table) => {
       table.setAttribute('role', 'table');
       if (!table.getAttribute('aria-label')) {
         table.setAttribute('aria-label', nearestSectionLabel(table));
@@ -3337,21 +3454,21 @@ table:not(.gantt-table) .tfoot-dark td,
       table.querySelectorAll('tbody tr:not(.cat-row):not(.subcat-row):not(.flow-category-row) td:first-child').forEach((cell) => {
         if (!cell.querySelector('input,select,button') && cell.textContent.trim()) cell.setAttribute('scope', 'row');
       });
-      if (!table.id) table.id = `data-table-${tableIndex + 1}`;
+      assignGeneratedId(table, 'data-table');
     });
   }
 
-  function enhanceScrollRegions() {
-    document.querySelectorAll('.tbl-scroll,.flow-planilla,.resumen-gantt-scroll').forEach((region, index) => {
+  function enhanceScrollRegions(scope = document) {
+    scopedQueryAll(scope, '.tbl-scroll,.flow-planilla,.resumen-gantt-scroll').forEach((region) => {
       region.setAttribute('tabindex', '0');
       region.setAttribute('role', 'region');
       if (!region.getAttribute('aria-label')) region.setAttribute('aria-label', `${nearestSectionLabel(region)} con desplazamiento horizontal`);
-      if (!region.id) region.id = `scroll-region-${index + 1}`;
+      assignGeneratedId(region, 'scroll-region');
     });
   }
 
-  function enhanceButtonsAccessibility() {
-    document.querySelectorAll('button').forEach((button) => {
+  function enhanceButtonsAccessibility(scope = document) {
+    scopedQueryAll(scope, 'button').forEach((button) => {
       const text = button.textContent.trim();
       if (!hasAccessibleName(button) || /^[+\-·×←→]*$/.test(text)) {
         const title = button.title ? button.title.trim() : '';
@@ -3371,8 +3488,8 @@ table:not(.gantt-table) .tfoot-dark td,
     });
   }
 
-  function enhanceInputsAccessibility() {
-    document.querySelectorAll('input,select,textarea').forEach((input) => {
+  function enhanceInputsAccessibility(scope = document) {
+    scopedQueryAll(scope, 'input,select,textarea').forEach((input) => {
       if (!hasAccessibleName(input)) input.setAttribute('aria-label', deriveInputLabel(input));
       if (input.matches('[data-formula-scope][data-formula-key], .cost-hidden-formula')) {
         input.setAttribute('aria-label', `Formula editable ${deriveInputLabel(input)}`);
@@ -3382,7 +3499,7 @@ table:not(.gantt-table) .tfoot-dark td,
     });
   }
 
-  function enhanceLandmarksAndDialogs() {
+  function enhanceLandmarksAndDialogs(scope = document) {
     const topnav = document.querySelector('.topnav');
     if (topnav) topnav.setAttribute('aria-label', 'Marca BRICSA');
     const main = document.getElementById('main-content');
@@ -3399,25 +3516,28 @@ table:not(.gantt-table) .tfoot-dark td,
       formulaModal.setAttribute('aria-labelledby', 'cost-formula-title');
       formulaModal.setAttribute('aria-describedby', 'cost-formula-subtitle');
     }
-    document.querySelectorAll('.modal-backdrop').forEach((modal) => {
+    scopedQueryAll(scope, '.modal-backdrop').forEach((modal) => {
       if (!modal.getAttribute('role')) modal.setAttribute('role', 'dialog');
       modal.setAttribute('aria-modal', 'true');
     });
   }
 
-  function enhanceAppAccessibility() {
+  function enhanceAppAccessibility(scope = document) {
     enhanceTabsAccessibility();
-    enhanceTablesAccessibility();
-    enhanceScrollRegions();
-    enhanceButtonsAccessibility();
-    enhanceInputsAccessibility();
-    enhanceLandmarksAndDialogs();
+    enhanceTablesAccessibility(scope);
+    enhanceScrollRegions(scope);
+    enhanceButtonsAccessibility(scope);
+    enhanceInputsAccessibility(scope);
+    enhanceLandmarksAndDialogs(scope);
   }
 
   const originalShowTabForA11y = window.showTab || showTab;
   showTab = function accessibleShowTab(tabId, button) {
     originalShowTabForA11y(tabId, button);
-    window.requestAnimationFrame(enhanceAppAccessibility);
+    window.requestAnimationFrame(() => {
+      enhanceTabsAccessibility();
+      enhanceLandmarksAndDialogs();
+    });
   };
   window.showTab = showTab;
 
@@ -3440,9 +3560,23 @@ table:not(.gantt-table) .tfoot-dark td,
   }
 
   let accessibilityTimer = null;
-  const scheduleAccessibilityEnhancement = () => {
+  let accessibilityScope = null;
+  const scheduleAccessibilityEnhancement = (mutations = []) => {
+    const mutationList = Array.isArray(mutations) ? mutations : [];
+    const target = mutationList.find((mutation) => mutation?.target)?.target;
+    const nextScope = getA11yScope(target);
+    if (!accessibilityScope) accessibilityScope = nextScope;
+    else if (accessibilityScope !== document && nextScope !== document && accessibilityScope.contains?.(nextScope)) {
+      accessibilityScope = nextScope;
+    } else if (nextScope === document || !nextScope.contains?.(accessibilityScope)) {
+      accessibilityScope = document.querySelector('.tab-pane.active') || document;
+    }
     window.clearTimeout(accessibilityTimer);
-    accessibilityTimer = window.setTimeout(enhanceAppAccessibility, 80);
+    accessibilityTimer = window.setTimeout(() => {
+      const scope = accessibilityScope || document;
+      accessibilityScope = null;
+      enhanceAppAccessibility(scope);
+    }, 160);
   };
   const observer = new MutationObserver(scheduleAccessibilityEnhancement);
   observer.observe(document.body, { childList: true, subtree: true });

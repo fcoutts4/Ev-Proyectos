@@ -44,11 +44,15 @@ const state = {
     batchQueued: false,
   },
   renderJobs: {},
+  uiStateSaveTimer: null,
 };
 
 const DEBUG_PERFORMANCE = false;
 const DEFAULT_AUTOSAVE_DELAY = 700;
 const INPUT_RENDER_DEBOUNCE_MS = 180;
+const UI_STATE_STORAGE_KEY = 'evproyectos.uiState.v1';
+const UI_STATE_SAVE_DELAY = 350;
+const formulaCatalogCache = new WeakMap();
 
 const USER_STORAGE_KEYS = [
   'evproyectos.userName',
@@ -79,7 +83,6 @@ function scrollTabPaneBelowSticky(pane) {
 }
 
 function showTab(tabId, button) {
-  if (getPendingAutosaveScopes().length) flushPendingAutosaves();
   const targetTabId = String(tabId || '').trim();
   const targetPaneId = `tab-${targetTabId}`;
   let activePane = null;
@@ -196,6 +199,68 @@ function cancelRenderJob(key) {
 
 function cancelAllRenderJobs() {
   Object.keys(state.renderJobs).forEach(cancelRenderJob);
+}
+
+function readUiStateStore() {
+  try {
+    const rawValue = window.localStorage.getItem(UI_STATE_STORAGE_KEY);
+    const parsed = rawValue ? JSON.parse(rawValue) : {};
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeUiStateStore(store) {
+  try {
+    window.localStorage.setItem(UI_STATE_STORAGE_KEY, JSON.stringify(store || {}));
+  } catch {
+    // UI state is a convenience layer; backend persistence must not depend on it.
+  }
+}
+
+function getProjectUiStateKey(projectId = state.proyectoId) {
+  return String(projectId || 'global');
+}
+
+function getProjectUiState(projectId = state.proyectoId) {
+  const store = readUiStateStore();
+  const projects = store.projects && typeof store.projects === 'object' ? store.projects : {};
+  const projectState = projects[getProjectUiStateKey(projectId)];
+  return projectState && typeof projectState === 'object' && !Array.isArray(projectState) ? projectState : {};
+}
+
+function loadProjectUiState(projectId = state.proyectoId) {
+  const projectState = getProjectUiState(projectId);
+  const costosUi = ensureCostosUiState();
+  const savedCostosCollapsed = projectState.costosCollapsed && typeof projectState.costosCollapsed === 'object'
+    ? projectState.costosCollapsed
+    : {};
+  costosUi.collapsed = { ...savedCostosCollapsed };
+}
+
+function persistProjectUiStateNow() {
+  window.clearTimeout(state.uiStateSaveTimer);
+  state.uiStateSaveTimer = null;
+  const store = readUiStateStore();
+  const projects = store.projects && typeof store.projects === 'object' ? store.projects : {};
+  const key = getProjectUiStateKey();
+  const currentProjectState = projects[key] && typeof projects[key] === 'object' ? projects[key] : {};
+  projects[key] = {
+    ...currentProjectState,
+    costosCollapsed: { ...(ensureCostosUiState().collapsed || {}) },
+  };
+  writeUiStateStore({ ...store, projects });
+}
+
+function scheduleProjectUiStateSave(delay = UI_STATE_SAVE_DELAY) {
+  window.clearTimeout(state.uiStateSaveTimer);
+  state.uiStateSaveTimer = window.setTimeout(persistProjectUiStateNow, Math.max(0, delay));
+}
+
+function flushProjectUiStateSave() {
+  if (!state.uiStateSaveTimer) return;
+  persistProjectUiStateNow();
 }
 
 function makeClientId(prefix = 'tmp') {
@@ -447,7 +512,7 @@ function getMonthlyIvaCredito() {
     (category.partidas || []).forEach((partida) => {
       if (!partida.tiene_iva) return;
       if (category.nombre === 'GASTOS FINANCIEROS' && /Linea aprobada|Pago de linea/i.test(partida.nombre || '')) return;
-      const dist = getMonthlyDistributionForPartida(partida, monthCount);
+      const dist = getMonthlyDistributionForPartida(partida, monthCount, context);
       dist.forEach((v, i) => { if (i < monthly.length) monthly[i] += toNumber(v) * 0.19; });
     });
   });
@@ -851,6 +916,9 @@ function setSyncStatus(status, message, detail) {
 }
 
 function getSyncDetailText() {
+  if (['dirty', 'saving', 'error'].includes(state.sync.status) && state.sync.detail) {
+    return state.sync.detail;
+  }
   const reference = state.sync.lastSavedAt || state.proyecto?.updated_at || state.health?.timestamp;
   return reference
     ? `Ultima sincronizacion: ${fmtDateTime(reference)}`
@@ -872,9 +940,10 @@ function renderSyncStatus() {
 
   const variants = {
     loading: { color: '#475569', bg: '#f8fafc', border: '#cbd5e1', label: 'Sincronizando' },
-    ok: { color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', label: 'Sincronizado' },
-    saving: { color: '#b45309', bg: '#fffbeb', border: '#fde68a', label: 'Guardando' },
-    error: { color: '#b91c1c', bg: '#fef2f2', border: '#fecaca', label: 'Sin conexion' },
+    dirty: { color: '#92400e', bg: '#fffbeb', border: '#fde68a', label: 'Cambios pendientes' },
+    ok: { color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', label: 'Guardado' },
+    saving: { color: '#b45309', bg: '#fffbeb', border: '#fde68a', label: 'Guardando...' },
+    error: { color: '#b91c1c', bg: '#fef2f2', border: '#fecaca', label: 'Error al guardar' },
   };
 
   const variant = variants[state.sync.status] || variants.loading;
@@ -901,9 +970,11 @@ async function persistAutosaveScopes(scopes, { silent = true } = {}) {
   const startedAt = performance.now();
   const includeCostos = scopeSet.has('costos');
   const onlyFormulaOverrides = scopeSet.size === 1 && scopeSet.has('proyecto');
+  const onlyCostos = scopeSet.size === 1 && scopeSet.has('costos');
   if (onlyFormulaOverrides) state.proyecto = getProjectSavePayload();
+  else if (onlyCostos) state.proyecto = getProjectSavePayload();
   else prepareStateForSave({ includeCostos });
-  if (scopeSet.has('capital')) state.capital = readCapitalFromEditor();
+  if (scopeSet.has('capital') && $('tab-capital')) state.capital = readCapitalFromEditor();
 
   const requests = new Map();
   const proyecto = getProjectSavePayload();
@@ -994,7 +1065,7 @@ function scheduleAutosave(scope, delay = DEFAULT_AUTOSAVE_DELAY) {
   state.autosave.queued[scope] = true;
   state.autosave.dirty[scope] = true;
   if (!hadPending) {
-    setSyncStatus('saving', 'GUARDANDO', `Cambios pendientes en ${AUTOSAVE_SCOPE_LABELS[scope] || scope}`);
+    setSyncStatus('dirty', 'CAMBIOS PENDIENTES', `Cambios pendientes en ${AUTOSAVE_SCOPE_LABELS[scope] || scope}`);
   }
   window.clearTimeout(state.autosave.batchTimer);
   state.autosave.batchTimer = window.setTimeout(() => {
@@ -1083,9 +1154,26 @@ async function flushPendingAutosaves() {
 }
 
 window.addEventListener('beforeunload', (event) => {
+  flushProjectUiStateSave();
   if (!getPendingAutosaveScopes().length) return;
+  try { flushPendingAutosaves(); } catch (_) { /* Browser may stop async work while unloading. */ }
   event.preventDefault();
   event.returnValue = '';
+});
+
+window.addEventListener('pagehide', () => {
+  flushProjectUiStateSave();
+  if (getPendingAutosaveScopes().length) {
+    try { flushPendingAutosaves(); } catch (_) { /* Best effort before the page is discarded. */ }
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'hidden') return;
+  flushProjectUiStateSave();
+  if (getPendingAutosaveScopes().length) {
+    try { flushPendingAutosaves(); } catch (_) { /* Best effort when the tab is backgrounded. */ }
+  }
 });
 
 async function saveNow() {
@@ -1204,13 +1292,19 @@ function setupAutosaveListeners() {
   if (!document.body.dataset.costAutosaveBound) {
     let costEditorSyncTimer = null;
     const syncCostDraftChange = (event, immediate = false) => {
-      if (!event.target.closest('#planilla-table [data-cost-row]')) return;
+      const row = event.target.closest('#planilla-table [data-cost-row]');
+      if (!row) return;
       const isIvaToggle = event.target.matches('[data-field="tiene_iva"]');
       const run = () => {
         costEditorSyncTimer = null;
-        readCostosEditor({ recompute: isIvaToggle });
+        syncCostRowDraft(row, { recompute: isIvaToggle });
         scheduleAutosave('costos');
-        if (isIvaToggle) renderCostosModule();
+        if (isIvaToggle) {
+          scheduleRenderJob('costos-iva-toggle', () => {
+            renderCostosModule();
+            renderProjectCashflow();
+          }, 80);
+        }
       };
       window.clearTimeout(costEditorSyncTimer);
       if (immediate) run();
@@ -2877,9 +2971,11 @@ function onConfigParamChange() {
   scheduleAutosave('proyecto');
   scheduleAutosave('terreno');
   scheduleAutosave('costos');
-  renderConstruccion();
-  if (typeof renderTerrainModule === 'function') renderTerrainModule();
-  if (typeof renderProjectCashflow === 'function') renderProjectCashflow();
+  scheduleRenderJob('global-config-dependencies', () => {
+    renderConstruccion();
+    if (typeof renderTerrainModule === 'function') renderTerrainModule();
+    if (typeof renderProjectCashflow === 'function') renderProjectCashflow();
+  });
 }
 window.onConfigParamChange = onConfigParamChange;
 
@@ -3231,8 +3327,10 @@ function onTerrainFinancialInputChange() {
     target.editable_source = 'terreno';
   });
 
-  renderTerrainModule();
-  renderCostosModule();
+  scheduleRenderJob('terreno-financial-dependencies', () => {
+    renderTerrainModule();
+    renderCostosModule();
+  });
   scheduleAutosave('terreno');
 }
 
@@ -3843,12 +3941,13 @@ function addFormulaReferenceAlias(map, key, value) {
   map.set(`_${normalized}`, numericValue);
 }
 
-function buildFormulaReferenceMaps(context = {}) {
+function buildFormulaReferenceMaps(context = {}, catalog = null) {
+  const formulaCatalog = catalog || getFormulaCatalogForContext(context);
   const values = new Map();
   const bracketValues = new Map();
   Object.entries(context || {}).forEach(([key, value]) => addFormulaReferenceAlias(values, key, value));
 
-  getCostFormulaCatalog().forEach((entry) => {
+  formulaCatalog.forEach((entry) => {
     const token = String(entry.token || '');
     const tokenKey = normalizeFormulaIdentifier(token);
     const replacementValue = Object.prototype.hasOwnProperty.call(context || {}, tokenKey)
@@ -3921,8 +4020,6 @@ function convertSiToTernary(expression) {
         topCommas.push(i);
         args.push(result.slice(argStart, i).trim());
         argStart = i + 1;
-      } else if (c === ',' && depth === 1) {
-        topCommas.push(i);
       }
       i++;
     }
@@ -3945,9 +4042,10 @@ function convertSiToTernary(expression) {
   return result;
 }
 
-function evaluateExpressionFormulaDetailed(expression, context = {}) {
+function evaluateExpressionFormulaDetailed(expression, context = {}, catalog = null) {
   const source = String(expression || '').trim();
   if (!source) return { ok: true, value: 0, references: [], expression: '', error: '' };
+  const formulaCatalog = catalog || getFormulaCatalogForContext(context);
   const aliases = normalizeFormulaExpressionSyntax(convertSiToTernary(source))
     .replace(/cantidad de meses de construcci[oÃ³ó]n/gi, 'meses_construccion')
     .replace(/meses de construcci[oÃ³ó]n/gi, 'meses_construccion')
@@ -3959,8 +4057,8 @@ function evaluateExpressionFormulaDetailed(expression, context = {}) {
     .replace(/m2 sobre cota 0/gi, 'm2_sobre_cota_0')
     .replace(/m2 subterraneo/gi, 'm2_subterraneo')
     .replace(/ventas brutas/gi, 'ventas_brutas');
-  const { values, bracketValues } = buildFormulaReferenceMaps(context);
-  const catalogEntries = getCostFormulaCatalog()
+  const { values, bracketValues } = buildFormulaReferenceMaps(context, formulaCatalog);
+  const catalogEntries = formulaCatalog
     .filter((entry) => entry.visible !== false)
     .map((entry) => ({
       ...entry,
@@ -4060,8 +4158,8 @@ function evaluateExpressionFormulaDetailed(expression, context = {}) {
   }
 }
 
-function evaluateExpressionFormula(expression, context = {}) {
-  const safeResult = evaluateExpressionFormulaDetailed(expression, context);
+function evaluateExpressionFormula(expression, context = {}, catalog = null) {
+  const safeResult = evaluateExpressionFormulaDetailed(expression, context, catalog);
   return safeResult.ok ? safeResult.value : 0;
   if (!expression) return 0;
   const contextValues = Object.entries(context || {}).reduce((acc, [key, value]) => {
@@ -4172,17 +4270,45 @@ function buildMonthlyContext(monthIndex, monthCount) {
   };
 }
 
-function evaluateMonthlyExpressionFormula(expression, monthCount) {
-  return Array.from({ length: monthCount }, (_, month) => {
-    const ctx = buildMonthlyContext(month, monthCount);
-    return toNumber(evaluateExpressionFormula(expression, ctx));
+function evaluateMonthlyExpressionFormula(expression, monthCount, baseContext = null, salesFlow = null, formulaCatalog = null) {
+  const safeMonthCount = Math.max(0, Math.round(toNumber(monthCount) || getCostMonthCount()));
+  const contextBase = baseContext || buildCostContext();
+  const flow = salesFlow || getProjectMonthlySalesFlows(safeMonthCount);
+  const catalog = formulaCatalog || getFormulaCatalogForContext(contextBase);
+  const recepcionMunicipal = getMunicipalReceptionMilestone();
+  const recepcionMes = recepcionMunicipal ? toNumber(recepcionMunicipal.inicio) : Number.POSITIVE_INFINITY;
+  let escriturasAcumuladas = 0;
+
+  return Array.from({ length: safeMonthCount }, (_, month) => {
+    const unidadesPromesa = toNumber(flow.unidadesPromesadas?.[month]);
+    const unidadesEscritura = toNumber(flow.unidadesEscrituradas?.[month]);
+    escriturasAcumuladas += unidadesEscritura;
+    const unidadesNoVendidasMes = month >= recepcionMes
+      ? Math.max(0, toNumber(contextBase.total_unidades) - escriturasAcumuladas)
+      : 0;
+    const ingresosPromesa = toNumber(flow.ingresosPromesa?.[month]);
+    const ingresosEscrituracion = toNumber(flow.ingresosEscrituracion?.[month]);
+    const ctx = {
+      ...contextBase,
+      unidades_promesadas_mes: unidadesPromesa,
+      unidades_escrituradas_mes: unidadesEscritura,
+      unidades_no_vendidas_mes: unidadesNoVendidasMes,
+      unidades_promesadas_escrituradas_mes: unidadesPromesa + unidadesEscritura,
+      ingresos_promesa_mes: ingresosPromesa,
+      ingresos_promesas_mes: ingresosPromesa,
+      ingresos_escrituracion_mes: ingresosEscrituracion,
+      ingresos_promesa_escrituracion_mes: ingresosPromesa + ingresosEscrituracion,
+      ingresos_mes: ingresosPromesa + ingresosEscrituracion,
+      mes: month,
+    };
+    return toNumber(evaluateExpressionFormula(expression, ctx, catalog));
   });
 }
 
-function calcularFlujoMensualPorFormula(subpartida, meses = getCostMonthCount()) {
+function calcularFlujoMensualPorFormula(subpartida, meses = getCostMonthCount(), context = null) {
   const monthCount = Array.isArray(meses) ? meses.length : Math.max(0, toNumber(meses) || getCostMonthCount());
   const formula = subpartida?.formula_referencia || getPartidaFormulaText(subpartida);
-  const monthly = evaluateMonthlyExpressionFormula(formula, monthCount);
+  const monthly = evaluateMonthlyExpressionFormula(formula, monthCount, context);
   if (subpartida) {
     subpartida.distribucion_mensual = monthly;
     subpartida.total_neto = monthly.reduce((sum, value) => sum + toNumber(value), 0);
@@ -4204,7 +4330,7 @@ function getMonthlyDistributionForPartida(partida, monthCount, context) {
   }
   if (partida.formula_tipo === 'expr_mensual') {
     if (!partida.formula_referencia) return createMonthlyArray(monthCount, 0);
-    const monthly = calcularFlujoMensualPorFormula(partida, monthCount);
+    const monthly = calcularFlujoMensualPorFormula(partida, monthCount, context);
     if (monthly.length < monthCount) {
       return [...monthly, ...Array(monthCount - monthly.length).fill(0)];
     }
@@ -4220,7 +4346,7 @@ function evaluateCostPartida(partida, context) {
   if (costConfig) return evaluateCostConfigTotal(costConfig, getCostMonthCount(), context);
   if (partida.formula_tipo === 'expr') return evaluateExpressionFormula(partida.formula_referencia, context);
   if (partida.formula_tipo === 'expr_mensual') {
-    const monthly = evaluateMonthlyExpressionFormula(partida.formula_referencia, getCostMonthCount());
+    const monthly = evaluateMonthlyExpressionFormula(partida.formula_referencia, getCostMonthCount(), context);
     return monthly.reduce((a, b) => a + toNumber(b), 0);
   }
   if (partida.formula_tipo === 'manual') return toNumber(partida.formula_valor || partida.total_neto);
@@ -4253,12 +4379,6 @@ function getCostStartDate() {
   const reference = state.proyecto?.compra_terreno_fecha || state.proyecto?.created_at || state.proyecto?.updated_at || new Date().toISOString();
   const date = new Date(reference);
   return Number.isNaN(date.getTime()) ? new Date() : date;
-}
-
-function addMonths(date, monthsToAdd) {
-  const next = new Date(date);
-  next.setMonth(next.getMonth() + monthsToAdd);
-  return next;
 }
 
 function formatCostMonthLabel(value) {
@@ -4596,12 +4716,14 @@ function renderCostIvaPanel(context = buildCostContext(), categorias = ensureCos
 
 function openCostIvaPanelFromButton(button) {
   if (!button) return;
-  readCostosEditor();
+  syncCostRowDraft(button.closest('[data-cost-row]'), { recompute: true });
   const costosUi = ensureCostosUiState();
   costosUi.activeIvaCategory = button.dataset.category || '';
   costosUi.activeIvaIndex = Number.parseInt(button.dataset.index, 10);
   costosUi.activeIvaId = button.dataset.costId || '';
-  renderCostosModule();
+  document.querySelectorAll('.cost-iva-btn.is-active').forEach((activeButton) => activeButton.classList.remove('is-active'));
+  button.classList.add('is-active');
+  renderCostIvaPanel();
 }
 
 function closeCostIvaPanel() {
@@ -4753,7 +4875,7 @@ function renderCostPlanilla() {
   setHtml('planilla-head', `
     <tr>
       <th style="width:60px"></th>
-      <th style="min-width:220px;text-align:left">Subpartida</th>
+      <th style="min-width:220px;text-align:left">Partida</th>
       <th class="cost-config-cell">Configurar</th>
       <th style="min-width:110px">Total neto</th>
       <th style="width:64px">IVA</th>
@@ -4763,15 +4885,6 @@ function renderCostPlanilla() {
 
   // Gastos financieros se gestiona en sus propias pestañas y no se muestra
   // en la planilla general. Terreno y Construccion quedan visibles con filas vinculadas.
-  categorias.forEach((categoria) => {
-    if (!isCostSourceCategory(categoria.nombre)) return;
-    (categoria.partidas || []).forEach((partida) => {
-      const t = evaluateCostPartida(partida, context);
-      partida.total_neto = t;
-      partida.distribucion_mensual = getMonthlyDistributionForPartida(partida, monthCount, context);
-    });
-  });
-
   renderCostIvaPanel(context, categorias);
 
   setHtml('planilla-tbody', categorias.map((categoria) => {
@@ -4816,9 +4929,9 @@ function renderCostPlanilla() {
         }
       }
 
-      const total = evaluateCostPartida(partida, context);
       const distribucion = getMonthlyDistributionForPartida(partida, monthCount, context);
-      const estadoCosto = getEstadoCosto(partida, total, monthCount);
+      const total = distribucion.reduce((sum, value) => sum + toNumber(value), 0);
+      const estadoCosto = getEstadoCosto(partida, total, monthCount, context, distribucion);
       const linkedSourceHint = partida.isLinked && partida.source === 'terreno'
         ? 'Viene desde la hoja Terreno: monto y fecha de compra'
         : partida.isLinked && partida.source === 'construccion'
@@ -4882,7 +4995,8 @@ function renderCostPlanilla() {
     </tr>
   `);
 
-  renderCostFlow(monthlyTotals);
+  const flowTotals = monthlyTotals.slice();
+  scheduleRenderJob('cost-flow-chart', () => renderCostFlow(flowTotals), 120);
 }
 
 function renderCostosModule() {
@@ -4891,21 +5005,29 @@ function renderCostosModule() {
   renderCostStructure();
 }
 
-function getProjectMonthlyCosts(includeFinancial = true) {
+function getProjectMonthlyCostBreakdown() {
   const monthCount = getCostMonthCount();
-  const monthly = createMonthlyArray(monthCount, 0);
+  const operative = createMonthlyArray(monthCount, 0);
+  const financial = createMonthlyArray(monthCount, 0);
   const context = buildCostContext();
   ensureCostosState().forEach((category) => {
-    if (!includeFinancial && category.nombre === 'GASTOS FINANCIEROS') return;
+    const isFinancial = category.nombre === 'GASTOS FINANCIEROS';
+    const target = isFinancial ? financial : operative;
     (category.partidas || []).forEach((partida) => {
-      if (category.nombre === 'GASTOS FINANCIEROS' && /Linea aprobada|Pago de linea/i.test(partida.nombre || '')) return;
+      if (isFinancial && /Linea aprobada|Pago de linea/i.test(partida.nombre || '')) return;
       const distribution = getMonthlyDistributionForPartida(partida, monthCount, context);
       distribution.forEach((value, index) => {
-        if (index < monthly.length) monthly[index] += toNumber(value);
+        if (index < target.length) target[index] += toNumber(value);
       });
     });
   });
-  return monthly;
+  return { operative, financial, monthCount };
+}
+
+function getProjectMonthlyCosts(includeFinancial = true) {
+  const { operative, financial } = getProjectMonthlyCostBreakdown();
+  if (!includeFinancial) return operative;
+  return operative.map((value, index) => value + financial[index]);
 }
 
 function getProjectMonthlyIncome(monthCount) {
@@ -4944,8 +5066,9 @@ function renderProjectCashflow() {
   const monthCount = getCostMonthCount();
   const labels = getCostMonthLabels();
   const income = getProjectMonthlyIncome(monthCount);
-  const costs = getProjectMonthlyCosts(false);
-  const financialCosts = getProjectMonthlyCosts(true).map((value, index) => Math.max(0, value - costs[index]));
+  const breakdown = getProjectMonthlyCostBreakdown();
+  const costs = breakdown.operative;
+  const financialCosts = breakdown.financial;
   const costsTotal = costs.map((v, i) => v + financialCosts[i]);
 
   // Flujo operativo bruto = Ingresos - Costos
@@ -5057,8 +5180,12 @@ function renderProjectCashflow() {
   }).join(''));
 }
 
-function getCostFormulaCatalog() {
-  const context = buildCostContext();
+function getCostFormulaCatalog(contextOverride = null) {
+  const context = contextOverride || buildCostContext();
+  const globalPaymentSettings = getGlobalPaymentSettings();
+  const totalUnits = toNumber(context.total_unidades) || state.cabida.reduce((sum, row) => sum + toNumber(row.cantidad), 0);
+  const precioPromedioUnidad = toNumber(context.precio_promedio_unidad);
+  const piePct = Math.min(100, Math.max(0, globalPaymentSettings.pie_promesa_pct));
   const mesesPreventa = Math.max(0, ...getCronogramaByType('PREVENTA').map((row) => toNumber(row.duracion)));
   const mesesVenta = Math.max(0, ...getCronogramaByType('VENTA').map((row) => toNumber(row.duracion)));
   const mesesEscrituracion = Math.max(0, ...getCronogramaByType('ESCRITURACION').map((row) => toNumber(row.duracion)));
@@ -5114,10 +5241,10 @@ function getCostFormulaCatalog() {
     { label: 'Total terreno', token: '_total_terreno', value: context.total_terreno, unit: 'UF' },
     { label: 'Ventas brutas', token: '_ventas_brutas', value: context.ventas_brutas, unit: 'UF' },
     // Ingresos por tipo de venta (para calcular comisiones, gastos comerciales, etc.)
-    { label: 'Ingresos promesas total', token: '_ingresos_promesas_total', value: (() => { const totals = getTotalSalesMetrics(); const settings = getGlobalPaymentSettings(); const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct)); const unidades = state.cabida.reduce((s, r) => s + toNumber(r.cantidad), 0); const promesaUnidad = totals.precioPromedio * piePct / 100; return unidades * promesaUnidad; })(), unit: 'UF' },
-    { label: 'Ingresos escrituracion total', token: '_ingresos_escrituracion_total', value: (() => { const totals = getTotalSalesMetrics(); const settings = getGlobalPaymentSettings(); const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct)); const escrituraPct = Math.max(0, 100 - piePct); const unidades = state.cabida.reduce((s, r) => s + toNumber(r.cantidad), 0); return unidades * totals.precioPromedio * escrituraPct / 100; })(), unit: 'UF' },
-    { label: 'Pct pie promesa', token: '_pct_pie_promesa', value: toNumber(getGlobalPaymentSettings().pie_promesa_pct), unit: '%' },
-    { label: 'Pct escrituracion', token: '_pct_escrituracion', value: Math.max(0, 100 - toNumber(getGlobalPaymentSettings().pie_promesa_pct)), unit: '%' },
+    { label: 'Ingresos promesas total', token: '_ingresos_promesas_total', value: totalUnits * precioPromedioUnidad * piePct / 100, unit: 'UF' },
+    { label: 'Ingresos escrituracion total', token: '_ingresos_escrituracion_total', value: totalUnits * precioPromedioUnidad * Math.max(0, 100 - piePct) / 100, unit: 'UF' },
+    { label: 'Pct pie promesa', token: '_pct_pie_promesa', value: toNumber(globalPaymentSettings.pie_promesa_pct), unit: '%' },
+    { label: 'Pct escrituracion', token: '_pct_escrituracion', value: Math.max(0, 100 - toNumber(globalPaymentSettings.pie_promesa_pct)), unit: '%' },
     ...COST_CATEGORY_ORDER.map((name) => ({
       label: `Total categoria ${name.toLowerCase()}`,
       token: `_total_categoria_${String(name).toLowerCase().replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}`,
@@ -5164,6 +5291,15 @@ function getCostFormulaCatalog() {
     if (key && !uniqueByToken.has(key)) uniqueByToken.set(key, entry);
   });
   return Array.from(uniqueByToken.values());
+}
+
+function getFormulaCatalogForContext(context = null) {
+  if (!context || typeof context !== 'object') return getCostFormulaCatalog(context);
+  const cached = formulaCatalogCache.get(context);
+  if (cached) return cached;
+  const catalog = getCostFormulaCatalog(context);
+  formulaCatalogCache.set(context, catalog);
+  return catalog;
 }
 
 function splitFormulaTokens(rawValue) {
@@ -5369,6 +5505,7 @@ function toggleCostCategoryCollapse(categoryName) {
     : true;
   const newCollapsed = !currentValue;
   state.costosUi.collapsed[categoryName] = newCollapsed;
+  scheduleProjectUiStateSave();
 
   const tbody = document.getElementById('planilla-tbody');
   const safeName = (window.CSS && CSS.escape) ? CSS.escape(categoryName) : categoryName.replace(/"/g, '\\"');
@@ -5514,7 +5651,7 @@ function insertFormulaTemplate(type) {
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
-function openCostFormulaModal(categoryName, index) {
+function openLegacyCostFormulaModal(categoryName, index) {
   readCostosEditor();
   const category = state.costos.find((item) => item.nombre === categoryName);
   const partida = category?.partidas?.[index];
@@ -5614,8 +5751,9 @@ function saveCostFormulaModal() {
   partida.formula_valor = formula.formula_valor;
   partida.formula_referencia = formula.formula_referencia;
   if (partida.editable_source === 'terreno') partida.auto_origen = false;
-  partida.total_neto = evaluateCostPartida(partida, buildCostContext());
-  partida.distribucion_mensual = getMonthlyDistributionForPartida(partida, getCostMonthCount());
+  const context = buildCostContext();
+  partida.distribucion_mensual = getMonthlyDistributionForPartida(partida, getCostMonthCount(), context);
+  partida.total_neto = partida.distribucion_mensual.reduce((sum, value) => sum + toNumber(value), 0);
   syncCostFormulaRowFields(categoryName, index, partida);
   closeCostFormulaModal({ render: false });
   if (partida.editable_source === 'terreno') renderTerrainModule();
@@ -5641,8 +5779,9 @@ function applyCostFormulaModalAutosave() {
   partida.formula_valor = formula.formula_valor;
   partida.formula_referencia = formula.formula_referencia;
   if (partida.editable_source === 'terreno') partida.auto_origen = false;
-  partida.total_neto = evaluateCostPartida(partida, buildCostContext());
-  partida.distribucion_mensual = getMonthlyDistributionForPartida(partida, getCostMonthCount());
+  const context = buildCostContext();
+  partida.distribucion_mensual = getMonthlyDistributionForPartida(partida, getCostMonthCount(), context);
+  partida.total_neto = partida.distribucion_mensual.reduce((sum, value) => sum + toNumber(value), 0);
   syncCostFormulaRowFields(categoryName, index, partida);
   scheduleAutosave(partida.editable_source === 'terreno' ? 'terreno' : 'costos');
 }
@@ -5953,7 +6092,8 @@ function evaluateCostAmountInput(rawValue, context, fallbackValue = 0) {
     const value = toNumber(canonicalInput);
     return { ok: true, input: canonicalInput, formula: '', value, calculated: value, references: [], error: '' };
   }
-  const result = evaluateExpressionFormulaDetailed(canonicalInput, context || buildCostContext());
+  const formulaContext = typeof context === 'function' ? context() : context;
+  const result = evaluateExpressionFormulaDetailed(canonicalInput, formulaContext || buildCostContext());
   if (!result.ok) {
     const fallback = toNumber(fallbackValue);
     return {
@@ -5975,6 +6115,21 @@ function evaluateCostAmountInput(rawValue, context, fallbackValue = 0) {
     references: result.references || extractFormulaReferences(canonicalInput),
     error: '',
   };
+}
+
+function isFormulaLikeAmountInput(rawValue) {
+  const input = String(rawValue ?? '').trim();
+  return !!input && !isPlainFormulaNumber(input);
+}
+
+function costConfigNeedsFormulaContext(config = {}) {
+  if (!config || typeof config !== 'object') return false;
+  const method = String(config.method || '').trim();
+  const usesFormulaTotal = method === 'global_formula' && String(config.total_source || '').trim() === 'formula';
+  if ((method === 'monthly_formula' || usesFormulaTotal) && String(config.formula || '').trim()) return true;
+  if (isFormulaLikeAmountInput(getCostAmountRawInput(config, 'amount'))) return true;
+  return Array.isArray(config.payments)
+    && config.payments.some((item) => isFormulaLikeAmountInput(getCostAmountRawInput(item, 'amount')));
 }
 
 function getFormulaDisplayText(rawValue = '') {
@@ -6078,7 +6233,7 @@ function normalizeCostConfig(rawConfig, context) {
   const ensureCtx = () => (ctx || (ctx = buildCostContext()));
   const amountMeta = evaluateCostAmountInput(
     getCostAmountRawInput(parsed, 'amount'),
-    ensureCtx(),
+    ensureCtx,
     parsed.amount_value ?? parsed.amount_calculated ?? parsed.amount
   );
   return {
@@ -6119,7 +6274,7 @@ function normalizeCostConfig(rawConfig, context) {
       amount: toNumber(item.amount),
     })) : [],
     payments: Array.isArray(parsed.payments) ? parsed.payments.map((item) => {
-      const itemAmount = evaluateCostAmountInput(getCostAmountRawInput(item, 'amount'), ensureCtx(), item.amount);
+      const itemAmount = evaluateCostAmountInput(getCostAmountRawInput(item, 'amount'), ensureCtx, item.amount);
       return applyCostAmountMeta({
         ref: item.ref || item.point?.ref || 'MANUAL_0',
         offset: toNumber(item.offset ?? item.point?.offset),
@@ -6184,12 +6339,12 @@ function migrateLegacyCostConfig(partida, context) {
     config = { method: 'manual', amount: toNumber(partida.formula_valor || partida.total_neto), start: makeCostPoint() };
   }
 
-  partida.cost_config = normalizeCostConfig(config);
+  partida.cost_config = normalizeCostConfig(config, context);
   return partida.cost_config;
 }
 
 function evaluateCostConfigBaseAmount(config, context) {
-  const safeConfig = normalizeCostConfig(config);
+  const safeConfig = normalizeCostConfig(config, context);
   if (!safeConfig) return 0;
   if (safeConfig.method !== 'milestones' && safeConfig.total_source === 'formula' && safeConfig.formula) {
     return toNumber(evaluateExpressionFormula(safeConfig.formula, context || buildCostContext()));
@@ -6198,7 +6353,7 @@ function evaluateCostConfigBaseAmount(config, context) {
 }
 
 function buildDistributionFromCostConfig(config, monthCount = getCostMonthCount(), context) {
-  const safeConfig = normalizeCostConfig(config);
+  const safeConfig = normalizeCostConfig(config, context);
   if (!safeConfig) return null;
   const months = createMonthlyArray(monthCount, 0);
   const startMonth = resolveCostConfigPoint(safeConfig.start);
@@ -6206,7 +6361,7 @@ function buildDistributionFromCostConfig(config, monthCount = getCostMonthCount(
   const amount = toNumber(safeConfig.amount);
 
   if (safeConfig.method === 'monthly_formula') {
-    return evaluateMonthlyExpressionFormula(safeConfig.formula, monthCount);
+    return evaluateMonthlyExpressionFormula(safeConfig.formula, monthCount, context);
   }
 
   if (safeConfig.method === 'manual') {
@@ -6277,10 +6432,12 @@ function evaluateCostConfigTotal(config, monthCount = getCostMonthCount(), conte
   return Array.isArray(monthly) ? monthly.reduce((sum, value) => sum + toNumber(value), 0) : 0;
 }
 
-function getEstadoCosto(partida, total = 0, monthCount = getCostMonthCount()) {
-  const config = migrateLegacyCostConfig(partida);
+function getEstadoCosto(partida, total = 0, monthCount = getCostMonthCount(), context = null, monthlyDistribution = null) {
+  const config = migrateLegacyCostConfig(partida, context);
   if (!config) return { activo: false, label: 'Pendiente', className: 'estado-pendiente' };
-  const monthly = buildDistributionFromCostConfig(config, monthCount);
+  const monthly = Array.isArray(monthlyDistribution)
+    ? monthlyDistribution
+    : buildDistributionFromCostConfig(config, monthCount, context);
   const hasFlow = Array.isArray(monthly) && monthly.some((value) => Math.abs(toNumber(value)) > 0.0001);
   if (!hasFlow && !toNumber(total)) return { activo: false, label: 'Pendiente', className: 'estado-pendiente' };
   if (config.method === 'monthly_formula') return { activo: true, label: 'Fórmula mensual', className: 'estado-monthly' };
@@ -6290,7 +6447,7 @@ function getEstadoCosto(partida, total = 0, monthCount = getCostMonthCount()) {
   return { activo: true, label: 'Configurado', className: 'estado-ok' };
 }
 
-function openPaymentPlanModal(categoryName, index) {
+function openLegacyPaymentPlanModal(categoryName, index) {
   readCostosEditor();
   const category = state.costos.find((item) => item.nombre === categoryName);
   const partida = category?.partidas?.[index];
@@ -6359,7 +6516,7 @@ function addPaymentPlanItem(type) {
   if (type === 'periodico') plan.periodicos.push({ inicio_ref: 'MANUAL_0', inicio_offset: 0, fin_ref: 'MANUAL_0', fin_offset: 0, cada_meses: 1, monto: 0 });
   partida.plan_pago = serializeInteractivePaymentPlan(plan);
   if (partida.editable_source === 'terreno') partida.auto_origen = false;
-  openPaymentPlanModal(state.costosUi.activePaymentCategory, state.costosUi.activePaymentIndex);
+  openLegacyPaymentPlanModal(state.costosUi.activePaymentCategory, state.costosUi.activePaymentIndex);
   scheduleAutosave(partida.editable_source === 'terreno' ? 'terreno' : 'costos');
 }
 
@@ -6434,7 +6591,7 @@ function applyQuickPaymentTemplate(templateType) {
 
   partida.plan_pago = serializeInteractivePaymentPlan(plan);
   if (partida.editable_source === 'terreno') partida.auto_origen = false;
-  openPaymentPlanModal(state.costosUi.activePaymentCategory, state.costosUi.activePaymentIndex);
+  openLegacyPaymentPlanModal(state.costosUi.activePaymentCategory, state.costosUi.activePaymentIndex);
   scheduleAutosave(partida.editable_source === 'terreno' ? 'terreno' : 'costos');
 }
 
@@ -6448,7 +6605,7 @@ function removePaymentPlanItem(type, index) {
   if (type === 'periodico') plan.periodicos.splice(index, 1);
   partida.plan_pago = serializeInteractivePaymentPlan(plan);
   if (partida.editable_source === 'terreno') partida.auto_origen = false;
-  openPaymentPlanModal(state.costosUi.activePaymentCategory, state.costosUi.activePaymentIndex);
+  openLegacyPaymentPlanModal(state.costosUi.activePaymentCategory, state.costosUi.activePaymentIndex);
   scheduleAutosave(partida.editable_source === 'terreno' ? 'terreno' : 'costos');
 }
 
@@ -6472,8 +6629,10 @@ function savePaymentPlanModal() {
     ref: row.querySelector('[data-field="ref"]')?.value || 'MANUAL_0',
     offset: toNumber(row.querySelector('[data-field="offset"]')?.value),
   }));
+  let paymentPlanContext = null;
+  const getPaymentPlanContext = () => (paymentPlanContext || (paymentPlanContext = buildCostContext()));
   const periodicos = Array.from(document.querySelectorAll('#payment-plan-periodicos .payment-line')).map((row) => {
-    const amountMeta = evaluateCostAmountInput(row.querySelector('[data-field="monto"]')?.value, buildCostContext(), 0);
+    const amountMeta = evaluateCostAmountInput(row.querySelector('[data-field="monto"]')?.value, getPaymentPlanContext, 0);
     return applyCostAmountMeta({
       inicio_ref: row.querySelector('[data-field="inicio_ref"]')?.value || 'MANUAL_0',
       inicio_offset: toNumber(row.querySelector('[data-field="inicio_offset"]')?.value),
@@ -6514,8 +6673,10 @@ function applyPaymentPlanAutosave() {
     ref: row.querySelector('[data-field="ref"]')?.value || 'MANUAL_0',
     offset: toNumber(row.querySelector('[data-field="offset"]')?.value),
   }));
+  let paymentPlanContext = null;
+  const getPaymentPlanContext = () => (paymentPlanContext || (paymentPlanContext = buildCostContext()));
   const periodicos = Array.from(document.querySelectorAll('#payment-plan-periodicos .payment-line')).map((row) => {
-    const amountMeta = evaluateCostAmountInput(row.querySelector('[data-field="monto"]')?.value, buildCostContext(), 0);
+    const amountMeta = evaluateCostAmountInput(row.querySelector('[data-field="monto"]')?.value, getPaymentPlanContext, 0);
     return applyCostAmountMeta({
       inicio_ref: row.querySelector('[data-field="inicio_ref"]')?.value || 'MANUAL_0',
       inicio_offset: toNumber(row.querySelector('[data-field="inicio_offset"]')?.value),
@@ -6637,8 +6798,8 @@ function getActiveCostConfigPartida() {
   return category?.partidas?.[state.costosUi.activeConfigIndex] || null;
 }
 
-function getCostConfigPctSummary(config) {
-  const safeConfig = normalizeCostConfig(config);
+function getCostConfigPctSummary(config, context = null) {
+  const safeConfig = normalizeCostConfig(config, context);
   if (!safeConfig || safeConfig.method !== 'milestones') return { pct: 0, delta: 0, ok: true };
   const pct = [...(safeConfig.hitos || []), ...(safeConfig.tramos || [])]
     .reduce((sum, item) => sum + toNumber(item.pct), 0);
@@ -6646,22 +6807,26 @@ function getCostConfigPctSummary(config) {
   return { pct, delta, ok: Math.abs(delta) <= 0.01 };
 }
 
-function getCostConfigValidation(config) {
-  const safeConfig = normalizeCostConfig(config);
+function getCostConfigValidation(config, context = null) {
+  let sharedContext = context;
+  let catalog = null;
+  const getSharedContext = () => (sharedContext || (sharedContext = buildCostContext()));
+  const getSharedCatalog = () => (catalog || (catalog = getFormulaCatalogForContext(getSharedContext())));
+  const safeConfig = normalizeCostConfig(config, sharedContext);
   if (!safeConfig) return { ok: true, label: '', message: '' };
   if (safeConfig.amount_error) return { ok: false, label: 'Formula invalida', message: safeConfig.amount_error };
   const paymentError = (safeConfig.payments || []).find((item) => item.amount_error);
   if (paymentError) return { ok: false, label: 'Formula invalida', message: paymentError.amount_error };
   if (safeConfig.method === 'monthly_formula' && safeConfig.formula) {
-    const formulaCheck = evaluateExpressionFormulaDetailed(safeConfig.formula, buildMonthlyContext(0, getCostMonthCount()));
+    const formulaCheck = evaluateExpressionFormulaDetailed(safeConfig.formula, buildMonthlyContext(0, getCostMonthCount()), getSharedCatalog());
     if (!formulaCheck.ok) return { ok: false, label: 'Formula invalida', message: formulaCheck.error };
   }
   if (safeConfig.method === 'global_formula' && safeConfig.total_source === 'formula' && safeConfig.formula) {
-    const formulaCheck = evaluateExpressionFormulaDetailed(safeConfig.formula, buildCostContext());
+    const formulaCheck = evaluateExpressionFormulaDetailed(safeConfig.formula, getSharedContext(), getSharedCatalog());
     if (!formulaCheck.ok) return { ok: false, label: 'Formula invalida', message: formulaCheck.error };
   }
   if (safeConfig.method !== 'milestones') return { ok: true, label: '', message: '' };
-  const summary = getCostConfigPctSummary(safeConfig);
+  const summary = getCostConfigPctSummary(safeConfig, sharedContext);
   if (summary.ok) return { ok: true, label: '100% asignado', message: '' };
   const label = summary.delta > 0
     ? `Falta ${fmtNumber(summary.delta, 2)}%`
@@ -6673,11 +6838,11 @@ function getCostConfigValidation(config) {
   };
 }
 
-function updateCostConfigPctWarning(config) {
+function updateCostConfigPctWarning(config, context = null, validationOverride = null) {
   const warning = $('cost-config-pct-warning');
   if (!warning) return;
-  const summary = getCostConfigPctSummary(config);
-  const validation = getCostConfigValidation(config);
+  const summary = getCostConfigPctSummary(config, context);
+  const validation = validationOverride || getCostConfigValidation(config, context);
   warning.textContent = validation.ok
     ? `Total asignado: ${fmtNumber(summary.pct, 2)}%`
     : `${validation.label} · total asignado: ${fmtNumber(summary.pct, 2)}%`;
@@ -6964,10 +7129,12 @@ function readCostConfigForm() {
   syncInlineFormulaAmountEditors($('cost-config-fields') || document);
   getCostConfigFormulaValueFromEditor();
   const draft = normalizeCostConfig(state.costosUi.costConfigDraft) || { method: 'manual', start: makeCostPoint(), end: makeCostPoint() };
+  let formContext = null;
+  const getFormContext = () => (formContext || (formContext = buildCostContext()));
   const method = $('cost-config-method')?.value || draft.method || 'manual';
   const amountMeta = evaluateCostAmountInput(
     $('cost-config-amount')?.value ?? getCostAmountRawInput(draft, 'amount'),
-    buildCostContext(),
+    getFormContext,
     draft.amount
   );
   const common = {
@@ -7014,14 +7181,14 @@ function readCostConfigForm() {
       item,
       evaluateCostAmountInput(
         paymentRows[index]?.querySelector('[data-field="amount"]')?.value,
-        buildCostContext(),
+        getFormContext,
         draft.payments?.[index]?.amount
       ),
       'amount'
     ));
   }
 
-  state.costosUi.costConfigDraft = normalizeCostConfig(common);
+  state.costosUi.costConfigDraft = normalizeCostConfig(common, formContext);
   return state.costosUi.costConfigDraft;
 }
 
@@ -7215,16 +7382,17 @@ function updateCostConfigPreview() {
   if (!partida) return;
   const config = readCostConfigForm();
   const monthCount = getCostMonthCount();
+  const context = costConfigNeedsFormulaContext(config) ? buildCostContext() : null;
   updateCostAmountFeedback($('cost-config-amount'), config);
   document.querySelectorAll('#cost-config-payments [data-formula-amount]').forEach((input, index) => {
     updateCostAmountFeedback(input, config.payments?.[index]);
   });
-  const monthly = buildDistributionFromCostConfig(config, monthCount) || createMonthlyArray(monthCount, 0);
+  const monthly = buildDistributionFromCostConfig(config, monthCount, context) || createMonthlyArray(monthCount, 0);
   const total = monthly.reduce((sum, value) => sum + toNumber(value), 0);
-  const validation = getCostConfigValidation(config);
-  updateCostConfigPctWarning(config);
+  const validation = getCostConfigValidation(config, context);
+  updateCostConfigPctWarning(config, context, validation);
   const estado = validation.ok
-    ? getEstadoCosto({ ...partida, cost_config: config, auto_origen: false }, total, monthCount)
+    ? getEstadoCosto({ ...partida, cost_config: config, auto_origen: false }, total, monthCount, context, monthly)
     : { activo: false, label: validation.label, className: 'estado-pendiente' };
   setText('cost-config-total', `Total: ${fmtUf(total)}`);
   const status = $('cost-config-status');
@@ -7253,7 +7421,7 @@ function updateCostConfigPreview() {
 }
 
 function openCostConfigModal(categoryName, index) {
-  readCostosEditor();
+  syncCostRowByRef(categoryName, index, { recompute: false });
   const category = state.costos.find((item) => item.nombre === categoryName);
   const partida = category?.partidas?.[index];
   if (!partida) return;
@@ -7286,15 +7454,16 @@ function saveCostConfigModal() {
   const partida = category?.partidas?.[index];
   if (!partida) return;
   const config = readCostConfigForm();
-  const validation = getCostConfigValidation(config);
+  const context = costConfigNeedsFormulaContext(config) ? buildCostContext() : null;
+  const validation = getCostConfigValidation(config, context);
   if (!validation.ok) {
     updateCostConfigPreview();
     window.alert(validation.message);
     return;
   }
-  const monthly = buildDistributionFromCostConfig(config, getCostMonthCount()) || createMonthlyArray();
+  const monthly = buildDistributionFromCostConfig(config, getCostMonthCount(), context) || createMonthlyArray();
   const total = monthly.reduce((sum, value) => sum + toNumber(value), 0);
-  partida.cost_config = normalizeCostConfig(config);
+  partida.cost_config = normalizeCostConfig(config, context);
   partida.total_neto = total;
   partida.distribucion_mensual = monthly;
   partida.plan_pago = JSON.stringify(partida.cost_config);
@@ -7355,12 +7524,30 @@ function openPaymentPlanModal(categoryName, index) {
 
 function removeCostPartida(categoryName, index) {
   if (categoryName === 'GASTOS FINANCIEROS') return;
-  readCostosEditor();
+  // Light DOM sync — no formula recalculation needed just to delete a row
+  readCostosEditor({ recompute: false });
   const category = state.costos.find((item) => item.nombre === categoryName);
   if (!category) return;
-  if (category.partidas?.[index]?.isDefault) return;
+  const partida = category.partidas?.[index];
+  if (!partida || partida.isDefault || partida.isProtected || partida.isLinked) return;
+
+  // 1. Instant visual removal — user sees it gone before any recalculation
+  const tbody = $('planilla-tbody');
+  if (tbody) {
+    const row = tbody.querySelector(`tr[data-category="${CSS.escape(categoryName)}"][data-index="${index}"]`);
+    if (row) row.remove();
+  }
+
+  // 2. Mutate state
   category.partidas.splice(index, 1);
-  renderCostosModule();
+
+  // 3. Re-render planilla only (updates totals accurately, skips renderCostStructure)
+  scheduleRenderJob('costos-planilla', () => {
+    ensureCostosState();
+    renderCostPlanilla();
+  }, 80);
+
+  // 4. Debounced save
   scheduleAutosave('costos');
 }
 
@@ -7386,6 +7573,7 @@ function renderKpis() {
 }
 
 function renderCapitalModule() {
+  if (!$('tab-capital')) return;
   state.capital = normalizeCapital(state.capital);
   const bindings = [
     ['cap-buffer', 'caja_minima_buffer'],
@@ -7455,7 +7643,7 @@ function prepareStateForSave({ includeCostos = true } = {}) {
   syncSalesDrivenMilestones();
 
   if (includeCostos && $('planilla-table')) state.costos = readCostosEditor();
-  if ($('cap-buffer')) state.capital = readCapitalFromEditor();
+  if ($('tab-capital') && $('cap-buffer')) state.capital = readCapitalFromEditor();
   state.proyecto = getProjectSavePayload();
 }
 
@@ -7549,14 +7737,16 @@ function readConstruccionFinanciamientoFromEditor() {
 function onCabidaInputChange() {
   state.proyecto = normalizeProject(getCabidaProjectSettingsFromEditor());
   state.cabida = getCabidaRowsFromEditor();
-  renderCabidaTables(state.cabida);
-  renderCabidaEditor(state.cabida);
-  renderTerrainModule();
-  renderConstruccion();
-  ensureVentasState();
-  renderVentasModule();
-  renderCostosModule();
-  renderProjectCashflow();
+  scheduleRenderJob('cabida-dependencies', () => {
+    renderCabidaTables(state.cabida);
+    renderCabidaEditor(state.cabida);
+    renderTerrainModule();
+    renderConstruccion();
+    ensureVentasState();
+    renderVentasModule();
+    renderCostosModule();
+    renderProjectCashflow();
+  });
   scheduleAutosave('cabida');
   scheduleAutosave('ventas');
   scheduleAutosave('costos');
@@ -7622,17 +7812,19 @@ function updateConstrParams() {
 function onGanttInputChange() {
   state.gantt = readGanttEditor();
   syncSalesDrivenMilestones();
-  renderTerrainModule();
-  renderGanttEditor(state.gantt);
-  renderConstruccion();
-  ensureVentasState();
-  setLocalizedInputValue('ventas-velocidad-promesas', getVentasVelocitySettings().promesas, 0);
-  setLocalizedInputValue('ventas-velocidad-escrituracion', getVentasVelocitySettings().escrituracion, 0);
-  renderVentasSchedules();
-  renderVentasSummaryCards();
-  renderVentasCashflow();
-  renderCostosModule();
-  renderProjectCashflow();
+  scheduleRenderJob('gantt-dependencies', () => {
+    renderTerrainModule();
+    renderGanttEditor(state.gantt);
+    renderConstruccion();
+    ensureVentasState();
+    setLocalizedInputValue('ventas-velocidad-promesas', getVentasVelocitySettings().promesas, 0);
+    setLocalizedInputValue('ventas-velocidad-escrituracion', getVentasVelocitySettings().escrituracion, 0);
+    renderVentasSchedules();
+    renderVentasSummaryCards();
+    renderVentasCashflow();
+    renderCostosModule();
+    renderProjectCashflow();
+  });
   scheduleAutosave('gantt');
   scheduleAutosave('ventas');
   scheduleAutosave('costos');
@@ -7789,10 +7981,12 @@ function onVentasInputChange() {
   state.ventasConfig = readVentasConfigEditor();
   state.ventasCronograma = readVentasCronogramaEditor();
   syncSalesDrivenMilestones();
-  renderGanttEditor(state.gantt);
-  renderVentasModule();
-  renderCostosModule();
-  renderProjectCashflow();
+  scheduleRenderJob('ventas-dependencies', () => {
+    renderGanttEditor(state.gantt);
+    renderVentasModule();
+    renderCostosModule();
+    renderProjectCashflow();
+  });
   scheduleAutosave('ventas');
   scheduleAutosave('gantt');
   scheduleAutosave('costos');
@@ -7844,6 +8038,64 @@ function parseFormulaInput(value, forcedMode = '') {
   if (/^-?[0-9.,]+$/.test(raw)) return { formula_tipo: 'manual', formula_valor: toNumber(raw), formula_referencia: '' };
   const isMensual = formulaContainsMonthlyReference(raw);
   return { formula_tipo: isMensual ? 'expr_mensual' : 'expr', formula_valor: 0, formula_referencia: raw };
+}
+
+function getCostPartidaFromRow(row) {
+  if (!row || row.dataset.auto === '1' || row.dataset.readonly === '1') return null;
+  const category = state.costos.find((item) => item.nombre === row.dataset.category);
+  if (!category) return null;
+  const index = toNumber(row.dataset.index);
+  const partida = row.dataset.costId
+    ? category.partidas?.find((item) => String(item.id || '') === row.dataset.costId)
+    : category.partidas?.[index];
+  return partida ? { category, partida, index } : null;
+}
+
+function syncCostRowDraft(row, { recompute = false } = {}) {
+  const target = getCostPartidaFromRow(row);
+  if (!target) return null;
+  const { partida } = target;
+
+  const nameInput = row.querySelector('[data-field="nombre"]');
+  if (nameInput) partida.nombre = nameInput.value?.trim() || 'Nueva subpartida';
+
+  const formulaInput = row.querySelector('[data-field="formula"]');
+  if (formulaInput && !partida.cost_config) {
+    const formula = parseFormulaInput(formulaInput.value);
+    partida.formula_tipo = formula.formula_tipo;
+    partida.formula_valor = formula.formula_valor;
+    partida.formula_referencia = formula.formula_referencia;
+  }
+
+  partida.plan_pago = partida.plan_pago || '';
+  const ivaInput = row.querySelector('[data-field="tiene_iva"]');
+  if (ivaInput) partida.tiene_iva = !!ivaInput.checked;
+  const esTerrenoInput = row.querySelector('[data-field="es_terreno"]');
+  if (esTerrenoInput) partida.es_terreno = !!esTerrenoInput.checked;
+
+  const monthInputs = Array.from(row.querySelectorAll('[data-month]'));
+  if (monthInputs.length) {
+    partida.distribucion_mensual = monthInputs.map((input) => toNumber(input.value));
+  }
+
+  if (recompute) {
+    const context = buildCostContext();
+    const monthCount = getCostMonthCount();
+    partida.distribucion_mensual = getMonthlyDistributionForPartida(partida, monthCount, context);
+    partida.total_neto = partida.distribucion_mensual.reduce((sum, value) => sum + toNumber(value), 0);
+  }
+
+  if (!isEmptyNewCostPartida({ ...partida, isNewDraft: false })) {
+    delete partida.isNewDraft;
+  }
+  return target;
+}
+
+function syncCostRowByRef(categoryName, index, options = {}) {
+  const rawName = String(categoryName || '');
+  const safeName = (window.CSS && CSS.escape) ? CSS.escape(rawName) : rawName.replace(/"/g, '\\"');
+  const row = document.querySelector(`#planilla-table [data-cost-row][data-category="${safeName}"][data-index="${Number.parseInt(index, 10)}"]`);
+  return row ? syncCostRowDraft(row, options) : null;
 }
 
 function readCostosEditor(options = {}) {
@@ -7899,11 +8151,69 @@ function readCostosEditor(options = {}) {
   return categories;
 }
 
+function renderCostDraftPartidaRow(categoryName, partida, index, isCollapsed = false) {
+  const monthCount = getCostMonthCount();
+  const rawDistribution = Array.isArray(partida.distribucion_mensual) ? partida.distribucion_mensual : [];
+  const distribution = createMonthlyArray(monthCount, 0).map((value, monthIndex) => toNumber(rawDistribution[monthIndex] ?? value));
+  const total = toNumber(partida.total_neto);
+  const hasFlow = distribution.some((value) => Math.abs(toNumber(value)) > 0.0001);
+  const estadoCosto = !hasFlow && !total
+    ? { activo: false, label: 'Pendiente', className: 'estado-pendiente' }
+    : getEstadoCosto(partida, total, monthCount, null, distribution);
+  const isProtectedDefault = !!partida.isDefault;
+  const rowStyle = isCollapsed ? ' style="display:none"' : '';
+
+  return `
+    <tr class="partida-row is-subpartida" data-cost-cat-row="${escapeHtml(categoryName)}"${rowStyle} data-cost-row data-category="${escapeHtml(categoryName)}" data-index="${index}" data-cost-id="${escapeHtml(partida.id || '')}" draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)">
+      <td style="text-align:center"><span class="row-tools">${isProtectedDefault ? '<button class="btn-outline btn-delete-inline" type="button" title="Subpartida base protegida" disabled>&times;</button>' : `<button class="btn-outline btn-delete-inline" type="button" title="Eliminar subpartida" onclick="removeCostPartida('${escapeHtml(categoryName)}', ${index})">&times;</button>`}<span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span></span></td>
+      <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}"/></td>
+      <td class="cost-config-cell"><span class="cost-config-pill ${estadoCosto.className}" onclick="openCostConfigModal('${escapeHtml(categoryName)}', ${index})" title="Configurar costo">${escapeHtml(estadoCosto.label)}</span></td>
+      <td style="text-align:center;color:#22c55e;font-weight:800"><span class="cost-total-cell" onclick="openCostConfigModal('${escapeHtml(categoryName)}', ${index})" title="Configurar costo">${fmtTableAmount(total, { kind: 'cost' })}</span><input type="hidden" class="cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}"/><input type="hidden" data-field="formula_tipo" value="${escapeHtml(partida.formula_tipo || 'expr')}"/></td>
+      <td class="cost-iva-cell" style="text-align:center">
+        <span class="cost-iva-actions">
+          <input class="cost-iva-check" type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''}/>
+          <button class="cost-iva-btn" type="button" data-category="${escapeHtml(categoryName)}" data-index="${index}" data-cost-id="${escapeHtml(partida.id || '')}" onclick="openCostIvaPanelFromButton(this)" title="Ver calculo de IVA" aria-label="Ver calculo de IVA para ${escapeHtml(partida.nombre || 'Subpartida')}">IVA</button>
+        </span>
+      </td>
+      ${distribution.map((value) => `<td data-month-cell style="text-align:center">${fmtTableAmount(value, { kind: 'cost' })}</td>`).join('')}
+    </tr>
+  `;
+}
+
+function insertCostPartidaRow(categoryName, partida, index) {
+  const tbody = $('planilla-tbody');
+  const rawName = String(categoryName || '');
+  const safeName = (window.CSS && CSS.escape) ? CSS.escape(rawName) : rawName.replace(/"/g, '\\"');
+  const catRow = tbody?.querySelector(`tr.cat-row[data-cost-category="${safeName}"]`);
+  if (!tbody || !catRow) return false;
+
+  catRow.classList.add('is-expanded');
+  const arrow = catRow.querySelector('.btn-collapse-cost');
+  if (arrow) {
+    arrow.disabled = false;
+    arrow.removeAttribute('style');
+    arrow.title = 'Expandir o colapsar';
+    arrow.innerHTML = '&#9662;';
+    arrow.onclick = () => toggleCostCategoryCollapse(categoryName);
+    arrow.setAttribute('aria-expanded', 'true');
+  }
+
+  const childRows = Array.from(tbody.querySelectorAll(`tr[data-cost-cat-row="${safeName}"]`));
+  childRows.forEach((row) => { row.style.display = ''; });
+  const anchorRow = childRows[childRows.length - 1] || catRow;
+  anchorRow.insertAdjacentHTML('afterend', renderCostDraftPartidaRow(categoryName, partida, index, false));
+
+  const insertedRow = tbody.querySelector(`tr[data-cost-id="${partida.id}"]`);
+  insertedRow?.querySelector('[data-field="nombre"]')?.focus();
+  return true;
+}
+
 function agregarPartidaLinea(categoryName) {
   const normalizedCategoryName = String(categoryName || '').trim();
   if (!normalizedCategoryName || normalizedCategoryName === 'GASTOS FINANCIEROS') return;
   const costosUi = ensureCostosUiState();
-  readCostosEditor({ recompute: false });
+  const activeCostRow = document.activeElement?.closest?.('#planilla-table [data-cost-row]');
+  if (activeCostRow) syncCostRowDraft(activeCostRow, { recompute: false });
   let category = state.costos.find((item) => item.nombre === normalizedCategoryName);
   if (!category) {
     category = { id: makeClientId('cat'), nombre: normalizedCategoryName, partidas: [] };
@@ -7926,7 +8236,10 @@ function agregarPartidaLinea(categoryName) {
     distribucion_mensual: createMonthlyArray(),
   });
   costosUi.collapsed[normalizedCategoryName] = false;
-  renderCostPlanilla();
+  scheduleProjectUiStateSave();
+  if (!insertCostPartidaRow(normalizedCategoryName, category.partidas[category.partidas.length - 1], category.partidas.length - 1)) {
+    renderCostPlanilla();
+  }
   scheduleAutosave('costos');
 }
 
@@ -8025,6 +8338,8 @@ async function loadProjects() {
 }
 
 async function loadProject(projectId) {
+  if (typeof window.flushBricsaUiState === 'function') window.flushBricsaUiState();
+  flushProjectUiStateSave();
   state.proyectoId = projectId;
   const url = new URL(window.location.href);
   url.searchParams.set('projectId', projectId);
@@ -8055,11 +8370,13 @@ async function loadProject(projectId) {
   state.financiamiento = normalizeFinanciamiento(financiamiento);
   state.capital = normalizeCapital(capital);
   state.calculos = calculos;
+  loadProjectUiState(projectId);
 
   renderAll();
 }
 
 function readCapitalFromEditor() {
+  if (!$('tab-capital')) return normalizeCapital(state.capital);
   return normalizeCapital({
     ...(state.capital || {}),
     caja_minima_buffer: toNumber($('cap-buffer')?.value ?? state.capital?.caja_minima_buffer ?? 2000),
@@ -8071,12 +8388,14 @@ function readCapitalFromEditor() {
 }
 
 function calcularCapital() {
+  if (!$('tab-capital')) return;
   state.capital = readCapitalFromEditor();
   scheduleAutosave('capital');
 }
 
 async function guardarCapital({ silent = false } = {}) {
   if (!state.proyectoId) return;
+  if (!$('tab-capital')) return;
   state.capital = readCapitalFromEditor();
   setSyncStatus('saving', 'GUARDANDO', 'Persistiendo parametros de capital');
   await api(`/api/proyectos/${state.proyectoId}/capital`, {
