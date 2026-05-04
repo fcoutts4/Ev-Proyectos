@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8"/>
@@ -949,15 +949,19 @@ table:not(.gantt-table) .tfoot-dark td,
 }
 
 /* ===== LOADING OVERLAY ===== */
-#app-loading-overlay{position:fixed;inset:0;background:var(--nav-bg,#f8fbff);z-index:500;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px;transition:opacity .22s ease}
+#app-loading-overlay{position:fixed;inset:0;background:radial-gradient(circle at top,#ffffff 0%,#f8fbff 38%,#eef4fb 100%);z-index:500;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;transition:opacity .22s ease}
 #app-loading-overlay.is-hidden{opacity:0;pointer-events:none}
-.app-loading-logo{width:180px;height:96px;background:transparent;border:0;border-radius:0;display:flex;align-items:center;justify-content:center;box-shadow:none;flex-shrink:0;overflow:hidden;margin-bottom:8px}
-.app-loading-logo-img{width:100%;height:100%;object-fit:contain;display:block;padding:0;background:transparent}
+.app-loading-logo{position:relative;width:112px;height:112px;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:visible;border-radius:999px;background:transparent;box-shadow:none;isolation:isolate}
+.app-loading-logo::before,.app-loading-logo::after{display:none}
+.app-loading-logo-img{position:relative;width:68px;height:68px;max-width:none;object-fit:contain;display:block;padding:0;background:transparent;transform:rotate(0deg);animation:none;z-index:2;filter:drop-shadow(0 12px 24px rgba(15,90,140,.12))}
+#app-loading-overlay.is-loading .app-loading-logo-img{animation:appLogoSpin 1.9s linear infinite}
 .app-loading-logo-fallback{display:none;width:100%;height:100%;align-items:center;justify-content:center;background:transparent;color:#0f172a;font-weight:900;font-size:26px;letter-spacing:.05em}
-.app-loading-spinner{width:32px;height:32px;border:3px solid #e2e8f0;border-top-color:#1d4ed8;border-radius:50%;animation:appSpin .72s linear infinite}
+.app-loading-spinner{display:none}
 @keyframes appSpin{to{transform:rotate(360deg)}}
+@keyframes appLogoSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .app-loading-text{font-size:14px;font-weight:700;color:#334155;letter-spacing:.03em}
-.app-loading-sub{font-size:11px;color:#94a3b8;margin-top:-10px}
+.app-loading-sub{font-size:11px;color:#94a3b8;margin-top:-10px;min-height:14px}
+.app-loading-sub:empty{display:none}
 
 /* ===== TOPNAV PROJECT NAME ===== */
 .topnav-proj-info{display:flex;flex-direction:column;justify-content:center;border-left:1px solid var(--border-soft,#e2e8f0);padding-left:12px;margin-left:8px;min-width:0;max-width:260px}
@@ -1090,6 +1094,16 @@ table:not(.gantt-table) .tfoot-dark td,
 .compact-box.danger{background:#fef2f2;border-color:#fecaca}
 .compact-label{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
 .compact-inline-input{display:flex;align-items:center;gap:4px}
+.terrain-form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px 12px}
+.terrain-field{display:flex;flex-direction:column;gap:4px}
+.terrain-total-field{background:#f8fbff;border:1px solid #d9e7ff;border-radius:8px;padding:8px 10px}
+.terrain-fin-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px 12px;align-items:start}
+.terrain-fin-stat{display:flex;flex-direction:column;gap:2px;justify-content:center;min-height:30px;padding:7px 8px;border-radius:8px;background:#fffaf0;border:1px solid #fde7b0}
+.terrain-fin-stat strong,.terrain-fin-stat div:last-child{line-height:1.2}
+.terrain-fin-stat.primary{background:#f8fbff;border-color:#d9e7ff}
+.terrain-fin-stat.half{grid-column:span 3}
+.terrain-field.third{grid-column:span 2}
+#tab-terreno .terrain-sync-hidden,#tab-terreno .terrain-fin-source-hidden{display:none!important}
 #tab-terreno .card,#tab-construccion .card{padding:14px!important}
 #tab-terreno .inp,#tab-construccion .inp{min-height:32px!important;padding:5px 8px!important;font-size:12px!important}
 #tab-terreno select.inp,#tab-construccion select.inp{padding-right:28px!important}
@@ -1100,6 +1114,39 @@ table:not(.gantt-table) .tfoot-dark td,
 #tab-terreno .finance-date-table th,#tab-terreno .finance-date-table td,#tab-construccion .finance-date-table th,#tab-construccion .finance-date-table td{padding:6px 7px!important}
 #tab-terreno .planilla-nav,#tab-construccion .planilla-nav{gap:6px}
 #tab-terreno .badge,#tab-construccion .badge{font-size:9px!important;padding:3px 7px!important}
+#tab-terreno .card{padding:12px!important}
+#tab-terreno .inp{min-height:30px!important;padding:4px 8px!important;font-size:11px!important}
+#tab-construccion .constr-top-grid{align-items:stretch}
+#tab-construccion .constr-top-grid>.card{display:flex;flex-direction:column;height:100%}
+#tab-construccion .constr-surface-table th{padding:5px 8px!important;font-size:9px!important}
+#tab-construccion .constr-surface-table td{padding:4px 8px!important;font-size:10px!important;line-height:1.15;vertical-align:middle}
+#tab-construccion .constr-surface-table .inp{min-height:26px!important;padding:2px 7px!important;font-size:11px!important}
+#tab-construccion .constr-surface-table td span{font-size:9px!important;line-height:1.1}
+#tab-construccion .constr-surface-table tfoot td{padding-top:5px!important;padding-bottom:5px!important}
+#tab-construccion .constr-surface-table .constr-inline-field{display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap}
+#tab-construccion .constr-surface-table .constr-inline-suffix{font-size:9px;color:#94a3b8;line-height:1}
+#tab-construccion .constr-surface-table .constr-total-nowrap{white-space:nowrap}
+#tab-construccion .constr-surface-table .constr-row-label-nowrap{white-space:nowrap}
+#tab-construccion .construction-global-params{margin-bottom:14px;padding:10px 14px!important;background:linear-gradient(180deg,#f8fafc 0%,#fdfefe 100%);border:1px solid #dbe4ee}
+#tab-construccion .construction-global-strip{display:grid;grid-template-columns:148px repeat(2,minmax(180px,1fr));gap:10px 12px;align-items:end}
+#tab-construccion .construction-global-kicker{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#64748b;align-self:center}
+#tab-construccion .construction-global-field label{font-size:10px!important;color:#64748b!important;display:block;margin-bottom:3px!important}
+#tab-construccion .construction-global-field .inp{min-height:30px!important;padding:4px 8px!important}
+#tab-construccion .construction-ep-card .sec-title{margin-bottom:0}
+#tab-construccion .construction-ep-card .finance-split-shell{border-color:#dbe4ee}
+#tab-construccion .construction-ep-card .finance-split-fixed thead th,
+#tab-construccion .construction-ep-card .finance-split-scroll thead th{height:34px;padding-top:7px!important;padding-bottom:7px!important;vertical-align:middle}
+#tab-construccion .construction-ep-card .finance-split-shell tbody td{height:38px;padding-top:3px!important;padding-bottom:3px!important;vertical-align:middle;line-height:1.1}
+#tab-construccion .construction-ep-card .finance-split-shell tfoot td{padding-top:7px!important;padding-bottom:7px!important;vertical-align:middle}
+#tab-construccion .construction-ep-card .finance-split-fixed td.finance-fixed-concept-cell{padding:0 10px!important}
+#tab-construccion .construction-ep-card .finance-fixed-concept-cell{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:6px;line-height:1.1;min-height:38px}
+#tab-construccion .construction-ep-card .finance-fixed-concept-cell span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#tab-construccion .construction-ep-card .formula-host{padding-top:0!important;padding-bottom:0!important}
+#tab-construccion .construction-ep-card .formula-readonly{display:block;font-size:10px;line-height:1.15;color:#334155;background:#f8fafc;border:1px solid #dbe4ee;border-radius:6px;padding:5px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width: 1100px){
+  #tab-construccion .construction-global-strip{grid-template-columns:1fr}
+  #tab-construccion .construction-global-kicker{margin-bottom:2px}
+}
 
 </style>
 </head>
@@ -1109,7 +1156,7 @@ table:not(.gantt-table) .tfoot-dark td,
 <!-- LOADING OVERLAY -->
 <div id="app-loading-overlay" role="status" aria-live="polite" aria-label="Cargando aplicación">
   <div class="app-loading-logo">
-    <img class="app-loading-logo-img" src="data:image/png;base64,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" alt="Logo BRICSA" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+    <img class="app-loading-logo-img" src="data:image/png;base64,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" alt="Logo CSA" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
     <span class="app-loading-logo-fallback">B</span>
   </div>
   <div class="app-loading-spinner"></div>
@@ -1138,7 +1185,7 @@ table:not(.gantt-table) .tfoot-dark td,
       <span id="sync-detail" class="topnav-sync-detail">Última sincronización: sin registro</span>
     </div>
     <button class="btn-projects" type="button" onclick="openProjectsPanel()" title="Gestionar proyectos" aria-haspopup="dialog" aria-controls="projects-panel">
-      <span class="btn-projects-icon">?</span> Proyectos
+      Proyectos
     </button>
   </div>
 </nav>
@@ -1318,7 +1365,7 @@ table:not(.gantt-table) .tfoot-dark td,
 
   <!-- Editor de Unidades -->
   <div class="card">
-    <div class="sec-title">?? EDITAR DEPARTAMENTOS Y LOCALES</div>
+    <div class="sec-title">EDITAR DEPARTAMENTOS Y LOCALES</div>
     <div id="cabida-editor"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
       <button class="btn-outline" type="button" onclick="agregarUso('Departamento')">+ Agregar Departamento</button>
@@ -1339,59 +1386,51 @@ table:not(.gantt-table) .tfoot-dark td,
   <div class="compact-grid-two" style="margin-bottom:12px">
     <div class="card" style="height:100%">
       <div class="sec-title"> COMPRA TERRENO</div>
-      <div style="display:grid;grid-template-columns:1fr;gap:8px">
-        <div>
+      <div class="terrain-form-grid">
+        <div class="terrain-field">
           <div class="compact-label">Fecha compra</div>
           <input type="month" class="inp" id="terreno-fecha-compra" onchange="onTerrenoInputChange()">
         </div>
-        <div class="compact-box">
-          <div class="compact-label">Carta Gantt</div>
-          <div id="terreno-gantt-sync" class="compact-note">Sincronizado.</div>
+        <div class="terrain-field">
+          <div class="compact-label">M2 bruto</div>
+          <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="terreno-m2-bruto" step="0.01" oninput="onTerrenoInputChange()">
         </div>
-        <div class="compact-field-grid">
-          <div class="compact-box">
-            <div class="compact-label">M2 bruto</div>
-            <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="terreno-m2-bruto" step="0.01" oninput="onTerrenoInputChange()">
-          </div>
-          <div class="compact-box">
-            <div class="compact-label">Afectación</div>
-            <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="terreno-m2-afectacion" step="0.01" oninput="onTerrenoInputChange()">
-          </div>
-          <div class="compact-box">
-            <div class="compact-label">M2 neto</div>
-            <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="terreno-m2-neto" step="0.01" readonly style="background:#fff;color:#0f172a;font-weight:700">
-          </div>
-          <div class="compact-box">
-            <div class="compact-label">UF / m2</div>
-            <input type="text" class="inp" id="terreno-precio-uf-m2" step="0.01" inputmode="decimal" data-localized-number="1" oninput="onTerrenoInputChange()">
-          </div>
-          <div class="compact-box accent" style="grid-column:1 / -1">
-            <div class="compact-label">Precio total</div>
-            <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="terreno-precio-total" step="0.01" readonly style="background:#fff;color:#0f172a;font-weight:800">
-          </div>
+        <div class="terrain-field">
+          <div class="compact-label">Afectación</div>
+          <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="terreno-m2-afectacion" step="0.01" oninput="onTerrenoInputChange()">
+        </div>
+        <div class="terrain-field">
+          <div class="compact-label">M2 neto</div>
+          <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="terreno-m2-neto" step="0.01" readonly style="background:#fff;color:#0f172a;font-weight:700">
+        </div>
+        <div class="terrain-field">
+          <div class="compact-label">UF / m2</div>
+          <input type="text" class="inp" id="terreno-precio-uf-m2" step="0.01" inputmode="decimal" data-localized-number="1" oninput="onTerrenoInputChange()">
+        </div>
+        <div class="terrain-total-field">
+          <div class="compact-label">Precio total</div>
+          <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="terreno-precio-total" step="0.01" readonly style="background:#fff;color:#0f172a;font-weight:800">
         </div>
       </div>
+      <div id="terreno-gantt-sync" class="terrain-sync-hidden" aria-hidden="true"></div>
     </div>
 
-    <div class="card" style="border:2px solid #fde68a;height:100%;max-width:520px;justify-self:start">
+    <div class="card" style="border:2px solid #fde68a;height:100%">
       <div class="sec-title" style="margin-bottom:12px;color:#b45309"> FINANCIAMIENTO TERRENO</div>
-      <div class="compact-box warn compact-note" style="margin-bottom:10px">Se replica en gastos financieros.</div>
-      <div id="fin-terreno-partidas" style="margin-bottom:12px;font-size:11px;color:#475569"></div>
-      <div class="compact-metric-grid" style="margin-bottom:8px">
-        <div><div class="compact-label">Costo</div><div style="font-weight:800;color:#b45309" id="fin-terreno-costo">0 UF</div></div>
-        <div><div class="compact-label">A financiar</div><div style="font-weight:800;color:#22c55e" id="fin-terreno-monto">0 UF</div></div>
-      </div>
-      <div class="compact-note soft" style="margin-bottom:8px" id="fin-terreno-plazos">Plazo vinculado a construcción</div>
-      <div class="compact-field-grid">
-        <div>
+      <div id="fin-terreno-partidas" class="terrain-fin-source-hidden" aria-hidden="true"></div>
+      <div id="fin-terreno-plazos" class="terrain-sync-hidden" aria-hidden="true"></div>
+      <div class="terrain-fin-grid">
+        <div class="terrain-fin-stat primary half"><div class="compact-label">Costo</div><div style="font-weight:800;color:#b45309" id="fin-terreno-costo">0 UF</div></div>
+        <div class="terrain-fin-stat half"><div class="compact-label">A financiar</div><div style="font-weight:800;color:#22c55e" id="fin-terreno-monto">0 UF</div></div>
+        <div class="terrain-field third">
           <div class="compact-label">% a financiar</div>
           <div class="compact-inline-input"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="fin-terreno-pct" min="0" max="100" oninput="onTerrenoInputChange()"><span style="font-size:11px">%</span></div>
         </div>
-        <div>
+        <div class="terrain-field third">
           <div class="compact-label">Tasa</div>
           <div class="compact-inline-input"><input type="text" class="inp" id="fin-terreno-tasa" step="0.01" inputmode="decimal" data-localized-number="1" oninput="onTerrenoInputChange()" onchange="onTerrenoInputChange()" onblur="onTerrenoInputChange()"><span style="font-size:11px">anual</span></div>
         </div>
-        <div>
+        <div class="terrain-field third">
           <div class="compact-label">Pago intereses</div>
           <select class="inp" id="fin-terreno-pago-int" onchange="onTerrenoInputChange()">
             <option>Semestral</option><option>Mensual</option><option>Anual</option><option>Contra Escrituraciones</option>
@@ -1407,8 +1446,8 @@ table:not(.gantt-table) .tfoot-dark td,
         <div class="sec-title" style="margin-bottom:2px"> GASTOS FINANCIEROS TERRENO</div>
       </div>
       <div class="planilla-nav">
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('terreno-fin-planilla-scroll', -480)">? Mes</button>
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('terreno-fin-planilla-scroll', 480)">Mes ?</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('terreno-fin-planilla-scroll', -480)">Mes -</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('terreno-fin-planilla-scroll', 480)">Mes +</button>
       </div>
     </div>
     <div id="terreno-fin-planilla-scroll" class="finance-split-shell">
@@ -1495,7 +1534,7 @@ table:not(.gantt-table) .tfoot-dark td,
           <input class="inp" id="ventas-velocidad-promesas" type="text" inputmode="numeric" data-localized-number="1" min="1" step="1" oninput="onVentasVelocityChange()">
           <span style="font-size:11px;color:#64748b">un/mes</span>
         </div>
-        <div style="font-size:10px;color:#64748b;margin-top:6px">Controla la duración del bloque <strong>Promesas</strong> en Carta Gantt.</div>
+        <div style="font-size:10px;color:#64748b;margin-top:6px"></div>
       </div>
       <div style="background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:12px">
         <div style="font-size:10px;font-weight:700;color:#c2410c;text-transform:uppercase;margin-bottom:6px">Velocidad de escrituración</div>
@@ -1503,7 +1542,7 @@ table:not(.gantt-table) .tfoot-dark td,
           <input class="inp" id="ventas-velocidad-escrituracion" type="text" inputmode="numeric" data-localized-number="1" min="1" step="1" oninput="onVentasVelocityChange()">
           <span style="font-size:11px;color:#64748b">un/mes</span>
         </div>
-        <div style="font-size:10px;color:#64748b;margin-top:6px">Controla la duración de <strong>Escrituración</strong> y parte cuando termina <strong>Recepción municipal</strong>.</div>
+        <div style="font-size:10px;color:#64748b;margin-top:6px"></div>
       </div>
     </div>
 
@@ -1594,7 +1633,7 @@ table:not(.gantt-table) .tfoot-dark td,
         <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:6px">Ciclo de Escrituración</div>
         <div style="display:flex;align-items:center;gap:8px;justify-content:center">
           <span style="font-size:1.1rem;font-weight:800" id="escrit-inicio">Mes 38</span>
-          <span style="color:#94a3b8">?</span>
+          <span style="color:#94a3b8">a</span>
           <span style="font-size:1.1rem;font-weight:800" id="escrit-fin">Mes 44</span>
       </div>
         <div style="text-align:center;margin-top:6px">
@@ -1612,8 +1651,8 @@ table:not(.gantt-table) .tfoot-dark td,
         <div style="font-size:10px;color:#94a3b8;margin-top:2px">Ingresos distribuidos por período según cronograma de promesas y escrituración</div>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('flujo-ventas-scroll',-480)" style="font-size:11px">? Mes</button>
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('flujo-ventas-scroll', 480)" style="font-size:11px">Mes ?</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('flujo-ventas-scroll',-480)" style="font-size:11px">Mes -</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('flujo-ventas-scroll', 480)" style="font-size:11px">Mes +</button>
       </div>
     </div>
     <div id="flujo-ventas-scroll" class="finance-split-shell" style="border-top:none;border-radius:0 0 10px 10px">
@@ -1652,8 +1691,8 @@ table:not(.gantt-table) .tfoot-dark td,
   <div class="card gantt-editor-card">
     <div style="display:flex;justify-content:flex-end;align-items:center;margin-bottom:12px">
       <div class="planilla-nav">
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('gantt-editor-scroll', -480)">? Mes</button>
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('gantt-editor-scroll', 480)">Mes ?</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('gantt-editor-scroll', -480)">Mes -</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('gantt-editor-scroll', 480)">Mes +</button>
       </div>
     </div>
     <div id="gantt-editor-scroll" class="tbl-scroll gantt-editor-shell">
@@ -1681,58 +1720,57 @@ table:not(.gantt-table) .tfoot-dark td,
   <div class="compact-sheet-head">
     <div>
       <div class="compact-sheet-head-title"> CONTRATO DE CONSTRUCCIÓN</div>
-      <div class="compact-sheet-head-sub">Costos, plazos y financiamiento.</div>
   </div>
     <button class="btn-primary" onclick="guardarConstruccion()"> Guardar</button>
 </div>
 
-  <div class="compact-grid-three" style="margin-bottom:12px">
+  <div class="compact-grid-three constr-top-grid" style="margin-bottom:12px">
 
     <!-- Superficies -->
     <div class="card">
       <div class="sec-title"> SUPERFICIES</div>
-      <table>
+      <table class="constr-surface-table">
         <thead><tr>
           <th style="text-align:left">PARTIDA</th>
-          <th>SUPERFICIE</th>
-          <th style="color:#3b82f6">PRECIO / M²</th>
+          <th>SUPERFICIE (m²)</th>
+          <th style="color:#3b82f6">PRECIO (UF/m²)</th>
           <th style="color:#22c55e">COSTO NETO</th>
       </tr></thead>
         <tbody>
           <tr>
             <td style="font-weight:600">Sobre tierra</td>
-            <td style="text-align:center"><input type="text" inputmode="numeric" data-localized-number="1" class="inp" id="constr-sup-st" min="0" step="1" style="width:90px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">m²</span></td>
-            <td style="text-align:center"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="constr-uf-st" value="27" style="width:80px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">/m²</span></td>
-            <td style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-st">192.942 UF</td>
+            <td style="text-align:center"><span class="constr-inline-field"><input type="text" inputmode="numeric" data-localized-number="1" class="inp" id="constr-sup-st" min="0" step="1" style="width:90px;text-align:center" oninput="updateConstrParams()"></span></td>
+            <td style="text-align:center"><span class="constr-inline-field"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="constr-uf-st" value="27" style="width:80px;text-align:center" oninput="updateConstrParams()"></span></td>
+            <td class="constr-total-nowrap" style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-st">192.942 UF</td>
         </tr>
           <tr>
             <td style="font-weight:600">Bajo tierra</td>
-            <td style="text-align:center"><input type="text" inputmode="numeric" data-localized-number="1" class="inp" id="constr-sup-bt" min="0" step="1" style="width:90px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">m²</span></td>
-            <td style="text-align:center"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="constr-uf-bt" value="15" style="width:80px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">/m²</span></td>
-            <td style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-bt">48.615 UF</td>
+            <td style="text-align:center"><span class="constr-inline-field"><input type="text" inputmode="numeric" data-localized-number="1" class="inp" id="constr-sup-bt" min="0" step="1" style="width:90px;text-align:center" oninput="updateConstrParams()"></span></td>
+            <td style="text-align:center"><span class="constr-inline-field"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="constr-uf-bt" value="15" style="width:80px;text-align:center" oninput="updateConstrParams()"></span></td>
+            <td class="constr-total-nowrap" style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-bt">48.615 UF</td>
         </tr>
           <tr>
             <td style="font-weight:600">Gastos Generales</td>
-            <td colspan="2" style="text-align:center"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="constr-gastos-generales" min="0" step="0.01" style="width:120px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">UF/mes</span></td>
-            <td style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-gg">0 UF</td>
+            <td colspan="2" style="text-align:center"><span class="constr-inline-field"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="constr-gastos-generales" min="0" step="0.01" style="width:120px;text-align:center" oninput="updateConstrParams()"><span class="constr-inline-suffix">UF/mes</span></span></td>
+            <td class="constr-total-nowrap" style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-gg">0 UF</td>
         </tr>
           <tr>
             <td style="font-weight:600">Utilidad</td>
-            <td colspan="2" style="text-align:center"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="constr-utilidad-pct" min="0" step="0.01" style="width:90px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">% costo + GG</span></td>
-            <td style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-utilidad">0 UF</td>
+            <td colspan="2" style="text-align:center"><span class="constr-inline-field"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="constr-utilidad-pct" min="0" step="0.01" style="width:90px;text-align:center" oninput="updateConstrParams()"><span class="constr-inline-suffix">% costo + GG</span></span></td>
+            <td class="constr-total-nowrap" style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-utilidad">0 UF</td>
         </tr>
       </tbody>
       <tfoot>
           <tr style="background:#f0fdf4;border-top:2px solid #86efac">
             <td style="font-weight:700;color:#15803d;font-size:11px;text-transform:uppercase;padding:8px 10px">Neto</td>
-            <td style="text-align:center;font-weight:700;color:#374151;font-size:12px" id="constr-sup-total">—</td>
-            <td style="text-align:center;font-weight:700;color:#3b82f6;font-size:12px" id="constr-uf-prom">—</td>
-            <td style="text-align:center;font-weight:800;color:#15803d;font-size:13px" id="constr-total-neto">—</td>
+            <td class="constr-total-nowrap" style="text-align:center;font-weight:700;color:#374151;font-size:12px" id="constr-sup-total">—</td>
+            <td class="constr-total-nowrap" style="text-align:center;font-weight:700;color:#3b82f6;font-size:12px" id="constr-uf-prom">—</td>
+            <td class="constr-total-nowrap" style="text-align:center;font-weight:800;color:#15803d;font-size:13px" id="constr-total-neto">—</td>
         </tr>
           <tr style="background:#f8fafc">
-            <td style="font-weight:600;color:#64748b;font-size:11px;padding:6px 10px">Bruto (IVA inc.)</td>
-            <td colspan="2" style="text-align:center;font-weight:600;color:#3b82f6;font-size:11px" id="constr-uf-bruto">—</td>
-            <td style="text-align:center;font-weight:700;color:#374151;font-size:12px" id="constr-total-bruto">—</td>
+            <td class="constr-row-label-nowrap" style="font-weight:600;color:#64748b;font-size:10px;padding:6px 10px">Bruto IVA inc.</td>
+            <td colspan="2" class="constr-total-nowrap" style="text-align:center;font-weight:600;color:#3b82f6;font-size:11px" id="constr-uf-bruto">—</td>
+            <td class="constr-total-nowrap" style="text-align:center;font-weight:700;color:#374151;font-size:12px" id="constr-total-bruto">—</td>
         </tr>
       </tfoot>
     </table>
@@ -1754,11 +1792,8 @@ table:not(.gantt-table) .tfoot-dark td,
             <span style="font-size:10px;color:#94a3b8">MESES</span>
           </div>
           <span class="badge badge-green" style="font-size:10px">SINCRONIZADO GANTT</span>
-      </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;gap:10px">
-          <div class="compact-note soft">Ligado al hito Construcción.</div>
-          <div style="font-size:12px;font-weight:800;color:#22c55e" id="plazo-label">20 MESES</div>
         </div>
+        <div id="plazo-label" style="display:none"></div>
     </div>
 
       <div class="compact-field-grid">
@@ -1768,7 +1803,7 @@ table:not(.gantt-table) .tfoot-dark td,
             <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="anticipo-slider" min="0" max="50" step="0.1" value="15" oninput="updateConstrParams()">
             <span style="font-weight:800;font-size:14px" id="anticipo-label">15%</span>
           </div>
-          <div style="font-size:10px;color:#166534;margin-top:6px" id="anticipo-meta">Pago inicial.</div>
+          <div style="font-size:10px;color:#166534;margin-top:6px" id="anticipo-meta"></div>
           <div style="font-size:11px;font-weight:700;color:#15803d;margin-top:4px" id="anticipo-monto">0 UF</div>
       </div>
         <div class="compact-box danger">
@@ -1777,10 +1812,17 @@ table:not(.gantt-table) .tfoot-dark td,
             <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="retencion-slider" min="0" max="20" step="0.1" value="5" oninput="updateConstrParams()">
             <span style="font-weight:800;font-size:14px" id="retencion-label">5%</span>
           </div>
-          <div style="font-size:10px;color:#991b1b;margin-top:6px" id="retencion-meta">Aplicada sobre cada EDPP.</div>
+          <div style="font-size:10px;color:#991b1b;margin-top:6px" id="retencion-meta"></div>
           <div style="font-size:11px;font-weight:700;color:#991b1b;margin-top:4px" id="retencion-monto">0 UF</div>
+        </div>
+        <div class="compact-box accent">
+          <div style="font-size:10px;font-weight:700;color:#1d4ed8;margin-bottom:6px"> CEEC / BENEFICIO IVA</div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="text" inputmode="decimal" data-localized-number="1" step="0.01" class="inp" id="cfg-pct-ceec" oninput="onConfigParamChange()" style="width:96px;text-align:center"/>
+            <span style="font-size:11px;color:#64748b">%</span>
+          </div>
+        </div>
       </div>
-    </div>
   </div>
 
     <div class="card" style="border:2px solid #bbf7d0">
@@ -1788,13 +1830,12 @@ table:not(.gantt-table) .tfoot-dark td,
       <div class="sec-title" style="margin-bottom:0;color:#16a34a"> FINANCIAMIENTO</div>
       <span class="badge badge-green" style="font-size:10px">ACTIVO</span>
     </div>
-    <div class="compact-box success compact-note" style="margin-bottom:10px">Usado en gastos financieros.</div>
-    <div id="fin-constr-partidas" style="margin-bottom:10px;font-size:11px;color:#475569"></div>
+    <div id="fin-constr-partidas" style="display:none"></div>
     <div class="compact-metric-grid" style="margin-bottom:8px">
       <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Costo</div><div style="font-weight:800;color:#22c55e" id="fin-constr-costo">0 UF</div></div>
       <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">A financiar</div><div style="font-weight:800;color:#22c55e" id="fin-constr-monto">0 UF</div></div>
     </div>
-    <div class="compact-note soft" style="margin-bottom:8px" id="fin-constr-plazos">Plazo vinculado a construcción</div>
+    <div id="fin-constr-plazos" style="display:none"></div>
     <div class="compact-field-grid">
       <div>
         <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">% a financiar</div>
@@ -1810,7 +1851,7 @@ table:not(.gantt-table) .tfoot-dark td,
           <option>Anual</option><option>Mensual</option><option>Semestral</option><option>Contra Escrituraciones</option>
         </select>
       </div>
-      <div style="grid-column:1/-1;border-top:1px solid #e2e8f0;padding-top:8px;margin-top:4px">
+      <div>
         <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">% Alzamiento</div>
         <div style="display:flex;align-items:center;gap:4px"><input type="text" inputmode="numeric" data-localized-number="1" class="inp" id="fin-constr-alzamiento" value="90" min="0" max="100" step="1" oninput="updateConstrParams()"><span style="font-size:11px">%</span></div>
       </div>
@@ -1818,26 +1859,18 @@ table:not(.gantt-table) .tfoot-dark td,
   </div>
 </div>
 
-  <!-- Parámetros globales de la tabla EP/GF -->
-  <div class="card" style="margin-bottom:16px;background:#f8fafc">
-    <div class="sec-title" style="margin-bottom:8px"> PARÁMETROS FINANCIEROS GLOBALES</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
-      <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">% Impuesto timbres</label><input type="text" inputmode="decimal" data-localized-number="1" step="0.01" class="inp" id="cfg-pct-timbres" oninput="onConfigParamChange(); syncGfParamMirror()"/></div>
-      <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">% CEEC (beneficio IVA)</label><input type="text" inputmode="decimal" data-localized-number="1" step="0.01" class="inp" id="cfg-pct-ceec" oninput="onConfigParamChange()"/></div>
-    </div>
-    <!-- Hidden inputs to keep data binding working -->
-    <input type="hidden" id="cfg-tasa-terreno"/><input type="hidden" id="cfg-tasa-construccion"/><input type="hidden" id="cfg-pct-renta"/>
-  </div>
+  <input type="hidden" id="cfg-pct-timbres" value="0.8"/>
+  <input type="hidden" id="cfg-tasa-terreno"/><input type="hidden" id="cfg-tasa-construccion"/><input type="hidden" id="cfg-pct-renta"/>
 
   <!-- TABLA 1: Estados de Pago (EP) -->
-  <div class="card" style="margin-bottom:16px">
+  <div class="card construction-ep-card" style="margin-bottom:16px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div>
         <div class="sec-title" style="margin-bottom:2px"> ESTADOS DE PAGO (EP)</div>
       </div>
       <div class="planilla-nav">
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-ep-scroll', -480)">? Mes</button>
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-ep-scroll', 480)">Mes ?</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-ep-scroll', -480)">Mes -</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-ep-scroll', 480)">Mes +</button>
       </div>
     </div>
     <div id="constr-ep-scroll" class="finance-split-shell">
@@ -1865,8 +1898,8 @@ table:not(.gantt-table) .tfoot-dark td,
         <div class="sec-title" style="margin-bottom:2px"> GASTOS FINANCIEROS CONSTRUCCIÓN</div>
       </div>
       <div class="planilla-nav">
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-fin-planilla-scroll', -480)">? Mes</button>
-        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-fin-planilla-scroll', 480)">Mes ?</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-fin-planilla-scroll', -480)">Mes -</button>
+        <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-fin-planilla-scroll', 480)">Mes +</button>
       </div>
     </div>
     <div class="gf-param-panel">
@@ -1925,8 +1958,8 @@ table:not(.gantt-table) .tfoot-dark td,
     </div>
       <div style="display:flex;gap:8px;align-items:center">
         <div class="planilla-nav">
-          <button class="btn-outline" type="button" onclick="scrollCostPlanilla(-480)">? Mes</button>
-          <button class="btn-outline" type="button" onclick="scrollCostPlanilla(480)">Mes ?</button>
+          <button class="btn-outline" type="button" onclick="scrollCostPlanilla(-480)">Mes -</button>
+          <button class="btn-outline" type="button" onclick="scrollCostPlanilla(480)">Mes +</button>
         </div>
         <button class="btn-primary" onclick="guardarCostos()"> Guardar</button>
     </div>
@@ -2678,7 +2711,7 @@ table:not(.gantt-table) .tfoot-dark td,
       if (typeof prepareLocalizedNumberInput === 'function') prepareLocalizedNumberInput(tasa);
     }
     if (timbres && document.activeElement !== timbres) {
-      timbres.value = fmtInputNumber(cfg.pct_timbres, 2);
+      timbres.value = fmtInputNumber(0.8, 2);
       if (typeof prepareLocalizedNumberInput === 'function') prepareLocalizedNumberInput(timbres);
     }
   }
@@ -2691,7 +2724,7 @@ table:not(.gantt-table) .tfoot-dark td,
     const cfgTimbres = document.getElementById('cfg-pct-timbres');
     if (tasa && cfgTasa) cfgTasa.value = tasa.value;
     if (timbres && cfgTimbres && document.activeElement !== cfgTimbres) {
-      cfgTimbres.value = fmtInputNumber(timbres.value, 2);
+      cfgTimbres.value = fmtInputNumber(0.8, 2);
       if (typeof prepareLocalizedNumberInput === 'function') prepareLocalizedNumberInput(cfgTimbres);
     }
     if (typeof onConfigParamChange === 'function') onConfigParamChange();
@@ -2740,7 +2773,6 @@ table:not(.gantt-table) .tfoot-dark td,
   function renderFormulaTableHeader(targetId, labels) {
     setHtml(targetId, `
       <tr>
-        <th style="min-width:300px;text-align:left">Formula editable</th>
         <th class="finance-total-col" style="width:110px;text-align:right">Total</th>
         ${labels.map((label) => `<th data-month-col>${escapeHtml(label)}</th>`).join('')}
       </tr>
@@ -2788,7 +2820,6 @@ table:not(.gantt-table) .tfoot-dark td,
       renderFormulaTableHeader('constr-ep-head', labels);
       setHtml('constr-ep-tbody', rows.map((row) => `
         <tr class="${row.bold ? 'finance-total-row' : ''}">
-          <td>${formulaInput('ep', row.key, row.formula, true)}</td>
           <td class="finance-total-col" style="text-align:right;font-weight:${row.bold ? 800 : 600}">${formatAmount(total(row.values), row.mode, true)}</td>
           ${row.values.map((value) => `<td data-month-cell style="text-align:center;${row.bold ? 'font-weight:700' : ''}">${formatAmount(value, row.mode)}</td>`).join('')}
         </tr>
@@ -2876,7 +2907,6 @@ table:not(.gantt-table) .tfoot-dark td,
       renderFormulaTableHeader('constr-fin-planilla-head', labels);
       setHtml('constr-fin-planilla-tbody', rows.map((row) => `
         <tr class="${row.bold ? 'finance-total-row' : ''}">
-          <td>${formulaInput('gf', row.key, row.formula, true)}</td>
           <td class="finance-total-col" style="text-align:right;font-weight:${row.bold ? 800 : 600}">${formatAmount(total(row.values), row.mode, true)}</td>
           ${row.values.map((value) => `<td data-month-cell style="text-align:center;${row.bold ? 'font-weight:700' : ''}">${formatAmount(value, row.mode)}</td>`).join('')}
         </tr>
@@ -3544,7 +3574,7 @@ table:not(.gantt-table) .tfoot-dark td,
       originalRenderConstruccion();
       const metrics = getConstructionMetrics();
       const anticipoPct = Math.max(0, toNumber(metrics.anticipo_pct)) / 100;
-      setText('anticipo-meta', `${fmtNumber(metrics.anticipo_pct)}% del contrato | pago unico inicial, sin devolucion ni descuento posterior`);
+      setText('anticipo-meta', '');
       setText('anticipo-monto', fmtUf(metrics.total_neto * anticipoPct));
       syncGfParamMirror();
     };
@@ -3631,7 +3661,7 @@ table:not(.gantt-table) .tfoot-dark td,
     const tabBar = document.getElementById('tabBar');
     if (!tabBar) return;
     tabBar.setAttribute('role', 'tablist');
-    tabBar.setAttribute('aria-label', 'Secciones de evaluacion del proyecto');
+    tabBar.setAttribute('aria-label', 'Secciones de evaluación del proyecto');
 
     const buttons = Array.from(tabBar.querySelectorAll('.tab-btn'));
     buttons.forEach((button, index) => {
@@ -3717,7 +3747,7 @@ table:not(.gantt-table) .tfoot-dark td,
     const topnav = document.querySelector('.topnav');
     if (topnav) topnav.setAttribute('aria-label', 'Marca BRICSA');
     const main = document.getElementById('main-content');
-    if (main) main.setAttribute('aria-label', 'Contenido principal de evaluacion de proyecto');
+    if (main) main.setAttribute('aria-label', 'Contenido principal de evaluación de proyecto');
     const syncBadge = document.getElementById('sync-badge');
     if (syncBadge) {
       syncBadge.setAttribute('role', 'status');

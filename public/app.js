@@ -1,4 +1,4 @@
-const state = {
+﻿const state = {
   proyectos: [],
   proyectoId: null,
   proyecto: null,
@@ -45,6 +45,15 @@ const state = {
   },
   renderJobs: {},
   uiStateSaveTimer: null,
+  editSession: {
+    active: false,
+    element: null,
+    deferredRenderJobs: {},
+    deferredCallbacks: {},
+    deferredAutosaveScopes: {},
+    flushTimer: null,
+    flushing: false,
+  },
 };
 
 const DEBUG_PERFORMANCE = false;
@@ -175,11 +184,32 @@ function perfLog(label, data = {}) {
   console.info(`[perf] ${label}`, data);
 }
 
-function scheduleRenderJob(key, callback, delay = INPUT_RENDER_DEBOUNCE_MS) {
+function isDeferredEditCandidate(element) {
+  if (!element || element.disabled || element.readOnly) return false;
+  if (element.isContentEditable) return true;
+  const tagName = String(element.tagName || '').toLowerCase();
+  if (tagName === 'textarea') return true;
+  if (tagName !== 'input') return false;
+  const type = String(element.type || 'text').toLowerCase();
+  return !['checkbox', 'radio', 'file', 'button', 'submit', 'reset', 'range', 'color', 'hidden'].includes(type);
+}
+
+function shouldDeferEditingWork() {
+  return !!(state.editSession.active && state.editSession.element && !state.editSession.flushing);
+}
+
+function queueDeferredEditCallback(key, callback) {
+  if (!key || typeof callback !== 'function') return;
+  state.editSession.deferredCallbacks[key] = callback;
+}
+
+function scheduleRenderJobNow(key, callback, delay = INPUT_RENDER_DEBOUNCE_MS) {
   if (!key || typeof callback !== 'function') return;
   const current = state.renderJobs[key];
   if (current?.timer) window.clearTimeout(current.timer);
   state.renderJobs[key] = {
+    callback,
+    delay,
     timer: window.setTimeout(() => {
       window.requestAnimationFrame(() => {
         const startedAt = performance.now();
@@ -194,10 +224,72 @@ function scheduleRenderJob(key, callback, delay = INPUT_RENDER_DEBOUNCE_MS) {
   };
 }
 
+function flushDeferredEditWork() {
+  const editSession = state.editSession;
+  window.clearTimeout(editSession.flushTimer);
+  editSession.flushTimer = null;
+
+  const deferredCallbacks = { ...editSession.deferredCallbacks };
+  const deferredRenderJobs = { ...editSession.deferredRenderJobs };
+  const deferredScopes = Object.keys(editSession.deferredAutosaveScopes).filter(Boolean);
+
+  editSession.deferredCallbacks = {};
+  editSession.deferredRenderJobs = {};
+  editSession.deferredAutosaveScopes = {};
+  editSession.flushing = true;
+
+  try {
+    Object.values(deferredCallbacks).forEach((callback) => {
+      try { callback(); } catch (error) { console.error(error); }
+    });
+    Object.entries(deferredRenderJobs).forEach(([key, job]) => {
+      scheduleRenderJobNow(key, job.callback, job.delay);
+    });
+    deferredScopes.forEach((scope) => {
+      scheduleAutosave(scope);
+    });
+  } finally {
+    editSession.flushing = false;
+  }
+}
+
+function scheduleDeferredEditFlush() {
+  window.clearTimeout(state.editSession.flushTimer);
+  state.editSession.flushTimer = window.setTimeout(() => {
+    state.editSession.active = false;
+    state.editSession.element = null;
+    flushDeferredEditWork();
+  }, 0);
+}
+
+function beginEditSession(element) {
+  if (!isDeferredEditCandidate(element)) return;
+  if (state.editSession.element === element && state.editSession.active) return;
+  Object.entries(state.renderJobs).forEach(([key, job]) => {
+    if (!job?.timer || typeof job.callback !== 'function') return;
+    window.clearTimeout(job.timer);
+    state.editSession.deferredRenderJobs[key] = { callback: job.callback, delay: job.delay ?? INPUT_RENDER_DEBOUNCE_MS };
+    delete state.renderJobs[key];
+  });
+  state.editSession.active = true;
+  state.editSession.element = element;
+  window.clearTimeout(state.editSession.flushTimer);
+  state.editSession.flushTimer = null;
+}
+
+function scheduleRenderJob(key, callback, delay = INPUT_RENDER_DEBOUNCE_MS) {
+  if (shouldDeferEditingWork()) {
+    state.editSession.deferredRenderJobs[key] = { callback, delay };
+    return;
+  }
+  scheduleRenderJobNow(key, callback, delay);
+}
+
 function cancelRenderJob(key) {
   const current = state.renderJobs[key];
   if (current?.timer) window.clearTimeout(current.timer);
   delete state.renderJobs[key];
+  delete state.editSession.deferredRenderJobs[key];
 }
 
 function cancelAllRenderJobs() {
@@ -275,7 +367,7 @@ function renderFinanceFixedColumn(prefix, rows = [], options = {}) {
   setHtml(`${prefix}-fixed-head`, `<tr><th style="text-align:left">Concepto</th></tr>`);
   setHtml(`${prefix}-fixed-tbody`, rows.map((row) => `
     <tr class="${row.bold ? 'finance-total-row' : ''}">
-      <td style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.color || '#334155'};background:${row.bg || (row.bold ? '#f4f8fc' : '#fff')}!important;display:flex;align-items:center;justify-content:space-between;gap:4px">
+      <td class="finance-fixed-concept-cell" style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.color || '#334155'};background:${row.bg || (row.bold ? '#f4f8fc' : '#fff')}!important;display:flex;align-items:center;justify-content:space-between;gap:4px">
         <span>${escapeHtml(row.label || '')}</span>
         ${row.actionHtml || ''}
       </td>
@@ -439,7 +531,7 @@ function isAddressNoisePart(value) {
   if (/^\d{5,8}$/.test(part)) return true;
   if (/^chile$/i.test(part)) return true;
   if (/^provincia\b/i.test(part)) return true;
-  if (/^regi[oó]n\b/i.test(part)) return true;
+  if (/^regi[oÃ³]n\b/i.test(part)) return true;
   if (/metropolitana de santiago/i.test(part)) return true;
   return false;
 }
@@ -618,7 +710,7 @@ function normalizeProject(project = {}) {
     bodegas_sup_terrazas: source.bodegas_sup_terrazas ?? 0,
     tasa_interes_terreno: source.tasa_interes_terreno ?? 3.5,
     tasa_interes_construccion: source.tasa_interes_construccion ?? 3.5,
-    pct_timbres: source.pct_timbres ?? 0.8,
+    pct_timbres: 0.8,
     pct_ceec: source.pct_ceec ?? 65,
     pct_impuesto_renta: source.pct_impuesto_renta ?? 27,
     formula_overrides: normalizeFormulaOverrides(source.formula_overrides),
@@ -646,7 +738,7 @@ function getGlobalFinancialParams() {
   return {
     tasa_terreno: toNumber(p.tasa_interes_terreno),
     tasa_construccion: toNumber(p.tasa_interes_construccion),
-    pct_timbres: toNumber(p.pct_timbres),
+    pct_timbres: 0.8,
     pct_ceec: toNumber(p.pct_ceec),
     pct_impuesto_renta: toNumber(p.pct_impuesto_renta),
   };
@@ -699,10 +791,10 @@ function renderFormulaCell(value, formulaObj, options = {}) {
   return `<td style="${cellStyle};position:relative" class="formula-host">
     <div style="display:inline-flex;align-items:center;gap:4px">
       <span>${formatted}</span>
-      <button type="button" class="btn-formula-mini" onclick="toggleFormulaPop('${popId}', event)" title="Ver fórmula" style="background:none;border:1px solid #cbd5e1;color:#3b82f6;border-radius:4px;padding:0 4px;font-size:9px;cursor:pointer;line-height:1.4">ƒx</button>
+      <button type="button" class="btn-formula-mini" onclick="toggleFormulaPop('${popId}', event)" title="Ver fÃ³rmula" style="background:none;border:1px solid #cbd5e1;color:#3b82f6;border-radius:4px;padding:0 4px;font-size:9px;cursor:pointer;line-height:1.4">Æ’x</button>
     </div>
     <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;right:0;top:100%;margin-top:4px;background:#0f172a;color:#fff;border-radius:8px;padding:10px 12px;min-width:240px;max-width:340px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">
-      <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Fórmula</div>
+      <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">FÃ³rmula</div>
       <div style="font-family:'Courier New',monospace;background:#1e293b;padding:6px 8px;border-radius:6px;margin-bottom:6px;white-space:pre-wrap;word-break:break-word">${escapeHtml(formulaText)}</div>
       ${refsHtml ? `<div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Variables</div>${refsHtml}` : ''}
       ${noteHtml}
@@ -819,7 +911,7 @@ function getMonthlyIvaDebito(monthlyIncome) {
 }
 
 function renderIvaDebitoPanel() {
-  // El detalle de IVA débito se renderiza inline en la fila del flujo de caja.
+  // El detalle de IVA dÃ©bito se renderiza inline en la fila del flujo de caja.
 }
 
 function getMonthlyPPM(monthlyIncome) {
@@ -842,17 +934,17 @@ function getMonthlyPPM(monthlyIncome) {
 }
 
 function getMonthlyImpuestoRenta(flujoAntesImpuestos, monthlyIncome) {
-  // Se paga en abril del año siguiente; tasa configurable
+  // Se paga en abril del aÃ±o siguiente; tasa configurable
   const monthCount = getCostMonthCount();
   const monthly = createMonthlyArray(monthCount, 0);
   const tasa = getGlobalFinancialParams().pct_impuesto_renta / 100;
   const totalIncome = monthlyIncome.reduce((a, b) => a + toNumber(b), 0);
   const totalFlujo = flujoAntesImpuestos.reduce((a, b) => a + toNumber(b), 0);
   if (totalIncome <= 0 || totalFlujo <= 0) return monthly;
-  // Simplificación: distribuir el impuesto proporcional a escrituraciones, con desfase de 12 meses
+  // SimplificaciÃ³n: distribuir el impuesto proporcional a escrituraciones, con desfase de 12 meses
   const startDate = getCostStartDate();
   const baseYear = startDate.getFullYear();
-  // Agrupar ingresos por año calendario
+  // Agrupar ingresos por aÃ±o calendario
   const anual = {};
   monthlyIncome.forEach((v, i) => {
     const d = addMonths(startDate, i);
@@ -864,7 +956,7 @@ function getMonthlyImpuestoRenta(flujoAntesImpuestos, monthlyIncome) {
     const ingresos = anual[yearKey];
     const year = Number(yearKey);
     const tributo = -tasa * ingresos * margen;
-    // Pagadero en abril del año siguiente: mes relativo desde startDate
+    // Pagadero en abril del aÃ±o siguiente: mes relativo desde startDate
     const payDate = new Date(year + 1, 3, 1); // April (mes index 3)
     const monthIndex = (payDate.getFullYear() - baseYear) * 12 + (payDate.getMonth() - startDate.getMonth());
     if (monthIndex >= 0 && monthIndex < monthCount) monthly[monthIndex] += tributo;
@@ -938,7 +1030,7 @@ function normalizeFinanciamiento(data = {}) {
     credito_terreno_pct: data.credito_terreno_pct ?? 70,
     credito_terreno_tasa: data.credito_terreno_tasa ?? 3.5,
     credito_terreno_pago_intereses: data.credito_terreno_pago_intereses || 'Semestral',
-    credito_terreno_pago_capital: data.credito_terreno_pago_capital || 'Inicio: Construcción',
+    credito_terreno_pago_capital: data.credito_terreno_pago_capital || 'Inicio: ConstrucciÃ³n',
     linea_construccion_activo: data.linea_construccion_activo ?? true,
     linea_construccion_pct: data.linea_construccion_pct ?? 100,
     linea_construccion_tasa: data.linea_construccion_tasa ?? 3.5,
@@ -1157,10 +1249,10 @@ function renderSyncStatus() {
   if (!badge || !label || !detail) return;
 
   const variantsOld = {
-    loading: { color: '#475569', bg: '#f8fafc', border: '#cbd5e1', icon: '☁' },
-    ok: { color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', icon: '☁ ✓' },
-    saving: { color: '#b45309', bg: '#fffbeb', border: '#fde68a', icon: '↻' },
-    error: { color: '#b91c1c', bg: '#fef2f2', border: '#fecaca', icon: '⚠' },
+    loading: { color: '#475569', bg: '#f8fafc', border: '#cbd5e1', icon: 'â˜' },
+    ok: { color: '#16a34a', bg: '#f0fdf4', border: '#bbf7d0', icon: 'â˜ âœ“' },
+    saving: { color: '#b45309', bg: '#fffbeb', border: '#fde68a', icon: 'â†»' },
+    error: { color: '#b91c1c', bg: '#fef2f2', border: '#fecaca', icon: 'âš ' },
   };
 
   const variants = {
@@ -1266,7 +1358,7 @@ async function persistAutosaveScopes(scopes, { silent = true } = {}) {
     );
   }
   if (scopeSet.has('costos')) {
-    queueAutosaveRequest(requests, 'costos', `/api/proyectos/${state.proyectoId}/costos`, 'POST', state.costos);
+    queueAutosaveRequest(requests, 'costos', `/api/proyectos/${state.proyectoId}/costos`, 'POST', getCostosPayloadForSave());
   }
   if (scopeSet.has('capital')) {
     queueAutosaveRequest(requests, 'capital', `/api/proyectos/${state.proyectoId}/capital`, 'POST', state.capital);
@@ -1284,6 +1376,13 @@ async function persistAutosaveScopes(scopes, { silent = true } = {}) {
 
 function scheduleAutosave(scope, delay = DEFAULT_AUTOSAVE_DELAY) {
   if (!state.proyectoId || !scope || !AUTOSAVE_SCOPE_LABELS[scope]) return;
+  if (shouldDeferEditingWork()) {
+    state.autosave.queued[scope] = true;
+    state.autosave.dirty[scope] = true;
+    state.editSession.deferredAutosaveScopes[scope] = true;
+    setSyncStatus('dirty', 'CAMBIOS PENDIENTES', `Cambios pendientes en ${AUTOSAVE_SCOPE_LABELS[scope] || scope}`);
+    return;
+  }
   const hadPending = getPendingAutosaveScopes().length > 0;
   window.clearTimeout(state.autosave.timers[scope]);
   state.autosave.timers[scope] = null;
@@ -1353,6 +1452,24 @@ async function runAutosave(scope) {
 }
 window.scheduleAutosave = scheduleAutosave;
 
+document.addEventListener('focusin', (event) => {
+  if (isDeferredEditCandidate(event.target)) beginEditSession(event.target);
+});
+
+document.addEventListener('focusout', (event) => {
+  if (state.editSession.element === event.target) scheduleDeferredEditFlush();
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter') return;
+  const target = event.target;
+  if (!isDeferredEditCandidate(target)) return;
+  if (String(target.tagName || '').toLowerCase() === 'textarea') return;
+  window.setTimeout(() => {
+    if (document.activeElement === target && typeof target.blur === 'function') target.blur();
+  }, 0);
+});
+
 function getPendingAutosaveScopes() {
   return Object.keys(AUTOSAVE_SCOPE_LABELS).filter((scope) => (
     state.autosave.queued[scope]
@@ -1363,6 +1480,11 @@ function getPendingAutosaveScopes() {
 }
 
 async function flushPendingAutosaves() {
+  if (state.editSession.active || Object.keys(state.editSession.deferredAutosaveScopes).length || Object.keys(state.editSession.deferredRenderJobs).length || Object.keys(state.editSession.deferredCallbacks).length) {
+    state.editSession.active = false;
+    state.editSession.element = null;
+    flushDeferredEditWork();
+  }
   const scopes = getPendingAutosaveScopes();
   window.clearTimeout(state.autosave.batchTimer);
   state.autosave.batchTimer = null;
@@ -1417,13 +1539,8 @@ async function saveNow() {
       setSyncStatus('ok', 'GUARDADO', `Guardado manual ${new Date().toLocaleTimeString()}`);
       return;
     }
-    try { prepareStateForSave({ includeCostos: true }); } catch (_) { /* readers may not be ready */ }
-    const scopes = Object.keys(AUTOSAVE_SCOPE_LABELS);
-    scopes.forEach((scope) => {
-      state.autosave.queued[scope] = true;
-      state.autosave.dirty[scope] = true;
-    });
-    await runAutosaveBatch(scopes);
+    try { prepareStateForSave({ includeCostos: false }); } catch (_) { /* readers may not be ready */ }
+    await persistAutosaveScopes(['proyecto'], { silent: true });
     setSyncStatus('ok', 'GUARDADO', `Guardado manual ${new Date().toLocaleTimeString()}`);
   } catch (error) {
     console.error('saveNow', error);
@@ -1457,25 +1574,38 @@ async function api(path, options = {}) {
   return response.json();
 }
 
-// ─── Loading overlay ────────────────────────────────────────────────────────
+// â”€â”€â”€ Loading overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function hideLoadingOverlay() {
   const overlay = $('app-loading-overlay');
   if (!overlay) return;
+  overlay.classList.remove('is-loading');
+  const logo = overlay.querySelector('.app-loading-logo-img');
+  if (logo) logo.style.transform = 'rotate(0deg)';
   overlay.classList.add('is-hidden');
   window.setTimeout(() => { overlay.style.display = 'none'; }, 260);
+}
+
+function showLoadingOverlay() {
+  const overlay = $('app-loading-overlay');
+  if (!overlay) return;
+  overlay.style.display = '';
+  overlay.classList.remove('is-hidden');
+  overlay.classList.add('is-loading');
+  const logo = overlay.querySelector('.app-loading-logo-img');
+  if (logo) logo.style.transform = 'rotate(0deg)';
 }
 
 function setLoadingText(text, sub = '') {
   const el = $('app-loading-text');
   if (el) el.textContent = text;
   const subEl = document.querySelector('.app-loading-sub');
-  if (subEl) subEl.textContent = sub;
+  if (subEl) subEl.textContent = String(sub || '').trim();
 }
 
-// ─── Projects panel ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Projects panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// Tracks whether the user has clicked "Cambiar dirección" on the active card.
+// Tracks whether the user has clicked "Cambiar direcciÃ³n" on the active card.
 // Resets when: project is switched, address is confirmed, or panel closes.
 let _addrEditingMode = false;
 
@@ -1562,7 +1692,7 @@ function toggleNewProjectForm() {
   form.hidden = !isHidden;
   if (btn) btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
   if (isHidden) {
-    // Showing form — clear previous values, errors and focus
+    // Showing form â€” clear previous values, errors and focus
     _newProjAddrConfirmed = false;
     _newProjectAddressSelection = null;
     resetAddressSearchContext('new');
@@ -1590,20 +1720,20 @@ function getAddressStateInfo(proyecto = {}) {
     return {
       className: 'addr-state-empty',
       icon: '&#128205;',
-      label: 'Dirección no establecida',
+      label: 'DirecciÃ³n no establecida',
     };
   }
   if (_isAddrConfirmed(proyecto)) {
     return {
       className: 'addr-state-confirmed',
       icon: '&#10003;',
-      label: 'Dirección establecida',
+      label: 'DirecciÃ³n establecida',
     };
   }
   return {
     className: 'addr-state-pending',
     icon: '&#9888;',
-    label: 'Dirección pendiente de validar',
+    label: 'DirecciÃ³n pendiente de validar',
   };
 }
 
@@ -1628,7 +1758,7 @@ function renderProjectsPanel() {
     list.innerHTML = `
       <div class="proj-panel-empty">
         <strong>Sin proyectos</strong>
-        Usa el botón "+ Nuevo Proyecto" para crear el primero.
+        Usa el botÃ³n "+ Nuevo Proyecto" para crear el primero.
       </div>`;
     return;
   }
@@ -1654,7 +1784,7 @@ function renderProjectsPanel() {
     // Small address badge for non-active cards
     let addrBadge;
     if (!addrText) {
-      addrBadge = '<em style="color:#94a3b8;font-style:italic">Sin dirección</em>';
+      addrBadge = '<em style="color:#94a3b8;font-style:italic">Sin direcciÃ³n</em>';
     } else if (confirmed) {
       addrBadge = `<span class="addr-state-dot addr-state-dot-green">&#10003;</span>${escapeHtml(addrText)}`;
     } else {
@@ -1669,22 +1799,22 @@ function renderProjectsPanel() {
     if (isActive) {
       const addrState = getAddressStateInfo(src);
       if (!showEditForm) {
-        // ── Established (green) ──────────────────────────────────────────
+        // â”€â”€ Established (green) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         addrSection = `
           <div class="proj-card-edit-section">
             <div class="addr-state addr-state-confirmed">
               <span class="addr-state-icon">&#10003;</span>
               <div class="addr-state-body">
-                <div class="addr-state-label">Dirección establecida</div>
+                <div class="addr-state-label">DirecciÃ³n establecida</div>
                 <div class="addr-state-value" title="${escapeHtml(addrText)}">${escapeHtml(addrText)}</div>
               </div>
               <button class="addr-change-btn" type="button"
                       onclick="event.stopPropagation();startEditAddress()"
-                      title="Editar dirección">Cambiar</button>
+                      title="Editar direcciÃ³n">Cambiar</button>
             </div>
           </div>`;
       } else {
-        // ── Edit / Pending / Not set ─────────────────────────────────────
+        // â”€â”€ Edit / Pending / Not set â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         addrSection = `
           <div class="proj-card-edit-section">
             <div class="addr-state ${addrState.className}" id="addr-status-indicator">
@@ -1694,7 +1824,7 @@ function renderProjectsPanel() {
             <div class="addr-search-wrap" onclick="event.stopPropagation()">
               <input class="inp" id="proj-addr-input"
                      value="${escapeHtml(addrText)}"
-                     placeholder="Buscar dirección del proyecto"
+                     placeholder="Buscar direcciÃ³n del proyecto"
                      autocomplete="off"
                      maxlength="240"
                      onfocus="focusAddressSearch('project', this.value)"
@@ -1705,7 +1835,7 @@ function renderProjectsPanel() {
             <div id="addr-validation-msg" class="addr-validation-msg"></div>
             <button id="addr-confirm-btn" class="addr-confirm-btn" type="button"
                     onclick="event.stopPropagation();saveProjectAddress()">
-              Guardar dirección
+              Guardar direcciÃ³n
             </button>
             ${_addrEditingMode && addrText ? `
               <button class="btn-outline" type="button" style="width:100%;margin-top:6px;font-size:11px;justify-content:center"
@@ -1714,7 +1844,7 @@ function renderProjectsPanel() {
       }
     }
 
-    // ── Name section for active card ──────────────────────────────────────────
+    // â”€â”€ Name section for active card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const nombreText = String(src.nombre || proyecto.nombre || '').trim() || 'Sin nombre';
     let nameSection = '';
     if (isActive) {
@@ -1727,7 +1857,7 @@ function renderProjectsPanel() {
                    placeholder="Nombre del proyecto"
                    autocomplete="off"
                    onkeydown="if(event.key==='Enter'){event.preventDefault();saveProjectName();}else if(event.key==='Escape'){event.preventDefault();cancelEditName();}">
-            <div id="proj-name-error" class="proj-name-error">El nombre del proyecto no puede estar vacío.</div>
+            <div id="proj-name-error" class="proj-name-error">El nombre del proyecto no puede estar vacÃ­o.</div>
             <div class="proj-name-edit-actions">
               <button class="btn-primary" type="button" onclick="event.stopPropagation();saveProjectName()">Guardar nombre</button>
               <button class="btn-outline" type="button" onclick="event.stopPropagation();cancelEditName()">Cancelar</button>
@@ -1750,7 +1880,7 @@ function renderProjectsPanel() {
       if (_projectDeleteState.projectId === projectId && _projectDeleteState.step === 1) {
         deleteProjectSection = `
           <div class="proj-delete-flow" onclick="event.stopPropagation()">
-            <div class="proj-delete-copy">¿Seguro que quieres eliminar este proyecto?</div>
+            <div class="proj-delete-copy">Â¿Seguro que quieres eliminar este proyecto?</div>
             <div class="proj-delete-actions">
               <button class="btn-outline" type="button" onclick="event.stopPropagation();cancelDeleteProject()">Cancelar</button>
               <button class="btn-primary" type="button" onclick="event.stopPropagation();continueDeleteProject('${escapeHtml(projectId)}')">Continuar</button>
@@ -1761,7 +1891,7 @@ function renderProjectsPanel() {
         const canDelete = isDeletePhraseValid(phrase);
         deleteProjectSection = `
           <div class="proj-delete-flow is-danger" onclick="event.stopPropagation()">
-            <div class="proj-delete-copy"><strong>Esta acción no se puede deshacer.</strong> Para confirmar, escribe ELIMINAR.</div>
+            <div class="proj-delete-copy"><strong>Esta acciÃ³n no se puede deshacer.</strong> Para confirmar, escribe ELIMINAR.</div>
             <input class="inp proj-delete-phrase" id="proj-delete-confirm-input" type="text"
                    value="${escapeHtml(phrase)}"
                    autocomplete="off"
@@ -1816,8 +1946,7 @@ async function switchProject(projectId) {
   closeProjectsPanel();
   try {
     setLoadingText('Cargando proyecto...', 'Un momento');
-    const overlay = $('app-loading-overlay');
-    if (overlay) { overlay.style.display = ''; overlay.classList.remove('is-hidden'); }
+    showLoadingOverlay();
     await flushPendingAutosaves();
     await loadProject(projectId);
   } finally {
@@ -1874,7 +2003,7 @@ async function submitNewProject() {
   }
 }
 
-// ─── Address state management ─────────────────────────────────────────────
+// â”€â”€â”€ Address state management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function startEditAddress() {
   _addrEditingMode = true;
@@ -1921,7 +2050,7 @@ async function saveProjectName() {
   if (!nombre) {
     input.style.borderColor = '#f87171';
     if (error) {
-      error.textContent = 'El nombre del proyecto no puede estar vacío.';
+      error.textContent = 'El nombre del proyecto no puede estar vacÃ­o.';
       error.classList.add('is-visible');
     }
     input.focus();
@@ -1962,7 +2091,7 @@ async function deleteCurrentProject() {
 
   const currentProject = state.proyectos[currentIndex] || {};
   const projectName = String(state.proyecto?.nombre || currentProject.nombre || 'este proyecto').trim() || 'este proyecto';
-  const confirmed = window.confirm(`¿Eliminar "${projectName}"? Esta acción no se puede deshacer.`);
+  const confirmed = window.confirm(`Â¿Eliminar "${projectName}"? Esta acciÃ³n no se puede deshacer.`);
   if (!confirmed) return;
 
   try {
@@ -1980,11 +2109,7 @@ async function deleteCurrentProject() {
       const nextProjectId = remainingProjects[nextIndex]?.id || remainingProjects[0].id;
       closeProjectsPanel();
       setLoadingText('Cargando proyecto...', 'Seleccionando otro proyecto');
-      const overlay = $('app-loading-overlay');
-      if (overlay) {
-        overlay.style.display = '';
-        overlay.classList.remove('is-hidden');
-      }
+      showLoadingOverlay();
       try {
         await loadProject(nextProjectId);
       } finally {
@@ -2053,7 +2178,7 @@ async function deleteCurrentProject(projectId = '') {
   const targetProjectId = String(projectId || '').trim();
   if (!targetProjectId || !state.proyectoId) return;
   if (targetProjectId !== String(state.proyectoId)) {
-    setSyncStatus('error', 'ERROR', 'El proyecto activo cambió. Intenta nuevamente.');
+    setSyncStatus('error', 'ERROR', 'El proyecto activo cambiÃ³. Intenta nuevamente.');
     resetProjectDeleteState();
     renderProjectsPanel();
     return;
@@ -2081,11 +2206,7 @@ async function deleteCurrentProject(projectId = '') {
       const nextIndex = Math.min(currentIndex, remainingProjects.length - 1);
       const nextProjectId = remainingProjects[nextIndex]?.id || remainingProjects[0].id;
       setLoadingText('Cargando proyecto...', 'Seleccionando otro proyecto');
-      const overlay = $('app-loading-overlay');
-      if (overlay) {
-        overlay.style.display = '';
-        overlay.classList.remove('is-hidden');
-      }
+      showLoadingOverlay();
       try {
         await loadProject(nextProjectId);
       } finally {
@@ -2130,7 +2251,7 @@ function setAddressStatusIndicator(value, selection = null) {
   const trimmed = String(value || '').trim();
   const selected = selection && normalizeAddressForCompare(selection.direccion) === normalizeAddressForCompare(trimmed);
   const stateInfo = selected
-    ? { className: 'addr-state-confirmed', icon: '&#10003;', label: 'Dirección establecida' }
+    ? { className: 'addr-state-confirmed', icon: '&#10003;', label: 'DirecciÃ³n establecida' }
     : getAddressStateInfo({ direccion: trimmed, direccionConfirmada: false, direccionValidada: false });
 
   if (indicator) {
@@ -2198,7 +2319,7 @@ async function saveProjectAddress() {
     _activeProjectAddressSelection = null;
     resetAddressSearchContext('project');
 
-    setSyncStatus('saving', 'GUARDANDO', 'Guardando dirección del proyecto...');
+    setSyncStatus('saving', 'GUARDANDO', 'Guardando direcciÃ³n del proyecto...');
     await api(`/api/proyectos/${state.proyectoId}`, {
       method: 'PUT',
       body: JSON.stringify(getProjectSavePayload()),
@@ -2207,8 +2328,8 @@ async function saveProjectAddress() {
     renderProjectHeader();
     renderProjectsPanel();
   } catch (error) {
-    setSyncStatus('error', 'ERROR', error.message || 'Error al guardar dirección');
-    if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Guardar dirección'; }
+    setSyncStatus('error', 'ERROR', error.message || 'Error al guardar direcciÃ³n');
+    if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Guardar direcciÃ³n'; }
   }
 }
 
@@ -2289,8 +2410,8 @@ function setNewProjectAddressStatus(value, selection = null, message = '') {
   }
   statusEl.classList.add('is-visible', selected ? 'is-confirmed' : 'is-pending');
   statusEl.innerHTML = selected
-    ? '<span>&#10003;</span> Dirección establecida'
-    : '<span>!</span> Dirección pendiente de validar';
+    ? '<span>&#10003;</span> DirecciÃ³n establecida'
+    : '<span>!</span> DirecciÃ³n pendiente de validar';
 }
 
 function renderAddressSearchFeedback(context, message) {
@@ -2354,6 +2475,25 @@ function searchGooglePlaces(query) {
       }
     );
   });
+}
+
+function stripDerivedLargeData(value, depth = 0) {
+  if (value == null) return value;
+  if (depth > 20) return null;
+  if (Array.isArray(value)) return value.map((item) => stripDerivedLargeData(item, depth + 1));
+  if (typeof value !== 'object') return value;
+  const result = {};
+  Object.entries(value).forEach(([key, item]) => {
+    if (key.startsWith('__')) return;
+    if (/^_(?!formula)/i.test(key)) return;
+    if (/html|dom|element|node|snapshot|cache|preview|chart|canvas/i.test(key)) return;
+    result[key] = stripDerivedLargeData(item, depth + 1);
+  });
+  return result;
+}
+
+function getCostosPayloadForSave() {
+  return stripDerivedLargeData(state.costos || []);
 }
 
 function resolveGooglePlace(suggestion) {
@@ -2471,7 +2611,7 @@ function scheduleAddressSearch(context, value) {
       if (error?.name === 'AbortError') return;
       if (contextState.sequence !== sequence) return;
       contextState.results = [];
-      renderAddressSearchFeedback(context, 'Validación de direcciones no configurada');
+      renderAddressSearchFeedback(context, 'ValidaciÃ³n de direcciones no configurada');
     } finally {
       if (contextState.sequence === sequence) contextState.controller = null;
     }
@@ -2508,7 +2648,7 @@ async function selectAddressSuggestion(context, index) {
   setAddressStatusIndicator(normalized.direccion, normalized);
 }
 
-// ─── New project address inline helpers ────────────────────────────────────
+// â”€â”€â”€ New project address inline helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // Tracks whether the address was explicitly confirmed in the "new project" form
 let _newProjAddrConfirmed = false;
@@ -2524,21 +2664,21 @@ function confirmNewProjectAddr() {
   if (!input) return;
   _newProjAddrConfirmed = false;
   _newProjectAddressSelection = null;
-  setNewProjectAddressStatus(input.value, null, 'Selecciona una sugerencia real para validar la dirección.');
+  setNewProjectAddressStatus(input.value, null, 'Selecciona una sugerencia real para validar la direcciÃ³n.');
 }
 
 async function refreshHealthStatus() {
   try {
     state.health = await api('/api/health');
-    setSyncStatus('ok', 'SINCRONIZADO', `Base ${state.health.database} · ${state.health.environment}`);
+    setSyncStatus('ok', 'SINCRONIZADO', `Base ${state.health.database} Â· ${state.health.environment}`);
   } catch (error) {
     setSyncStatus('error', 'SIN CONEXION', error.message);
   }
 }
 
 function ensureProjectControls() {
-  // Dropdown removed — project switching is handled exclusively by the
-  // projects panel (btn-projects → openProjectsPanel). This function is
+  // Dropdown removed â€” project switching is handled exclusively by the
+  // projects panel (btn-projects â†’ openProjectsPanel). This function is
   // kept as a no-op so any existing call-sites don't break.
 }
 
@@ -2722,11 +2862,11 @@ function renderCabidaTables(rows) {
 
   setText('cabida-vendible-pct', `${fmtNumber(proyecto.terraza_util_pct, 1)}%`);
   setText('res-cabida-vendible-pct', `${fmtNumber(proyecto.terraza_util_pct, 1)}%`);
-  setText('cabida-common-total', `${fmtNumber(commonAreaTotal, 1)} m²`);
+  setText('cabida-common-total', `${fmtNumber(commonAreaTotal, 1)} mÂ²`);
   setText('res-cabida-common-total', `${fmtNumber(commonAreaTotal, 1)} m2`);
-  setText('cabida-util-total', `${fmtNumber(totals.util, 1)} m²`);
+  setText('cabida-util-total', `${fmtNumber(totals.util, 1)} mÂ²`);
   setText('res-cabida-util-total', `${fmtNumber(totals.util, 1)} m2`);
-  setText('cabida-vendible-total', `${fmtNumber(totals.vendible, 1)} m²`);
+  setText('cabida-vendible-total', `${fmtNumber(totals.vendible, 1)} mÂ²`);
   setText('res-cabida-vendible-total', `${fmtNumber(totals.vendible, 1)} m2`);
 }
 
@@ -2746,7 +2886,7 @@ function renderCabidaEditor(rows) {
         <div class="card" data-cabida-row>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
             <label style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase">Tipo</label>
-            <button type="button" onclick="eliminarUso(${idx})" style="background:none;border:1px solid #fecaca;color:#b91c1c;border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;line-height:1.5">× Eliminar</button>
+            <button type="button" onclick="eliminarUso(${idx})" style="background:none;border:1px solid #fecaca;color:#b91c1c;border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;line-height:1.5">Ã— Eliminar</button>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div style="grid-column:1 / -1">
@@ -2754,9 +2894,9 @@ function renderCabidaEditor(rows) {
               <input class="inp" data-field="uso" value="${escapeHtml(row.uso)}" onchange="onCabidaInputChange()"/>
             </div>
             <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">Cantidad</label><input class="inp" type="text" inputmode="numeric" data-localized-number="1" data-field="cantidad" value="${fmtInputNumber(row.cantidad, 0)}" onchange="onCabidaInputChange()"/></div>
-            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">M² interior</label><input class="inp" type="text" inputmode="decimal" data-localized-number="1" step="0.01" data-field="sup_interior" value="${fmtInputNumber(row.sup_interior, 2)}" onchange="onCabidaInputChange()"/></div>
-            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">M² terraza</label><input class="inp" type="text" inputmode="decimal" data-localized-number="1" step="0.01" data-field="sup_terrazas" value="${fmtInputNumber(row.sup_terrazas, 2)}" onchange="onCabidaInputChange()"/></div>
-            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">M² vendible</label><input class="inp" type="text" value="${fmtNumber(getSellableAreaPerUnit(row.sup_interior, row.sup_terrazas), 2)}" disabled/></div>
+            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">MÂ² interior</label><input class="inp" type="text" inputmode="decimal" data-localized-number="1" step="0.01" data-field="sup_interior" value="${fmtInputNumber(row.sup_interior, 2)}" onchange="onCabidaInputChange()"/></div>
+            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">MÂ² terraza</label><input class="inp" type="text" inputmode="decimal" data-localized-number="1" step="0.01" data-field="sup_terrazas" value="${fmtInputNumber(row.sup_terrazas, 2)}" onchange="onCabidaInputChange()"/></div>
+            <div><label style="font-size:11px;color:#64748b;display:block;margin-bottom:6px">MÂ² vendible</label><input class="inp" type="text" value="${fmtNumber(getSellableAreaPerUnit(row.sup_interior, row.sup_terrazas), 2)}" disabled/></div>
           </div>
         </div>
       `).join('')}
@@ -2782,13 +2922,13 @@ function getGanttDependencyOptions(currentName) {
 }
 
 const GANTT_CANONICAL_NAME_RULES = [
-  { canonical: 'Compra terreno', pattern: /^(Compra terreno|Adquisicion de Terreno|Adquisición de Terreno|Compra de Terreno)$/i },
-  { canonical: 'Construcción', pattern: /^Construcci[óo]n$/i },
+  { canonical: 'Compra terreno', pattern: /^(Compra terreno|Adquisicion de Terreno|AdquisiciÃ³n de Terreno|Compra de Terreno)$/i },
+  { canonical: 'ConstrucciÃ³n', pattern: /^Construcci[Ã³o]n$/i },
   { canonical: 'Aprobaci\u00f3n PE', pattern: /^(Aprobaci(?:o|\u00f3)n(?: del)? Proyecto(?: de)? Edificaci(?:o|\u00f3)n|Aprobaci(?:o|\u00f3)n(?:\s+del)?\s+Pro(?:yecto)?(?:\s+de)?(?:\s+Edificaci(?:o|\u00f3)n)?|Aprobaci(?:o|\u00f3)n\s*P\.?\s*E\.?|Aprobaci(?:o|\u00f3)n\s*PE|Permiso(?: de)? Edificaci(?:o|\u00f3)n)$/i },
   { canonical: 'Promesas', pattern: /^(Promesas|Inicio promesas)$/i },
   { canonical: 'Postventa', pattern: /^Postventa$/i },
-  { canonical: 'Recepción municipal', pattern: /^Recepci[óo]n municipal$/i },
-  { canonical: 'Escrituración', pattern: /^Escrituraci[óo]n$/i },
+  { canonical: 'RecepciÃ³n municipal', pattern: /^Recepci[Ã³o]n municipal$/i },
+  { canonical: 'EscrituraciÃ³n', pattern: /^Escrituraci[Ã³o]n$/i },
 ];
 
 const GANTT_PRESET_COLORS = [
@@ -2978,7 +3118,7 @@ function normalizeGanttRows(rows) {
     const dependencia = row.dependencia || '';
     const dependenciaTipo = row.dependencia_tipo || 'fin';
     const dependenciaRow = dependencia ? byName.get(dependencia) : null;
-    // Tipo 'fin': la fila dependiente arranca el MES SIGUIENTE al término (fin + 1).
+    // Tipo 'fin': la fila dependiente arranca el MES SIGUIENTE al tÃ©rmino (fin + 1).
     // Tipo 'inicio': arranca al inicio del mismo mes que la dep.
     const inicioBase = dependenciaRow
       ? (dependenciaTipo === 'inicio'
@@ -3070,7 +3210,7 @@ function renderGanttEditor(rows = state.gantt) {
         <td class="gantt-sticky-left gantt-cell-tight" style="left:480px;width:78px"><input class="inp" data-field="duracion" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(row.duracion, 0)}" ${lock.duration ? 'disabled' : ''} onchange="onGanttInputChange()"/></td>
         <td>
           <div class="gantt-editor-track" style="width:${meta.timelineWidth}px;--month-width:${monthWidth}px">
-            <div class="gantt-editor-bar" title="Inicio ${fmtNumber(row.inicio)} · Fin ${fmtNumber(row.fin)}" style="left:${left}px;width:${width}px;background:${escapeHtml(row.color || '#3b82f6')}"></div>
+            <div class="gantt-editor-bar" title="Inicio ${fmtNumber(row.inicio)} Â· Fin ${fmtNumber(row.fin)}" style="left:${left}px;width:${width}px;background:${escapeHtml(row.color || '#3b82f6')}"></div>
           </div>
         </td>
         <td class="gantt-sticky-right" style="width:42px">
@@ -3113,7 +3253,7 @@ function renderGanttPreview() {
       <div class="gantt-row">
         <div class="gantt-label">${escapeHtml(hito.nombre)}</div>
         <div class="gantt-track" style="width:${meta.timelineWidth}px;--month-width:${monthWidth}px">
-          <div class="gantt-bar" title="Inicio ${fmtNumber(hito.inicio)} · Fin ${fmtNumber(hito.fin)}" style="left:${left}px;width:${width}px;background:${escapeHtml(hito.color || '#3b82f6')}"></div>
+          <div class="gantt-bar" title="Inicio ${fmtNumber(hito.inicio)} Â· Fin ${fmtNumber(hito.fin)}" style="left:${left}px;width:${width}px;background:${escapeHtml(hito.color || '#3b82f6')}"></div>
         </div>
       </div>
     `;
@@ -3238,11 +3378,11 @@ function getPromiseMilestone() {
 }
 
 function getMunicipalReceptionMilestone() {
-  return state.gantt.find((row) => /RECEPCI[ÓO]N MUNICIPAL/i.test(String(row.nombre || '').trim())) || null;
+  return state.gantt.find((row) => /RECEPCI[Ã“O]N MUNICIPAL/i.test(String(row.nombre || '').trim())) || null;
 }
 
 function getEscrituracionMilestone() {
-  return state.gantt.find((row) => /^ESCRITURACI[ÓO]N$/i.test(String(row.nombre || '').trim())) || null;
+  return state.gantt.find((row) => /^ESCRITURACI[Ã“O]N$/i.test(String(row.nombre || '').trim())) || null;
 }
 
 function ensureVentasState() {
@@ -3407,7 +3547,7 @@ function getCronogramaComputed(item) {
   const base = isVentasCronogramaType(item, 'PREVENTA') ? toNumber(ganttRef?.inicio) : toNumber(ganttRef?.fin) + 1;
   const inicio = ganttRef ? base + toNumber(item.mes_inicio) : toNumber(item.mes_inicio);
 
-  // Duración calculada automáticamente basada en velocidad
+  // DuraciÃ³n calculada automÃ¡ticamente basada en velocidad
   let duracion = Math.max(1, toNumber(item.duracion));
   const totals = getTotalSalesMetrics();
   const velocitySettings = getVentasVelocitySettings();
@@ -3419,8 +3559,8 @@ function getCronogramaComputed(item) {
       duracion = Math.ceil(totals.totalUnidades / velocidadPromesas);
     }
   } else if (isVentasCronogramaType(item, 'ESCRITURACION')) {
-    // Escrituraciones: velocidad efectiva = min(promesas, escrituración)
-    // Limitadas por acumulado de promesas, pero no por una duración fija
+    // Escrituraciones: velocidad efectiva = min(promesas, escrituraciÃ³n)
+    // Limitadas por acumulado de promesas, pero no por una duraciÃ³n fija
     const promesaRow = getCronogramaByType('PREVENTA')[0];
     const promesaComputed = promesaRow ? getCronogramaComputed(promesaRow) : null;
     duracion = calculateEscrituraDurationWithPromiseCap(inicio, promesaComputed?.inicio || 0);
@@ -3540,7 +3680,7 @@ function ganttOptionsHtml(selected) {
 }
 
 function renderVentasSchedules() {
-  // Cronograma de Promesas: fila única global (auto-calculada)
+  // Cronograma de Promesas: fila Ãºnica global (auto-calculada)
   const preventaRows = getCronogramaByType('PREVENTA');
   const totalUnidadesPromesas = preventaRows.reduce((sum, row) => {
     const metrics = getUsoSaleMetrics(row.uso);
@@ -3560,7 +3700,7 @@ function renderVentasSchedules() {
     </tr>
   ` : '<tr><td colspan="5" style="text-align:center;color:#94a3b8">Sin unidades configuradas</td></tr>');
 
-  // Cronograma de Escrituración: fila única global (auto-calculada)
+  // Cronograma de EscrituraciÃ³n: fila Ãºnica global (auto-calculada)
   const escrRow = getCronogramaByType('ESCRITURACION')[0];
   const totalUnidadesEscr = state.ventasConfig.reduce((sum, item) => sum + getUsoSaleMetrics(item.uso).unidades, 0);
   const computedEscr = escrRow ? getCronogramaComputed(escrRow) : { inicio: 0, fin: 0, duracion: 0 };
@@ -3568,13 +3708,13 @@ function renderVentasSchedules() {
 
   setHtml('escrituracion-tbody', escrRow ? `
     <tr>
-      <td style="color:#64748b">${escapeHtml(escrRow.vinculo_gantt || 'Escrituración')}</td>
+      <td style="color:#64748b">${escapeHtml(escrRow.vinculo_gantt || 'EscrituraciÃ³n')}</td>
       <td style="text-align:center;font-weight:700">${fmtNumber(computedEscr.inicio)}</td>
       <td style="text-align:center;color:#16a34a;font-weight:700">${fmtNumber(computedEscr.fin)}</td>
       <td style="text-align:center">${fmtNumber(totalUnidadesEscr)} un</td>
       <td style="text-align:center">${fmtNumber(velEscr, 1)} un/mes</td>
     </tr>
-  ` : '<tr><td colspan="5" style="text-align:center;color:#94a3b8">Sin datos de escrituración</td></tr>');
+  ` : '<tr><td colspan="5" style="text-align:center;color:#94a3b8">Sin datos de escrituraciÃ³n</td></tr>');
 }
 
 function drawSpeedometer(value, maxValue) {
@@ -3650,8 +3790,8 @@ function renderVentasSummaryCardsLegacy() {
   setText('escrit-dur', `Duracion: ${fmtNumber(escrituraDuracion)} meses`);
 
   setHtml('mix-ventas-list', `
-    <div class="etapa-card" style="border-color:#3b82f6"><div style="font-weight:800">Preventa</div><div style="font-size:12px;color:#64748b">${fmtPct(preventaPct)} del stock · ${fmtUf(totalVenta * preventaPct / 100)}</div></div>
-    <div class="etapa-card" style="border-color:#22c55e"><div style="font-weight:800">Venta</div><div style="font-size:12px;color:#64748b">${fmtPct(ventaPct)} del stock · ${fmtUf(totalVenta * ventaPct / 100)}</div></div>
+    <div class="etapa-card" style="border-color:#3b82f6"><div style="font-weight:800">Preventa</div><div style="font-size:12px;color:#64748b">${fmtPct(preventaPct)} del stock Â· ${fmtUf(totalVenta * preventaPct / 100)}</div></div>
+    <div class="etapa-card" style="border-color:#22c55e"><div style="font-weight:800">Venta</div><div style="font-size:12px;color:#64748b">${fmtPct(ventaPct)} del stock Â· ${fmtUf(totalVenta * ventaPct / 100)}</div></div>
     <div class="etapa-card" style="border-color:#f97316"><div style="font-weight:800">Escrituracion</div><div style="font-size:12px;color:#64748b">Desde ${escapeHtml(formatTimelineMonthLabel(escrituraInicio))} hasta ${escapeHtml(formatTimelineMonthLabel(escrituraFin))}</div></div>
   `);
 }
@@ -3684,7 +3824,7 @@ function getPromesasEscrituracionUnidades(monthCountOrMonths) {
   // Retorna arrays de promesas y escrituras capeados
   // Las escrituras nunca pueden exceder el acumulado de promesas acumuladas
   // Escrituras usa velocidad definida por usuario (ej: 20/mes exacto)
-  // Acepta monthCount (número) o array de meses
+  // Acepta monthCount (nÃºmero) o array de meses
   const promesaRows = getCronogramaByType('PREVENTA');
   const escrituraRow = getCronogramaByType('ESCRITURACION')[0];
   const promesaComputed = promesaRows.length ? getCronogramaComputed(promesaRows[0]) : null;
@@ -3749,8 +3889,8 @@ function renderVentasSummaryCards() {
   setText('escrit-dur', `Duracion: ${fmtNumber(escrituraDuracion)} meses`);
 
   setHtml('mix-ventas-list', `
-    <div class="etapa-card" style="border-color:#3b82f6"><div style="font-weight:800">Promesas departamentos</div><div style="font-size:12px;color:#64748b">${fmtPct(promesasPct)} del stock deptos · ${fmtUf(totalVentaDeptos)}</div></div>
-    <div class="etapa-card" style="border-color:#8b5cf6"><div style="font-weight:800">Estac. y bodegas</div><div style="font-size:12px;color:#64748b">${fmtNumber(addons.estacionamientos.unidades)} estac. + ${fmtNumber(addons.bodegas.unidades)} bod. · ${fmtUf(totalVentaAccesorios)}</div></div>
+    <div class="etapa-card" style="border-color:#3b82f6"><div style="font-weight:800">Promesas departamentos</div><div style="font-size:12px;color:#64748b">${fmtPct(promesasPct)} del stock deptos Â· ${fmtUf(totalVentaDeptos)}</div></div>
+    <div class="etapa-card" style="border-color:#8b5cf6"><div style="font-weight:800">Estac. y bodegas</div><div style="font-size:12px;color:#64748b">${fmtNumber(addons.estacionamientos.unidades)} estac. + ${fmtNumber(addons.bodegas.unidades)} bod. Â· ${fmtUf(totalVentaAccesorios)}</div></div>
     <div class="etapa-card" style="border-color:#f97316"><div style="font-weight:800">Escrituracion</div><div style="font-size:12px;color:#64748b">Desde ${escapeHtml(formatTimelineMonthLabel(escrituraInicio))} hasta ${escapeHtml(formatTimelineMonthLabel(escrituraFin))}</div></div>
   `);
 }
@@ -3949,7 +4089,7 @@ function renderConstruccion() {
   setText('constr-total-neto', fmtTableAmount(metrics.total_neto, { kind: 'cost', total: true }));
   setText('constr-uf-bruto', `${fmtNumber(metrics.uf_bruto, 2)} /m2`);
   setText('constr-total-bruto', fmtTableAmount(metrics.total_bruto, { kind: 'cost', total: true }));
-  setText('plazo-label', `${fmtNumber(metrics.plazo_meses)} MESES`);
+  setText('plazo-label', '');
   setText('anticipo-label', `${fmtNumber(metrics.anticipo_pct)}%`);
   setText('retencion-label', `${fmtNumber(metrics.retencion_pct)}%`);
 
@@ -3965,9 +4105,9 @@ function renderConstruccion() {
 
   const meses = Math.max(1, metrics.plazo_meses);
   const distribution = buildConstructionSCurve(metrics, meses);
-  setText('anticipo-meta', `${fmtNumber(metrics.anticipo_pct)}% del contrato`);
+  setText('anticipo-meta', '');
   setText('anticipo-monto', fmtUf(distribution.anticipoAmount));
-  setText('retencion-meta', `${fmtNumber(metrics.retencion_pct)}% retenido en EDPP`);
+  setText('retencion-meta', '');
   setText('retencion-monto', fmtUf(distribution.retentionAmount));
   renderConstructionSCurveChart(metrics, distribution);
 
@@ -3995,7 +4135,7 @@ function renderTerrainModule() {
   setText(
     'terreno-gantt-sync',
     milestone
-      ? `El bloque "${milestone.nombre}" quedó sincronizado con ${formatMonthYear(purchaseDate)}.`
+      ? `El bloque "${milestone.nombre}" quedÃ³ sincronizado con ${formatMonthYear(purchaseDate)}.`
       : 'Sin bloque Compra terreno en la carta gantt.'
   );
 
@@ -4008,8 +4148,9 @@ function renderTerrainModule() {
   setText('fin-terreno-plazos', `Horizonte base: ${fmtNumber(terrainTermMonths)} mes(es)`);
   setHtml('fin-terreno-partidas', (state.costos.find((category) => category.nombre === 'TERRENO')?.partidas || [])
     .filter((partida) => partida.es_terreno)
+    .filter((partida) => !/^Nueva subpartida$/i.test(String(partida.nombre || '').trim()))
     .map((partida) => `<div>${escapeHtml(partida.nombre)} <strong>${fmtUf(partida.total_neto)}</strong></div>`)
-    .join('') || '<div>Sin partidas marcadas.</div>');
+    .join(''));
   renderFinancingSourcePlanilla('terreno');
 }
 
@@ -4025,14 +4166,14 @@ function renderConstructionFinancing() {
   setLocalizedInputValue('fin-constr-alzamiento', state.financiamiento.pct_alzamiento ?? 90, 0);
   setText('fin-constr-costo', fmtUf(metrics.total_neto));
   setText('fin-constr-monto', fmtUf(approved));
-  setText('fin-constr-plazos', `Mes ${fmtNumber(start)} a ${fmtNumber(start + duration)}`);
-  setHtml('fin-constr-partidas', `<div>Base: total neto de construcción.</div>`);
+  setText('fin-constr-plazos', '');
+  setHtml('fin-constr-partidas', '');
 
   // Sync global config inputs
   const cfg = getGlobalFinancialParams();
   if ($('cfg-tasa-terreno')) $('cfg-tasa-terreno').value = toNumber(cfg.tasa_terreno);
   setLocalizedInputValue('cfg-tasa-construccion', cfg.tasa_construccion, 2);
-  setLocalizedInputValue('cfg-pct-timbres', cfg.pct_timbres, 2);
+  setLocalizedInputValue('cfg-pct-timbres', 0.8, 2);
   setLocalizedInputValue('cfg-pct-ceec', cfg.pct_ceec, 2);
   if ($('cfg-pct-renta')) $('cfg-pct-renta').value = toNumber(cfg.pct_impuesto_renta);
 
@@ -4058,7 +4199,7 @@ function computeConstructionEP() {
   const anticipo = createMonthlyArray(monthCount, 0);
   const retenciones = createMonthlyArray(monthCount, 0);
 
-  // Anticipo: desembolso completo un mes antes del inicio de construcción
+  // Anticipo: desembolso completo un mes antes del inicio de construcciÃ³n
   anticipo[anticipoMonth] += anticipoTotal;
 
   // Durante la obra: EDPP neto del saldo de contrato despues de anticipo.
@@ -4066,10 +4207,10 @@ function computeConstructionEP() {
     const m = Math.min(monthCount - 1, startMonth + i);
     ep[m] += toNumber(dist.monthlyCosts[i]); // EDPP neto del mes
     anticipo[m] -= toNumber(dist.monthlyAnticipoRecovery[i]); // compatibilidad: normalmente 0, el EP ya descuenta anticipo
-    retenciones[m] -= toNumber(dist.monthlyRetention[i]); // retención del mes
+    retenciones[m] -= toNumber(dist.monthlyRetention[i]); // retenciÃ³n del mes
   }
 
-  // Devolución de retenciones al final de obra
+  // DevoluciÃ³n de retenciones al final de obra
   const totalRet = dist.retentionAmount;
   const finalM = Math.min(monthCount - 1, startMonth + meses);
   retenciones[finalM] += totalRet;
@@ -4104,7 +4245,7 @@ function renderConstructionEP() {
 
   setHtml('constr-ep-head', `
     <tr>
-      <th style="width:60px;text-align:center">ƒx</th>
+      <th style="min-width:300px;text-align:left">Fórmula</th>
       <th class="finance-total-col" style="width:110px;text-align:right">Total</th>
       ${labels.map((l) => `<th data-month-col>${escapeHtml(l)}</th>`).join('')}
     </tr>
@@ -4116,24 +4257,17 @@ function renderConstructionEP() {
     { label: 'Anticipo neto', values: data.anticipo, formula: `+Anticipo neto total un mes antes de construccion; los EDPP reparten el saldo neto del contrato  (Total = ${fmtUf(data.anticipoTotal)})`, color: '#fbbf24' },
     { label: 'Retenciones netas', values: data.retenciones, formula: 'Retencion neta mensual y devolucion neta total al final de obra.', color: '#fbbf24' },
     { label: 'Subtotal neto', values: data.subtotal, formula: 'EDPP neto + Anticipo neto + Retenciones netas', bold: true, color: '#22c55e' },
-    { label: 'IVA bruto (19%)', values: data.ivaBruto, formula: 'Subtotal neto × 19%', color: '#94a3b8' },
-    { label: `CEEC (${cfg.pct_ceec}%)`, values: data.ceec, formula: `IVA bruto × ${cfg.pct_ceec}%  ·  Beneficio que reduce el IVA`, color: '#a855f7' },
-    { label: 'IVA efectivo', values: data.ivaEfectivo, formula: 'IVA bruto − CEEC', color: '#94a3b8' },
-    { label: 'TOTAL A PAGO (c/IVA)', values: data.totalPago, formula: 'Subtotal neto + IVA efectivo  →  alimenta GIROS', bold: true, color: '#22c55e' },
+    { label: 'IVA bruto (19%)', values: data.ivaBruto, formula: 'Subtotal neto Ã— 19%', color: '#94a3b8' },
+    { label: `CEEC (${cfg.pct_ceec}%)`, values: data.ceec, formula: `IVA bruto Ã— ${cfg.pct_ceec}%  Â·  Beneficio que reduce el IVA`, color: '#a855f7' },
+    { label: 'IVA efectivo', values: data.ivaEfectivo, formula: 'IVA bruto âˆ’ CEEC', color: '#94a3b8' },
+    { label: 'TOTAL A PAGO (c/IVA)', values: data.totalPago, formula: 'Subtotal neto + IVA efectivo  â†’  alimenta GIROS', bold: true, color: '#22c55e' },
   ];
 
   setHtml('constr-ep-tbody', rows.map((r) => {
-    const popId = `fpop-ep-${Math.random().toString(36).slice(2, 8)}`;
     const bg = r.bold ? 'background:#f0fdf4' : '';
     return `
       <tr class="${r.bold ? 'finance-total-row' : ''}" style="${bg}">
-        <td style="text-align:center;position:relative" class="formula-host">
-          <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #cbd5e1;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">ƒx</button>
-          <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;left:0;top:100%;margin-top:4px;background:#0f172a;color:#fff;border-radius:8px;padding:10px 12px;min-width:260px;max-width:360px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">
-            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Fórmula</div>
-            <div style="font-family:'Courier New',monospace;background:#1e293b;padding:6px 8px;border-radius:6px">${escapeHtml(r.formula)}</div>
-          </div>
-        </td>
+        <td class="formula-host"><span class="formula-readonly" title="${escapeHtml(r.formula)}">${escapeHtml(r.formula)}</span></td>
         <td class="finance-total-col" style="text-align:right;font-weight:${r.bold ? 800 : 600};color:${r.color || '#334155'}">${fmtUf(total(r.values))}</td>
         ${r.values.map((v) => `<td data-month-cell style="text-align:center;color:${r.color === '#22c55e' ? '#16a34a' : '#334155'};${r.bold ? 'font-weight:700' : ''}">${fmtTableAmount(v, { kind: 'income' })}</td>`).join('')}
       </tr>`;
@@ -4159,7 +4293,7 @@ function renderConstructionGF(epData) {
 
   const giros = epData ? epData.totalPago.slice() : createMonthlyArray(monthCount, 0);
   const pctAlzamiento = toNumber(state.financiamiento.pct_alzamiento ?? 90) / 100;
-  // Escrituración income al 100% del valor de la propiedad (para alzamiento)
+  // EscrituraciÃ³n income al 100% del valor de la propiedad (para alzamiento)
   const totalesVentas = getTotalSalesMetrics();
   const { escrituras: escriturasArr } = getPromesasEscrituracionUnidades(monthCount);
   const escrituracionIncome100 = escriturasArr.map((u) => u * totalesVentas.precioPromedio);
@@ -4173,7 +4307,7 @@ function renderConstructionGF(epData) {
   for (let t = 0; t < monthCount; t += 1) {
     const g = toNumber(giros[t]);
     impTimbres[t] = g * timbrePct;
-    // Pago línea = % alzamiento × escrituración 100% del mes anterior
+    // Pago lÃ­nea = % alzamiento Ã— escrituraciÃ³n 100% del mes anterior
     const prevEscrit = t > 0 ? toNumber(escrituracionIncome100[t - 1]) : 0;
     let pago = pctAlzamiento * prevEscrit;
     const newAcum = prevAcum + g - pago;
@@ -4186,7 +4320,7 @@ function renderConstructionGF(epData) {
 
   setHtml('constr-fin-planilla-head', `
     <tr>
-      <th style="width:60px;text-align:center">ƒx</th>
+      <th style="width:60px;text-align:center">Æ’x</th>
       <th class="finance-total-col" style="width:110px;text-align:right">Total</th>
       ${labels.map((l) => `<th data-month-col>${escapeHtml(l)}</th>`).join('')}
     </tr>
@@ -4195,9 +4329,9 @@ function renderConstructionGF(epData) {
   const total = (arr) => arr.reduce((a, b) => a + toNumber(b), 0);
   const rows = [
     { label: 'GIROS (desde EP)', values: giros, formula: 'GIROS(t) = TOTAL_A_PAGO_c_IVA(t)  [conectado a tabla EP]', color: '#22c55e' },
-    { label: 'ACUMULADO', values: acumulado, formula: 'ACUMULADO(t) = ACUMULADO(t−1) + GIROS(t) + PAGOS_LINEA(t)', bold: true, color: '#0f172a' },
-    { label: `INTERÉS (${cfg.tasa_construccion}% anual)`, values: interesMensual, formula: `INTERÉS(t) = ACUMULADO(t) × ${cfg.tasa_construccion}%/12`, color: '#f59e0b' },
-    { label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, values: impTimbres, formula: `IMP_TIMBRES(t) = GIROS(t) × ${cfg.pct_timbres}%`, color: '#f59e0b' },
+    { label: 'ACUMULADO', values: acumulado, formula: 'ACUMULADO(t) = ACUMULADO(tâˆ’1) + GIROS(t) + PAGOS_LINEA(t)', bold: true, color: '#0f172a' },
+    { label: `INTERÃ‰S (${cfg.tasa_construccion}% anual)`, values: interesMensual, formula: `INTERÃ‰S(t) = ACUMULADO(t) Ã— ${cfg.tasa_construccion}%/12`, color: '#f59e0b' },
+    { label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, values: impTimbres, formula: `IMP_TIMBRES(t) = GIROS(t) Ã— ${cfg.pct_timbres}%`, color: '#f59e0b' },
   ];
 
   setHtml('constr-fin-planilla-tbody', rows.map((r) => {
@@ -4206,9 +4340,9 @@ function renderConstructionGF(epData) {
     return `
       <tr class="${r.bold ? 'finance-total-row' : ''}" style="${bg}">
         <td style="text-align:center;position:relative" class="formula-host">
-          <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #cbd5e1;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">ƒx</button>
+          <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #cbd5e1;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">Æ’x</button>
           <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;left:0;top:100%;margin-top:4px;background:#0f172a;color:#fff;border-radius:8px;padding:10px 12px;min-width:260px;max-width:360px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">
-            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Fórmula</div>
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">FÃ³rmula</div>
             <div style="font-family:'Courier New',monospace;background:#1e293b;padding:6px 8px;border-radius:6px">${escapeHtml(r.formula)}</div>
           </div>
         </td>
@@ -4226,12 +4360,11 @@ function renderConstructionGF(epData) {
   setHtml('constr-fin-planilla-tfoot', '');
 }
 
-function onConfigParamChange() {
+function onConfigParamChange(force = false) {
   if (!state.proyecto) return;
   const fields = [
     ['cfg-tasa-terreno', 'tasa_interes_terreno'],
     ['cfg-tasa-construccion', 'tasa_interes_construccion'],
-    ['cfg-pct-timbres', 'pct_timbres'],
     ['cfg-pct-ceec', 'pct_ceec'],
     ['cfg-pct-renta', 'pct_impuesto_renta'],
   ];
@@ -4239,6 +4372,12 @@ function onConfigParamChange() {
     const el = $(inputId);
     if (el) state.proyecto[field] = toNumber(el.value);
   });
+  state.proyecto.pct_timbres = 0.8;
+  if ($('cfg-pct-timbres')) $('cfg-pct-timbres').value = '0.8';
+  if (!force && shouldDeferEditingWork()) {
+    queueDeferredEditCallback('global-config-change', () => onConfigParamChange(true));
+    return;
+  }
   // Propagar tasas a financiamiento legacy
   state.financiamiento.credito_terreno_tasa = toNumber(state.proyecto.tasa_interes_terreno);
   state.financiamiento.linea_construccion_tasa = toNumber(state.proyecto.tasa_interes_construccion);
@@ -4376,7 +4515,7 @@ function renderConstructionSCurveChart(metrics, distribution) {
               const index = items[0].dataIndex;
               return [
                 `Anticipo ya descontado del saldo EP: ${fmtUf(distribution.anticipoAmount)}`,
-                `Retención: ${fmtUf(distribution.monthlyRetention[index])}`,
+                `RetenciÃ³n: ${fmtUf(distribution.monthlyRetention[index])}`,
               ];
             },
           },
@@ -4422,7 +4561,7 @@ function renderFinancingSourcePlanilla(sourceType) {
   const prefix = sourceType === 'terreno' ? 'terreno-fin-planilla' : 'constr-fin-planilla';
   if (!$(`${prefix}-head`) || !$(`${prefix}-tbody`) || !$(`${prefix}-tfoot`)) return;
 
-  // Terreno: patrón unificado GIROS / ACUMULADO / INTERÉS / TIMBRES con fórmulas visibles
+  // Terreno: patrÃ³n unificado GIROS / ACUMULADO / INTERÃ‰S / TIMBRES con fÃ³rmulas visibles
   if (sourceType === 'terreno') {
     const labels = getCostMonthLabels();
     const monthCount = getCostMonthCount();
@@ -4437,7 +4576,7 @@ function renderFinancingSourcePlanilla(sourceType) {
       : 0;
     // Giro: mismo mes de compra de terreno (desde Gantt)
     const terrainPurchaseMonth = Math.min(monthCount - 1, Math.max(0, toNumber(getTerrainMilestone()?.inicio || 0)));
-    // Pago línea: mismo mes del anticipo de construcción (mes antes del inicio de obra)
+    // Pago lÃ­nea: mismo mes del anticipo de construcciÃ³n (mes antes del inicio de obra)
     const anticipoLineaMonth = Math.max(0, Math.min(monthCount - 1, getConstructionStartMonth() - 1));
 
     const giros = createMonthlyArray(monthCount, 0);
@@ -4455,7 +4594,7 @@ function renderFinancingSourcePlanilla(sourceType) {
       acumulado[t] = prevAcum + toNumber(giros[t]) + toNumber(pagosLinea[t]);
       prevAcum = acumulado[t];
     }
-    // Pass 2: interés anual — se paga en el aniversario del giro (o al cierre anticipado)
+    // Pass 2: interÃ©s anual â€” se paga en el aniversario del giro (o al cierre anticipado)
     const interesAnual = createMonthlyArray(monthCount, 0);
     let accrued = 0;
     for (let t = 0; t < monthCount; t += 1) {
@@ -4472,12 +4611,12 @@ function renderFinancingSourcePlanilla(sourceType) {
 
     setHtml('terreno-fin-planilla-head', `
       <tr>
-        <th style="width:60px;text-align:center">ƒx</th>
+        <th class="finance-total-col" style="width:110px;text-align:right">Total</th>
         ${labels.map((l) => `<th data-month-col>${escapeHtml(l)}</th>`).join('')}
       </tr>
     `);
 
-    // Buscar índices en GASTOS FINANCIEROS para habilitar configuración en GIROS y PAGO LINEA
+    // Buscar Ã­ndices en GASTOS FINANCIEROS para habilitar configuraciÃ³n en GIROS y PAGO LINEA
     const gfCategory = ensureCostosState().find((item) => item.nombre === 'GASTOS FINANCIEROS');
     const gfPartidas = gfCategory?.partidas || [];
     const gfLineaIdx = gfPartidas.findIndex((p) => /Terreno.*Linea aprobada/i.test(p.nombre || ''));
@@ -4487,25 +4626,19 @@ function renderFinancingSourcePlanilla(sourceType) {
       : '';
 
     const rows = [
-      { label: 'GIROS', values: giros, formula: `GIROS = % línea × Costo terreno · desembolso en mes compra`, color: '#22c55e', actionHtml: makeGfPlanBtn(gfLineaIdx, 'Giro línea terreno') },
-      { label: 'PAGO LÍNEA', values: pagosLinea, formula: `PAGO_LÍNEA(t) = pago al vencimiento del plazo de la línea de terreno`, color: '#ef4444', actionHtml: makeGfPlanBtn(gfPagoIdx, 'Pago de línea terreno') },
-      { label: 'ACUMULADO', values: acumulado, formula: 'ACUMULADO(t) = ACUMULADO(t−1) + GIROS(t) + PAGOS_LINEA(t)', bold: true, color: '#0f172a' },
-      { label: `INTERÉS ANUAL (${tasaTerreno}%)`, values: interesAnual, formula: `Acumulado anual de interés · pagado en aniversario del giro o al cierre anticipado`, color: '#f59e0b' },
-      { label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, values: impTimbres, formula: `IMP_TIMBRES(t) = GIROS(t) × ${cfg.pct_timbres}%`, color: '#f59e0b' },
+      { label: 'GIROS', values: giros, formula: `GIROS = % lÃ­nea Ã— Costo terreno Â· desembolso en mes compra`, color: '#22c55e', actionHtml: makeGfPlanBtn(gfLineaIdx, 'Giro lÃ­nea terreno') },
+      { label: 'PAGO LÃNEA', values: pagosLinea, formula: `PAGO_LÃNEA(t) = pago al vencimiento del plazo de la lÃ­nea de terreno`, color: '#ef4444', actionHtml: makeGfPlanBtn(gfPagoIdx, 'Pago de lÃ­nea terreno') },
+      { label: 'ACUMULADO', values: acumulado, formula: 'ACUMULADO(t) = ACUMULADO(tâˆ’1) + GIROS(t) + PAGOS_LINEA(t)', bold: true, color: '#0f172a' },
+      { label: `INTERÃ‰S ANUAL (${tasaTerreno}%)`, values: interesAnual, formula: `Acumulado anual de interÃ©s Â· pagado en aniversario del giro o al cierre anticipado`, color: '#f59e0b' },
+      { label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, values: impTimbres, formula: `IMP_TIMBRES(t) = GIROS(t) Ã— ${cfg.pct_timbres}%`, color: '#f59e0b' },
     ];
 
     setHtml('terreno-fin-planilla-tbody', rows.map((r) => {
-      const popId = `fpop-tf-${Math.random().toString(36).slice(2, 8)}`;
       const bg = r.bold ? 'background:#f8fafc' : '';
+      const rowTotal = total(r.values);
       return `
         <tr class="${r.bold ? 'finance-total-row' : ''}" style="${bg}">
-          <td style="text-align:center;position:relative" class="formula-host">
-            <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #cbd5e1;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">ƒx</button>
-            <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;left:0;top:100%;margin-top:4px;background:#0f172a;color:#fff;border-radius:8px;padding:10px 12px;min-width:260px;max-width:360px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">
-              <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">Fórmula</div>
-              <div style="font-family:'Courier New',monospace;background:#1e293b;padding:6px 8px;border-radius:6px">${escapeHtml(r.formula)}</div>
-            </div>
-          </td>
+          <td class="finance-total-col" style="text-align:right;font-weight:${r.bold ? 800 : 600};color:${r.color || '#334155'}">${fmtUf(rowTotal)}</td>
           ${r.values.map((v) => `<td data-month-cell style="text-align:center;color:#334155;${r.bold ? 'font-weight:700' : ''}">${fmtTableAmount(v, { kind: 'income' })}</td>`).join('')}
         </tr>`;
     }).join(''));
@@ -4553,7 +4686,7 @@ function renderFinancingSourcePlanilla(sourceType) {
           <input class="inp cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}">
         </td>
         <td style="text-align:center">
-          <div class="formula-chip-cell is-clickable" onclick="openCostFormulaModal('GASTOS FINANCIEROS', ${partida._costIndex})" title="Click para editar la fórmula">
+          <div class="formula-chip-cell is-clickable" onclick="openCostFormulaModal('GASTOS FINANCIEROS', ${partida._costIndex})" title="Click para editar la fÃ³rmula">
             ${renderFormulaChipsForCell(partida, false)}
           </div>
         </td>
@@ -4565,7 +4698,7 @@ function renderFinancingSourcePlanilla(sourceType) {
     `;
   }).join('') || `
     <tr>
-      <td colspan="${5 + monthCount}" style="text-align:center;color:#94a3b8;padding:14px">Sin gastos financieros ${sourceType === 'terreno' ? 'de terreno' : 'de construcción'} para mostrar.</td>
+      <td colspan="${5 + monthCount}" style="text-align:center;color:#94a3b8;padding:14px">Sin gastos financieros ${sourceType === 'terreno' ? 'de terreno' : 'de construcciÃ³n'} para mostrar.</td>
     </tr>
   `);
 
@@ -4710,18 +4843,18 @@ function getConstructionStartMonth() {
 }
 
 function getConstructionMilestone() {
-  return state.gantt.find((row) => String(row.nombre || '').trim().toLowerCase() === 'construcción')
+  return state.gantt.find((row) => String(row.nombre || '').trim().toLowerCase() === 'construcciÃ³n')
     || state.gantt.find((row) => String(row.nombre || '').trim().toLowerCase() === 'construccion')
-    || state.gantt.find((row) => /CONSTRUCCI[ÓO]N/i.test(row.nombre || ''))
+    || state.gantt.find((row) => /CONSTRUCCI[Ã“O]N/i.test(row.nombre || ''))
     || null;
 }
 
 function syncConstructionMilestone(duration = toNumber(state.construccion?.plazo_meses || 1)) {
   const targetDuration = Math.max(1, toNumber(duration));
   const rows = Array.isArray(state.gantt) ? state.gantt.map((row) => ({ ...row })) : [];
-  const index = rows.findIndex((row) => /CONSTRUCCI[ÓO]N/i.test(String(row.nombre || '').trim()));
+  const index = rows.findIndex((row) => /CONSTRUCCI[Ã“O]N/i.test(String(row.nombre || '').trim()));
   if (index >= 0) {
-    rows[index].nombre = 'Construcción';
+    rows[index].nombre = 'ConstrucciÃ³n';
     rows[index].duracion = targetDuration;
     rows[index].fin = toNumber(rows[index].inicio) + targetDuration - 1;
     // Limpiar dependencia si apunta a una fila que ya no existe
@@ -4733,7 +4866,7 @@ function syncConstructionMilestone(duration = toNumber(state.construccion?.plazo
   } else {
     rows.push({
       id: '',
-      nombre: 'Construcción',
+      nombre: 'ConstrucciÃ³n',
       color: '#16a34a',
       dependencia: null,
       dependencia_tipo: 'fin',
@@ -5000,11 +5133,11 @@ function syncSalesDrivenMilestones() {
   // Actualizar gantt temporalmente para que getConstructionStartFromPreventa use inicio_promesas correcto
   state.gantt = normalizeGanttRows(rows);
 
-  const constructionRow = getConstructionMilestone() || rows.find((row) => /CONSTRUCCI[ÓO]N/i.test(String(row.nombre || '').trim()));
+  const constructionRow = getConstructionMilestone() || rows.find((row) => /CONSTRUCCI[Ã“O]N/i.test(String(row.nombre || '').trim()));
   const defaultReceptionStart = constructionRow ? toNumber(constructionRow.fin) + 1 : 1;
-  const receptionRow = ensureMilestone(/^Recepción municipal$/i, (baseRow) => ({
+  const receptionRow = ensureMilestone(/^RecepciÃ³n municipal$/i, (baseRow) => ({
     id: baseRow.id || '',
-    nombre: 'Recepción municipal',
+    nombre: 'RecepciÃ³n municipal',
     color: baseRow.color || '#0ea5e9',
     dependencia: baseRow.dependencia || null,
     dependencia_tipo: baseRow.dependencia_tipo || 'fin',
@@ -5014,11 +5147,11 @@ function syncSalesDrivenMilestones() {
     fin: 0,
   }));
 
-  const escrituraRow = ensureMilestone(/^Escrituración$/i, (baseRow) => ({
+  const escrituraRow = ensureMilestone(/^EscrituraciÃ³n$/i, (baseRow) => ({
     id: baseRow.id || '',
-    nombre: 'Escrituración',
+    nombre: 'EscrituraciÃ³n',
     color: baseRow.color || '#f97316',
-    dependencia: baseRow.dependencia || 'Recepción municipal',
+    dependencia: baseRow.dependencia || 'RecepciÃ³n municipal',
     dependencia_tipo: baseRow.dependencia_tipo || 'fin',
     desfase: toNumber(baseRow.desfase),
     inicio: toNumber(baseRow.inicio),
@@ -5031,20 +5164,20 @@ function syncSalesDrivenMilestones() {
   escrituraRow.desfase = 0;
   state.gantt = normalizeGanttRows(rows);
   const normalizedPromise = state.gantt.find((row) => /^(Promesas|Inicio promesas)$/i.test(String(row.nombre || '').trim())) || promiseRow;
-  const normalizedEscritura = state.gantt.find((row) => /^Escrituraci[óo]n$/i.test(String(row.nombre || '').trim())) || escrituraRow;
+  const normalizedEscritura = state.gantt.find((row) => /^Escrituraci[Ã³o]n$/i.test(String(row.nombre || '').trim())) || escrituraRow;
   escrituraDuration = calculateEscrituraDurationWithPromiseCap(normalizedEscritura.inicio, normalizedPromise.inicio);
-  const escrituraIndex = rows.findIndex((row) => /^Escrituraci[óo]n$/i.test(String(row.nombre || '').trim()));
+  const escrituraIndex = rows.findIndex((row) => /^Escrituraci[Ã³o]n$/i.test(String(row.nombre || '').trim()));
   if (escrituraIndex >= 0) rows[escrituraIndex].duracion = escrituraDuration;
 
-  // Construcción: si el usuario NO definió dependencia manual, se usa el cálculo
-  // automático desde % de promesas acumuladas. Si SÍ tiene dependencia manual,
-  // se respeta y normalizeGanttRows calculará el inicio.
-  const constrIdx = rows.findIndex((r) => /CONSTRUCCI[ÓO]N/i.test(String(r.nombre || '').trim()));
+  // ConstrucciÃ³n: si el usuario NO definiÃ³ dependencia manual, se usa el cÃ¡lculo
+  // automÃ¡tico desde % de promesas acumuladas. Si SÃ tiene dependencia manual,
+  // se respeta y normalizeGanttRows calcularÃ¡ el inicio.
+  const constrIdx = rows.findIndex((r) => /CONSTRUCCI[Ã“O]N/i.test(String(r.nombre || '').trim()));
   if (constrIdx >= 0) {
     const existingDep = String(rows[constrIdx].dependencia || '').trim();
     const depExists = existingDep && rows.some((r, i) => i !== constrIdx && String(r.nombre || '').trim() === existingDep);
     if (!depExists) {
-      // Sin dependencia válida: usar cálculo automático desde preventa%
+      // Sin dependencia vÃ¡lida: usar cÃ¡lculo automÃ¡tico desde preventa%
       const constrStart = getConstructionStartFromPreventa();
       rows[constrIdx] = {
         ...rows[constrIdx],
@@ -5054,7 +5187,7 @@ function syncSalesDrivenMilestones() {
         fin: constrStart + Math.max(1, toNumber(rows[constrIdx].duracion)) - 1,
       };
     }
-    // Con dependencia manual válida: no tocar — normalizeGanttRows hace el resto
+    // Con dependencia manual vÃ¡lida: no tocar â€” normalizeGanttRows hace el resto
   }
 
   state.gantt = normalizeGanttRows(rows);
@@ -5089,12 +5222,12 @@ function getGanttLockConfig(row) {
   if (/^(Promesas|Inicio promesas)$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: false, hint: 'Inicio ligado al mes siguiente del fin de Aprobacion del Proyecto de Edificacion; duracion calculada desde Ventas.' };
   if (/^Escrituraci(?:o|\u00f3)n$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: false, hint: 'Inicio ligado al mes siguiente del fin de Recepcion municipal; duracion calculada desde Ventas con techo de promesas acumuladas.' };
   if (isBuildingApprovalMilestoneName(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
-  // Filas clave: nombre y borrado bloqueados; dependencia, fechas y duración editables.
+  // Filas clave: nombre y borrado bloqueados; dependencia, fechas y duraciÃ³n editables.
   if (/^Compra terreno$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
-  if (/^Construcci[óo]n$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Nombre protegido. Duración viene de la hoja de Construcción.' };
-  if (/^(Promesas|Inicio promesas)$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Duración calculada desde la hoja Ventas.' };
-  if (/^Recepci[óo]n municipal$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
-  if (/^Escrituraci[óo]n$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Duración calculada desde Ventas con techo de promesas acumuladas.' };
+  if (/^Construcci[Ã³o]n$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Nombre protegido. DuraciÃ³n viene de la hoja de ConstrucciÃ³n.' };
+  if (/^(Promesas|Inicio promesas)$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'DuraciÃ³n calculada desde la hoja Ventas.' };
+  if (/^Recepci[Ã³o]n municipal$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
+  if (/^Escrituraci[Ã³o]n$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'DuraciÃ³n calculada desde Ventas con techo de promesas acumuladas.' };
   return { fixed: false, name: true, dependency: false, start: false, duration: false, delete: false, drag: false, hint: 'Nombre bloqueado para evitar romper dependencias; usa este hito auxiliar para controlar costos o fechas.' };
 }
 
@@ -5246,7 +5379,7 @@ function extractFormulaReferences(expression = '') {
   const raw = String(expression || '');
   const refs = [];
   const seen = new Set();
-  raw.replace(/\[[^\]]+\]|[_A-Za-zÀ-ÿ][_A-Za-z0-9À-ÿ]*/g, (match) => {
+  raw.replace(/\[[^\]]+\]|[_A-Za-z\u00C0-\u017F][_A-Za-z0-9\u00C0-\u017F]*/g, (match) => {
     if (/^SI$/i.test(match)) return match;
     if (/^\[[^\]]+\]$/.test(match)) {
       const label = match.slice(1, -1).trim();
@@ -5321,11 +5454,11 @@ function evaluateExpressionFormulaDetailed(expression, context = {}, catalog = n
   if (!source) return { ok: true, value: 0, references: [], expression: '', error: '' };
   const formulaCatalog = catalog || getFormulaCatalogForContext(context);
   const aliases = normalizeFormulaExpressionSyntax(convertSiToTernary(source))
-    .replace(/cantidad de meses de construcci[oÃ³ó]n/gi, 'meses_construccion')
-    .replace(/meses de construcci[oÃ³ó]n/gi, 'meses_construccion')
+    .replace(/cantidad de meses de construcci[oÃƒÂ³Ã³]n/gi, 'meses_construccion')
+    .replace(/meses de construcci[oÃƒÂ³Ã³]n/gi, 'meses_construccion')
     .replace(/meses preventa/gi, 'meses_preventa')
     .replace(/meses venta/gi, 'meses_venta')
-    .replace(/meses escrituraci[oÃ³ó]n/gi, 'meses_escrituracion')
+    .replace(/meses escrituraci[oÃƒÂ³Ã³]n/gi, 'meses_escrituracion')
     .replace(/m2 utiles/gi, 'm2_utiles')
     .replace(/m2 municipales/gi, 'm2_municipales')
     .replace(/m2 sobre cota 0/gi, 'm2_sobre_cota_0')
@@ -5382,7 +5515,7 @@ function evaluateExpressionFormulaDetailed(expression, context = {}, catalog = n
     });
   });
 
-  expr = expr.replace(/[_A-Za-zÀ-ÿ][_A-Za-z0-9À-ÿ]*/g, (token) => {
+  expr = expr.replace(/[_A-Za-z\u00C0-\u017F][_A-Za-z0-9\u00C0-\u017F]*/g, (token) => {
     if (/^SI$/i.test(token)) return token;
     const normalized = normalizeFormulaIdentifier(token);
     if (values.has(normalized)) {
@@ -5452,8 +5585,8 @@ function evaluateExpressionFormula(expression, context = {}, catalog = null) {
   });
   normalized = normalized
     .toLowerCase()
-    .replace(/cantidad de meses de construcci[oó]n/g, 'meses_construccion')
-    .replace(/meses de construcci[oó]n/g, 'meses_construccion')
+    .replace(/cantidad de meses de construcci[oÃ³]n/g, 'meses_construccion')
+    .replace(/meses de construcci[oÃ³]n/g, 'meses_construccion')
     .replace(/meses preventa/g, 'meses_preventa')
     .replace(/meses venta/g, 'meses_venta')
     .replace(/meses escrituracion/g, 'meses_escrituracion')
@@ -5467,7 +5600,7 @@ function evaluateExpressionFormula(expression, context = {}, catalog = null) {
   Object.entries(contextValues).forEach(([key, value]) => {
     expr = expr.replace(new RegExp(`\\b${key}\\b`, 'g'), String(toNumber(value)));
   });
-  // Permite operadores de comparación y ternario además de aritméticos
+  // Permite operadores de comparaciÃ³n y ternario ademÃ¡s de aritmÃ©ticos
   expr = expr.replace(/[^0-9+\-*/(). ,<>=!?:]/g, '');
   if (!expr.trim()) return 0;
   try {
@@ -5781,14 +5914,14 @@ function buildFinancialCostRows(manualRows = []) {
   const alzamiento = construccionAprobada * 0.003;
 
   const defaults = [
-    { nombre: 'Terreno · Linea aprobada', editable_source: 'terreno', formula_display: 'extraido financiamiento terreno', total_neto: terrenoAprobado, distribucion_mensual: [terrenoAprobado] },
-    { nombre: 'Terreno · Interes', editable_source: 'terreno', formula_display: 'extraido financiamiento terreno', total_neto: terrenoInteres, distribucion_mensual: [0, terrenoInteres] },
-    { nombre: 'Terreno · Pago de linea', editable_source: 'terreno', formula_display: 'extraido pago de linea terreno', total_neto: terrenoAprobado, distribucion_mensual: Array.from({ length: 13 }, (_, index) => index === Math.min(12, terrainTermMonths) ? terrenoAprobado : 0) },
-    { nombre: 'Construccion · Linea aprobada', editable_source: 'construccion', formula_display: 'extraido linea construccion', total_neto: construccionAprobada, distribucion_mensual: [0, ...Array.from({ length: 12 }, (_, index) => index < constructionMonths ? construccionAprobada / constructionMonths : 0)] },
-    { nombre: 'Construccion · Interes', editable_source: 'construccion', formula_display: 'extraido linea construccion', total_neto: construccionInteres, distribucion_mensual: [0, ...Array.from({ length: 12 }, (_, index) => index < constructionMonths ? construccionInteres / constructionMonths : 0)] },
-    { nombre: 'Construccion · Impuesto de timbre', editable_source: 'construccion', formula_display: 'extraido linea construccion', total_neto: impuestoTimbre, distribucion_mensual: [impuestoTimbre] },
-    { nombre: 'Construccion · Alzamiento', editable_source: 'construccion', formula_display: 'extraido linea construccion', total_neto: alzamiento, distribucion_mensual: Array.from({ length: 13 }, (_, index) => index === Math.min(12, constructionMonths) ? alzamiento : 0) },
-    { nombre: 'Construccion · Pago de linea', editable_source: 'construccion', formula_display: 'extraido linea construccion', total_neto: construccionAprobada, distribucion_mensual: Array.from({ length: 13 }, (_, index) => index === Math.min(12, constructionMonths) ? construccionAprobada : 0) },
+    { nombre: 'Terreno Â· Linea aprobada', editable_source: 'terreno', formula_display: 'extraido financiamiento terreno', total_neto: terrenoAprobado, distribucion_mensual: [terrenoAprobado] },
+    { nombre: 'Terreno Â· Interes', editable_source: 'terreno', formula_display: 'extraido financiamiento terreno', total_neto: terrenoInteres, distribucion_mensual: [0, terrenoInteres] },
+    { nombre: 'Terreno Â· Pago de linea', editable_source: 'terreno', formula_display: 'extraido pago de linea terreno', total_neto: terrenoAprobado, distribucion_mensual: Array.from({ length: 13 }, (_, index) => index === Math.min(12, terrainTermMonths) ? terrenoAprobado : 0) },
+    { nombre: 'Construccion Â· Linea aprobada', editable_source: 'construccion', formula_display: 'extraido linea construccion', total_neto: construccionAprobada, distribucion_mensual: [0, ...Array.from({ length: 12 }, (_, index) => index < constructionMonths ? construccionAprobada / constructionMonths : 0)] },
+    { nombre: 'Construccion Â· Interes', editable_source: 'construccion', formula_display: 'extraido linea construccion', total_neto: construccionInteres, distribucion_mensual: [0, ...Array.from({ length: 12 }, (_, index) => index < constructionMonths ? construccionInteres / constructionMonths : 0)] },
+    { nombre: 'Construccion Â· Impuesto de timbre', editable_source: 'construccion', formula_display: 'extraido linea construccion', total_neto: impuestoTimbre, distribucion_mensual: [impuestoTimbre] },
+    { nombre: 'Construccion Â· Alzamiento', editable_source: 'construccion', formula_display: 'extraido linea construccion', total_neto: alzamiento, distribucion_mensual: Array.from({ length: 13 }, (_, index) => index === Math.min(12, constructionMonths) ? alzamiento : 0) },
+    { nombre: 'Construccion Â· Pago de linea', editable_source: 'construccion', formula_display: 'extraido linea construccion', total_neto: construccionAprobada, distribucion_mensual: Array.from({ length: 13 }, (_, index) => index === Math.min(12, constructionMonths) ? construccionAprobada : 0) },
   ];
 
   const defaultKeys = new Set(defaults.map((row) => String(row.nombre || '').trim().toLowerCase()));
@@ -6157,7 +6290,7 @@ function renderCostPlanilla() {
     </tr>
   `);
 
-  // Gastos financieros se gestiona en sus propias pestañas y no se muestra
+  // Gastos financieros se gestiona en sus propias pestaÃ±as y no se muestra
   // en la planilla general. Terreno y Construccion quedan visibles con filas vinculadas.
   renderCostIvaPanel(context, categorias);
 
@@ -6185,13 +6318,13 @@ function renderCostPlanilla() {
         const sectionLabel = /^Terreno/i.test(partida.nombre || '')
           ? 'Financiamiento Terreno'
           : /^Construccion/i.test(partida.nombre || '')
-            ? 'Financiamiento Construcción'
+            ? 'Financiamiento ConstrucciÃ³n'
             : '';
         const previous = (categoria.partidas || [])[index - 1];
         const previousLabel = previous && /^Terreno/i.test(previous.nombre || '')
           ? 'Financiamiento Terreno'
           : previous && /^Construccion/i.test(previous.nombre || '')
-            ? 'Financiamiento Construcción'
+            ? 'Financiamiento ConstrucciÃ³n'
             : '';
 
         if (sectionLabel && sectionLabel !== previousLabel) {
@@ -6365,7 +6498,7 @@ function renderProjectCashflow() {
   const ppm = getMonthlyPPM(income);
   const impRenta = getMonthlyImpuestoRenta(flujoAntesImpuestos, income);
 
-  // Flujo después de impuestos
+  // Flujo despuÃ©s de impuestos
   const flujoDespuesImpuestos = flujoAntesImpuestos.map((v, i) => v + toNumber(ppm[i]) + toNumber(impRenta[i]));
 
   const cumulative = cumulativeSeries(flujoDespuesImpuestos);
@@ -6383,7 +6516,7 @@ function renderProjectCashflow() {
   const capitalNeedSin = Math.abs(Math.min(0, ...cumulativeBruto));
   const payback = cumulative.findIndex((value) => value >= 0);
 
-  // TIR real (mensual → anual)
+  // TIR real (mensual â†’ anual)
   const tirNetaAnual = irrAnualFromMensual(flujoDespuesImpuestos);
   const tirBrutaAnual = irrAnualFromMensual(flujoOperativoBruto);
 
@@ -6411,7 +6544,7 @@ function renderProjectCashflow() {
     return `<div class="dist-row"><div class="dist-label">${escapeHtml(label)}</div><div class="dist-bar-wrap"><div class="dist-bar" style="width:${Math.max(2, Math.min(100, Math.abs(pct)))}%;background:${color}"></div></div><div class="dist-pct">${fmtPct(pct)}</div></div>`;
   }).join(''));
 
-  setHtml('flujo-tabla-header', `<tr><th style="text-align:left;min-width:220px">Concepto</th><th style="text-align:center;min-width:90px">Fórmula</th><th class="flow-total-col">Total</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}</tr>`);
+  setHtml('flujo-tabla-header', `<tr><th style="text-align:left;min-width:220px">Concepto</th><th style="text-align:center;min-width:90px">FÃ³rmula</th><th class="flow-total-col">Total</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}</tr>`);
 
   const rows = [
     { label: 'Ingresos (Ventas)', values: income, sign: '+', formula: 'SUMA(Ventas por mes)', refs: [{ label: 'Total ingresos', value: fmtUf(totalIncome) }] },
@@ -6420,16 +6553,16 @@ function renderProjectCashflow() {
     { label: 'Total Egresos Brutos', values: totalEgresosBrutos.map((v) => -v), sign: '-', formula: 'Costos base + Gastos financieros + IVA credito + Pago IVA', refs: [{ label: 'Total egresos brutos', value: fmtUf(totalEgresosBrutosValue) }] },
     { label: 'Flujo mensual bruto', values: flujoMensualBruto, sign: '=', bold: true, formula: 'Ingresos brutos - Total Egresos Brutos', refs: [{ label: 'Total', value: fmtUf(totalFlujoMensualBruto) }] },
     { label: 'Flujo operativo bruto', values: flujoOperativoBruto, sign: '=', bold: true, formula: 'Ingresos - Costos - Gastos financieros', refs: [{ label: 'Total', value: fmtUf(totalFlujoBruto) }] },
-    { label: 'IVA crédito', values: ivaCredito.map((v) => -v), sign: '-', formula: '-SUMA(Egresos con check IVA × 19%)', refs: [{ label: 'Total IVA crédito', value: fmtUf(ivaCredito.reduce((a, b) => a + b, 0)) }] },
-    { label: 'IVA débito', values: ivaDebito, sign: '+', formula: 'Ingresos brutos escriturados × Factor IVA débito (IVA / IB)', refs: [{ label: 'Total IVA débito', value: fmtUf(ivaDebito.reduce((a, b) => a + b, 0)) }, { label: 'Factor IVA débito', value: fmtNumber(getIvaDebitoAnalysis().factor, 4) }] },
+    { label: 'IVA crÃ©dito', values: ivaCredito.map((v) => -v), sign: '-', formula: '-SUMA(Egresos con check IVA Ã— 19%)', refs: [{ label: 'Total IVA crÃ©dito', value: fmtUf(ivaCredito.reduce((a, b) => a + b, 0)) }] },
+    { label: 'IVA dÃ©bito', values: ivaDebito, sign: '+', formula: 'Ingresos brutos escriturados Ã— Factor IVA dÃ©bito (IVA / IB)', refs: [{ label: 'Total IVA dÃ©bito', value: fmtUf(ivaDebito.reduce((a, b) => a + b, 0)) }, { label: 'Factor IVA dÃ©bito', value: fmtNumber(getIvaDebitoAnalysis().factor, 4) }] },
     { label: 'IVA mensual', values: ivaSettlement.ivaMensual, sign: '=', formula: 'IVA debito - IVA credito', refs: [{ label: 'Total IVA mensual', value: fmtUf(ivaSettlement.ivaMensual.reduce((a, b) => a + b, 0)) }] },
     { label: 'Remanente IVA mensual', values: ivaSettlement.remanente, sign: '=', formula: 'MIN(Remanente anterior + IVA mensual, 0)', refs: [{ label: 'Remanente final', value: fmtUf(ivaSettlement.remanente[ivaSettlement.remanente.length - 1] || 0) }] },
     { label: 'Pago IVA', values: ivaSettlement.pagoIva.map((v) => -v), sign: '-', formula: 'Si IVA mensual > 0: pago el exceso sobre remanente anterior; si no, 0', refs: [{ label: 'Total pago IVA', value: fmtUf(ivaSettlement.pagoIva.reduce((a, b) => a + b, 0)) }] },
     { label: 'Flujo antes de impuestos', values: flujoAntesImpuestos, sign: '=', bold: true, formula: 'Flujo operativo bruto - Pago IVA', refs: [{ label: 'Total', value: fmtUf(totalFlujoAntes) }] },
-    { label: 'PPM', values: ppm, sign: '-', formula: '-1% × Ingresos escrituración / (1 + factor_IVA)', refs: [{ label: 'Total PPM', value: fmtUf(ppm.reduce((a, b) => a + b, 0)) }] },
-    { label: 'Impuesto Renta', values: impRenta, sign: '-', formula: `-${getGlobalFinancialParams().pct_impuesto_renta}% × (Escrituras año × Valor prom. × Margen). Pago abril año siguiente`, refs: [{ label: 'Total Renta', value: fmtUf(impRenta.reduce((a, b) => a + b, 0)) }] },
-    { label: 'Flujo después de impuestos', values: flujoDespuesImpuestos, sign: '=', bold: true, formula: 'Flujo antes de impuestos + PPM + Impuesto Renta', refs: [{ label: 'Total', value: fmtUf(totalFlujoDespues) }] },
-    { label: 'Flujo acumulado', values: cumulative, sign: '∑', bold: true, formula: 'ACUMULADO(t) = ACUMULADO(t-1) + Flujo después impuestos(t)', refs: [] },
+    { label: 'PPM', values: ppm, sign: '-', formula: '-1% Ã— Ingresos escrituraciÃ³n / (1 + factor_IVA)', refs: [{ label: 'Total PPM', value: fmtUf(ppm.reduce((a, b) => a + b, 0)) }] },
+    { label: 'Impuesto Renta', values: impRenta, sign: '-', formula: `-${getGlobalFinancialParams().pct_impuesto_renta}% Ã— (Escrituras aÃ±o Ã— Valor prom. Ã— Margen). Pago abril aÃ±o siguiente`, refs: [{ label: 'Total Renta', value: fmtUf(impRenta.reduce((a, b) => a + b, 0)) }] },
+    { label: 'Flujo despuÃ©s de impuestos', values: flujoDespuesImpuestos, sign: '=', bold: true, formula: 'Flujo antes de impuestos + PPM + Impuesto Renta', refs: [{ label: 'Total', value: fmtUf(totalFlujoDespues) }] },
+    { label: 'Flujo acumulado', values: cumulative, sign: 'âˆ‘', bold: true, formula: 'ACUMULADO(t) = ACUMULADO(t-1) + Flujo despuÃ©s impuestos(t)', refs: [] },
   ];
 
   setHtml('flujo-tabla-tbody', rows.map((row) => {
@@ -6441,9 +6574,9 @@ function renderProjectCashflow() {
       <tr style="${bgRow}">
         <td style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.bold ? '#22c55e' : '#fff'}">${escapeHtml(row.label)}</td>
         <td style="text-align:center;position:relative" class="formula-host">
-          <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #475569;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">ƒx</button>
+          <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #475569;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">Æ’x</button>
           <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;left:0;top:100%;margin-top:4px;background:#fff;color:#0f172a;border:1px solid #cbd5e1;border-radius:8px;padding:10px 12px;min-width:260px;max-width:380px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">
-            <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Fórmula</div>
+            <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">FÃ³rmula</div>
             <div style="font-family:'Courier New',monospace;background:#f1f5f9;padding:6px 8px;border-radius:6px;margin-bottom:6px">${escapeHtml(row.formula)}</div>
             ${refsHtml}
           </div>
@@ -6464,7 +6597,7 @@ function getCostFormulaCatalog(contextOverride = null) {
   const mesesVenta = Math.max(0, ...getCronogramaByType('VENTA').map((row) => toNumber(row.duracion)));
   const mesesEscrituracion = Math.max(0, ...getCronogramaByType('ESCRITURACION').map((row) => toNumber(row.duracion)));
   const rawCatalog = [
-    // Variables mensuales (se usan en expr_mensual, varían por mes)
+    // Variables mensuales (se usan en expr_mensual, varÃ­an por mes)
     { label: 'Unidades promesadas mes', token: '_unidades_promesadas_mes', value: 0, unit: 'un', monthly: true },
     { label: 'Unidades escrituradas mes', token: '_unidades_escrituradas_mes', value: 0, unit: 'un', monthly: true },
     { label: 'Unidades no vendidas mes', token: '_unidades_no_vendidas_mes', value: 0, unit: 'un', monthly: true },
@@ -6577,7 +6710,7 @@ function getFormulaCatalogForContext(context = null) {
 }
 
 function splitFormulaTokens(rawValue) {
-  const parts = String(rawValue || '').match(/\[[^\]]+\]|_[a-z0-9_À-ÿ]+|[a-zÀ-ÿ][a-z0-9_À-ÿ]*|\d+(?:[.,]\d+)?%?|>=|<=|==|!=|[()+\-*/<>,%]|[^\s]+/gi);
+  const parts = String(rawValue || '').match(/\[[^\]]+\]|_[a-z0-9_\u00C0-\u017F]+|[a-z\u00C0-\u017F][a-z0-9_\u00C0-\u017F]*|\d+(?:[.,]\d+)?%?|>=|<=|==|!=|[()+\-*/<>,%]|[^\s]+/gi);
   return Array.isArray(parts) ? parts.slice(0, 40) : [];
 }
 
@@ -6619,7 +6752,7 @@ function renderFormulaToken(token, isAuto = false) {
 function renderFormulaChipsForCell(partida, isReadOnly = false) {
   const rawValue = getPartidaFormulaText(partida);
   const value = String(rawValue || '').trim();
-  if (!value) return '<span class="formula-chip-empty">Sin fórmula · click para editar</span>';
+  if (!value) return '<span class="formula-chip-empty">Sin fÃ³rmula Â· click para editar</span>';
   const isAuto = !!partida?.auto_origen && !partida?.editable_source;
   const tokens = splitFormulaTokens(value);
   const chips = tokens.map((token) => renderFormulaToken(token, isAuto || isReadOnly)).join('');
@@ -6676,6 +6809,10 @@ function renderCostFormulaPreviewContent(rawValue, formulaType = 'expr', isAuto 
 }
 
 function updateCostFormulaPreview(input) {
+  if (shouldDeferEditingWork()) {
+    queueDeferredEditCallback('cost-formula-inline-preview', () => updateCostFormulaPreview(input));
+    return;
+  }
   const cell = input?.closest('.formula-cell');
   const preview = cell?.querySelector('[data-formula-preview]');
   if (!preview) return;
@@ -6713,7 +6850,11 @@ function renderCostFormulaMonthlyPreview(rawValue, enabled) {
   `;
 }
 
-function updateCostFormulaModalPreview() {
+function updateCostFormulaModalPreview(force = false) {
+  if (!force && shouldDeferEditingWork()) {
+    queueDeferredEditCallback('cost-formula-modal-preview', () => updateCostFormulaModalPreview(true));
+    return;
+  }
   const input = $('cost-formula-modal-input');
   const preview = $('cost-formula-modal-preview');
   const resultEl = $('cost-formula-modal-result');
@@ -6882,7 +7023,7 @@ function renderFormulaRefPanel() {
       const shortLabel = String(entry.label || '').replace(/^Total (partida|categoria) /i, '');
       return `<button type="button" class="formula-ref-item" onmousedown="event.preventDefault(); insertCostFormulaReference($('cost-formula-modal-input'), '${escapeHtml(entry.token)}'); updateCostFormulaModalPreview(); autosaveCostFormulaModal()">
         <span class="ref-label" title="${escapeHtml(entry.label)}">${escapeHtml(shortLabel)}</span>
-        ${isMonthly ? '<span class="ref-monthly-badge">∑mes</span>' : ''}
+        ${isMonthly ? '<span class="ref-monthly-badge">âˆ‘mes</span>' : ''}
         <span class="ref-value">${escapeHtml(formatFormulaCatalogValue(entry))}</span>
       </button>`;
     }).join('');
@@ -6949,10 +7090,10 @@ function openLegacyCostFormulaModal(categoryName, index) {
     modeSelect.value = getPartidaImputationMode(partida);
     modeSelect.disabled = readOnlyAuto;
   }
-  title.textContent = `Fórmula · ${partida.nombre || 'Subpartida'}`;
+  title.textContent = `FÃ³rmula Â· ${partida.nombre || 'Subpartida'}`;
   subtitle.textContent = readOnlyAuto
-    ? 'Fórmula calculada automáticamente.'
-    : 'Edita la fórmula. Los cambios se guardan automáticamente.';
+    ? 'FÃ³rmula calculada automÃ¡ticamente.'
+    : 'Edita la fÃ³rmula. Los cambios se guardan automÃ¡ticamente.';
   updateCostFormulaModalPreview();
   $('cost-formula-modal').style.display = 'flex';
   renderFormulaRefPanel();
@@ -7061,6 +7202,10 @@ function applyCostFormulaModalAutosave() {
 }
 
 function autosaveCostFormulaModal(delay = 500) {
+  if (shouldDeferEditingWork()) {
+    queueDeferredEditCallback('cost-formula-modal-autosave', () => autosaveCostFormulaModal(delay));
+    return;
+  }
   window.clearTimeout(state.costosUi.formulaAutosaveTimer);
   state.costosUi.formulaAutosaveTimer = window.setTimeout(() => {
     state.costosUi.formulaAutosaveTimer = null;
@@ -7081,7 +7226,7 @@ function insertCostFormulaReference(input, token) {
   const start = input.selectionStart ?? value.length;
   const end = input.selectionEnd ?? value.length;
   const beforeCursor = value.slice(0, start);
-  const match = beforeCursor.match(/(?:_|[a-zÀ-ÿ])[a-z0-9_À-ÿ]*$/i);
+  const match = beforeCursor.match(/(?:_|[a-z\u00C0-\u017F])[a-z0-9_\u00C0-\u017F]*$/i);
   const replaceStart = match ? match.index : start;
   input.value = `${value.slice(0, replaceStart)}${token}${value.slice(end)}`;
   if (input.id === 'cost-config-formula-inline') {
@@ -7130,8 +7275,8 @@ function renderCostFormulaSuggestions(input, query = '') {
 function sanitizeCostFormulaFreeText(raw) {
   return String(raw || '');
   const source = String(raw || '');
-  // Solo permite referencias técnicas (_token). Evita texto libre como referencias manuales.
-  return source.replace(/\b(?!SI\b)[A-Za-zÁÉÍÓÚáéíóúÑñ][A-Za-z0-9_ÁÉÍÓÚáéíóúÑñ]*\b/g, '');
+  // Solo permite referencias tÃ©cnicas (_token). Evita texto libre como referencias manuales.
+  return source.replace(/\b(?!SI\b)[A-Za-z\u00C0-\u017F][A-Za-z0-9_\u00C0-\u017F]*\b/g, '');
 }
 
 function handleCostFormulaInput(input) {
@@ -7146,7 +7291,7 @@ function handleCostFormulaInput(input) {
   if (!input.id) input.id = `cost-formula-${Math.random().toString(36).slice(2, 9)}`;
   state.costosUi.formulaInputId = input.id;
   const cursor = input.selectionStart ?? String(input.value || '').length;
-  const match = String(input.value || '').slice(0, cursor).match(/(?:_|[a-zÀ-ÿ])[a-z0-9_À-ÿ]*$/i);
+  const match = String(input.value || '').slice(0, cursor).match(/(?:_|[a-z\u00C0-\u017F])[a-z0-9_\u00C0-\u017F]*$/i);
   if (!match) {
     renderCostFormulaSuggestions(input, '');
     const panel = input.closest('.formula-cell')?.querySelector('.formula-suggest');
@@ -7714,9 +7859,9 @@ function getEstadoCosto(partida, total = 0, monthCount = getCostMonthCount(), co
     : buildDistributionFromCostConfig(config, monthCount, context);
   const hasFlow = Array.isArray(monthly) && monthly.some((value) => Math.abs(toNumber(value)) > 0.0001);
   if (!hasFlow && !toNumber(total)) return { activo: false, label: 'Pendiente', className: 'estado-pendiente' };
-  if (config.method === 'monthly_formula') return { activo: true, label: 'Fórmula mensual', className: 'estado-monthly' };
+  if (config.method === 'monthly_formula') return { activo: true, label: 'FÃ³rmula mensual', className: 'estado-monthly' };
   if (config.method === 'monthly_amount') return { activo: true, label: 'Monto mensual', className: 'estado-ok' };
-  if (config.method === 'periodic') return { activo: true, label: 'Periódico', className: 'estado-periodic' };
+  if (config.method === 'periodic') return { activo: true, label: 'PeriÃ³dico', className: 'estado-periodic' };
   if (config.method === 'milestones') return { activo: true, label: config.tramos?.length ? 'Combinado' : 'Hitos', className: 'estado-hitos' };
   return { activo: true, label: 'Configurado', className: 'estado-ok' };
 }
@@ -7770,7 +7915,7 @@ function openLegacyPaymentPlanModal(categoryName, index) {
       <input class="inp" data-field="monto" data-formula-amount="1" type="text" inputmode="text" value="${escapeHtml(item.monto_input || item.monto_formula || fmtInputNumber(toNumber(item.monto), 2))}" placeholder="Monto o formula"/>
       <button class="btn-outline btn-plus" type="button" onclick="removePaymentPlanItem('periodico', ${idx})">&times;</button>
     </div>
-  `).join('') || '<div style="font-size:11px;color:#94a3b8">Sin pagos periódicos.</div>');
+  `).join('') || '<div style="font-size:11px;color:#94a3b8">Sin pagos periÃ³dicos.</div>');
 
   $('payment-plan-modal').style.display = 'flex';
 }
@@ -7824,7 +7969,7 @@ function applyQuickPaymentTemplate(templateType) {
       break;
 
     case 'pagos_puntuales':
-      // 3 pagos iguales en hitos específicos del Gantt
+      // 3 pagos iguales en hitos especÃ­ficos del Gantt
       plan.hitos = [
         { pct: 33, ref: 'MANUAL_0', offset: 0 },
         { pct: 33, ref: firstGanttEnd, offset: 0 },
@@ -8020,7 +8165,7 @@ function renderCostConfigTotalSourceControl(selectedValue = 'amount') {
       ${renderCostConfigField('Origen del total', `
         <select id="cost-config-total-source" class="inp" onchange="renderCostConfigFields(); updateCostConfigPreview()">
           <option value="amount" ${source === 'amount' ? 'selected' : ''}>Monto total</option>
-          <option value="formula" ${source === 'formula' ? 'selected' : ''}>Total por fórmula</option>
+          <option value="formula" ${source === 'formula' ? 'selected' : ''}>Total por fÃ³rmula</option>
         </select>
       `)}
     </div>
@@ -8119,7 +8264,7 @@ function updateCostConfigPctWarning(config, context = null, validationOverride =
   const validation = validationOverride || getCostConfigValidation(config, context);
   warning.textContent = validation.ok
     ? `Total asignado: ${fmtNumber(summary.pct, 2)}%`
-    : `${validation.label} · total asignado: ${fmtNumber(summary.pct, 2)}%`;
+    : `${validation.label} Â· total asignado: ${fmtNumber(summary.pct, 2)}%`;
   warning.className = `cost-config-warning ${validation.ok ? 'is-ok' : (summary.pct > 100 ? 'is-error' : 'is-warn')}`;
 }
 
@@ -8174,7 +8319,7 @@ function renderInlineFormulaAmountEditor({
       <input id="${escapeHtml(id)}" ${dataFieldAttr} type="hidden" data-formula-amount="1" value="${escapeHtml(rawValue)}">
       <div id="${escapeHtml(id)}-editor" class="formula-chip-editor cost-config-formula-editor" data-formula-editor-target="${escapeHtml(id)}" data-base-formula="${escapeHtml(rawValue)}" onclick="focusInlineFormulaEditor('${escapeHtml(id)}')">
         ${renderFormulaEditorChips(rawValue, id)}
-        <input id="${escapeHtml(id)}-inline" class="cost-config-formula-inline" value="" placeholder="${escapeHtml(rawValue ? ' +, -, *, /, %, número...' : placeholder)}" oninput="handleInlineFormulaEditorInput(this, '${escapeHtml(id)}')" onfocus="handleCostFormulaInput(this)" onkeydown="handleInlineFormulaEditorKeydown(event, this, '${escapeHtml(id)}')" onblur="commitInlineFormulaEditorLater(this, '${escapeHtml(id)}')">
+        <input id="${escapeHtml(id)}-inline" class="cost-config-formula-inline" value="" placeholder="${escapeHtml(rawValue ? ' +, -, *, /, %, nÃºmero...' : placeholder)}" oninput="handleInlineFormulaEditorInput(this, '${escapeHtml(id)}')" onfocus="handleCostFormulaInput(this)" onkeydown="handleInlineFormulaEditorKeydown(event, this, '${escapeHtml(id)}')" onblur="commitInlineFormulaEditorLater(this, '${escapeHtml(id)}')">
       </div>
       <div class="formula-suggest"></div>
     </div>
@@ -8206,7 +8351,7 @@ function refreshInlineFormulaEditor(targetId, rawValue = '', focusInline = false
   editor.dataset.baseFormula = value;
   editor.innerHTML = `
     ${renderFormulaEditorChips(value, targetId)}
-    <input id="${escapeHtml(targetId)}-inline" class="cost-config-formula-inline" value="" placeholder="${escapeHtml(value ? ' +, -, *, /, %, número...' : 'Escribe monto o referencia')}" oninput="handleInlineFormulaEditorInput(this, '${escapeHtml(targetId)}')" onfocus="handleCostFormulaInput(this)" onkeydown="handleInlineFormulaEditorKeydown(event, this, '${escapeHtml(targetId)}')" onblur="commitInlineFormulaEditorLater(this, '${escapeHtml(targetId)}')">
+    <input id="${escapeHtml(targetId)}-inline" class="cost-config-formula-inline" value="" placeholder="${escapeHtml(value ? ' +, -, *, /, %, nÃºmero...' : 'Escribe monto o referencia')}" oninput="handleInlineFormulaEditorInput(this, '${escapeHtml(targetId)}')" onfocus="handleCostFormulaInput(this)" onkeydown="handleInlineFormulaEditorKeydown(event, this, '${escapeHtml(targetId)}')" onblur="commitInlineFormulaEditorLater(this, '${escapeHtml(targetId)}')">
   `;
   if (focusInline) focusInlineFormulaEditor(targetId);
 }
@@ -8306,7 +8451,7 @@ function refreshCostConfigFormulaEditor(rawValue = '', focusInline = false) {
   editor.dataset.baseFormula = value;
   editor.innerHTML = `
     ${renderCostConfigFormulaChips(value)}
-    <input id="cost-config-formula-inline" class="cost-config-formula-inline" value="" placeholder="${value ? ' +, -, *, /, %, número...' : 'Escribe o selecciona una referencia'}" oninput="handleCostConfigFormulaInlineInput(this)" onfocus="handleCostFormulaInput(this)" onkeydown="handleCostConfigFormulaInlineKeydown(event, this)" onblur="commitCostConfigFormulaInlineLater(this)">
+    <input id="cost-config-formula-inline" class="cost-config-formula-inline" value="" placeholder="${value ? ' +, -, *, /, %, nÃºmero...' : 'Escribe o selecciona una referencia'}" oninput="handleCostConfigFormulaInlineInput(this)" onfocus="handleCostFormulaInput(this)" onkeydown="handleCostConfigFormulaInlineKeydown(event, this)" onblur="commitCostConfigFormulaInlineLater(this)">
   `;
   if (focusInline) focusCostConfigFormulaInline();
 }
@@ -8466,7 +8611,7 @@ function readCostConfigForm() {
   return state.costosUi.costConfigDraft;
 }
 
-function renderCostConfigFormulaInput(value = '', label = 'Fórmula', options = {}) {
+function renderCostConfigFormulaInput(value = '', label = 'FÃ³rmula', options = {}) {
   const rawValue = canonicalizeFormulaReferenceText(value || '');
   if (options.chipEditor) {
     return `
@@ -8475,11 +8620,11 @@ function renderCostConfigFormulaInput(value = '', label = 'Fórmula', options = 
         <input id="cost-config-formula" type="hidden" value="${escapeHtml(rawValue)}">
         <div id="cost-config-formula-editor" class="formula-chip-editor cost-config-formula-editor" data-base-formula="${escapeHtml(rawValue)}" onclick="focusCostConfigFormulaInline()">
           ${renderCostConfigFormulaChips(rawValue)}
-          <input id="cost-config-formula-inline" class="cost-config-formula-inline" value="" placeholder="${rawValue ? ' +, -, *, /, %, número...' : 'Escribe o selecciona una referencia'}" oninput="handleCostConfigFormulaInlineInput(this)" onfocus="handleCostFormulaInput(this)" onkeydown="handleCostConfigFormulaInlineKeydown(event, this)" onblur="commitCostConfigFormulaInlineLater(this)">
+          <input id="cost-config-formula-inline" class="cost-config-formula-inline" value="" placeholder="${rawValue ? ' +, -, *, /, %, nÃºmero...' : 'Escribe o selecciona una referencia'}" oninput="handleCostConfigFormulaInlineInput(this)" onfocus="handleCostFormulaInput(this)" onkeydown="handleCostConfigFormulaInlineKeydown(event, this)" onblur="commitCostConfigFormulaInlineLater(this)">
         </div>
         <div class="formula-suggest"></div>
         <div class="cost-config-formula-actions">
-          <span class="cost-config-formula-hint">Selecciona una referencia para insertarla como chip y continúa escribiendo a la derecha.</span>
+          <span class="cost-config-formula-hint">Selecciona una referencia para insertarla como chip y continÃºa escribiendo a la derecha.</span>
           <button class="cost-config-link-btn" type="button" onclick="clearCostConfigFormula()">Limpiar</button>
         </div>
       </div>
@@ -8509,8 +8654,8 @@ function renderCostConfigFields(options = {}) {
   if (method === 'manual') {
     html = `
       <div class="cost-config-grid">
-        ${renderCostConfigAmountField({ label: 'Monto único UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula, ej: 2500 o 15 * meses preventa' })}
-        ${renderCostPointControls('start', 'Fecha de imputación', config.start)}
+        ${renderCostConfigAmountField({ label: 'Monto Ãºnico UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula, ej: 2500 o 15 * meses preventa' })}
+        ${renderCostPointControls('start', 'Fecha de imputaciÃ³n', config.start)}
       </div>
     `;
   } else if (method === 'monthly_amount') {
@@ -8522,14 +8667,14 @@ function renderCostConfigFields(options = {}) {
       </div>
     `;
   } else if (method === 'monthly_formula') {
-    html = renderCostConfigFormulaInput(config.formula, 'Fórmula mensual', { chipEditor: true });
+    html = renderCostConfigFormulaInput(config.formula, 'FÃ³rmula mensual', { chipEditor: true });
   } else if (method === 'global_formula') {
     const totalSource = config.total_source === 'formula' ? 'formula' : 'amount';
     html = `
       <div class="cost-config-grid">
         ${renderCostConfigTotalSourceControl(totalSource)}
         ${totalSource === 'formula'
-          ? renderCostConfigFormulaInput(config.formula, 'Total por fórmula', { chipEditor: true })
+          ? renderCostConfigFormulaInput(config.formula, 'Total por fÃ³rmula', { chipEditor: true })
           : renderCostConfigAmountField({ label: 'Monto total UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula, ej: 2500 o 15 * meses preventa' })}
       </div>
       <div class="cost-config-grid">
@@ -8580,7 +8725,7 @@ function renderCostConfigFields(options = {}) {
       <div class="cost-config-grid">
         ${renderCostConfigAmountField({ label: 'Monto total UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula, ej: 2500 o 15 * meses preventa' })}
         <div class="cost-config-panel">
-          <div class="cost-config-label">Validación de porcentajes</div>
+          <div class="cost-config-label">ValidaciÃ³n de porcentajes</div>
           <div id="cost-config-pct-warning" class="cost-config-warning">Total asignado: 0%</div>
         </div>
       </div>
@@ -8651,7 +8796,11 @@ function renderCostConfigRefPanel() {
   }).join('') || '<div style="font-size:11px;color:#94a3b8">Sin referencias disponibles</div>';
 }
 
-function updateCostConfigPreview() {
+function updateCostConfigPreview(force = false) {
+  if (!force && shouldDeferEditingWork()) {
+    queueDeferredEditCallback('cost-config-preview', () => updateCostConfigPreview(true));
+    return;
+  }
   const partida = getActiveCostConfigPartida();
   if (!partida) return;
   const config = readCostConfigForm();
@@ -8702,8 +8851,8 @@ function openCostConfigModal(categoryName, index) {
   state.costosUi.activeConfigCategory = categoryName;
   state.costosUi.activeConfigIndex = index;
   state.costosUi.costConfigDraft = clonePlain(migrateLegacyCostConfig(partida), { method: 'manual', start: makeCostPoint(), end: makeCostPoint() });
-  setText('cost-config-title', `Configurar Costo · ${partida.nombre || 'Subpartida'}`);
-  setText('cost-config-subtitle', 'Define cómo nace el costo; el flujo mensual y el total se calculan automáticamente.');
+  setText('cost-config-title', `Configurar Costo Â· ${partida.nombre || 'Subpartida'}`);
+  setText('cost-config-subtitle', 'Define cÃ³mo nace el costo; el flujo mensual y el total se calculan automÃ¡ticamente.');
   const methodSelect = $('cost-config-method');
   if (methodSelect) methodSelect.value = state.costosUi.costConfigDraft.method || 'manual';
   renderCostConfigFields({ fromDraft: true });
@@ -8798,14 +8947,14 @@ function openPaymentPlanModal(categoryName, index) {
 
 function removeCostPartida(categoryName, index) {
   if (categoryName === 'GASTOS FINANCIEROS') return;
-  // Light DOM sync — no formula recalculation needed just to delete a row
+  // Light DOM sync â€” no formula recalculation needed just to delete a row
   readCostosEditor({ recompute: false });
   const category = state.costos.find((item) => item.nombre === categoryName);
   if (!category) return;
   const partida = category.partidas?.[index];
   if (!partida || partida.isDefault || partida.isProtected || partida.isLinked) return;
 
-  // 1. Instant visual removal — user sees it gone before any recalculation
+  // 1. Instant visual removal â€” user sees it gone before any recalculation
   const tbody = $('planilla-tbody');
   if (tbody) {
     const row = tbody.querySelector(`tr[data-category="${CSS.escape(categoryName)}"][data-index="${index}"]`);
@@ -9008,9 +9157,13 @@ function readConstruccionFinanciamientoFromEditor() {
   });
 }
 
-function onCabidaInputChange() {
+function onCabidaInputChange(force = false) {
   state.proyecto = normalizeProject(getCabidaProjectSettingsFromEditor());
   state.cabida = getCabidaRowsFromEditor();
+  if (!force && shouldDeferEditingWork()) {
+    queueDeferredEditCallback('cabida-input-change', () => onCabidaInputChange(true));
+    return;
+  }
   scheduleRenderJob('cabida-dependencies', () => {
     renderCabidaTables(state.cabida);
     renderCabidaEditor(state.cabida);
@@ -9026,13 +9179,17 @@ function onCabidaInputChange() {
   scheduleAutosave('costos');
 }
 
-function onTerrenoInputChange() {
+function onTerrenoInputChange(force = false) {
   state.proyecto = normalizeProject(readTerrenoProjectSettingsFromEditor());
   state.financiamiento = readTerrenoFinanciamientoFromEditor();
   state.proyecto = normalizeProject({
     ...state.proyecto,
     tasa_interes_terreno: toNumber(state.financiamiento.credito_terreno_tasa),
   });
+  if (!force && shouldDeferEditingWork()) {
+    queueDeferredEditCallback('terreno-input-change', () => onTerrenoInputChange(true));
+    return;
+  }
   syncTerrainPurchaseMilestone();
   scheduleRenderJob('terreno-dependencies', () => {
     renderGanttEditor(state.gantt);
@@ -9065,9 +9222,13 @@ function readConstruccionFromEditor() {
   });
 }
 
-function updateConstrParams() {
+function updateConstrParams(force = false) {
   state.construccion = readConstruccionFromEditor();
   state.financiamiento = readConstruccionFinanciamientoFromEditor();
+  if (!force && shouldDeferEditingWork()) {
+    queueDeferredEditCallback('construccion-input-change', () => updateConstrParams(true));
+    return;
+  }
   syncConstructionMilestone(state.construccion.plazo_meses);
   syncSalesDrivenMilestones();
   scheduleRenderJob('construccion-dependencies', () => {
@@ -9083,8 +9244,12 @@ function updateConstrParams() {
   scheduleAutosave('costos');
 }
 
-function onGanttInputChange() {
+function onGanttInputChange(force = false) {
   state.gantt = readGanttEditor();
+  if (!force && shouldDeferEditingWork()) {
+    queueDeferredEditCallback('gantt-input-change', () => onGanttInputChange(true));
+    return;
+  }
   syncSalesDrivenMilestones();
   scheduleRenderJob('gantt-dependencies', () => {
     renderTerrainModule();
@@ -9251,9 +9416,13 @@ function readVentasCronogramaEditor() {
   return rows;
 }
 
-function onVentasInputChange() {
+function onVentasInputChange(force = false) {
   state.ventasConfig = readVentasConfigEditor();
   state.ventasCronograma = readVentasCronogramaEditor();
+  if (!force && shouldDeferEditingWork()) {
+    queueDeferredEditCallback('ventas-input-change', () => onVentasInputChange(true));
+    return;
+  }
   syncSalesDrivenMilestones();
   scheduleRenderJob('ventas-dependencies', () => {
     renderGanttEditor(state.gantt);
@@ -9266,8 +9435,12 @@ function onVentasInputChange() {
   scheduleAutosave('costos');
 }
 
-function onVentasVelocityChange() {
+function onVentasVelocityChange(force = false) {
   state.ventasCronograma = readVentasCronogramaEditor();
+  if (!force && shouldDeferEditingWork()) {
+    queueDeferredEditCallback('ventas-velocity-change', () => onVentasVelocityChange(true));
+    return;
+  }
   syncSalesDrivenMilestones();
   scheduleRenderJob('ventas-velocity-dependencies', () => {
     renderGanttEditor(state.gantt);
@@ -9605,9 +9778,19 @@ async function loadProjects() {
   if (!state.proyectos.length) return;
   const params = new URLSearchParams(window.location.search);
   const requestedProjectId = params.get('projectId');
+  const activeProjectId = window.localStorage.getItem('activeProjectId') || '';
+  const getUpdatedTime = (project) => {
+    const raw = getProjectUpdatedAtValue(project);
+    const parsed = raw ? Date.parse(raw) : Number.NaN;
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const mostRecentProject = [...state.proyectos]
+    .sort((a, b) => getUpdatedTime(b) - getUpdatedTime(a))[0];
   const targetProjectId = state.proyectos.some((project) => project.id === requestedProjectId)
     ? requestedProjectId
-    : state.proyectos[0].id;
+    : (state.proyectos.some((project) => project.id === activeProjectId)
+      ? activeProjectId
+      : (mostRecentProject?.id || state.proyectos[0].id));
   await loadProject(targetProjectId);
 }
 
@@ -9620,6 +9803,7 @@ async function loadProject(projectId) {
   _activeProjectAddressSelection = null;
   resetAddressSearchContext('project');
   state.proyectoId = projectId;
+  try { window.localStorage.setItem('activeProjectId', String(projectId || '')); } catch (_) { /* ignore */ }
   const url = new URL(window.location.href);
   url.searchParams.set('projectId', projectId);
   window.history.replaceState({}, '', url);
@@ -9720,10 +9904,6 @@ async function guardarCabida({ silent = false } = {}) {
       api(`/api/proyectos/${state.proyectoId}/ventas/cronograma`, {
         method: 'POST',
         body: JSON.stringify(state.ventasCronograma),
-      }),
-      api(`/api/proyectos/${state.proyectoId}/costos`, {
-        method: 'POST',
-        body: JSON.stringify(state.costos),
       })
     );
   }
@@ -9755,12 +9935,6 @@ async function guardarTerreno({ silent = false } = {}) {
       body: JSON.stringify(state.ventasCronograma || []),
     }),
   ];
-  if (!silent) {
-    requests.push(api(`/api/proyectos/${state.proyectoId}/costos`, {
-      method: 'POST',
-      body: JSON.stringify(state.costos),
-    }));
-  }
   await Promise.all(requests);
   await finishSave({ silent });
 }
@@ -9790,12 +9964,6 @@ async function guardarConstruccion({ silent = false } = {}) {
       body: JSON.stringify(financiamiento),
     }),
   ];
-  if (!silent) {
-    requests.push(api(`/api/proyectos/${state.proyectoId}/costos`, {
-      method: 'POST',
-      body: JSON.stringify(state.costos),
-    }));
-  }
   await Promise.all(requests);
   await finishSave({ silent });
 }
@@ -9811,12 +9979,6 @@ async function guardarGantt({ silent = false } = {}) {
       body: JSON.stringify(rows),
     }),
   ];
-  if (!silent) {
-    requests.push(api(`/api/proyectos/${state.proyectoId}/costos`, {
-      method: 'POST',
-      body: JSON.stringify(state.costos),
-    }));
-  }
   await Promise.all(requests);
   await finishSave({ silent });
 }
@@ -9837,12 +9999,6 @@ async function guardarVentas({ silent = false } = {}) {
       body: JSON.stringify(cronograma),
     }),
   ];
-  if (!silent) {
-    requests.push(api(`/api/proyectos/${state.proyectoId}/costos`, {
-      method: 'POST',
-      body: JSON.stringify(state.costos),
-    }));
-  }
   await Promise.all(requests);
   await finishSave({ silent });
 }
@@ -9850,7 +10006,8 @@ async function guardarVentas({ silent = false } = {}) {
 async function guardarCostos({ silent = false } = {}) {
   if (!state.proyectoId) return;
   prepareStateForSave();
-  const payload = readCostosEditor();
+  readCostosEditor();
+  const payload = getCostosPayloadForSave();
   setSyncStatus('saving', 'GUARDANDO', 'Persistiendo planilla de costos');
   await api(`/api/proyectos/${state.proyectoId}/costos`, {
     method: 'POST',
@@ -10058,9 +10215,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   try {
-    setLoadingText('Verificando conexión...', 'Conectando con el servidor');
+    showLoadingOverlay();
+    setLoadingText('Verificando conexiÃ³n...', 'Conectando con el servidor');
     await refreshHealthStatus();
-    setLoadingText('Cargando proyectos...', 'Obteniendo lista de proyectos');
+    setLoadingText('Cargando proyectos...');
     await loadProjects();
     hideLoadingOverlay();
     // If no projects exist, guide user to create the first one
@@ -10071,7 +10229,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error(error);
     hideLoadingOverlay();
     setSyncStatus('error', 'SIN CONEXION', error.message);
-    setText('proj-title', 'Error de conexión');
+    setText('proj-title', 'Error de conexiÃ³n');
     setText('proj-dir', error.message);
   }
 });
+
+
+
