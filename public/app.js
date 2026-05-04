@@ -167,7 +167,27 @@ const MOJIBAKE_MAP = {
   'Ã±': 'ñ', 'Ã‘': 'Ñ', 'Ã¼': 'ü', 'Ãœ': 'Ü',
   'Â·': '·', 'Âº': 'º', 'Âª': 'ª', 'Â°': '°', 'Â': '',
   'â€”': '—', 'â€“': '–', 'âˆ’': '−', 'â€¢': '•', 'Ã—': '×', 'Ã·': '÷',
+  'MÂ²': 'm²',
+  'mÂ²': 'm²',
+  'Ãš': 'Ú',
+  'Ã\u008d': 'Í',
+  'VÃNCULO': 'VÍNCULO',
+  'FÃ³rmula': 'Fórmula',
+  'ConstrucciÃ³n': 'Construcción',
+  'ParÃ¡metros': 'Parámetros',
+  'RecepciÃ³n': 'Recepción',
+  'EscrituraciÃ³n': 'Escrituración',
+  'LÃ­nea': 'Línea',
 };
+
+function decodeLatin1ToUtf8(source) {
+  try {
+    const bytes = Uint8Array.from(String(source || ''), (char) => char.charCodeAt(0) & 0xff);
+    return new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+  } catch {
+    return String(source || '');
+  }
+}
 
 function repairMojibakeText(value) {
   const source = String(value ?? '');
@@ -176,6 +196,11 @@ function repairMojibakeText(value) {
   Object.entries(MOJIBAKE_MAP).forEach(([bad, good]) => {
     fixed = fixed.split(bad).join(good);
   });
+  if (MOJIBAKE_HINT_RE.test(fixed)) {
+    const decoded = decodeLatin1ToUtf8(fixed);
+    const decodedHasLessNoise = (decoded.match(MOJIBAKE_HINT_RE)?.length || 0) < (fixed.match(MOJIBAKE_HINT_RE)?.length || 0);
+    if (decodedHasLessNoise) fixed = decoded;
+  }
   return fixed;
 }
 
@@ -226,6 +251,12 @@ function normalizeVisibleTextEncoding(root = document.body) {
       const fixed = repairMojibakeText(value);
       if (fixed !== value) el.setAttribute(attr, fixed);
     });
+    if (el.tagName === 'BUTTON') {
+      const text = String(el.textContent || '').trim();
+      if (/^[×x]\s+Eliminar$/i.test(text) || /^Ã—\s+Eliminar$/i.test(text)) {
+        el.textContent = 'Eliminar';
+      }
+    }
   });
 }
 
@@ -3170,7 +3201,7 @@ function renderCabidaEditor(rows) {
         <div class="card" data-cabida-row>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
             <label style="font-size:11px;font-weight:700;color:#475569;text-transform:uppercase">Tipo</label>
-            <button type="button" onclick="eliminarUso(${idx})" style="background:none;border:1px solid #fecaca;color:#b91c1c;border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;line-height:1.5">Ã— Eliminar</button>
+            <button type="button" onclick="eliminarUso(${idx})" style="background:none;border:1px solid #fecaca;color:#b91c1c;border-radius:6px;padding:2px 8px;font-size:11px;cursor:pointer;line-height:1.5">Eliminar</button>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
             <div style="grid-column:1 / -1">
