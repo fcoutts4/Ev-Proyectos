@@ -1238,8 +1238,8 @@ function getSyncDetailText() {
   }
   const reference = state.sync.lastSavedAt || state.proyecto?.updated_at || state.health?.timestamp;
   return reference
-    ? `Ultima sincronizacion: ${fmtDateTime(reference)}`
-    : 'Ultima sincronizacion: sin registro';
+    ? `Última sincronización: ${fmtDateTime(reference)}`
+    : 'Última sincronización: sin registro';
 }
 
 function renderSyncStatus() {
@@ -4635,7 +4635,7 @@ function renderFinancingSourcePlanilla(sourceType) {
 
     setHtml('terreno-fin-planilla-tbody', rows.map((r) => {
       const bg = r.bold ? 'background:#f8fafc' : '';
-      const rowTotal = total(r.values);
+      const rowTotal = (r.values || []).reduce((acc, value) => acc + toNumber(value), 0);
       return `
         <tr class="${r.bold ? 'finance-total-row' : ''}" style="${bg}">
           <td class="finance-total-col" style="text-align:right;font-weight:${r.bold ? 800 : 600};color:${r.color || '#334155'}">${fmtUf(rowTotal)}</td>
@@ -10216,7 +10216,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   try {
     showLoadingOverlay();
-    setLoadingText('Verificando conexiÃ³n...', 'Conectando con el servidor');
+    setLoadingText('Verificando conexión...', 'Conectando con el servidor');
     await refreshHealthStatus();
     setLoadingText('Cargando proyectos...');
     await loadProjects();
@@ -10229,7 +10229,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error(error);
     hideLoadingOverlay();
     setSyncStatus('error', 'SIN CONEXION', error.message);
-    setText('proj-title', 'Error de conexiÃ³n');
+    setText('proj-title', 'Error de conexión');
     setText('proj-dir', error.message);
   }
 });
