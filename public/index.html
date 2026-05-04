@@ -788,6 +788,7 @@ tfoot td{line-height:1.25}
 .finance-split-shell table{border:none!important;border-radius:0!important}
 .finance-split-fixed table{width:370px;min-width:370px;table-layout:fixed}
 .finance-split-shell .finance-date-table{table-layout:fixed}
+.finance-split-scroll .finance-date-table{width:max-content;min-width:max-content}
 .finance-fixed-concept-col{width:220px;min-width:220px;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .finance-fixed-total-col{width:150px;min-width:150px;max-width:150px;white-space:nowrap;overflow:visible;text-overflow:clip}
 .finance-split-fixed td.finance-fixed-total-col,.finance-split-fixed th.finance-fixed-total-col{position:relative;z-index:3;background:#fff!important}
@@ -827,7 +828,15 @@ tfoot td{line-height:1.25}
 .finance-date-table tbody tr:nth-child(even):not(.finance-total-row) .finance-sticky-left{background:#f8fafc!important}
 .finance-date-table .finance-total-row .finance-concept-col{background:#f4f8fc!important}
 .finance-date-table th[data-month-col],
-.finance-date-table td[data-month-cell]{min-width:72px;white-space:nowrap}
+.finance-date-table td[data-month-cell]{
+  width:88px;
+  min-width:88px;
+  max-width:88px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  box-sizing:border-box;
+}
 #constr-ep-table th:nth-child(3),
 #constr-ep-table td:nth-child(3),
 #constr-fin-planilla-table th:nth-child(3),
