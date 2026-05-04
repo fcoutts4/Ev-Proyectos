@@ -5550,7 +5550,7 @@ function indexSafeNumber(value, fallback) {
 
 function getGanttLockConfig(row, index = -1, allRows = []) {
   const canonicalName = canonicalizeGanttName(row?.nombre || '');
-  const baseMilestones = new Set(['Compra terreno', 'Construcción', 'Promesas', 'Recepción municipal', 'Escrituración']);
+  const baseMilestones = new Set(['Compra terreno', 'Construcción', 'Aprobación PE', 'Promesas', 'Recepción municipal', 'Escrituración']);
   const firstBaseIndex = baseMilestones.has(canonicalName)
     ? allRows.findIndex((item) => canonicalizeGanttName(item?.nombre || '') === canonicalName)
     : -1;
