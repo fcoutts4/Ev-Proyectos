@@ -415,6 +415,10 @@ function makeClientId(prefix = 'tmp') {
 
 function renderFinanceFixedColumn(prefix, rows = [], options = {}) {
   const includeTotal = !!options.includeTotal;
+  const renderCellContent = (value) => {
+    const source = String(value ?? '');
+    return /<[^>]+>/.test(source) ? source : escapeHtml(source);
+  };
   setHtml(`${prefix}-fixed-head`, `
     <tr>
       <th class="finance-fixed-concept-col" style="text-align:left">Concepto</th>
@@ -427,7 +431,7 @@ function renderFinanceFixedColumn(prefix, rows = [], options = {}) {
         <span>${escapeHtml(row.label || '')}</span>
         ${row.actionHtml || ''}
       </td>
-      ${includeTotal ? `<td class="finance-fixed-total-col" style="text-align:right;font-weight:${row.bold ? 800 : 600};color:${row.color || '#334155'};background:${row.bg || (row.bold ? '#f4f8fc' : '#fff')}!important">${escapeHtml(row.totalText || '')}</td>` : ''}
+      ${includeTotal ? `<td class="finance-fixed-total-col" style="text-align:right;font-weight:${row.bold ? 800 : 600};color:${row.color || '#334155'};background:${row.bg || (row.bold ? '#f4f8fc' : '#fff')}!important">${renderCellContent(row.totalHtml ?? row.totalText ?? '')}</td>` : ''}
     </tr>
   `).join(''));
   setHtml(`${prefix}-fixed-tfoot`, options.footerLabel ? `
