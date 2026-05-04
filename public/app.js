@@ -3875,7 +3875,12 @@ function getGlobalPaymentSettings() {
 }
 
 function findGanttByName(name) {
-  return state.gantt.find((row) => row.nombre === name) || null;
+  const raw = String(name || '').trim();
+  if (!raw) return null;
+  const canonical = canonicalizeGanttName(raw);
+  return state.gantt.find((row) => canonicalizeGanttName(row.nombre) === canonical)
+    || state.gantt.find((row) => String(row.nombre || '').trim() === raw)
+    || null;
 }
 
 function getCronogramaComputed(item) {
@@ -5516,6 +5521,7 @@ function syncSalesDrivenMilestones() {
   }
 
   state.gantt = normalizeGanttRows(rows);
+  const canonicalEscritura = state.gantt.find((row) => canonicalizeGanttName(row.nombre) === 'Escrituración') || null;
   state.ventasCronograma = (state.ventasCronograma || []).map((row) => {
     if (isVentasCronogramaType(row, 'PREVENTA')) {
       return {
@@ -5528,7 +5534,7 @@ function syncSalesDrivenMilestones() {
     if (isVentasCronogramaType(row, 'ESCRITURACION')) {
       return {
         ...row,
-        vinculo_gantt: escrituraRow.nombre,
+        vinculo_gantt: canonicalEscritura?.nombre || 'Escrituración',
         mes_inicio: 0,
         duracion: escrituraDuration,
       };
