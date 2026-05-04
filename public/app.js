@@ -364,17 +364,27 @@ function makeClientId(prefix = 'tmp') {
 }
 
 function renderFinanceFixedColumn(prefix, rows = [], options = {}) {
-  setHtml(`${prefix}-fixed-head`, `<tr><th style="text-align:left">Concepto</th></tr>`);
+  const includeTotal = !!options.includeTotal;
+  setHtml(`${prefix}-fixed-head`, `
+    <tr>
+      <th class="finance-fixed-concept-col" style="text-align:left">Concepto</th>
+      ${includeTotal ? '<th class="finance-fixed-total-col" style="text-align:right">Total</th>' : ''}
+    </tr>
+  `);
   setHtml(`${prefix}-fixed-tbody`, rows.map((row) => `
     <tr class="${row.bold ? 'finance-total-row' : ''}">
-      <td class="finance-fixed-concept-cell" style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.color || '#334155'};background:${row.bg || (row.bold ? '#f4f8fc' : '#fff')}!important;display:flex;align-items:center;justify-content:space-between;gap:4px">
+      <td class="finance-fixed-concept-cell finance-fixed-concept-col" style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.color || '#334155'};background:${row.bg || (row.bold ? '#f4f8fc' : '#fff')}!important;display:flex;align-items:center;justify-content:space-between;gap:4px">
         <span>${escapeHtml(row.label || '')}</span>
         ${row.actionHtml || ''}
       </td>
+      ${includeTotal ? `<td class="finance-fixed-total-col" style="text-align:right;font-weight:${row.bold ? 800 : 600};color:${row.color || '#334155'};background:${row.bg || (row.bold ? '#f4f8fc' : '#fff')}!important">${row.totalText || ''}</td>` : ''}
     </tr>
   `).join(''));
   setHtml(`${prefix}-fixed-tfoot`, options.footerLabel ? `
-    <tr class="tfoot-dark"><td>${escapeHtml(options.footerLabel)}</td></tr>
+    <tr class="tfoot-dark">
+      <td class="finance-fixed-concept-col">${escapeHtml(options.footerLabel)}</td>
+      ${includeTotal ? '<td class="finance-fixed-total-col"></td>' : ''}
+    </tr>
   ` : '');
 }
 
@@ -4266,8 +4276,6 @@ function renderConstructionEP() {
 
   setHtml('constr-ep-head', `
     <tr>
-      <th style="min-width:300px;text-align:left">Fórmula</th>
-      <th class="finance-total-col" style="width:110px;text-align:right">Total</th>
       ${labels.map((l) => `<th data-month-col>${escapeHtml(l)}</th>`).join('')}
     </tr>
   `);
@@ -4288,8 +4296,6 @@ function renderConstructionEP() {
     const bg = r.bold ? 'background:#f0fdf4' : '';
     return `
       <tr class="${r.bold ? 'finance-total-row' : ''}" style="${bg}">
-        <td class="formula-host"><span class="formula-readonly" title="${escapeHtml(r.formula)}">${escapeHtml(r.formula)}</span></td>
-        <td class="finance-total-col" style="text-align:right;font-weight:${r.bold ? 800 : 600};color:${r.color || '#334155'}">${fmtUf(total(r.values))}</td>
         ${r.values.map((v) => `<td data-month-cell style="text-align:center;color:${r.color === '#22c55e' ? '#16a34a' : '#334155'};${r.bold ? 'font-weight:700' : ''}">${fmtTableAmount(v, { kind: 'income' })}</td>`).join('')}
       </tr>`;
   }).join(''));
@@ -4299,7 +4305,8 @@ function renderConstructionEP() {
     bold: r.bold,
     color: r.bold ? '#166534' : '#334155',
     bg: r.bold ? '#f0fdf4' : '#fff',
-  })));
+    totalText: fmtUf(total(r.values)),
+  })), { includeTotal: true });
   setHtml('constr-ep-tfoot', '');
   return data;
 }
@@ -4341,8 +4348,6 @@ function renderConstructionGF(epData) {
 
   setHtml('constr-fin-planilla-head', `
     <tr>
-      <th style="width:60px;text-align:center">Æ’x</th>
-      <th class="finance-total-col" style="width:110px;text-align:right">Total</th>
       ${labels.map((l) => `<th data-month-col>${escapeHtml(l)}</th>`).join('')}
     </tr>
   `);
@@ -4356,18 +4361,9 @@ function renderConstructionGF(epData) {
   ];
 
   setHtml('constr-fin-planilla-tbody', rows.map((r) => {
-    const popId = `fpop-gf-${Math.random().toString(36).slice(2, 8)}`;
     const bg = r.bold ? 'background:#f8fafc' : '';
     return `
       <tr class="${r.bold ? 'finance-total-row' : ''}" style="${bg}">
-        <td style="text-align:center;position:relative" class="formula-host">
-          <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #cbd5e1;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">Æ’x</button>
-          <div id="${popId}" class="formula-pop" style="display:none;position:absolute;z-index:50;left:0;top:100%;margin-top:4px;background:#0f172a;color:#fff;border-radius:8px;padding:10px 12px;min-width:260px;max-width:360px;text-align:left;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:11px">
-            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px">FÃ³rmula</div>
-            <div style="font-family:'Courier New',monospace;background:#1e293b;padding:6px 8px;border-radius:6px">${escapeHtml(r.formula)}</div>
-          </div>
-        </td>
-        <td class="finance-total-col" style="text-align:right;font-weight:${r.bold ? 800 : 600};color:${r.color}">${fmtUf(total(r.values))}</td>
         ${r.values.map((v) => `<td data-month-cell style="text-align:center;color:#334155;${r.bold ? 'font-weight:700' : ''}">${fmtTableAmount(v, { kind: 'income' })}</td>`).join('')}
       </tr>`;
   }).join(''));
@@ -4377,7 +4373,8 @@ function renderConstructionGF(epData) {
     bold: r.bold,
     color: r.color,
     bg: r.bold ? '#f8fafc' : '#fff',
-  })));
+    totalText: fmtUf(total(r.values)),
+  })), { includeTotal: true });
   setHtml('constr-fin-planilla-tfoot', '');
 }
 
@@ -4632,23 +4629,13 @@ function renderFinancingSourcePlanilla(sourceType) {
 
     setHtml('terreno-fin-planilla-head', `
       <tr>
-        <th class="finance-total-col" style="width:110px;text-align:right">Total</th>
         ${labels.map((l) => `<th data-month-col>${escapeHtml(l)}</th>`).join('')}
       </tr>
     `);
 
-    // Buscar Ã­ndices en GASTOS FINANCIEROS para habilitar configuraciÃ³n en GIROS y PAGO LINEA
-    const gfCategory = ensureCostosState().find((item) => item.nombre === 'GASTOS FINANCIEROS');
-    const gfPartidas = gfCategory?.partidas || [];
-    const gfLineaIdx = gfPartidas.findIndex((p) => /Terreno.*Linea aprobada/i.test(p.nombre || ''));
-    const gfPagoIdx = gfPartidas.findIndex((p) => /Terreno.*Pago de linea/i.test(p.nombre || ''));
-    const makeGfPlanBtn = (idx, label) => idx >= 0
-      ? `<button type="button" title="Configurar costo: ${label}" onclick="openPaymentPlanModal('GASTOS FINANCIEROS',${idx})" style="font-size:9px;padding:1px 5px;background:#eff6ff;border:1px solid #93c5fd;color:#1d4ed8;border-radius:3px;cursor:pointer;flex-shrink:0">config</button>`
-      : '';
-
     const rows = [
-      { label: 'GIROS', values: giros, formula: `GIROS = % lÃ­nea Ã— Costo terreno Â· desembolso en mes compra`, color: '#22c55e', actionHtml: makeGfPlanBtn(gfLineaIdx, 'Giro lÃ­nea terreno') },
-      { label: 'PAGO LÃNEA', values: pagosLinea, formula: `PAGO_LÃNEA(t) = pago al vencimiento del plazo de la lÃ­nea de terreno`, color: '#ef4444', actionHtml: makeGfPlanBtn(gfPagoIdx, 'Pago de lÃ­nea terreno') },
+      { label: 'GIROS', values: giros, formula: `GIROS = % lÃ­nea Ã— Costo terreno Â· desembolso en mes compra`, color: '#22c55e' },
+      { label: 'PAGO LÃNEA', values: pagosLinea, formula: `PAGO_LÃNEA(t) = pago al vencimiento del plazo de la lÃ­nea de terreno`, color: '#ef4444' },
       { label: 'ACUMULADO', values: acumulado, formula: 'ACUMULADO(t) = ACUMULADO(tâˆ’1) + GIROS(t) + PAGOS_LINEA(t)', bold: true, color: '#0f172a' },
       { label: `INTERÃ‰S ANUAL (${tasaTerreno}%)`, values: interesAnual, formula: `Acumulado anual de interÃ©s Â· pagado en aniversario del giro o al cierre anticipado`, color: '#f59e0b' },
       { label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, values: impTimbres, formula: `IMP_TIMBRES(t) = GIROS(t) Ã— ${cfg.pct_timbres}%`, color: '#f59e0b' },
@@ -4659,7 +4646,6 @@ function renderFinancingSourcePlanilla(sourceType) {
       const rowTotal = (r.values || []).reduce((acc, value) => acc + toNumber(value), 0);
       return `
         <tr class="${r.bold ? 'finance-total-row' : ''}" style="${bg}">
-          <td class="finance-total-col" style="text-align:right;font-weight:${r.bold ? 800 : 600};color:${r.color || '#334155'}">${fmtUf(rowTotal)}</td>
           ${r.values.map((v) => `<td data-month-cell style="text-align:center;color:#334155;${r.bold ? 'font-weight:700' : ''}">${fmtTableAmount(v, { kind: 'income' })}</td>`).join('')}
         </tr>`;
     }).join(''));
@@ -4669,8 +4655,8 @@ function renderFinancingSourcePlanilla(sourceType) {
       bold: r.bold,
       color: r.color,
       bg: r.bold ? '#f8fafc' : '#fff',
-      actionHtml: r.actionHtml || '',
-    })));
+      totalText: fmtUf((r.values || []).reduce((acc, value) => acc + toNumber(value), 0)),
+    })), { includeTotal: true });
     setHtml('terreno-fin-planilla-tfoot', '');
     return;
   }
