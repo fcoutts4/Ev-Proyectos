@@ -1250,6 +1250,10 @@ function setLoadingText(text, sub = '') {
 
 // ─── Projects panel ─────────────────────────────────────────────────────────
 
+// Tracks whether the user has clicked "Cambiar dirección" on the active card.
+// Resets when: project is switched, address is confirmed, or panel closes.
+let _addrEditingMode = false;
+
 function openProjectsPanel(showCreateForm = false) {
   renderProjectsPanel();
   const panel = $('projects-panel');
@@ -1283,6 +1287,9 @@ function closeProjectsPanel() {
   panel.classList.remove('is-open');
   if (backdrop) backdrop.classList.remove('is-open');
   document.body.style.overflow = '';
+  // Reset transient UI state
+  _addrEditingMode = false;
+  _newProjAddrConfirmed = false;
   window.setTimeout(() => { panel.hidden = true; }, 280);
 }
 
@@ -1294,15 +1301,29 @@ function toggleNewProjectForm() {
   form.hidden = !isHidden;
   if (btn) btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
   if (isHidden) {
-    // Showing form — clear previous errors and focus
+    // Showing form — clear previous values, errors and focus
+    _newProjAddrConfirmed = false;
     const errEl = $('new-project-form-error');
     if (errEl) errEl.classList.remove('is-visible');
     const inp = $('new-project-nombre');
     if (inp) { inp.value = ''; inp.style.borderColor = ''; }
     const dirInp = $('new-project-direccion');
     if (dirInp) dirInp.value = '';
+    const confirmBtn = $('new-project-addr-confirm');
+    if (confirmBtn) confirmBtn.disabled = true;
+    const statusEl = $('new-project-addr-status');
+    if (statusEl) { statusEl.className = 'proj-new-addr-status'; statusEl.textContent = ''; }
     window.setTimeout(() => inp?.focus(), 60);
   }
+}
+
+function _isAddrConfirmed(proyecto) {
+  // Migration rule: if direccionConfirmada is undefined but the project has a
+  // non-empty address with >= 5 chars, treat it as confirmed (legacy data).
+  if (proyecto.direccionConfirmada === true) return true;
+  if (proyecto.direccionConfirmada === false) return false;
+  // undefined → implied by presence of a real address
+  return !!(proyecto.direccion && String(proyecto.direccion).trim().length >= 5);
 }
 
 function renderProjectsPanel() {
@@ -1320,6 +1341,9 @@ function renderProjectsPanel() {
 
   list.innerHTML = state.proyectos.map((proyecto) => {
     const isActive = proyecto.id === state.proyectoId;
+    // For the active project, use the fuller state.proyecto object which has
+    // the latest direccionConfirmada after edits.
+    const src = isActive && state.proyecto ? state.proyecto : proyecto;
     let fechaStr = '';
     try {
       const rawDate = proyecto.updated_at || proyecto.updatedAt || proyecto.fecha_actualizacion;
@@ -1330,8 +1354,70 @@ function renderProjectsPanel() {
       }
     } catch (_) { /* skip */ }
 
-    const addrText = proyecto.direccion || '';
-    const addrDisplay = addrText || '<em style="color:#94a3b8">Sin dirección</em>';
+    const addrText = String(src.direccion || '').trim();
+    const confirmed = _isAddrConfirmed(src);
+
+    // Small address badge for non-active cards
+    let addrBadge;
+    if (!addrText) {
+      addrBadge = '<em style="color:#94a3b8;font-style:italic">Sin dirección</em>';
+    } else if (confirmed) {
+      addrBadge = `<span class="addr-state-dot addr-state-dot-green">✓</span>${escapeHtml(addrText)}`;
+    } else {
+      addrBadge = `<span class="addr-state-dot addr-state-dot-yellow">!</span>${escapeHtml(addrText)} <em style="color:#94a3b8">(pendiente)</em>`;
+    }
+
+    // Address management section for the active card
+    const showEditForm = isActive && (_addrEditingMode || !confirmed);
+    let addrSection = '';
+    if (isActive) {
+      if (!showEditForm) {
+        // ── Established (green) ──────────────────────────────────────────
+        addrSection = `
+          <div class="proj-card-edit-section">
+            <div class="addr-state addr-state-confirmed">
+              <span class="addr-state-icon">✅</span>
+              <div class="addr-state-body">
+                <div class="addr-state-label">Dirección establecida</div>
+                <div class="addr-state-value" title="${escapeHtml(addrText)}">${escapeHtml(addrText)}</div>
+              </div>
+              <button class="addr-change-btn" type="button"
+                      onclick="event.stopPropagation();startEditAddress()"
+                      title="Editar dirección">Cambiar</button>
+            </div>
+          </div>`;
+      } else {
+        // ── Edit / Pending / Not set ─────────────────────────────────────
+        const stateClass = !addrText ? 'addr-state-empty' : 'addr-state-pending';
+        const stateIcon = !addrText ? '📍' : '⚠️';
+        const stateLabel = !addrText ? 'Dirección no establecida' : 'Pendiente de confirmar';
+        const canConfirm = addrText.length >= 5;
+        addrSection = `
+          <div class="proj-card-edit-section">
+            <div class="addr-state ${stateClass}" id="addr-status-indicator">
+              <span class="addr-state-icon">${stateIcon}</span>
+              <span>${stateLabel}</span>
+            </div>
+            <input class="inp" id="proj-addr-input"
+                   value="${escapeHtml(addrText)}"
+                   placeholder="Ej: Av. Providencia 1234, Santiago"
+                   maxlength="240"
+                   style="margin-bottom:4px"
+                   onclick="event.stopPropagation()"
+                   oninput="updateAddrStatusIndicator(this.value)"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();confirmProjectAddress();}">
+            <div id="addr-validation-msg" class="addr-validation-msg"></div>
+            <button id="addr-confirm-btn" class="addr-confirm-btn" type="button"
+                    onclick="event.stopPropagation();confirmProjectAddress()"
+                    ${canConfirm ? '' : 'disabled'}>
+              ✓ Confirmar dirección
+            </button>
+            ${_addrEditingMode && addrText ? `
+              <button class="btn-outline" type="button" style="width:100%;margin-top:6px;font-size:11px;justify-content:center"
+                      onclick="event.stopPropagation();cancelEditAddress()">Cancelar</button>` : ''}
+          </div>`;
+      }
+    }
 
     return `
       <div class="proj-card ${isActive ? 'is-active' : ''}"
@@ -1345,27 +1431,16 @@ function renderProjectsPanel() {
           <div class="proj-card-name">${escapeHtml(proyecto.nombre || 'Sin nombre')}</div>
           ${isActive ? '<span class="proj-card-badge">Activo</span>' : ''}
         </div>
-        <div class="proj-card-addr">${addrDisplay}</div>
+        ${!isActive ? `<div class="proj-card-addr">${addrBadge}</div>` : ''}
         ${fechaStr ? `<div class="proj-card-date">Actualizado: ${escapeHtml(fechaStr)}</div>` : ''}
-        ${isActive ? `
-          <div class="proj-card-edit-section">
-            <div class="proj-card-edit-label">Dirección del proyecto</div>
-            <div class="proj-card-edit-row">
-              <input class="inp" id="proj-addr-input"
-                     value="${escapeHtml(addrText)}"
-                     placeholder="Ej: Av. Providencia 1234, Santiago"
-                     maxlength="240"
-                     onclick="event.stopPropagation()"
-                     onkeydown="if(event.key==='Enter'){event.preventDefault();saveProjectAddress();}">
-              <button class="btn-primary" type="button" onclick="event.stopPropagation();saveProjectAddress()">Guardar</button>
-            </div>
-          </div>` : ''}
+        ${addrSection}
       </div>`;
   }).join('');
 }
 
 async function switchProject(projectId) {
   if (!projectId || projectId === state.proyectoId) return;
+  _addrEditingMode = false; // reset edit mode when changing project
   closeProjectsPanel();
   try {
     setLoadingText('Cargando proyecto...', 'Un momento');
@@ -1395,6 +1470,10 @@ async function submitNewProject() {
   if (errEl) errEl.classList.remove('is-visible');
 
   const direccion = dirInput?.value?.trim() || '';
+  // direccionConfirmada: true if user clicked "✓ Confirmar" OR address meets
+  // the minimum length and there's no explicit denial.
+  const direccionConfirmada = _newProjAddrConfirmed || direccion.length >= 5;
+
   const submitBtn = $('new-project-submit');
   if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Creando...'; }
 
@@ -1402,8 +1481,10 @@ async function submitNewProject() {
     setSyncStatus('saving', 'GUARDANDO', 'Creando nuevo proyecto...');
     const result = await api('/api/proyectos', {
       method: 'POST',
-      body: JSON.stringify({ nombre, direccion }),
+      body: JSON.stringify({ nombre, direccion, direccionConfirmada: !!direccion && direccionConfirmada }),
     });
+    // Reset new-form tracking
+    _newProjAddrConfirmed = false;
     // Reload project list and switch to the new project
     state.proyectos = await api('/api/proyectos');
     renderProjectSelector();
@@ -1415,32 +1496,104 @@ async function submitNewProject() {
   }
 }
 
-async function saveProjectAddress() {
+// ─── Address state management ─────────────────────────────────────────────
+
+function startEditAddress() {
+  _addrEditingMode = true;
+  renderProjectsPanel();
+  window.setTimeout(() => $('proj-addr-input')?.focus(), 60);
+}
+
+function cancelEditAddress() {
+  _addrEditingMode = false;
+  renderProjectsPanel();
+}
+
+function updateAddrStatusIndicator(value) {
+  const indicator = $('addr-status-indicator');
+  const confirmBtn = $('addr-confirm-btn');
+  const msg = $('addr-validation-msg');
+  const trimmed = String(value || '').trim();
+
+  if (indicator) {
+    if (!trimmed) {
+      indicator.className = 'addr-state addr-state-empty';
+      indicator.innerHTML = '<span class="addr-state-icon">📍</span><span>Dirección no establecida</span>';
+    } else if (trimmed.length < 5) {
+      indicator.className = 'addr-state addr-state-warn';
+      indicator.innerHTML = '<span class="addr-state-icon">⚠️</span><span>Dirección muy corta</span>';
+    } else {
+      indicator.className = 'addr-state addr-state-pending';
+      indicator.innerHTML = '<span class="addr-state-icon">⚠️</span><span>Pendiente de confirmar</span>';
+    }
+  }
+  if (confirmBtn) confirmBtn.disabled = trimmed.length < 5;
+  if (msg) { msg.textContent = ''; msg.classList.remove('is-visible'); }
+}
+
+async function confirmProjectAddress() {
   const input = $('proj-addr-input');
+  const msg = $('addr-validation-msg');
   if (!input || !state.proyectoId) return;
+
   const direccion = input.value.trim();
-  const saveBtn = input.closest('.proj-card-edit-row')?.querySelector('button');
-  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Guardando...'; }
+  if (direccion.length < 5) {
+    input.focus();
+    if (msg) { msg.textContent = 'Ingresa una dirección válida (mínimo 5 caracteres).'; msg.classList.add('is-visible'); }
+    return;
+  }
+  if (msg) { msg.textContent = ''; msg.classList.remove('is-visible'); }
+
+  const confirmBtn = $('addr-confirm-btn');
+  if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Confirmando...'; }
 
   try {
-    // Update local state
-    state.proyecto = normalizeProject({ ...(state.proyecto || {}), direccion });
-    // Update proyectos list entry
+    // Update local state — confirmed!
+    state.proyecto = normalizeProject({ ...(state.proyecto || {}), direccion, direccionConfirmada: true });
     const listEntry = state.proyectos.find((p) => p.id === state.proyectoId);
-    if (listEntry) listEntry.direccion = direccion;
-    // Persist to server
+    if (listEntry) { listEntry.direccion = direccion; listEntry.direccionConfirmada = true; }
+    _addrEditingMode = false;
+
     setSyncStatus('saving', 'GUARDANDO', 'Guardando dirección...');
     await api(`/api/proyectos/${state.proyectoId}`, {
       method: 'PUT',
       body: JSON.stringify(getProjectSavePayload()),
     });
     setSyncStatus('ok', 'GUARDADO', `Guardado ${new Date().toLocaleTimeString()}`);
-    // Refresh visible elements
     renderProjectHeader();
     renderProjectsPanel();
   } catch (error) {
     setSyncStatus('error', 'ERROR', error.message || 'Error al guardar dirección');
-    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Guardar'; }
+    if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = '✓ Confirmar dirección'; }
+  }
+}
+
+// ─── New project address inline helpers ────────────────────────────────────
+
+// Tracks whether the address was explicitly confirmed in the "new project" form
+let _newProjAddrConfirmed = false;
+
+function updateNewProjectAddrStatus() {
+  const input = $('new-project-direccion');
+  const confirmBtn = $('new-project-addr-confirm');
+  const statusEl = $('new-project-addr-status');
+  if (!input) return;
+  const val = input.value.trim();
+  _newProjAddrConfirmed = false;
+  if (confirmBtn) confirmBtn.disabled = val.length < 5;
+  if (statusEl) { statusEl.className = 'proj-new-addr-status'; statusEl.textContent = ''; }
+}
+
+function confirmNewProjectAddr() {
+  const input = $('new-project-direccion');
+  const statusEl = $('new-project-addr-status');
+  if (!input) return;
+  const val = input.value.trim();
+  if (val.length < 5) return;
+  _newProjAddrConfirmed = true;
+  if (statusEl) {
+    statusEl.className = 'proj-new-addr-status is-visible is-confirmed';
+    statusEl.innerHTML = '<span>✅</span> Dirección confirmada';
   }
 }
 
@@ -1454,25 +1607,9 @@ async function refreshHealthStatus() {
 }
 
 function ensureProjectControls() {
-  if ($('project-selector')) return;
-
-  const controlsSlot = $('project-controls-slot');
-  if (!controlsSlot) return;
-
-  const controls = document.createElement('div');
-  controls.style.display = 'flex';
-  controls.style.alignItems = 'center';
-  controls.style.gap = '8px';
-  controls.innerHTML = `
-    <select id="project-selector" class="inp" style="min-width:220px;max-width:320px"></select>
-  `;
-
-  controlsSlot.appendChild(controls);
-
-  $('project-selector').addEventListener('change', async (event) => {
-    await flushPendingAutosaves();
-    await loadProject(event.target.value);
-  });
+  // Dropdown removed — project switching is handled exclusively by the
+  // projects panel (btn-projects → openProjectsPanel). This function is
+  // kept as a no-op so any existing call-sites don't break.
 }
 
 function ensureActionButtons() {
@@ -1529,15 +1666,7 @@ function setupAutosaveListeners() {
 }
 
 function renderProjectSelector() {
-  const selector = $('project-selector');
-  if (selector) {
-    selector.innerHTML = state.proyectos.map((proyecto) => `
-      <option value="${escapeHtml(proyecto.id)}" ${proyecto.id === state.proyectoId ? 'selected' : ''}>
-        ${escapeHtml(proyecto.nombre)}
-      </option>
-    `).join('');
-  }
-  // Keep projects panel in sync (if open)
+  // Dropdown was removed. Keep projects panel in sync if it is open.
   const panel = $('projects-panel');
   if (panel && !panel.hidden) renderProjectsPanel();
 }
@@ -8848,7 +8977,12 @@ window.closeProjectsPanel = closeProjectsPanel;
 window.toggleNewProjectForm = toggleNewProjectForm;
 window.submitNewProject = submitNewProject;
 window.switchProject = switchProject;
-window.saveProjectAddress = saveProjectAddress;
+window.startEditAddress = startEditAddress;
+window.cancelEditAddress = cancelEditAddress;
+window.confirmProjectAddress = confirmProjectAddress;
+window.updateAddrStatusIndicator = updateAddrStatusIndicator;
+window.updateNewProjectAddrStatus = updateNewProjectAddrStatus;
+window.confirmNewProjectAddr = confirmNewProjectAddr;
 window.onCabidaInputChange = onCabidaInputChange;
 window.onTerrenoInputChange = onTerrenoInputChange;
 window.guardarFormulaOverrides = guardarFormulaOverrides;

@@ -1005,6 +1005,41 @@ table:not(.gantt-table) .tfoot-dark td,
 .proj-panel-empty{padding:24px;text-align:center;color:#94a3b8;font-size:13px;line-height:1.5;border:1px dashed var(--border-soft,#e2e8f0);border-radius:10px}
 .proj-panel-empty strong{display:block;color:#475569;font-size:14px;margin-bottom:6px}
 
+/* ===== ADDR STATE (validación visual de dirección) ===== */
+.addr-state{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;font-size:12px;font-weight:600;line-height:1.3;margin-bottom:8px}
+.addr-state-icon{font-size:14px;line-height:1;flex-shrink:0}
+.addr-state-body{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+.addr-state-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;line-height:1}
+.addr-state-value{font-size:12px;font-weight:600;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+/* Confirmed (green) */
+.addr-state-confirmed{background:#f0fdf4;border:1px solid #86efac;color:#166534}
+.addr-state-confirmed .addr-state-label{color:#15803d}
+/* Pending (yellow) */
+.addr-state-pending{background:#fefce8;border:1px solid #fde047;color:#713f12}
+.addr-state-pending .addr-state-label{color:#a16207}
+/* Empty/not set (orange-red soft) */
+.addr-state-empty{background:#fff7ed;border:1px solid #fdba74;color:#9a3412}
+.addr-state-empty .addr-state-label{color:#c2410c}
+.addr-change-btn{margin-left:auto;flex-shrink:0;padding:4px 10px;font-size:10px;font-weight:700;background:#fff;border:1px solid #86efac;border-radius:6px;color:#166534;cursor:pointer;white-space:nowrap;min-height:26px;line-height:1}
+.addr-change-btn:hover{background:#dcfce7;border-color:#4ade80}
+.addr-confirm-btn{width:100%;margin-top:8px;padding:8px 14px;font-size:12px;font-weight:700;background:#1d4ed8;color:#fff;border:none;border-radius:8px;cursor:pointer;min-height:36px;display:flex;align-items:center;justify-content:center;gap:6px;transition:background .15s}
+.addr-confirm-btn:hover:not(:disabled){background:#1e40af}
+.addr-confirm-btn:disabled{opacity:.55;cursor:not-allowed}
+.addr-validation-msg{font-size:11px;color:#b91c1c;font-weight:700;margin-top:4px;display:none}
+.addr-validation-msg.is-visible{display:block}
+.addr-state-dot{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;font-size:9px;font-weight:900;flex-shrink:0;line-height:1;margin-right:3px}
+.addr-state-dot-green{background:#dcfce7;color:#16a34a;border:1px solid #86efac}
+.addr-state-dot-yellow{background:#fef9c3;color:#a16207;border:1px solid #fde047}
+.proj-new-addr-row{display:flex;gap:6px;align-items:flex-start}
+.proj-new-addr-row .inp{flex:1;min-height:34px;font-size:12px}
+.proj-new-confirm-addr-btn{padding:0 10px;min-height:34px;font-size:11px;font-weight:700;background:#f0fdf4;color:#166534;border:1px solid #86efac;border-radius:6px;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all .15s}
+.proj-new-confirm-addr-btn:hover:not(:disabled){background:#dcfce7}
+.proj-new-confirm-addr-btn:disabled{opacity:.5;cursor:not-allowed}
+.proj-new-addr-status{font-size:10px;font-weight:700;margin-top:4px;display:none;gap:4px;align-items:center}
+.proj-new-addr-status.is-visible{display:flex}
+.proj-new-addr-status.is-confirmed{color:#166534}
+.proj-new-addr-status.is-pending{color:#a16207}
+
 </style>
 </head>
 <body>
@@ -1039,7 +1074,6 @@ table:not(.gantt-table) .tfoot-dark td,
     <button class="btn-projects" type="button" onclick="openProjectsPanel()" title="Gestionar proyectos" aria-haspopup="dialog" aria-controls="projects-panel">
       <span class="btn-projects-icon">⊞</span> Proyectos
     </button>
-    <div id="project-controls-slot"></div>
   </div>
 </nav>
 
@@ -2226,8 +2260,12 @@ table:not(.gantt-table) .tfoot-dark td,
           <input class="inp" id="new-project-nombre" type="text" placeholder="Ej: Edificio Miraflores" autocomplete="off" maxlength="120" style="min-height:34px;font-size:12px">
         </div>
         <div class="proj-new-form-field">
-          <label class="proj-new-form-label" for="new-project-direccion">Dirección</label>
-          <input class="inp" id="new-project-direccion" type="text" placeholder="Ej: Av. Providencia 1234, Santiago" autocomplete="off" maxlength="240" style="min-height:34px;font-size:12px">
+          <label class="proj-new-form-label" for="new-project-direccion">Dirección del proyecto</label>
+          <div class="proj-new-addr-row">
+            <input class="inp" id="new-project-direccion" type="text" placeholder="Ej: Av. Providencia 1234, Santiago" autocomplete="off" maxlength="240" oninput="updateNewProjectAddrStatus()">
+            <button class="proj-new-confirm-addr-btn" type="button" id="new-project-addr-confirm" onclick="confirmNewProjectAddr()" disabled title="Confirmar dirección">✓ Confirmar</button>
+          </div>
+          <div id="new-project-addr-status" class="proj-new-addr-status"></div>
         </div>
         <div id="new-project-form-error" class="proj-new-form-error">El nombre es obligatorio.</div>
         <div class="proj-new-form-actions">
