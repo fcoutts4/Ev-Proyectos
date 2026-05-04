@@ -947,6 +947,17 @@ table:not(.gantt-table) .tfoot-dark td,
 #ventas-precios-table .inp{min-height:28px!important;padding:3px 8px!important}
 #formas-pago-table tbody td{padding-top:5px!important;padding-bottom:5px!important;line-height:1.15}
 #formas-pago-table .inp{min-height:28px!important;padding:3px 8px!important}
+#formas-pago-table{width:100%!important;min-width:0!important;table-layout:fixed}
+#formas-pago-table th:nth-child(1),#formas-pago-table td:nth-child(1){width:12%}
+#formas-pago-table th:nth-child(2),#formas-pago-table td:nth-child(2){width:28%}
+#formas-pago-table th:nth-child(3),#formas-pago-table td:nth-child(3){width:12%}
+#formas-pago-table th:nth-child(4),#formas-pago-table td:nth-child(4){width:24%}
+#formas-pago-table th:nth-child(5),#formas-pago-table td:nth-child(5){width:24%}
+#formas-pago-table td:nth-child(1) .inp{max-width:92px;width:100%;margin:0 auto;text-align:center}
+#formas-pago-table td:nth-child(2) .inp{width:100%}
+#formas-pago-table td:nth-child(3) .inp{max-width:84px;width:100%;margin:0 auto;text-align:center}
+#formas-pago-table td:nth-child(4),#formas-pago-table td:nth-child(5){white-space:nowrap}
+.formas-pago-wrap{overflow-x:hidden!important}
 .ventas-card{padding:14px!important}
 .ventas-section-gap{margin-bottom:12px!important}
 .ventas-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
@@ -986,6 +997,7 @@ table:not(.gantt-table) .tfoot-dark td,
   .ventas-inline-grid{grid-template-columns:1fr!important}
   .ventas-speed-grid{grid-template-columns:1fr!important}
   .ventas-kpi-grid{grid-template-columns:1fr!important}
+  #formas-pago-table th,#formas-pago-table td{font-size:11px}
   .payment-plan-grid-head{display:none}
   .planilla-header{align-items:flex-start!important}
 }
@@ -1576,7 +1588,7 @@ table:not(.gantt-table) .tfoot-dark td,
   <!-- 2. Forma de Pago + Velocidades -->
   <div class="card ventas-card" style="margin-bottom:0">
     <div class="sec-title ventas-compact-title">Forma de Pago</div>
-    <div class="tbl-scroll ventas-section-gap" style="margin-bottom:10px">
+    <div class="tbl-scroll ventas-section-gap formas-pago-wrap" style="margin-bottom:10px">
       <table id="formas-pago-table" style="min-width:680px">
         <thead><tr>
           <th style="color:#3b82f6">PIE (%)</th>
