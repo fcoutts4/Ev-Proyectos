@@ -945,16 +945,88 @@ table:not(.gantt-table) .tfoot-dark td,
   .sync-text,.kpi-sub{color:#334155!important}
 }
 
+/* ===== LOADING OVERLAY ===== */
+#app-loading-overlay{position:fixed;inset:0;background:var(--nav-bg,#f8fbff);z-index:500;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px;transition:opacity .22s ease}
+#app-loading-overlay.is-hidden{opacity:0;pointer-events:none}
+.app-loading-logo{width:44px;height:44px;background:#0f172a;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:18px;letter-spacing:.05em;flex-shrink:0}
+.app-loading-spinner{width:32px;height:32px;border:3px solid #e2e8f0;border-top-color:#1d4ed8;border-radius:50%;animation:appSpin .72s linear infinite}
+@keyframes appSpin{to{transform:rotate(360deg)}}
+.app-loading-text{font-size:14px;font-weight:700;color:#334155;letter-spacing:.03em}
+.app-loading-sub{font-size:11px;color:#94a3b8;margin-top:-10px}
+
+/* ===== TOPNAV PROJECT NAME ===== */
+.topnav-proj-info{display:flex;flex-direction:column;justify-content:center;border-left:1px solid var(--border-soft,#e2e8f0);padding-left:12px;margin-left:8px;min-width:0;max-width:260px}
+.topnav-proj-name{font-size:12px;font-weight:700;color:var(--text-main,#0b1220);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+.topnav-proj-addr{font-size:10px;color:var(--text-soft,#475569);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25}
+@media(max-width:900px){.topnav-proj-info{display:none}}
+
+/* ===== PROJECTS PANEL BUTTON ===== */
+.btn-projects{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#475569;background:#fff;border:1px solid var(--border-strong,#c7d2e0);border-radius:8px;padding:5px 11px;cursor:pointer;white-space:nowrap;transition:all .15s ease;min-height:32px}
+.btn-projects:hover{background:var(--bg-soft,#eef3f8);color:#0f172a;border-color:#94a3b8}
+.btn-projects-icon{font-size:13px;line-height:1;display:inline-block}
+
+/* ===== PROJECTS PANEL DRAWER ===== */
+#projects-panel-backdrop{position:fixed;inset:0;background:rgba(15,23,42,.28);z-index:149;opacity:0;pointer-events:none;transition:opacity .22s ease}
+#projects-panel-backdrop.is-open{opacity:1;pointer-events:auto}
+#projects-panel{position:fixed;top:0;right:0;bottom:0;width:min(440px,100vw);background:#fff;z-index:150;transform:translateX(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;box-shadow:-12px 0 48px rgba(15,23,42,.18);border-left:1px solid var(--border-strong,#c7d2e0)}
+#projects-panel.is-open{transform:translateX(0)}
+.proj-panel-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px 16px;border-bottom:1px solid var(--border-soft,#e2e8f0);flex-shrink:0;gap:12px}
+.proj-panel-title{font-size:15px;font-weight:900;color:var(--text-main,#0b1220);letter-spacing:.02em;line-height:1}
+.proj-panel-close{width:30px;height:30px;border:1px solid var(--border-strong,#c7d2e0);border-radius:7px;background:var(--bg-soft,#eef3f8);color:#475569;font-size:15px;font-weight:900;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;line-height:1;flex-shrink:0}
+.proj-panel-close:hover{background:#fee2e2;border-color:#fca5a5;color:#b91c1c}
+.proj-panel-body{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px;overscroll-behavior:contain}
+.proj-panel-section-label{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#64748b;margin-bottom:-4px}
+.proj-panel-new-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:11px 16px;border:2px dashed var(--border-strong,#c7d2e0);border-radius:10px;background:var(--bg-soft,#eef3f8);color:#475569;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s ease;min-height:44px}
+.proj-panel-new-btn:hover{border-color:#1d4ed8;color:#1d4ed8;background:#eff6ff}
+.proj-panel-new-btn-icon{font-size:16px;font-weight:800;line-height:1}
+.proj-new-form{border:1px solid #bfdbfe;border-radius:10px;padding:16px;background:#eff6ff;display:flex;flex-direction:column;gap:10px;animation:uiFadeIn .14s ease-out}
+.proj-new-form-title{font-size:11px;font-weight:800;color:#1e40af;text-transform:uppercase;letter-spacing:.07em}
+.proj-new-form-field{display:flex;flex-direction:column;gap:4px}
+.proj-new-form-label{font-size:10px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.04em}
+.proj-new-form-actions{display:flex;gap:8px;margin-top:2px}
+.proj-new-form-actions .btn-primary{flex:1;padding:7px 12px;font-size:12px;justify-content:center}
+.proj-new-form-actions .btn-outline{padding:7px 12px;font-size:12px}
+.proj-new-form-error{font-size:11px;color:#b91c1c;font-weight:700;display:none}
+.proj-new-form-error.is-visible{display:block}
+.proj-panel-list{display:flex;flex-direction:column;gap:8px}
+.proj-card{border:1px solid var(--border-strong,#c7d2e0);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .15s ease;background:#fff;position:relative;user-select:none}
+.proj-card:hover:not(.is-active){border-color:#94a3b8;background:var(--bg-soft,#eef3f8);box-shadow:0 2px 8px rgba(15,23,42,.08)}
+.proj-card.is-active{border-color:#1d4ed8;background:#eff6ff;cursor:default}
+.proj-card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:4px}
+.proj-card-name{font-size:13px;font-weight:800;color:var(--text-main,#0b1220);line-height:1.25;min-width:0;flex:1}
+.proj-card-badge{font-size:9px;font-weight:800;background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe;border-radius:999px;padding:2px 8px;white-space:nowrap;flex-shrink:0;line-height:1.4;align-self:flex-start;margin-top:2px}
+.proj-card-addr{font-size:11px;color:#64748b;line-height:1.35;margin-bottom:4px;min-height:16px}
+.proj-card-date{font-size:10px;color:#94a3b8;line-height:1.25}
+.proj-card-edit-section{margin-top:12px;padding-top:12px;border-top:1px solid #bfdbfe}
+.proj-card-edit-label{font-size:10px;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
+.proj-card-edit-row{display:flex;gap:6px;align-items:center}
+.proj-card-edit-row .inp{flex:1;min-height:32px;font-size:11px;padding:5px 8px}
+.proj-card-edit-row .btn-primary{padding:5px 12px;font-size:11px;white-space:nowrap;min-height:32px}
+.proj-panel-empty{padding:24px;text-align:center;color:#94a3b8;font-size:13px;line-height:1.5;border:1px dashed var(--border-soft,#e2e8f0);border-radius:10px}
+.proj-panel-empty strong{display:block;color:#475569;font-size:14px;margin-bottom:6px}
+
 </style>
 </head>
 <body>
 <a class="skip-link" href="#main-content">Saltar al contenido principal</a>
+
+<!-- LOADING OVERLAY -->
+<div id="app-loading-overlay" role="status" aria-live="polite" aria-label="Cargando aplicación">
+  <div class="app-loading-logo">B</div>
+  <div class="app-loading-spinner"></div>
+  <div class="app-loading-text" id="app-loading-text">Cargando proyectos...</div>
+  <div class="app-loading-sub">Conectando con el servidor</div>
+</div>
 
 <!-- TOP NAV -->
 <nav class="topnav">
   <div class="topnav-left">
     <div class="logo-box">B</div>
     <span style="font-weight:900;font-size:13px;letter-spacing:.05em;color:#0f172a">BRICSA</span>
+    <div class="topnav-proj-info">
+      <span id="proj-title" class="topnav-proj-name"></span>
+      <span id="proj-dir" class="topnav-proj-addr"></span>
+    </div>
   </div>
   <div class="topnav-right">
     <div class="topnav-sync">
@@ -964,6 +1036,9 @@ table:not(.gantt-table) .tfoot-dark td,
       <button id="btn-save-now" type="button" onclick="saveNow()" title="Guardar cambios pendientes ahora" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#1e40af;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:6px 12px;cursor:pointer;letter-spacing:.03em">Guardar ahora</button>
       <span id="sync-detail" class="topnav-sync-detail">Última sincronización: sin registro</span>
     </div>
+    <button class="btn-projects" type="button" onclick="openProjectsPanel()" title="Gestionar proyectos" aria-haspopup="dialog" aria-controls="projects-panel">
+      <span class="btn-projects-icon">⊞</span> Proyectos
+    </button>
     <div id="project-controls-slot"></div>
   </div>
 </nav>
@@ -2124,6 +2199,50 @@ table:not(.gantt-table) .tfoot-dark td,
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- PROJECTS PANEL BACKDROP -->
+<div id="projects-panel-backdrop" onclick="closeProjectsPanel()" aria-hidden="true"></div>
+
+<!-- PROJECTS PANEL -->
+<div id="projects-panel" role="dialog" aria-modal="true" aria-label="Gestión de proyectos" hidden>
+  <div class="proj-panel-head">
+    <span class="proj-panel-title">Proyectos</span>
+    <button class="proj-panel-close" type="button" onclick="closeProjectsPanel()" title="Cerrar panel" aria-label="Cerrar panel de proyectos">&times;</button>
+  </div>
+  <div class="proj-panel-body">
+
+    <!-- Crear nuevo proyecto -->
+    <button class="proj-panel-new-btn" type="button" id="btn-toggle-new-project" onclick="toggleNewProjectForm()" aria-expanded="false" aria-controls="new-project-form">
+      <span class="proj-panel-new-btn-icon">+</span> Nuevo Proyecto
+    </button>
+
+    <div id="new-project-form" hidden>
+      <div class="proj-new-form">
+        <div class="proj-new-form-title">Nuevo Proyecto</div>
+        <div class="proj-new-form-field">
+          <label class="proj-new-form-label" for="new-project-nombre">Nombre del proyecto *</label>
+          <input class="inp" id="new-project-nombre" type="text" placeholder="Ej: Edificio Miraflores" autocomplete="off" maxlength="120" style="min-height:34px;font-size:12px">
+        </div>
+        <div class="proj-new-form-field">
+          <label class="proj-new-form-label" for="new-project-direccion">Dirección</label>
+          <input class="inp" id="new-project-direccion" type="text" placeholder="Ej: Av. Providencia 1234, Santiago" autocomplete="off" maxlength="240" style="min-height:34px;font-size:12px">
+        </div>
+        <div id="new-project-form-error" class="proj-new-form-error">El nombre es obligatorio.</div>
+        <div class="proj-new-form-actions">
+          <button class="btn-primary" type="button" id="new-project-submit" onclick="submitNewProject()">Crear Proyecto</button>
+          <button class="btn-outline" type="button" onclick="toggleNewProjectForm()">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lista de proyectos -->
+    <div class="proj-panel-section-label">Proyectos existentes</div>
+    <div class="proj-panel-list" id="projects-list">
+      <!-- Populated by JS -->
+    </div>
+
   </div>
 </div>
 

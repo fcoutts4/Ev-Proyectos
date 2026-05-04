@@ -1232,6 +1232,218 @@ async function api(path, options = {}) {
   return response.json();
 }
 
+// ─── Loading overlay ────────────────────────────────────────────────────────
+
+function hideLoadingOverlay() {
+  const overlay = $('app-loading-overlay');
+  if (!overlay) return;
+  overlay.classList.add('is-hidden');
+  window.setTimeout(() => { overlay.style.display = 'none'; }, 260);
+}
+
+function setLoadingText(text, sub = '') {
+  const el = $('app-loading-text');
+  if (el) el.textContent = text;
+  const subEl = document.querySelector('.app-loading-sub');
+  if (subEl) subEl.textContent = sub;
+}
+
+// ─── Projects panel ─────────────────────────────────────────────────────────
+
+function openProjectsPanel(showCreateForm = false) {
+  renderProjectsPanel();
+  const panel = $('projects-panel');
+  const backdrop = $('projects-panel-backdrop');
+  if (!panel) return;
+  panel.hidden = false;
+  window.requestAnimationFrame(() => {
+    panel.classList.add('is-open');
+    if (backdrop) backdrop.classList.add('is-open');
+  });
+  document.body.style.overflow = 'hidden';
+  if (showCreateForm) {
+    const form = $('new-project-form');
+    if (form) {
+      form.hidden = false;
+      const btn = $('btn-toggle-new-project');
+      if (btn) btn.setAttribute('aria-expanded', 'true');
+    }
+  }
+  // Focus management
+  window.setTimeout(() => {
+    if (showCreateForm) $('new-project-nombre')?.focus();
+    else $('projects-panel')?.querySelector('.proj-panel-close')?.focus();
+  }, 80);
+}
+
+function closeProjectsPanel() {
+  const panel = $('projects-panel');
+  const backdrop = $('projects-panel-backdrop');
+  if (!panel) return;
+  panel.classList.remove('is-open');
+  if (backdrop) backdrop.classList.remove('is-open');
+  document.body.style.overflow = '';
+  window.setTimeout(() => { panel.hidden = true; }, 280);
+}
+
+function toggleNewProjectForm() {
+  const form = $('new-project-form');
+  const btn = $('btn-toggle-new-project');
+  if (!form) return;
+  const isHidden = form.hidden;
+  form.hidden = !isHidden;
+  if (btn) btn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+  if (isHidden) {
+    // Showing form — clear previous errors and focus
+    const errEl = $('new-project-form-error');
+    if (errEl) errEl.classList.remove('is-visible');
+    const inp = $('new-project-nombre');
+    if (inp) { inp.value = ''; inp.style.borderColor = ''; }
+    const dirInp = $('new-project-direccion');
+    if (dirInp) dirInp.value = '';
+    window.setTimeout(() => inp?.focus(), 60);
+  }
+}
+
+function renderProjectsPanel() {
+  const list = $('projects-list');
+  if (!list) return;
+
+  if (!state.proyectos.length) {
+    list.innerHTML = `
+      <div class="proj-panel-empty">
+        <strong>Sin proyectos</strong>
+        Usa el botón "+ Nuevo Proyecto" para crear el primero.
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = state.proyectos.map((proyecto) => {
+    const isActive = proyecto.id === state.proyectoId;
+    let fechaStr = '';
+    try {
+      const rawDate = proyecto.updated_at || proyecto.updatedAt || proyecto.fecha_actualizacion;
+      if (rawDate) {
+        fechaStr = new Date(rawDate).toLocaleDateString('es-CL', {
+          day: 'numeric', month: 'short', year: 'numeric',
+        });
+      }
+    } catch (_) { /* skip */ }
+
+    const addrText = proyecto.direccion || '';
+    const addrDisplay = addrText || '<em style="color:#94a3b8">Sin dirección</em>';
+
+    return `
+      <div class="proj-card ${isActive ? 'is-active' : ''}"
+           data-proj-id="${escapeHtml(proyecto.id)}"
+           ${!isActive ? `onclick="switchProject('${escapeHtml(proyecto.id)}')"` : ''}
+           role="${isActive ? 'article' : 'button'}"
+           ${!isActive ? 'tabindex="0"' : ''}
+           ${!isActive ? `onkeydown="if(event.key==='Enter'||event.key===' ')switchProject('${escapeHtml(proyecto.id)}')"` : ''}
+           title="${isActive ? 'Proyecto activo' : `Cambiar a: ${escapeHtml(proyecto.nombre || '')}`}">
+        <div class="proj-card-header">
+          <div class="proj-card-name">${escapeHtml(proyecto.nombre || 'Sin nombre')}</div>
+          ${isActive ? '<span class="proj-card-badge">Activo</span>' : ''}
+        </div>
+        <div class="proj-card-addr">${addrDisplay}</div>
+        ${fechaStr ? `<div class="proj-card-date">Actualizado: ${escapeHtml(fechaStr)}</div>` : ''}
+        ${isActive ? `
+          <div class="proj-card-edit-section">
+            <div class="proj-card-edit-label">Dirección del proyecto</div>
+            <div class="proj-card-edit-row">
+              <input class="inp" id="proj-addr-input"
+                     value="${escapeHtml(addrText)}"
+                     placeholder="Ej: Av. Providencia 1234, Santiago"
+                     maxlength="240"
+                     onclick="event.stopPropagation()"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();saveProjectAddress();}">
+              <button class="btn-primary" type="button" onclick="event.stopPropagation();saveProjectAddress()">Guardar</button>
+            </div>
+          </div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+async function switchProject(projectId) {
+  if (!projectId || projectId === state.proyectoId) return;
+  closeProjectsPanel();
+  try {
+    setLoadingText('Cargando proyecto...', 'Un momento');
+    const overlay = $('app-loading-overlay');
+    if (overlay) { overlay.style.display = ''; overlay.classList.remove('is-hidden'); }
+    await flushPendingAutosaves();
+    await loadProject(projectId);
+  } finally {
+    hideLoadingOverlay();
+  }
+}
+
+async function submitNewProject() {
+  const nombreInput = $('new-project-nombre');
+  const dirInput = $('new-project-direccion');
+  const errEl = $('new-project-form-error');
+  if (!nombreInput) return;
+
+  const nombre = nombreInput.value.trim();
+  if (!nombre) {
+    nombreInput.style.borderColor = '#f87171';
+    nombreInput.focus();
+    if (errEl) errEl.classList.add('is-visible');
+    return;
+  }
+  nombreInput.style.borderColor = '';
+  if (errEl) errEl.classList.remove('is-visible');
+
+  const direccion = dirInput?.value?.trim() || '';
+  const submitBtn = $('new-project-submit');
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Creando...'; }
+
+  try {
+    setSyncStatus('saving', 'GUARDANDO', 'Creando nuevo proyecto...');
+    const result = await api('/api/proyectos', {
+      method: 'POST',
+      body: JSON.stringify({ nombre, direccion }),
+    });
+    // Reload project list and switch to the new project
+    state.proyectos = await api('/api/proyectos');
+    renderProjectSelector();
+    closeProjectsPanel();
+    await loadProject(result.id);
+  } catch (error) {
+    setSyncStatus('error', 'ERROR', error.message || 'Error al crear el proyecto');
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Crear Proyecto'; }
+  }
+}
+
+async function saveProjectAddress() {
+  const input = $('proj-addr-input');
+  if (!input || !state.proyectoId) return;
+  const direccion = input.value.trim();
+  const saveBtn = input.closest('.proj-card-edit-row')?.querySelector('button');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Guardando...'; }
+
+  try {
+    // Update local state
+    state.proyecto = normalizeProject({ ...(state.proyecto || {}), direccion });
+    // Update proyectos list entry
+    const listEntry = state.proyectos.find((p) => p.id === state.proyectoId);
+    if (listEntry) listEntry.direccion = direccion;
+    // Persist to server
+    setSyncStatus('saving', 'GUARDANDO', 'Guardando dirección...');
+    await api(`/api/proyectos/${state.proyectoId}`, {
+      method: 'PUT',
+      body: JSON.stringify(getProjectSavePayload()),
+    });
+    setSyncStatus('ok', 'GUARDADO', `Guardado ${new Date().toLocaleTimeString()}`);
+    // Refresh visible elements
+    renderProjectHeader();
+    renderProjectsPanel();
+  } catch (error) {
+    setSyncStatus('error', 'ERROR', error.message || 'Error al guardar dirección');
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Guardar'; }
+  }
+}
+
 async function refreshHealthStatus() {
   try {
     state.health = await api('/api/health');
@@ -1318,13 +1530,16 @@ function setupAutosaveListeners() {
 
 function renderProjectSelector() {
   const selector = $('project-selector');
-  if (!selector) return;
-
-  selector.innerHTML = state.proyectos.map((proyecto) => `
-    <option value="${escapeHtml(proyecto.id)}" ${proyecto.id === state.proyectoId ? 'selected' : ''}>
-      ${escapeHtml(proyecto.nombre)}
-    </option>
-  `).join('');
+  if (selector) {
+    selector.innerHTML = state.proyectos.map((proyecto) => `
+      <option value="${escapeHtml(proyecto.id)}" ${proyecto.id === state.proyectoId ? 'selected' : ''}>
+        ${escapeHtml(proyecto.nombre)}
+      </option>
+    `).join('');
+  }
+  // Keep projects panel in sync (if open)
+  const panel = $('projects-panel');
+  if (panel && !panel.hidden) renderProjectsPanel();
 }
 
 function getCabidaMetrics(rows) {
@@ -8628,6 +8843,12 @@ window.showTab = showTab;
 window.toggleTabDock = toggleTabDock;
 window.openTabDock = openTabDock;
 window.closeTabDock = closeTabDock;
+window.openProjectsPanel = openProjectsPanel;
+window.closeProjectsPanel = closeProjectsPanel;
+window.toggleNewProjectForm = toggleNewProjectForm;
+window.submitNewProject = submitNewProject;
+window.switchProject = switchProject;
+window.saveProjectAddress = saveProjectAddress;
 window.onCabidaInputChange = onCabidaInputChange;
 window.onTerrenoInputChange = onTerrenoInputChange;
 window.guardarFormulaOverrides = guardarFormulaOverrides;
@@ -8711,6 +8932,14 @@ window.onVentasVelocityChange = onVentasVelocityChange;
 
 // getGanttLockConfig is defined once above (line ~2969). No duplicate needed here.
 
+document.addEventListener('keydown', (event) => {
+  if (event.key !== 'Escape') return;
+  const panel = $('projects-panel');
+  if (panel && !panel.hidden && panel.classList.contains('is-open')) {
+    closeProjectsPanel();
+  }
+});
+
 document.addEventListener('DOMContentLoaded', async () => {
   ensureProjectControls();
   ensureActionButtons();
@@ -8747,12 +8976,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   try {
+    setLoadingText('Verificando conexión...', 'Conectando con el servidor');
     await refreshHealthStatus();
+    setLoadingText('Cargando proyectos...', 'Obteniendo lista de proyectos');
     await loadProjects();
+    hideLoadingOverlay();
+    // If no projects exist, guide user to create the first one
+    if (!state.proyectos.length) {
+      openProjectsPanel(true);
+    }
   } catch (error) {
     console.error(error);
+    hideLoadingOverlay();
     setSyncStatus('error', 'SIN CONEXION', error.message);
-    setText('proj-title', 'No se pudo cargar la version dinamica');
+    setText('proj-title', 'Error de conexión');
     setText('proj-dir', error.message);
   }
 });
