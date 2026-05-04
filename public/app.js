@@ -2922,13 +2922,13 @@ function getGanttDependencyOptions(currentName) {
 }
 
 const GANTT_CANONICAL_NAME_RULES = [
-  { canonical: 'Compra terreno', pattern: /^(Compra terreno|Adquisicion de Terreno|AdquisiciÃ³n de Terreno|Compra de Terreno)$/i },
-  { canonical: 'ConstrucciÃ³n', pattern: /^Construcci[Ã³o]n$/i },
+  { canonical: 'Compra terreno', pattern: /^(Compra terreno|Adquisicion de Terreno|Adquisición de Terreno|Compra de Terreno)$/i },
+  { canonical: 'Construcción', pattern: /^Construcci(?:o|ó|Ã³)n$/i },
   { canonical: 'Aprobaci\u00f3n PE', pattern: /^(Aprobaci(?:o|\u00f3)n(?: del)? Proyecto(?: de)? Edificaci(?:o|\u00f3)n|Aprobaci(?:o|\u00f3)n(?:\s+del)?\s+Pro(?:yecto)?(?:\s+de)?(?:\s+Edificaci(?:o|\u00f3)n)?|Aprobaci(?:o|\u00f3)n\s*P\.?\s*E\.?|Aprobaci(?:o|\u00f3)n\s*PE|Permiso(?: de)? Edificaci(?:o|\u00f3)n)$/i },
   { canonical: 'Promesas', pattern: /^(Promesas|Inicio promesas)$/i },
   { canonical: 'Postventa', pattern: /^Postventa$/i },
-  { canonical: 'RecepciÃ³n municipal', pattern: /^Recepci[Ã³o]n municipal$/i },
-  { canonical: 'EscrituraciÃ³n', pattern: /^Escrituraci[Ã³o]n$/i },
+  { canonical: 'Recepción municipal', pattern: /^Recepci(?:o|ó|Ã³)n municipal$/i },
+  { canonical: 'Escrituración', pattern: /^Escrituraci(?:o|ó|Ã³)n$/i },
 ];
 
 const GANTT_PRESET_COLORS = [
@@ -2939,8 +2939,29 @@ const GANTT_PRESET_COLORS = [
 function canonicalizeGanttName(name) {
   const raw = String(name || '').trim();
   if (!raw) return raw;
+  const sanitized = raw
+    .replace(/Ã¡/gi, 'á')
+    .replace(/Ã©/gi, 'é')
+    .replace(/Ã­/gi, 'í')
+    .replace(/Ã³/gi, 'ó')
+    .replace(/Ãº/gi, 'ú')
+    .replace(/Ã±/gi, 'ñ')
+    .replace(/Â/g, '');
+  const key = sanitized
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+  if (key.startsWith('recepcion municip')) return 'Recepción municipal';
+  if (key.startsWith('escrituraci')) return 'Escrituración';
+  if (key.startsWith('construccion')) return 'Construcción';
+  if (key === 'promesas' || key === 'inicio promesas') return 'Promesas';
+  if (key.startsWith('compra terreno') || key.startsWith('adquisicion de terreno')) return 'Compra terreno';
   const rule = GANTT_CANONICAL_NAME_RULES.find((item) => item.pattern.test(raw));
-  return rule ? rule.canonical : raw;
+  if (rule) return rule.canonical;
+  const sanitizedRule = GANTT_CANONICAL_NAME_RULES.find((item) => item.pattern.test(sanitized));
+  return sanitizedRule ? sanitizedRule.canonical : sanitized;
 }
 
 const UNIQUE_GANTT_MILESTONES = new Set(GANTT_CANONICAL_NAME_RULES.map((item) => item.canonical));
@@ -3182,7 +3203,7 @@ function renderGanttEditor(rows = state.gantt) {
   setHtml('gantt-tbody', normalized.map((row, index) => {
     const left = toNumber(row.inicio) * monthWidth;
     const width = Math.max(1, toNumber(row.duracion)) * monthWidth;
-    const lock = getGanttLockConfig(row);
+    const lock = getGanttLockConfig(row, index, normalized);
     return `
       <tr data-gantt-row data-id="${escapeHtml(row.id || '')}" data-index="${index}" ondragover="allowGanttDrop(event)" ondrop="dropGanttRow(event)">
         <td class="gantt-sticky-left gantt-actions" style="left:0;width:34px">
@@ -5217,18 +5238,20 @@ function indexSafeNumber(value, fallback) {
   return parsed || parsed === 0 ? parsed : fallback;
 }
 
-function getGanttLockConfig(row) {
-  const name = String(row?.nombre || '').trim();
-  if (/^(Promesas|Inicio promesas)$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: false, hint: 'Inicio ligado al mes siguiente del fin de Aprobacion del Proyecto de Edificacion; duracion calculada desde Ventas.' };
-  if (/^Escrituraci(?:o|\u00f3)n$/i.test(name)) return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: false, hint: 'Inicio ligado al mes siguiente del fin de Recepcion municipal; duracion calculada desde Ventas con techo de promesas acumuladas.' };
-  if (isBuildingApprovalMilestoneName(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
-  // Filas clave: nombre y borrado bloqueados; dependencia, fechas y duraciÃ³n editables.
-  if (/^Compra terreno$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
-  if (/^Construcci[Ã³o]n$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Nombre protegido. DuraciÃ³n viene de la hoja de ConstrucciÃ³n.' };
-  if (/^(Promesas|Inicio promesas)$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'DuraciÃ³n calculada desde la hoja Ventas.' };
-  if (/^Recepci[Ã³o]n municipal$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
-  if (/^Escrituraci[Ã³o]n$/i.test(name)) return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'DuraciÃ³n calculada desde Ventas con techo de promesas acumuladas.' };
-  return { fixed: false, name: true, dependency: false, start: false, duration: false, delete: false, drag: false, hint: 'Nombre bloqueado para evitar romper dependencias; usa este hito auxiliar para controlar costos o fechas.' };
+function getGanttLockConfig(row, index = -1, allRows = []) {
+  const canonicalName = canonicalizeGanttName(row?.nombre || '');
+  const baseMilestones = new Set(['Compra terreno', 'Construcción', 'Promesas', 'Recepción municipal', 'Escrituración']);
+  const firstBaseIndex = baseMilestones.has(canonicalName)
+    ? allRows.findIndex((item) => canonicalizeGanttName(item?.nombre || '') === canonicalName)
+    : -1;
+  const isPrimaryBase = baseMilestones.has(canonicalName) && firstBaseIndex === index;
+  if (!isPrimaryBase) {
+    return { fixed: false, name: false, dependency: false, start: false, duration: false, delete: false, drag: false, hint: 'Fila editable.' };
+  }
+  if (canonicalName === 'Promesas') return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: false, hint: 'Inicio ligado al mes siguiente del fin de Aprobación del Proyecto de Edificación; duración calculada desde Ventas.' };
+  if (canonicalName === 'Escrituración') return { fixed: true, name: true, dependency: true, start: true, duration: true, delete: true, drag: false, hint: 'Inicio ligado al mes siguiente del fin de Recepción municipal; duración calculada desde Ventas con techo de promesas acumuladas.' };
+  if (canonicalName === 'Construcción') return { fixed: true, name: true, dependency: false, start: false, duration: true, delete: true, drag: false, hint: 'Nombre protegido. Duración viene de la hoja de Construcción.' };
+  return { fixed: true, name: true, dependency: false, start: false, duration: false, delete: true, drag: false, hint: 'Nombre protegido (referencia clave). Dependencia y fechas editables.' };
 }
 
 function getPartidaFormulaText(partida) {
