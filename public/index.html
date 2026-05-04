@@ -787,12 +787,16 @@ tfoot td{line-height:1.25}
 .finance-split-scroll{overflow:auto;background:#fff;scrollbar-gutter:stable;overscroll-behavior-inline:contain}
 .finance-split-shell table{border:none!important;border-radius:0!important}
 .finance-split-fixed table{width:370px;min-width:370px;table-layout:fixed}
+.finance-split-shell .finance-date-table{table-layout:fixed}
 .finance-fixed-concept-col{width:220px;min-width:220px;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .finance-fixed-total-col{width:150px;min-width:150px;max-width:150px;white-space:nowrap;overflow:visible;text-overflow:clip}
 .finance-split-fixed td.finance-fixed-total-col,.finance-split-fixed th.finance-fixed-total-col{position:relative;z-index:3;background:#fff!important}
 .finance-split-fixed td.finance-fixed-total-col{padding-right:10px!important}
-.finance-split-fixed thead th{height:28px}
-.finance-split-shell tbody td{height:40px}
+.finance-split-shell .finance-date-table thead th{height:28px;padding:4px 8px!important;vertical-align:middle;line-height:1.1;box-sizing:border-box}
+.finance-split-shell .finance-date-table tbody td{height:34px;min-height:34px;padding:4px 8px!important;vertical-align:middle;line-height:1.1;box-sizing:border-box}
+.finance-split-shell .finance-date-table tfoot td{padding:6px 8px!important;vertical-align:middle;line-height:1.1;box-sizing:border-box}
+.finance-fixed-concept-cell{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:6px;height:34px;min-height:34px;padding:4px 8px!important;line-height:1.1;box-sizing:border-box}
+.finance-fixed-concept-cell span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .finance-split-fixed .finance-total-row td{background:#f4f8fc!important;font-weight:800!important}
 .finance-split-scroll thead th{position:sticky;top:0;z-index:3}
 .finance-date-table{border:none!important;border-radius:0!important;border-collapse:separate!important;border-spacing:0!important}
@@ -1139,11 +1143,10 @@ table:not(.gantt-table) .tfoot-dark td,
 #tab-construccion .construction-ep-card .finance-split-shell{border-color:#dbe4ee}
 #tab-construccion .construction-ep-card .finance-split-fixed thead th,
 #tab-construccion .construction-ep-card .finance-split-scroll thead th{height:28px;padding-top:4px!important;padding-bottom:4px!important;vertical-align:middle}
-#tab-construccion .construction-ep-card .finance-split-shell tbody td{height:40px;padding-top:2px!important;padding-bottom:2px!important;vertical-align:middle;line-height:1.1}
+#tab-construccion .construction-ep-card .finance-split-shell tbody td{height:34px;min-height:34px;padding-top:4px!important;padding-bottom:4px!important;vertical-align:middle;line-height:1.1}
 #tab-construccion .construction-ep-card .finance-split-shell tfoot td{padding-top:7px!important;padding-bottom:7px!important;vertical-align:middle}
-#tab-construccion .construction-ep-card .finance-split-fixed td.finance-fixed-concept-cell{padding:0 10px!important}
-#tab-construccion .construction-ep-card .finance-fixed-concept-cell{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:6px;line-height:1.1;min-height:38px}
-#tab-construccion .construction-ep-card .finance-fixed-concept-cell span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#tab-construccion .construction-ep-card .finance-split-fixed td.finance-fixed-concept-cell{padding:4px 8px!important}
+#tab-construccion .construction-ep-card .finance-fixed-concept-cell{min-height:34px;height:34px}
 #tab-construccion .construction-ep-card .formula-host{padding-top:0!important;padding-bottom:0!important}
 #tab-construccion .construction-ep-card .formula-readonly{display:block;font-size:10px;line-height:1.15;color:#334155;background:#f8fafc;border:1px solid #dbe4ee;border-radius:6px;padding:5px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (max-width: 1100px){
