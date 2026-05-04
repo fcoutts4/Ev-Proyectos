@@ -4153,7 +4153,7 @@ function renderVentasSummaryCardsLegacy() {
   setText('vel-duracion', `${fmtNumber(duration)} meses`);
   setText('vel-analisis', `Analisis desde ${formatTimelineMonthLabel(analysisStart)} a ${formatTimelineMonthLabel(analysisEnd)}`);
   setText('vel-entregas', fmtNumber(velEntregas, 1));
-  setText('vel-promesas-mini', `Vel. promesas: ${fmtNumber(velPromesas, 1)} un/mes${cierrePromesas > 0 ? ` · Cierre promesas: ${fmtNumber(cierrePromesas, 0)} un` : ''}${cierreEscrituracion > 0 ? ` · Cierre escrituración: ${fmtNumber(cierreEscrituracion, 0)} un` : ''}`);
+  setText('vel-promesas-mini', '');
   setText('escrit-inicio', formatTimelineMonthLabel(escrituraInicio));
   setText('escrit-fin', formatTimelineMonthLabel(escrituraFin));
   setText('escrit-dur', `Duracion: ${fmtNumber(escrituraDuracion)} meses`);
@@ -4257,7 +4257,7 @@ function renderVentasSummaryCards() {
   setText('vel-duracion', `${fmtNumber(duration)} meses`);
   setText('vel-analisis', `Analisis desde ${formatTimelineMonthLabel(analysisStart)} a ${formatTimelineMonthLabel(analysisEnd)}`);
   setText('vel-entregas', fmtNumber(velEntregas, 1));
-  setText('vel-promesas-mini', `Vel. promesas: ${fmtNumber(velPromesas, 1)} un/mes${cierrePromesas > 0 ? ` · Cierre promesas: ${fmtNumber(cierrePromesas, 0)} un` : ''}${cierreEscrituracion > 0 ? ` · Cierre escrituración: ${fmtNumber(cierreEscrituracion, 0)} un` : ''}`);
+  setText('vel-promesas-mini', '');
   setText('escrit-inicio', formatTimelineMonthLabel(escrituraInicio));
   setText('escrit-fin', formatTimelineMonthLabel(escrituraFin));
   setText('escrit-dur', `Duracion: ${fmtNumber(escrituraDuracion)} meses`);
