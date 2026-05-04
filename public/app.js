@@ -3687,6 +3687,27 @@ function buildVentasUnitFlowForMonths(months, promiseStart = 0, escrituraStart =
   return { promesas, escrituras };
 }
 
+function getDisplayedVelocityStats(series) {
+  const active = (Array.isArray(series) ? series : [])
+    .map((value) => Math.max(0, toNumber(value)))
+    .filter((value) => value > 0);
+  if (!active.length) {
+    return { velocidad: 0, ultimoMesParcial: false, cierreUnidades: 0 };
+  }
+  if (active.length === 1) {
+    return { velocidad: active[0], ultimoMesParcial: false, cierreUnidades: 0 };
+  }
+  const last = active[active.length - 1];
+  const previous = active[active.length - 2];
+  const ultimoMesParcial = last < previous;
+  const sample = ultimoMesParcial ? active.slice(0, -1) : active;
+  if (!sample.length) {
+    return { velocidad: last, ultimoMesParcial, cierreUnidades: ultimoMesParcial ? last : 0 };
+  }
+  const velocidad = sample.reduce((sum, value) => sum + value, 0) / sample.length;
+  return { velocidad, ultimoMesParcial, cierreUnidades: ultimoMesParcial ? last : 0 };
+}
+
 function calculateEscrituraDurationWithPromiseCap(escrituraStart, promiseStart = 0) {
   const totalUnits = Math.max(0, Math.round(toNumber(getTotalSalesMetrics().totalUnidades)));
   if (!totalUnits) return 1;
@@ -4021,9 +4042,6 @@ function ganttOptionsHtml(selected) {
 }
 
 function renderVentasSchedules() {
-  const velocitySettings = getVentasVelocitySettings();
-  const velPromesasConfig = Math.max(1, Math.round(toNumber(velocitySettings.promesas)));
-  const velEscrConfig = Math.max(1, Math.round(toNumber(velocitySettings.escrituracion)));
   // Cronograma de Promesas: fila Ãºnica global (auto-calculada)
   const preventaRows = getCronogramaByType('PREVENTA');
   const totalUnidadesPromesas = preventaRows.reduce((sum, row) => {
@@ -4032,6 +4050,12 @@ function renderVentasSchedules() {
   }, 0);
   const primeraPreventa = preventaRows[0];
   const computedPreventa = primeraPreventa ? getCronogramaComputed(primeraPreventa) : { inicio: 0, fin: 0, duracion: 0 };
+  const escrRow = getCronogramaByType('ESCRITURACION')[0];
+  const computedEscr = escrRow ? getCronogramaComputed(escrRow) : { inicio: 0, fin: 0, duracion: 0 };
+  const flowMonths = buildTimelineMonths(Math.max(computedPreventa.fin || 0, computedEscr.fin || 0));
+  const flow = getPromesasEscrituracionUnidades(flowMonths);
+  const velPromesasReal = getDisplayedVelocityStats(flow.promesas).velocidad;
+  const velEscrReal = getDisplayedVelocityStats(flow.escrituras).velocidad;
 
   setHtml('preventa-tbody', primeraPreventa ? `
     <tr>
@@ -4039,14 +4063,12 @@ function renderVentasSchedules() {
       <td style="text-align:center;font-weight:700">${fmtNumber(computedPreventa.inicio)}</td>
       <td style="text-align:center;color:#16a34a;font-weight:700">${fmtNumber(computedPreventa.fin)}</td>
       <td style="text-align:center">${fmtNumber(totalUnidadesPromesas)} un</td>
-      <td style="text-align:center">${fmtNumber(velPromesasConfig, 0)} un/mes</td>
+      <td style="text-align:center">${fmtNumber(velPromesasReal, 1)} un/mes</td>
     </tr>
   ` : '<tr><td colspan="5" style="text-align:center;color:#94a3b8">Sin unidades configuradas</td></tr>');
 
   // Cronograma de EscrituraciÃ³n: fila Ãºnica global (auto-calculada)
-  const escrRow = getCronogramaByType('ESCRITURACION')[0];
   const totalUnidadesEscr = state.ventasConfig.reduce((sum, item) => sum + getUsoSaleMetrics(item.uso).unidades, 0);
-  const computedEscr = escrRow ? getCronogramaComputed(escrRow) : { inicio: 0, fin: 0, duracion: 0 };
 
   setHtml('escrituracion-tbody', escrRow ? `
     <tr>
@@ -4054,7 +4076,7 @@ function renderVentasSchedules() {
       <td style="text-align:center;font-weight:700">${fmtNumber(computedEscr.inicio)}</td>
       <td style="text-align:center;color:#16a34a;font-weight:700">${fmtNumber(computedEscr.fin)}</td>
       <td style="text-align:center">${fmtNumber(totalUnidadesEscr)} un</td>
-      <td style="text-align:center">${fmtNumber(velEscrConfig, 0)} un/mes</td>
+      <td style="text-align:center">${fmtNumber(velEscrReal, 1)} un/mes</td>
     </tr>
   ` : '<tr><td colspan="5" style="text-align:center;color:#94a3b8">Sin datos de escrituraciÃ³n</td></tr>');
 }
@@ -4100,9 +4122,12 @@ function renderVentasSummaryCardsLegacy() {
   const escrituraFin = escrRow ? getCronogramaComputed(escrRow).fin : 0;
   const escrituraDuracion = escrRow ? getCronogramaComputed(escrRow).duracion : 0;
   const totalUnidades = state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).unidades, 0);
-  const velocitySettings = getVentasVelocitySettings();
-  const velEntregas = Math.max(1, Math.round(toNumber(velocitySettings.escrituracion)));
-  const velPromesas = Math.max(1, Math.round(toNumber(velocitySettings.promesas)));
+  const flowMonths = buildTimelineMonths(escrituraFin);
+  const flow = getPromesasEscrituracionUnidades(flowMonths);
+  const promesasStats = getDisplayedVelocityStats(flow.promesas);
+  const escrituracionStats = getDisplayedVelocityStats(flow.escrituras);
+  const velEntregas = escrituracionStats.velocidad;
+  const velPromesas = promesasStats.velocidad;
 
   const analysisStart = escrituraDuracion > 0
     ? escrituraInicio
@@ -4119,16 +4144,16 @@ function renderVentasSummaryCardsLegacy() {
   const duration = analysisEnd >= analysisStart ? analysisEnd - analysisStart + 1 : 1;
   const velUf = totalVenta / duration;
   const velUn = velPromesas;
-  const cierrePromesas = totalUnidades > 0 ? totalUnidades % velPromesas : 0;
-  const cierreEscrituracion = totalUnidades > 0 ? totalUnidades % velEntregas : 0;
+  const cierrePromesas = promesasStats.cierreUnidades;
+  const cierreEscrituracion = escrituracionStats.cierreUnidades;
 
   drawSpeedometer(velUf, Math.max(velUf * 1.3, 1));
   setText('vel-global-uf', fmtNumber(velUf));
-  setText('vel-global-un', `${fmtNumber(velUn, 0)} un/m`);
+  setText('vel-global-un', `${fmtNumber(velUn, 1)} un/m`);
   setText('vel-duracion', `${fmtNumber(duration)} meses`);
   setText('vel-analisis', `Analisis desde ${formatTimelineMonthLabel(analysisStart)} a ${formatTimelineMonthLabel(analysisEnd)}`);
-  setText('vel-entregas', fmtNumber(velEntregas, 0));
-  setText('vel-promesas-mini', `Vel. promesas: ${fmtNumber(velPromesas, 0)} un/mes${cierrePromesas > 0 ? ` · Cierre promesas: ${fmtNumber(cierrePromesas, 0)} un` : ''}${cierreEscrituracion > 0 ? ` · Cierre escrituración: ${fmtNumber(cierreEscrituracion, 0)} un` : ''}`);
+  setText('vel-entregas', fmtNumber(velEntregas, 1));
+  setText('vel-promesas-mini', `Vel. promesas: ${fmtNumber(velPromesas, 1)} un/mes${cierrePromesas > 0 ? ` · Cierre promesas: ${fmtNumber(cierrePromesas, 0)} un` : ''}${cierreEscrituracion > 0 ? ` · Cierre escrituración: ${fmtNumber(cierreEscrituracion, 0)} un` : ''}`);
   setText('escrit-inicio', formatTimelineMonthLabel(escrituraInicio));
   setText('escrit-fin', formatTimelineMonthLabel(escrituraFin));
   setText('escrit-dur', `Duracion: ${fmtNumber(escrituraDuracion)} meses`);
@@ -4200,9 +4225,12 @@ function renderVentasSummaryCards() {
   const escrituraFin = escrRow ? getCronogramaComputed(escrRow).fin : 0;
   const escrituraDuracion = escrRow ? getCronogramaComputed(escrRow).duracion : 0;
   const totalUnidades = state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).unidades, 0);
-  const velocitySettings = getVentasVelocitySettings();
-  const velEntregas = Math.max(1, Math.round(toNumber(velocitySettings.escrituracion)));
-  const velPromesas = Math.max(1, Math.round(toNumber(velocitySettings.promesas)));
+  const flowMonths = buildTimelineMonths(escrituraFin);
+  const flow = getPromesasEscrituracionUnidades(flowMonths);
+  const promesasStats = getDisplayedVelocityStats(flow.promesas);
+  const escrituracionStats = getDisplayedVelocityStats(flow.escrituras);
+  const velEntregas = escrituracionStats.velocidad;
+  const velPromesas = promesasStats.velocidad;
 
   const analysisPoints = preRows.map((row) => getCronogramaComputed(row));
   const analysisStart = escrituraDuracion > 0
@@ -4220,16 +4248,16 @@ function renderVentasSummaryCards() {
   const duration = analysisEnd >= analysisStart ? analysisEnd - analysisStart + 1 : 1;
   const velUf = totalVenta / duration;
   const velUn = velPromesas;
-  const cierrePromesas = totalUnidades > 0 ? totalUnidades % velPromesas : 0;
-  const cierreEscrituracion = totalUnidades > 0 ? totalUnidades % velEntregas : 0;
+  const cierrePromesas = promesasStats.cierreUnidades;
+  const cierreEscrituracion = escrituracionStats.cierreUnidades;
 
   drawSpeedometer(velUf, Math.max(velUf * 1.3, 1));
   setText('vel-global-uf', fmtNumber(velUf));
-  setText('vel-global-un', `${fmtNumber(velUn, 0)} un/m`);
+  setText('vel-global-un', `${fmtNumber(velUn, 1)} un/m`);
   setText('vel-duracion', `${fmtNumber(duration)} meses`);
   setText('vel-analisis', `Analisis desde ${formatTimelineMonthLabel(analysisStart)} a ${formatTimelineMonthLabel(analysisEnd)}`);
-  setText('vel-entregas', fmtNumber(velEntregas, 0));
-  setText('vel-promesas-mini', `Vel. promesas: ${fmtNumber(velPromesas, 0)} un/mes${cierrePromesas > 0 ? ` · Cierre promesas: ${fmtNumber(cierrePromesas, 0)} un` : ''}${cierreEscrituracion > 0 ? ` · Cierre escrituración: ${fmtNumber(cierreEscrituracion, 0)} un` : ''}`);
+  setText('vel-entregas', fmtNumber(velEntregas, 1));
+  setText('vel-promesas-mini', `Vel. promesas: ${fmtNumber(velPromesas, 1)} un/mes${cierrePromesas > 0 ? ` · Cierre promesas: ${fmtNumber(cierrePromesas, 0)} un` : ''}${cierreEscrituracion > 0 ? ` · Cierre escrituración: ${fmtNumber(cierreEscrituracion, 0)} un` : ''}`);
   setText('escrit-inicio', formatTimelineMonthLabel(escrituraInicio));
   setText('escrit-fin', formatTimelineMonthLabel(escrituraFin));
   setText('escrit-dur', `Duracion: ${fmtNumber(escrituraDuracion)} meses`);
