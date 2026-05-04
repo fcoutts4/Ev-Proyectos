@@ -51,7 +51,10 @@ const DEBUG_PERFORMANCE = false;
 const DEFAULT_AUTOSAVE_DELAY = 700;
 const INPUT_RENDER_DEBOUNCE_MS = 180;
 const UI_STATE_STORAGE_KEY = 'evproyectos.uiState.v1';
+const PROJECT_META_STORAGE_KEY = 'evproyectos.projectMeta.v1';
 const UI_STATE_SAVE_DELAY = 350;
+const ADDRESS_SEARCH_DEBOUNCE_MS = 400;
+const ADDRESS_SEARCH_MIN_CHARS = 3;
 const formulaCatalogCache = new WeakMap();
 
 const USER_STORAGE_KEYS = [
@@ -364,6 +367,208 @@ function normalizeFormulaOverrides(value = {}) {
   };
 }
 
+function isExplicitTrue(value) {
+  return value === true || value === 1 || value === '1' || value === 'true';
+}
+
+function readProjectMetaStore() {
+  try {
+    const rawValue = window.localStorage.getItem(PROJECT_META_STORAGE_KEY);
+    if (!rawValue) return { projects: {} };
+    const parsed = JSON.parse(rawValue);
+    if (!parsed || typeof parsed !== 'object') return { projects: {} };
+    return {
+      ...parsed,
+      projects: parsed.projects && typeof parsed.projects === 'object' ? parsed.projects : {},
+    };
+  } catch (_) {
+    return { projects: {} };
+  }
+}
+
+function writeProjectMetaStore(store) {
+  try {
+    window.localStorage.setItem(PROJECT_META_STORAGE_KEY, JSON.stringify(store || { projects: {} }));
+  } catch (_) {
+    // localStorage can fail in private windows; backend save still proceeds.
+  }
+}
+
+function getProjectLocalMeta(projectId) {
+  if (!projectId) return {};
+  const store = readProjectMetaStore();
+  const meta = store.projects?.[String(projectId)];
+  return meta && typeof meta === 'object' ? meta : {};
+}
+
+function saveProjectLocalMeta(projectId, patch = {}) {
+  if (!projectId) return;
+  const store = readProjectMetaStore();
+  const projects = store.projects && typeof store.projects === 'object' ? store.projects : {};
+  projects[String(projectId)] = {
+    ...(projects[String(projectId)] || {}),
+    ...patch,
+  };
+  writeProjectMetaStore({ ...store, projects });
+}
+
+function normalizeAddressForCompare(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function cleanAddressPart(value) {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .replace(/\b(openstreetmap|nominatim|google places|google)\b/gi, '')
+    .trim()
+    .replace(/^,+|,+$/g, '')
+    .trim();
+}
+
+function isAddressNoisePart(value) {
+  const part = cleanAddressPart(value);
+  if (!part) return true;
+  if (/^\d{5,8}$/.test(part)) return true;
+  if (/^chile$/i.test(part)) return true;
+  if (/^provincia\b/i.test(part)) return true;
+  if (/^regi[oó]n\b/i.test(part)) return true;
+  if (/metropolitana de santiago/i.test(part)) return true;
+  return false;
+}
+
+function limitAddressDisplay(value) {
+  const text = cleanAddressPart(value);
+  return text.length > 100 ? `${text.slice(0, 97).trim()}...` : text;
+}
+
+function compactAddressFromParts(street, comuna, fallback = '') {
+  const cleanStreet = cleanAddressPart(street);
+  const cleanComuna = cleanAddressPart(comuna);
+  if (cleanStreet && cleanComuna && normalizeAddressForCompare(cleanStreet) !== normalizeAddressForCompare(cleanComuna)) {
+    return limitAddressDisplay(`${cleanStreet}, ${cleanComuna}`);
+  }
+  if (cleanStreet) return limitAddressDisplay(cleanStreet);
+
+  const fallbackParts = String(fallback || '')
+    .split(',')
+    .map(cleanAddressPart)
+    .filter((part) => part && !isAddressNoisePart(part));
+  if (!fallbackParts.length) return limitAddressDisplay(fallback);
+
+  if (/^\d+[a-zA-Z]?$/.test(fallbackParts[0]) && fallbackParts[1]) {
+    const fallbackStreet = `${fallbackParts[1]} ${fallbackParts[0]}`.trim();
+    const fallbackComuna = fallbackParts[2] || '';
+    return compactAddressFromParts(fallbackStreet, fallbackComuna);
+  }
+
+  return compactAddressFromParts(fallbackParts[0], fallbackParts[1] || '');
+}
+
+function compactAddressFromText(value) {
+  return compactAddressFromParts('', '', value);
+}
+
+function getNominatimSimpleAddress(item = {}) {
+  const address = item.address && typeof item.address === 'object' ? item.address : {};
+  const streetName = address.road
+    || address.pedestrian
+    || address.footway
+    || address.street
+    || address.residential
+    || address.path
+    || address.neighbourhood
+    || '';
+  const houseNumber = address.house_number || '';
+  const street = streetName && houseNumber ? `${streetName} ${houseNumber}` : streetName;
+  const comuna = address.city
+    || address.town
+    || address.village
+    || address.municipality
+    || address.commune
+    || address.city_district
+    || address.suburb
+    || '';
+  return compactAddressFromParts(street, comuna, item.display_name || '');
+}
+
+function getGoogleAddressComponent(components = [], type) {
+  const match = Array.isArray(components)
+    ? components.find((component) => Array.isArray(component.types) && component.types.includes(type))
+    : null;
+  return match?.long_name || '';
+}
+
+function getGoogleSimpleAddress(place = {}) {
+  const components = place.address_components || [];
+  const route = getGoogleAddressComponent(components, 'route');
+  const streetNumber = getGoogleAddressComponent(components, 'street_number');
+  const street = route && streetNumber ? `${route} ${streetNumber}` : (route || place.name || '');
+  const comuna = getGoogleAddressComponent(components, 'locality')
+    || getGoogleAddressComponent(components, 'administrative_area_level_3')
+    || getGoogleAddressComponent(components, 'sublocality_level_1')
+    || getGoogleAddressComponent(components, 'sublocality')
+    || '';
+  return compactAddressFromParts(street, comuna, place.formatted_address || place.name || '');
+}
+
+function getProjectUpdatedAtValue(project = {}) {
+  return project.updated_at || project.updatedAt || project.fechaActualizacion || project.fecha_actualizacion || '';
+}
+
+function stampProjectUpdated(project = {}, explicitDate = new Date().toISOString()) {
+  return {
+    ...project,
+    updated_at: explicitDate,
+    updatedAt: explicitDate,
+    fechaActualizacion: explicitDate,
+    fecha_actualizacion: explicitDate,
+  };
+}
+
+function applyProjectLocalMeta(project = {}) {
+  if (!project || typeof project !== 'object') return normalizeProject(project);
+  const meta = getProjectLocalMeta(project.id);
+  if (!meta || !Object.keys(meta).length) return normalizeProject(project);
+
+  const merged = { ...project };
+  if (typeof meta.nombre === 'string' && meta.nombre.trim()) merged.nombre = meta.nombre.trim();
+  if (Object.prototype.hasOwnProperty.call(meta, 'direccion')) {
+    merged.direccion = isExplicitTrue(meta.direccionValidada)
+      ? compactAddressFromText(meta.direccion || meta.direccionCompleta || '')
+      : String(meta.direccion || '').trim();
+  }
+  if (Object.prototype.hasOwnProperty.call(meta, 'direccionCompleta')) {
+    merged.direccionCompleta = String(meta.direccionCompleta || '').trim();
+  }
+
+  const mergedAddress = normalizeAddressForCompare(merged.direccion);
+  if (mergedAddress && Object.prototype.hasOwnProperty.call(meta, 'direccion')) {
+    merged.direccionConfirmada = isExplicitTrue(meta.direccionConfirmada);
+    merged.direccionValidada = isExplicitTrue(meta.direccionValidada);
+    merged.direccionPlaceId = meta.direccionPlaceId || '';
+    merged.direccionLat = Number.isFinite(Number(meta.direccionLat)) ? Number(meta.direccionLat) : null;
+    merged.direccionLng = Number.isFinite(Number(meta.direccionLng)) ? Number(meta.direccionLng) : null;
+    merged.direccionCompleta = String(meta.direccionCompleta || meta.direccion || '').trim();
+  } else if (mergedAddress && (!isExplicitTrue(merged.direccionConfirmada) || !isExplicitTrue(merged.direccionValidada))) {
+    merged.direccionConfirmada = false;
+    merged.direccionValidada = false;
+    merged.direccionPlaceId = '';
+    merged.direccionLat = null;
+    merged.direccionLng = null;
+    merged.direccionCompleta = '';
+  }
+
+  const metaUpdatedAt = meta.fechaActualizacion || meta.updated_at || meta.updatedAt || meta.fecha_actualizacion;
+  if (metaUpdatedAt) {
+    merged.fechaActualizacion = metaUpdatedAt;
+    merged.fecha_actualizacion = metaUpdatedAt;
+    if (!merged.updated_at) merged.updated_at = metaUpdatedAt;
+    if (!merged.updatedAt) merged.updatedAt = metaUpdatedAt;
+  }
+
+  return normalizeProject(merged);
+}
+
 function normalizeProject(project = {}) {
   const source = project && typeof project === 'object' ? project : {};
   const terrenoM2Bruto = source.terreno_m2_bruto ?? source.terreno_m2_bruto_afecto ?? 0;
@@ -373,8 +578,20 @@ function normalizeProject(project = {}) {
   const terrenoPrecioTotal = source.terreno_precio_total ?? 0;
   const terrenoPrecioUfM2 = source.terreno_precio_uf_m2
     ?? (terrenoM2Neto > 0 ? terrenoPrecioTotal / terrenoM2Neto : 0);
+  const direccion = String(source.direccion || '').trim();
+  const direccionValidada = !!direccion && isExplicitTrue(source.direccionConfirmada) && isExplicitTrue(source.direccionValidada);
+  const direccionCompleta = direccionValidada
+    ? String(source.direccionCompleta || source.direccion || '').trim()
+    : '';
   return {
     ...source,
+    direccion,
+    direccionCompleta,
+    direccionConfirmada: direccionValidada,
+    direccionValidada,
+    direccionPlaceId: direccionValidada ? (source.direccionPlaceId || '') : '',
+    direccionLat: direccionValidada && Number.isFinite(Number(source.direccionLat)) ? Number(source.direccionLat) : null,
+    direccionLng: direccionValidada && Number.isFinite(Number(source.direccionLng)) ? Number(source.direccionLng) : null,
     compra_terreno_fecha: source.compra_terreno_fecha || '',
     terreno_m2_bruto: terrenoM2Bruto,
     terreno_m2_bruto_afecto: terrenoM2Bruto,
@@ -1254,6 +1471,20 @@ function setLoadingText(text, sub = '') {
 // Resets when: project is switched, address is confirmed, or panel closes.
 let _addrEditingMode = false;
 
+// Tracks whether the user is editing the project name on the active card.
+// Resets when: project is switched, name is saved/cancelled, or panel closes.
+let _nameEditingMode = false;
+
+const _addressSearchState = {
+  project: { timer: null, controller: null, sequence: 0, results: [] },
+  new: { timer: null, controller: null, sequence: 0, results: [] },
+};
+
+let _activeProjectAddressSelection = null;
+let _newProjectAddressSelection = null;
+let _googleAutocompleteService = null;
+let _googlePlacesService = null;
+
 function openProjectsPanel(showCreateForm = false) {
   renderProjectsPanel();
   const panel = $('projects-panel');
@@ -1289,7 +1520,12 @@ function closeProjectsPanel() {
   document.body.style.overflow = '';
   // Reset transient UI state
   _addrEditingMode = false;
+  _nameEditingMode = false;
+  _activeProjectAddressSelection = null;
+  resetAddressSearchContext('project');
   _newProjAddrConfirmed = false;
+  _newProjectAddressSelection = null;
+  resetAddressSearchContext('new');
   window.setTimeout(() => { panel.hidden = true; }, 280);
 }
 
@@ -1303,14 +1539,14 @@ function toggleNewProjectForm() {
   if (isHidden) {
     // Showing form — clear previous values, errors and focus
     _newProjAddrConfirmed = false;
+    _newProjectAddressSelection = null;
+    resetAddressSearchContext('new');
     const errEl = $('new-project-form-error');
     if (errEl) errEl.classList.remove('is-visible');
     const inp = $('new-project-nombre');
     if (inp) { inp.value = ''; inp.style.borderColor = ''; }
     const dirInp = $('new-project-direccion');
     if (dirInp) dirInp.value = '';
-    const confirmBtn = $('new-project-addr-confirm');
-    if (confirmBtn) confirmBtn.disabled = true;
     const statusEl = $('new-project-addr-status');
     if (statusEl) { statusEl.className = 'proj-new-addr-status'; statusEl.textContent = ''; }
     window.setTimeout(() => inp?.focus(), 60);
@@ -1318,12 +1554,45 @@ function toggleNewProjectForm() {
 }
 
 function _isAddrConfirmed(proyecto) {
-  // Migration rule: if direccionConfirmada is undefined but the project has a
-  // non-empty address with >= 5 chars, treat it as confirmed (legacy data).
-  if (proyecto.direccionConfirmada === true) return true;
-  if (proyecto.direccionConfirmada === false) return false;
-  // undefined → implied by presence of a real address
-  return !!(proyecto.direccion && String(proyecto.direccion).trim().length >= 5);
+  return !!String(proyecto?.direccion || '').trim()
+    && isExplicitTrue(proyecto?.direccionConfirmada)
+    && isExplicitTrue(proyecto?.direccionValidada);
+}
+
+function getAddressStateInfo(proyecto = {}) {
+  const addrText = String(proyecto.direccion || '').trim();
+  if (!addrText) {
+    return {
+      className: 'addr-state-empty',
+      icon: '&#128205;',
+      label: 'Dirección no establecida',
+    };
+  }
+  if (_isAddrConfirmed(proyecto)) {
+    return {
+      className: 'addr-state-confirmed',
+      icon: '&#10003;',
+      label: 'Dirección establecida',
+    };
+  }
+  return {
+    className: 'addr-state-pending',
+    icon: '&#9888;',
+    label: 'Dirección pendiente de validar',
+  };
+}
+
+function getStoredAddressSelection(proyecto = {}) {
+  if (!_isAddrConfirmed(proyecto)) return null;
+  return {
+    provider: 'stored',
+    label: proyecto.direccion,
+    direccion: proyecto.direccion,
+    direccionCompleta: proyecto.direccionCompleta || proyecto.direccion || '',
+    placeId: proyecto.direccionPlaceId || '',
+    lat: proyecto.direccionLat,
+    lng: proyecto.direccionLng,
+  };
 }
 
 function renderProjectsPanel() {
@@ -1346,7 +1615,7 @@ function renderProjectsPanel() {
     const src = isActive && state.proyecto ? state.proyecto : proyecto;
     let fechaStr = '';
     try {
-      const rawDate = proyecto.updated_at || proyecto.updatedAt || proyecto.fecha_actualizacion;
+      const rawDate = getProjectUpdatedAtValue(src) || getProjectUpdatedAtValue(proyecto);
       if (rawDate) {
         fechaStr = new Date(rawDate).toLocaleDateString('es-CL', {
           day: 'numeric', month: 'short', year: 'numeric',
@@ -1362,7 +1631,7 @@ function renderProjectsPanel() {
     if (!addrText) {
       addrBadge = '<em style="color:#94a3b8;font-style:italic">Sin dirección</em>';
     } else if (confirmed) {
-      addrBadge = `<span class="addr-state-dot addr-state-dot-green">✓</span>${escapeHtml(addrText)}`;
+      addrBadge = `<span class="addr-state-dot addr-state-dot-green">&#10003;</span>${escapeHtml(addrText)}`;
     } else {
       addrBadge = `<span class="addr-state-dot addr-state-dot-yellow">!</span>${escapeHtml(addrText)} <em style="color:#94a3b8">(pendiente)</em>`;
     }
@@ -1371,12 +1640,13 @@ function renderProjectsPanel() {
     const showEditForm = isActive && (_addrEditingMode || !confirmed);
     let addrSection = '';
     if (isActive) {
+      const addrState = getAddressStateInfo(src);
       if (!showEditForm) {
         // ── Established (green) ──────────────────────────────────────────
         addrSection = `
           <div class="proj-card-edit-section">
             <div class="addr-state addr-state-confirmed">
-              <span class="addr-state-icon">✅</span>
+              <span class="addr-state-icon">&#10003;</span>
               <div class="addr-state-body">
                 <div class="addr-state-label">Dirección establecida</div>
                 <div class="addr-state-value" title="${escapeHtml(addrText)}">${escapeHtml(addrText)}</div>
@@ -1388,33 +1658,62 @@ function renderProjectsPanel() {
           </div>`;
       } else {
         // ── Edit / Pending / Not set ─────────────────────────────────────
-        const stateClass = !addrText ? 'addr-state-empty' : 'addr-state-pending';
-        const stateIcon = !addrText ? '📍' : '⚠️';
-        const stateLabel = !addrText ? 'Dirección no establecida' : 'Pendiente de confirmar';
-        const canConfirm = addrText.length >= 5;
         addrSection = `
           <div class="proj-card-edit-section">
-            <div class="addr-state ${stateClass}" id="addr-status-indicator">
-              <span class="addr-state-icon">${stateIcon}</span>
-              <span>${stateLabel}</span>
+            <div class="addr-state ${addrState.className}" id="addr-status-indicator">
+              <span class="addr-state-icon">${addrState.icon}</span>
+              <span>${escapeHtml(addrState.label)}</span>
             </div>
-            <input class="inp" id="proj-addr-input"
-                   value="${escapeHtml(addrText)}"
-                   placeholder="Ej: Av. Providencia 1234, Santiago"
-                   maxlength="240"
-                   style="margin-bottom:4px"
-                   onclick="event.stopPropagation()"
-                   oninput="updateAddrStatusIndicator(this.value)"
-                   onkeydown="if(event.key==='Enter'){event.preventDefault();confirmProjectAddress();}">
+            <div class="addr-search-wrap" onclick="event.stopPropagation()">
+              <input class="inp" id="proj-addr-input"
+                     value="${escapeHtml(addrText)}"
+                     placeholder="Buscar dirección del proyecto"
+                     autocomplete="off"
+                     maxlength="240"
+                     onfocus="focusAddressSearch('project', this.value)"
+                     oninput="handleProjectAddressInput(this.value)"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();saveProjectAddress();}">
+              <div id="proj-addr-suggestions" class="addr-suggestions" hidden></div>
+            </div>
             <div id="addr-validation-msg" class="addr-validation-msg"></div>
             <button id="addr-confirm-btn" class="addr-confirm-btn" type="button"
-                    onclick="event.stopPropagation();confirmProjectAddress()"
-                    ${canConfirm ? '' : 'disabled'}>
-              ✓ Confirmar dirección
+                    onclick="event.stopPropagation();saveProjectAddress()">
+              Guardar dirección
             </button>
             ${_addrEditingMode && addrText ? `
               <button class="btn-outline" type="button" style="width:100%;margin-top:6px;font-size:11px;justify-content:center"
                       onclick="event.stopPropagation();cancelEditAddress()">Cancelar</button>` : ''}
+          </div>`;
+      }
+    }
+
+    // ── Name section for active card ──────────────────────────────────────────
+    const nombreText = String(src.nombre || proyecto.nombre || '').trim() || 'Sin nombre';
+    let nameSection = '';
+    if (isActive) {
+      if (_nameEditingMode) {
+        nameSection = `
+          <div class="proj-name-edit-wrap" onclick="event.stopPropagation()">
+            <input class="inp proj-name-edit-inp" id="proj-name-input"
+                   value="${escapeHtml(nombreText)}"
+                   maxlength="120"
+                   placeholder="Nombre del proyecto"
+                   autocomplete="off"
+                   onkeydown="if(event.key==='Enter'){event.preventDefault();saveProjectName();}else if(event.key==='Escape'){event.preventDefault();cancelEditName();}">
+            <div id="proj-name-error" class="proj-name-error">El nombre del proyecto no puede estar vacío.</div>
+            <div class="proj-name-edit-actions">
+              <button class="btn-primary" type="button" onclick="event.stopPropagation();saveProjectName()">Guardar nombre</button>
+              <button class="btn-outline" type="button" onclick="event.stopPropagation();cancelEditName()">Cancelar</button>
+            </div>
+          </div>`;
+      } else {
+        nameSection = `
+          <div class="proj-name-display">
+            <div class="proj-card-name" style="flex:1">${escapeHtml(nombreText)}</div>
+            <button class="proj-name-edit-btn" type="button"
+                    onclick="event.stopPropagation();startEditName()"
+                    title="Editar nombre del proyecto"
+                    aria-label="Editar nombre del proyecto">&#9998;</button>
           </div>`;
       }
     }
@@ -1427,9 +1726,9 @@ function renderProjectsPanel() {
            ${!isActive ? 'tabindex="0"' : ''}
            ${!isActive ? `onkeydown="if(event.key==='Enter'||event.key===' ')switchProject('${escapeHtml(proyecto.id)}')"` : ''}
            title="${isActive ? 'Proyecto activo' : `Cambiar a: ${escapeHtml(proyecto.nombre || '')}`}">
-        <div class="proj-card-header">
-          <div class="proj-card-name">${escapeHtml(proyecto.nombre || 'Sin nombre')}</div>
-          ${isActive ? '<span class="proj-card-badge">Activo</span>' : ''}
+        <div class="proj-card-header" style="${isActive && _nameEditingMode ? 'flex-direction:column;gap:8px;align-items:stretch' : ''}">
+          ${isActive ? nameSection : `<div class="proj-card-name">${escapeHtml(proyecto.nombre || 'Sin nombre')}</div>`}
+          ${isActive && !_nameEditingMode ? '<span class="proj-card-badge">Activo</span>' : ''}
         </div>
         ${!isActive ? `<div class="proj-card-addr">${addrBadge}</div>` : ''}
         ${fechaStr ? `<div class="proj-card-date">Actualizado: ${escapeHtml(fechaStr)}</div>` : ''}
@@ -1441,6 +1740,9 @@ function renderProjectsPanel() {
 async function switchProject(projectId) {
   if (!projectId || projectId === state.proyectoId) return;
   _addrEditingMode = false; // reset edit mode when changing project
+  _nameEditingMode = false;
+  _activeProjectAddressSelection = null;
+  resetAddressSearchContext('project');
   closeProjectsPanel();
   try {
     setLoadingText('Cargando proyecto...', 'Un momento');
@@ -1469,10 +1771,7 @@ async function submitNewProject() {
   nombreInput.style.borderColor = '';
   if (errEl) errEl.classList.remove('is-visible');
 
-  const direccion = dirInput?.value?.trim() || '';
-  // direccionConfirmada: true if user clicked "✓ Confirmar" OR address meets
-  // the minimum length and there's no explicit denial.
-  const direccionConfirmada = _newProjAddrConfirmed || direccion.length >= 5;
+  const addressPayload = buildAddressValidationPayload(dirInput?.value || '', _newProjectAddressSelection);
 
   const submitBtn = $('new-project-submit');
   if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Creando...'; }
@@ -1481,12 +1780,21 @@ async function submitNewProject() {
     setSyncStatus('saving', 'GUARDANDO', 'Creando nuevo proyecto...');
     const result = await api('/api/proyectos', {
       method: 'POST',
-      body: JSON.stringify({ nombre, direccion, direccionConfirmada: !!direccion && direccionConfirmada }),
+      body: JSON.stringify({ nombre, ...addressPayload }),
+    });
+    const fechaActualizacion = new Date().toISOString();
+    saveProjectLocalMeta(result.id, {
+      nombre,
+      ...addressPayload,
+      fechaActualizacion,
+      updated_at: fechaActualizacion,
     });
     // Reset new-form tracking
     _newProjAddrConfirmed = false;
+    _newProjectAddressSelection = null;
+    resetAddressSearchContext('new');
     // Reload project list and switch to the new project
-    state.proyectos = await api('/api/proyectos');
+    state.proyectos = (await api('/api/proyectos')).map(applyProjectLocalMeta);
     renderProjectSelector();
     closeProjectsPanel();
     await loadProject(result.id);
@@ -1500,61 +1808,151 @@ async function submitNewProject() {
 
 function startEditAddress() {
   _addrEditingMode = true;
+  _activeProjectAddressSelection = getStoredAddressSelection(state.proyecto);
+  resetAddressSearchContext('project');
   renderProjectsPanel();
   window.setTimeout(() => $('proj-addr-input')?.focus(), 60);
 }
 
 function cancelEditAddress() {
   _addrEditingMode = false;
+  _activeProjectAddressSelection = null;
+  resetAddressSearchContext('project');
   renderProjectsPanel();
 }
 
-function updateAddrStatusIndicator(value) {
+function startEditName() {
+  _nameEditingMode = true;
+  renderProjectsPanel();
+  window.setTimeout(() => {
+    const input = $('proj-name-input');
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  }, 60);
+}
+
+function cancelEditName() {
+  _nameEditingMode = false;
+  renderProjectsPanel();
+}
+
+async function saveProjectName() {
+  const input = $('proj-name-input');
+  const error = $('proj-name-error');
+  if (!input || !state.proyectoId || !state.proyecto) return;
+
+  const nombre = input.value.trim();
+  if (!nombre) {
+    input.style.borderColor = '#f87171';
+    if (error) {
+      error.textContent = 'El nombre del proyecto no puede estar vacío.';
+      error.classList.add('is-visible');
+    }
+    input.focus();
+    return;
+  }
+
+  input.style.borderColor = '';
+  if (error) error.classList.remove('is-visible');
+
+  const fechaActualizacion = new Date().toISOString();
+  state.proyecto = normalizeProject(stampProjectUpdated({ ...(state.proyecto || {}), nombre }, fechaActualizacion));
+  const listEntry = state.proyectos.find((p) => p.id === state.proyectoId);
+  if (listEntry) Object.assign(listEntry, stampProjectUpdated({ ...listEntry, nombre }, fechaActualizacion));
+  saveProjectLocalMeta(state.proyectoId, { nombre, fechaActualizacion, updated_at: fechaActualizacion });
+  _nameEditingMode = false;
+
+  renderProjectHeader();
+  renderProjectsPanel();
+
+  try {
+    setSyncStatus('saving', 'GUARDANDO', 'Guardando nombre del proyecto...');
+    await api(`/api/proyectos/${state.proyectoId}`, {
+      method: 'PUT',
+      body: JSON.stringify(getProjectSavePayload()),
+    });
+    setSyncStatus('ok', 'GUARDADO', `Guardado ${new Date().toLocaleTimeString()}`);
+  } catch (error) {
+    setSyncStatus('error', 'ERROR', error.message || 'Error al guardar nombre');
+  }
+}
+
+function setAddressStatusIndicator(value, selection = null) {
   const indicator = $('addr-status-indicator');
-  const confirmBtn = $('addr-confirm-btn');
   const msg = $('addr-validation-msg');
   const trimmed = String(value || '').trim();
+  const selected = selection && normalizeAddressForCompare(selection.direccion) === normalizeAddressForCompare(trimmed);
+  const stateInfo = selected
+    ? { className: 'addr-state-confirmed', icon: '&#10003;', label: 'Dirección establecida' }
+    : getAddressStateInfo({ direccion: trimmed, direccionConfirmada: false, direccionValidada: false });
 
   if (indicator) {
-    if (!trimmed) {
-      indicator.className = 'addr-state addr-state-empty';
-      indicator.innerHTML = '<span class="addr-state-icon">📍</span><span>Dirección no establecida</span>';
-    } else if (trimmed.length < 5) {
-      indicator.className = 'addr-state addr-state-warn';
-      indicator.innerHTML = '<span class="addr-state-icon">⚠️</span><span>Dirección muy corta</span>';
-    } else {
-      indicator.className = 'addr-state addr-state-pending';
-      indicator.innerHTML = '<span class="addr-state-icon">⚠️</span><span>Pendiente de confirmar</span>';
-    }
+    indicator.className = `addr-state ${stateInfo.className}`;
+    indicator.innerHTML = `<span class="addr-state-icon">${stateInfo.icon}</span><span>${escapeHtml(stateInfo.label)}</span>`;
   }
-  if (confirmBtn) confirmBtn.disabled = trimmed.length < 5;
   if (msg) { msg.textContent = ''; msg.classList.remove('is-visible'); }
 }
 
-async function confirmProjectAddress() {
+function updateAddrStatusIndicator(value) {
+  _activeProjectAddressSelection = null;
+  setAddressStatusIndicator(value, null);
+  scheduleAddressSearch('project', value);
+}
+
+function handleProjectAddressInput(value) {
+  updateAddrStatusIndicator(value);
+}
+
+function handleNewProjectAddressInput(value) {
+  _newProjAddrConfirmed = false;
+  _newProjectAddressSelection = null;
+  setNewProjectAddressStatus(value, null);
+  scheduleAddressSearch('new', value);
+}
+
+function focusAddressSearch(context, value) {
+  const trimmed = String(value || '').trim();
+  const contextState = _addressSearchState[context];
+  if (contextState?.results?.length) {
+    renderAddressSuggestions(context, contextState.results);
+    return;
+  }
+  if (trimmed.length >= ADDRESS_SEARCH_MIN_CHARS) scheduleAddressSearch(context, trimmed);
+}
+
+async function saveProjectAddress() {
   const input = $('proj-addr-input');
   const msg = $('addr-validation-msg');
   if (!input || !state.proyectoId) return;
 
-  const direccion = input.value.trim();
-  if (direccion.length < 5) {
-    input.focus();
-    if (msg) { msg.textContent = 'Ingresa una dirección válida (mínimo 5 caracteres).'; msg.classList.add('is-visible'); }
-    return;
-  }
+  const addressPayload = buildAddressValidationPayload(input.value, _activeProjectAddressSelection);
   if (msg) { msg.textContent = ''; msg.classList.remove('is-visible'); }
 
   const confirmBtn = $('addr-confirm-btn');
-  if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Confirmando...'; }
+  if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Guardando...'; }
 
   try {
-    // Update local state — confirmed!
-    state.proyecto = normalizeProject({ ...(state.proyecto || {}), direccion, direccionConfirmada: true });
+    const fechaActualizacion = new Date().toISOString();
+    state.proyecto = normalizeProject(stampProjectUpdated({
+      ...(state.proyecto || {}),
+      ...addressPayload,
+    }, fechaActualizacion));
     const listEntry = state.proyectos.find((p) => p.id === state.proyectoId);
-    if (listEntry) { listEntry.direccion = direccion; listEntry.direccionConfirmada = true; }
+    if (listEntry) {
+      Object.assign(listEntry, stampProjectUpdated({ ...listEntry, ...addressPayload }, fechaActualizacion));
+    }
+    saveProjectLocalMeta(state.proyectoId, {
+      ...addressPayload,
+      fechaActualizacion,
+      updated_at: fechaActualizacion,
+    });
     _addrEditingMode = false;
+    _activeProjectAddressSelection = null;
+    resetAddressSearchContext('project');
 
-    setSyncStatus('saving', 'GUARDANDO', 'Guardando dirección...');
+    setSyncStatus('saving', 'GUARDANDO', 'Guardando dirección del proyecto...');
     await api(`/api/proyectos/${state.proyectoId}`, {
       method: 'PUT',
       body: JSON.stringify(getProjectSavePayload()),
@@ -1564,8 +1962,304 @@ async function confirmProjectAddress() {
     renderProjectsPanel();
   } catch (error) {
     setSyncStatus('error', 'ERROR', error.message || 'Error al guardar dirección');
-    if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = '✓ Confirmar dirección'; }
+    if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Guardar dirección'; }
   }
+}
+
+async function confirmProjectAddress() {
+  return saveProjectAddress();
+}
+
+function getAddressContextElements(context) {
+  if (context === 'new') {
+    return {
+      input: $('new-project-direccion'),
+      suggestions: $('new-project-addr-suggestions'),
+      status: $('new-project-addr-status'),
+    };
+  }
+  return {
+    input: $('proj-addr-input'),
+    suggestions: $('proj-addr-suggestions'),
+    status: $('addr-status-indicator'),
+  };
+}
+
+function resetAddressSearchContext(context) {
+  const contextState = _addressSearchState[context];
+  if (!contextState) return;
+  window.clearTimeout(contextState.timer);
+  contextState.timer = null;
+  contextState.sequence += 1;
+  contextState.results = [];
+  if (contextState.controller) {
+    contextState.controller.abort();
+    contextState.controller = null;
+  }
+  const suggestions = getAddressContextElements(context).suggestions;
+  if (suggestions) {
+    suggestions.hidden = true;
+    suggestions.innerHTML = '';
+  }
+}
+
+function buildAddressValidationPayload(value, selection = null) {
+  const inputAddress = String(value || '').trim();
+  const direccion = selection
+    ? compactAddressFromText(selection.direccion || inputAddress)
+    : inputAddress;
+  const isSelected = !!direccion
+    && selection
+    && normalizeAddressForCompare(selection.direccion) === normalizeAddressForCompare(direccion);
+  const direccionLat = Number(selection?.lat);
+  const direccionLng = Number(selection?.lng);
+
+  return {
+    direccion,
+    direccionCompleta: isSelected ? String(selection.direccionCompleta || selection.fullAddress || selection.direccion || direccion).trim() : '',
+    direccionConfirmada: !!isSelected,
+    direccionValidada: !!isSelected,
+    direccionPlaceId: isSelected ? String(selection.placeId || '') : '',
+    direccionLat: isSelected && Number.isFinite(direccionLat) ? direccionLat : null,
+    direccionLng: isSelected && Number.isFinite(direccionLng) ? direccionLng : null,
+  };
+}
+
+function setNewProjectAddressStatus(value, selection = null, message = '') {
+  const statusEl = $('new-project-addr-status');
+  if (!statusEl) return;
+  const trimmed = String(value || '').trim();
+  const selected = selection && normalizeAddressForCompare(selection.direccion) === normalizeAddressForCompare(trimmed);
+  statusEl.className = 'proj-new-addr-status';
+
+  if (message) {
+    statusEl.classList.add('is-visible', 'is-pending');
+    statusEl.textContent = message;
+    return;
+  }
+  if (!trimmed) {
+    statusEl.textContent = '';
+    return;
+  }
+  statusEl.classList.add('is-visible', selected ? 'is-confirmed' : 'is-pending');
+  statusEl.innerHTML = selected
+    ? '<span>&#10003;</span> Dirección establecida'
+    : '<span>!</span> Dirección pendiente de validar';
+}
+
+function renderAddressSearchFeedback(context, message) {
+  const suggestions = getAddressContextElements(context).suggestions;
+  if (!suggestions) return;
+  suggestions.hidden = false;
+  suggestions.innerHTML = `<div class="addr-suggestions-feedback">${escapeHtml(message)}</div>`;
+}
+
+function renderAddressSuggestions(context, suggestionsList = []) {
+  const suggestions = getAddressContextElements(context).suggestions;
+  if (!suggestions) return;
+  if (!suggestionsList.length) {
+    renderAddressSearchFeedback(context, 'No se encontraron direcciones');
+    return;
+  }
+  suggestions.hidden = false;
+  suggestions.innerHTML = suggestionsList.map((suggestion, index) => `
+    <button class="addr-suggestion-item" type="button"
+            onclick="event.stopPropagation();selectAddressSuggestion('${escapeHtml(context)}', ${index})">
+      <span class="addr-suggestion-main">${escapeHtml(suggestion.label || suggestion.direccion || '')}</span>
+    </button>
+  `).join('');
+}
+
+function hasGooglePlacesProvider() {
+  return !!(window.google?.maps?.places?.AutocompleteService && window.google?.maps?.places?.PlacesService);
+}
+
+function getGooglePlacesServices() {
+  if (!hasGooglePlacesProvider()) return null;
+  const placesApi = window.google.maps.places;
+  if (!_googleAutocompleteService) _googleAutocompleteService = new placesApi.AutocompleteService();
+  if (!_googlePlacesService) _googlePlacesService = new placesApi.PlacesService(document.createElement('div'));
+  return { autocomplete: _googleAutocompleteService, places: _googlePlacesService };
+}
+
+function searchGooglePlaces(query) {
+  const services = getGooglePlacesServices();
+  if (!services) return Promise.resolve([]);
+  return new Promise((resolve) => {
+    services.autocomplete.getPlacePredictions(
+      {
+        input: query,
+        componentRestrictions: { country: 'cl' },
+      },
+      (predictions, status) => {
+        const placesStatus = window.google.maps.places.PlacesServiceStatus;
+        if (status !== placesStatus.OK || !Array.isArray(predictions)) {
+          resolve([]);
+          return;
+        }
+        resolve(predictions.slice(0, 6).map((prediction) => ({
+          provider: 'google',
+          label: compactAddressFromText(prediction.description),
+          direccion: compactAddressFromText(prediction.description),
+          direccionCompleta: prediction.description,
+          placeId: prediction.place_id,
+          raw: prediction,
+        })));
+      }
+    );
+  });
+}
+
+function resolveGooglePlace(suggestion) {
+  const services = getGooglePlacesServices();
+  if (!services || suggestion.provider !== 'google' || !suggestion.placeId) return Promise.resolve(suggestion);
+  return new Promise((resolve) => {
+    services.places.getDetails(
+      {
+        placeId: suggestion.placeId,
+        fields: ['formatted_address', 'geometry', 'place_id', 'name', 'address_components'],
+      },
+      (place, status) => {
+        const placesStatus = window.google.maps.places.PlacesServiceStatus;
+        if (status !== placesStatus.OK || !place) {
+          resolve(suggestion);
+          return;
+        }
+        const location = place.geometry?.location;
+        const direccionCompleta = place.formatted_address || suggestion.direccionCompleta || suggestion.direccion;
+        const direccion = getGoogleSimpleAddress(place) || compactAddressFromText(direccionCompleta);
+        resolve({
+          ...suggestion,
+          direccion,
+          label: direccion,
+          direccionCompleta,
+          placeId: place.place_id || suggestion.placeId,
+          lat: typeof location?.lat === 'function' ? location.lat() : null,
+          lng: typeof location?.lng === 'function' ? location.lng() : null,
+        });
+      }
+    );
+  });
+}
+
+async function searchNominatimAddresses(query, signal) {
+  if (typeof window.fetch !== 'function') {
+    const error = new Error('unconfigured');
+    error.code = 'unconfigured';
+    throw error;
+  }
+  const url = new URL('https://nominatim.openstreetmap.org/search');
+  url.searchParams.set('q', query);
+  url.searchParams.set('format', 'jsonv2');
+  url.searchParams.set('addressdetails', '1');
+  url.searchParams.set('limit', '6');
+  url.searchParams.set('accept-language', 'es');
+
+  const response = await fetch(url.toString(), {
+    signal,
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) throw new Error(`Nominatim ${response.status}`);
+  const results = await response.json();
+  if (!Array.isArray(results)) return [];
+  return results.map((item) => {
+    const direccionCompleta = String(item.display_name || '').trim();
+    const direccion = getNominatimSimpleAddress(item);
+    return {
+      provider: 'nominatim',
+      label: direccion,
+      direccion,
+      direccionCompleta,
+      placeId: item.place_id ? `osm:${item.place_id}` : [item.osm_type, item.osm_id].filter(Boolean).join(':'),
+      lat: Number(item.lat),
+      lng: Number(item.lon),
+      raw: item,
+    };
+  }).filter((item) => item.direccion);
+}
+
+async function searchAddressSuggestions(query, signal) {
+  if (hasGooglePlacesProvider()) return searchGooglePlaces(query);
+  return searchNominatimAddresses(query, signal);
+}
+
+async function resolveAddressSuggestion(suggestion) {
+  if (suggestion?.provider === 'google') return resolveGooglePlace(suggestion);
+  return suggestion;
+}
+
+function scheduleAddressSearch(context, value) {
+  const contextState = _addressSearchState[context];
+  if (!contextState) return;
+  const trimmed = String(value || '').trim();
+  contextState.sequence += 1;
+  const plannedSequence = contextState.sequence;
+
+  window.clearTimeout(contextState.timer);
+  contextState.timer = null;
+  contextState.results = [];
+  if (contextState.controller) {
+    contextState.controller.abort();
+    contextState.controller = null;
+  }
+
+  const suggestions = getAddressContextElements(context).suggestions;
+  if (suggestions) {
+    suggestions.hidden = true;
+    suggestions.innerHTML = '';
+  }
+
+  if (trimmed.length < ADDRESS_SEARCH_MIN_CHARS) return;
+
+  contextState.timer = window.setTimeout(async () => {
+    const sequence = plannedSequence;
+    contextState.controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    renderAddressSearchFeedback(context, 'Buscando direcciones...');
+
+    try {
+      const results = await searchAddressSuggestions(trimmed, contextState.controller?.signal);
+      if (contextState.sequence !== sequence) return;
+      contextState.results = results;
+      renderAddressSuggestions(context, results);
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      if (contextState.sequence !== sequence) return;
+      contextState.results = [];
+      renderAddressSearchFeedback(context, 'Validación de direcciones no configurada');
+    } finally {
+      if (contextState.sequence === sequence) contextState.controller = null;
+    }
+  }, ADDRESS_SEARCH_DEBOUNCE_MS);
+}
+
+async function selectAddressSuggestion(context, index) {
+  const contextState = _addressSearchState[context];
+  const suggestion = contextState?.results?.[index];
+  const elements = getAddressContextElements(context);
+  if (!suggestion || !elements.input) return;
+
+  renderAddressSearchFeedback(context, 'Buscando direcciones...');
+  const resolved = await resolveAddressSuggestion(suggestion);
+  const direccionCompleta = String(resolved.direccionCompleta || resolved.fullAddress || resolved.direccion || resolved.label || '').trim();
+  const direccion = compactAddressFromText(resolved.direccion || resolved.label || direccionCompleta);
+  const normalized = {
+    ...resolved,
+    direccion,
+    label: direccion,
+    direccionCompleta,
+  };
+  elements.input.value = normalized.direccion;
+  resetAddressSearchContext(context);
+
+  if (context === 'new') {
+    _newProjectAddressSelection = normalized;
+    _newProjAddrConfirmed = true;
+    setNewProjectAddressStatus(normalized.direccion, normalized);
+    return;
+  }
+
+  _activeProjectAddressSelection = normalized;
+  setAddressStatusIndicator(normalized.direccion, normalized);
 }
 
 // ─── New project address inline helpers ────────────────────────────────────
@@ -1575,26 +2269,16 @@ let _newProjAddrConfirmed = false;
 
 function updateNewProjectAddrStatus() {
   const input = $('new-project-direccion');
-  const confirmBtn = $('new-project-addr-confirm');
-  const statusEl = $('new-project-addr-status');
   if (!input) return;
-  const val = input.value.trim();
-  _newProjAddrConfirmed = false;
-  if (confirmBtn) confirmBtn.disabled = val.length < 5;
-  if (statusEl) { statusEl.className = 'proj-new-addr-status'; statusEl.textContent = ''; }
+  handleNewProjectAddressInput(input.value);
 }
 
 function confirmNewProjectAddr() {
   const input = $('new-project-direccion');
-  const statusEl = $('new-project-addr-status');
   if (!input) return;
-  const val = input.value.trim();
-  if (val.length < 5) return;
-  _newProjAddrConfirmed = true;
-  if (statusEl) {
-    statusEl.className = 'proj-new-addr-status is-visible is-confirmed';
-    statusEl.innerHTML = '<span>✅</span> Dirección confirmada';
-  }
+  _newProjAddrConfirmed = false;
+  _newProjectAddressSelection = null;
+  setNewProjectAddressStatus(input.value, null, 'Selecciona una sugerencia real para validar la dirección.');
 }
 
 async function refreshHealthStatus() {
@@ -8671,7 +9355,7 @@ function dropCostRow(event) {
 }
 
 async function loadProjects() {
-  state.proyectos = await api('/api/proyectos');
+  state.proyectos = (await api('/api/proyectos')).map(applyProjectLocalMeta);
   if (!state.proyectos.length) return;
   const params = new URLSearchParams(window.location.search);
   const requestedProjectId = params.get('projectId');
@@ -8684,6 +9368,10 @@ async function loadProjects() {
 async function loadProject(projectId) {
   if (typeof window.flushBricsaUiState === 'function') window.flushBricsaUiState();
   flushProjectUiStateSave();
+  _addrEditingMode = false;
+  _nameEditingMode = false;
+  _activeProjectAddressSelection = null;
+  resetAddressSearchContext('project');
   state.proyectoId = projectId;
   const url = new URL(window.location.href);
   url.searchParams.set('projectId', projectId);
@@ -8701,7 +9389,7 @@ async function loadProject(projectId) {
     api(`/api/proyectos/${projectId}/calculos`).catch(() => ({})),
   ]);
 
-  state.proyecto = normalizeProject(proyecto);
+  state.proyecto = applyProjectLocalMeta(proyecto);
   if (typeof window.applyPersistedFormulaOverrides === 'function') {
     window.applyPersistedFormulaOverrides(state.proyecto.formula_overrides);
   }
@@ -8980,9 +9668,17 @@ window.switchProject = switchProject;
 window.startEditAddress = startEditAddress;
 window.cancelEditAddress = cancelEditAddress;
 window.confirmProjectAddress = confirmProjectAddress;
+window.saveProjectAddress = saveProjectAddress;
 window.updateAddrStatusIndicator = updateAddrStatusIndicator;
+window.handleProjectAddressInput = handleProjectAddressInput;
+window.handleNewProjectAddressInput = handleNewProjectAddressInput;
+window.focusAddressSearch = focusAddressSearch;
+window.selectAddressSuggestion = selectAddressSuggestion;
 window.updateNewProjectAddrStatus = updateNewProjectAddrStatus;
 window.confirmNewProjectAddr = confirmNewProjectAddr;
+window.startEditName = startEditName;
+window.cancelEditName = cancelEditName;
+window.saveProjectName = saveProjectName;
 window.onCabidaInputChange = onCabidaInputChange;
 window.onTerrenoInputChange = onTerrenoInputChange;
 window.guardarFormulaOverrides = guardarFormulaOverrides;
