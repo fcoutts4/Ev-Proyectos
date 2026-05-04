@@ -3953,12 +3953,9 @@ function renderVentasPricing() {
       <tr data-ventas-config-row data-uso="${escapeHtml(config.uso)}">
         <td>${escapeHtml(config.uso)}</td>
         <td style="text-align:center">${fmtNumber(metrics.unidades)}</td>
-        <td style="text-align:center">${fmtNumber(metrics.supVendible, 1)}</td>
         <td style="text-align:center">${fmtNumber(metrics.m2PorUnidad, 1)}</td>
         <td><input class="inp" type="text" inputmode="decimal" data-localized-number="1" step="0.01" data-field="precio_uf_m2" value="${fmtInputNumber(config.precio_uf_m2, 2)}" onchange="onVentasInputChange()"/></td>
         <td style="text-align:center">${fmtTableAmount(metrics.precioBase, { kind: 'income' })}</td>
-        <td style="text-align:center;color:#16a34a">${fmtTableAmount(metrics.total, { kind: 'income' })}</td>
-        <td style="text-align:center">-</td>
         <td style="text-align:center;color:#ea580c;font-weight:800">${fmtTableAmount(metrics.total, { kind: 'income' })}</td>
         <td style="text-align:center">${fmtTableAmount(metrics.ticket, { kind: 'income' })}</td>
       </tr>
@@ -3978,10 +3975,7 @@ function renderVentasPricing() {
       <td style="text-align:center">${fmtNumber(addons.estacionamientos.unidades)}</td>
       <td style="text-align:center">-</td>
       <td style="text-align:center">-</td>
-      <td style="text-align:center">-</td>
-      <td style="text-align:center">-</td>
-      <td style="text-align:center">-</td>
-      <td><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#64748b;white-space:nowrap">${fmtNumber(addons.estacionamientos.unidades)} un</span><input id="ventas-precio-estacionamiento-global" class="inp" type="text" inputmode="decimal" data-localized-number="1" step="0.01" value="${fmtInputNumber(accessorySales.precio_estacionamiento, 2)}" onchange="onVentasInputChange()"/></div></td>
+      <td><input id="ventas-precio-estacionamiento-global" class="inp" type="text" inputmode="decimal" data-localized-number="1" step="0.01" value="${fmtInputNumber(accessorySales.precio_estacionamiento, 2)}" onchange="onVentasInputChange()"/></td>
       <td style="text-align:center;color:#ea580c;font-weight:800">${fmtTableAmount(addons.estacionamientos.total, { kind: 'income' })}</td>
       <td style="text-align:center">-</td>
     </tr>
@@ -3990,10 +3984,7 @@ function renderVentasPricing() {
       <td style="text-align:center">${fmtNumber(addons.bodegas.unidades)}</td>
       <td style="text-align:center">-</td>
       <td style="text-align:center">-</td>
-      <td style="text-align:center">-</td>
-      <td style="text-align:center">-</td>
-      <td style="text-align:center">-</td>
-      <td><div style="display:flex;align-items:center;gap:8px"><span style="font-size:11px;color:#64748b;white-space:nowrap">${fmtNumber(addons.bodegas.unidades)} un</span><input id="ventas-precio-bodega-global" class="inp" type="text" inputmode="decimal" data-localized-number="1" step="0.01" value="${fmtInputNumber(accessorySales.precio_bodega, 2)}" onchange="onVentasInputChange()"/></div></td>
+      <td><input id="ventas-precio-bodega-global" class="inp" type="text" inputmode="decimal" data-localized-number="1" step="0.01" value="${fmtInputNumber(accessorySales.precio_bodega, 2)}" onchange="onVentasInputChange()"/></td>
       <td style="text-align:center;color:#ea580c;font-weight:800">${fmtTableAmount(addons.bodegas.total, { kind: 'income' })}</td>
       <td style="text-align:center">-</td>
     </tr>
@@ -4001,9 +3992,9 @@ function renderVentasPricing() {
   setHtml('ventas-tfoot', `
     <td>Total</td>
     <td>${fmtNumber(totalUnidades)}</td>
-    <td>${fmtNumber(totalSup, 1)}</td>
     <td>${fmtNumber(totalUnidades ? totalSup / totalUnidades : 0, 1)}</td>
-    <td colspan="4"></td>
+    <td>-</td>
+    <td>-</td>
     <td style="font-weight:800;color:#22c55e">${fmtTableAmount(totalVenta, { kind: 'income', total: true })}</td>
     <td>${fmtTableAmount(totalVentas.precioPromedio, { kind: 'income', total: true })}</td>
   `);
