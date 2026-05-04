@@ -412,6 +412,14 @@ function saveProjectLocalMeta(projectId, patch = {}) {
   writeProjectMetaStore({ ...store, projects });
 }
 
+function removeProjectLocalMeta(projectId) {
+  if (!projectId) return;
+  const store = readProjectMetaStore();
+  const projects = store.projects && typeof store.projects === 'object' ? { ...store.projects } : {};
+  delete projects[String(projectId)];
+  writeProjectMetaStore({ ...store, projects });
+}
+
 function normalizeAddressForCompare(value) {
   return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
@@ -1638,6 +1646,7 @@ function renderProjectsPanel() {
 
     // Address management section for the active card
     const showEditForm = isActive && (_addrEditingMode || !confirmed);
+    const showProjectEditTools = isActive && (_nameEditingMode || showEditForm);
     let addrSection = '';
     if (isActive) {
       const addrState = getAddressStateInfo(src);
@@ -1718,6 +1727,15 @@ function renderProjectsPanel() {
       }
     }
 
+    const deleteProjectSection = showProjectEditTools ? `
+        <div class="proj-card-actions" onclick="event.stopPropagation()">
+          <button class="btn-outline proj-delete-btn" type="button"
+                  onclick="event.stopPropagation();deleteCurrentProject()"
+                  title="Eliminar este proyecto de forma permanente">
+            Eliminar proyecto
+          </button>
+        </div>` : '';
+
     return `
       <div class="proj-card ${isActive ? 'is-active' : ''}"
            data-proj-id="${escapeHtml(proyecto.id)}"
@@ -1733,6 +1751,7 @@ function renderProjectsPanel() {
         ${!isActive ? `<div class="proj-card-addr">${addrBadge}</div>` : ''}
         ${fechaStr ? `<div class="proj-card-date">Actualizado: ${escapeHtml(fechaStr)}</div>` : ''}
         ${addrSection}
+        ${deleteProjectSection}
       </div>`;
   }).join('');
 }
@@ -1876,6 +1895,72 @@ async function saveProjectName() {
     setSyncStatus('ok', 'GUARDADO', `Guardado ${new Date().toLocaleTimeString()}`);
   } catch (error) {
     setSyncStatus('error', 'ERROR', error.message || 'Error al guardar nombre');
+  }
+}
+
+async function deleteCurrentProject() {
+  if (!state.proyectoId) return;
+  const projectId = state.proyectoId;
+  const currentIndex = state.proyectos.findIndex((project) => project.id === projectId);
+  if (currentIndex < 0) return;
+
+  const currentProject = state.proyectos[currentIndex] || {};
+  const projectName = String(state.proyecto?.nombre || currentProject.nombre || 'este proyecto').trim() || 'este proyecto';
+  const confirmed = window.confirm(`¿Eliminar "${projectName}"? Esta acción no se puede deshacer.`);
+  if (!confirmed) return;
+
+  try {
+    setSyncStatus('saving', 'GUARDANDO', 'Eliminando proyecto...');
+    await flushPendingAutosaves();
+    await api(`/api/proyectos/${projectId}`, { method: 'DELETE' });
+    removeProjectLocalMeta(projectId);
+
+    const remainingProjects = state.proyectos.filter((project) => project.id !== projectId);
+    state.proyectos = remainingProjects;
+    renderProjectSelector();
+
+    if (remainingProjects.length) {
+      const nextIndex = Math.min(currentIndex, remainingProjects.length - 1);
+      const nextProjectId = remainingProjects[nextIndex]?.id || remainingProjects[0].id;
+      closeProjectsPanel();
+      setLoadingText('Cargando proyecto...', 'Seleccionando otro proyecto');
+      const overlay = $('app-loading-overlay');
+      if (overlay) {
+        overlay.style.display = '';
+        overlay.classList.remove('is-hidden');
+      }
+      try {
+        await loadProject(nextProjectId);
+      } finally {
+        hideLoadingOverlay();
+      }
+    } else {
+      state.proyectoId = null;
+      state.proyecto = null;
+      state.cabida = [];
+      state.gantt = [];
+      state.ventasConfig = [];
+      state.ventasCronograma = [];
+      state.construccion = {};
+      state.costos = [];
+      state.financiamiento = {};
+      state.capital = {};
+      state.calculos = {};
+      _addrEditingMode = false;
+      _nameEditingMode = false;
+      _activeProjectAddressSelection = null;
+      resetAddressSearchContext('project');
+      const url = new URL(window.location.href);
+      url.searchParams.delete('projectId');
+      window.history.replaceState({}, '', url);
+      renderProjectHeader();
+      renderProjectsPanel();
+      openProjectsPanel(true);
+    }
+
+    setSyncStatus('ok', 'GUARDADO', `Proyecto eliminado ${new Date().toLocaleTimeString()}`);
+  } catch (error) {
+    setSyncStatus('error', 'ERROR', error.message || 'Error al eliminar proyecto');
   }
 }
 
@@ -9679,6 +9764,7 @@ window.confirmNewProjectAddr = confirmNewProjectAddr;
 window.startEditName = startEditName;
 window.cancelEditName = cancelEditName;
 window.saveProjectName = saveProjectName;
+window.deleteCurrentProject = deleteCurrentProject;
 window.onCabidaInputChange = onCabidaInputChange;
 window.onTerrenoInputChange = onTerrenoInputChange;
 window.guardarFormulaOverrides = guardarFormulaOverrides;
