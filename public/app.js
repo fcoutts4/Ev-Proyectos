@@ -160,8 +160,38 @@ function $(id) {
   return document.getElementById(id);
 }
 
+const MOJIBAKE_HINT_RE = /[ÃÂ�]/;
+const MOJIBAKE_MAP = {
+  'Ã¡': 'á', 'Ã©': 'é', 'Ã­': 'í', 'Ã³': 'ó', 'Ãº': 'ú',
+  'Ã': 'Á', 'Ã‰': 'É', 'Ã': 'Í', 'Ã“': 'Ó', 'Ãš': 'Ú',
+  'Ã±': 'ñ', 'Ã‘': 'Ñ', 'Ã¼': 'ü', 'Ãœ': 'Ü',
+  'Â·': '·', 'Âº': 'º', 'Âª': 'ª', 'Â°': '°', 'Â': '',
+  'â€”': '—', 'â€“': '–', 'âˆ’': '−', 'â€¢': '•', 'Ã—': '×', 'Ã·': '÷',
+};
+
+function repairMojibakeText(value) {
+  const source = String(value ?? '');
+  if (!source || !MOJIBAKE_HINT_RE.test(source)) return source;
+  let fixed = source;
+  Object.entries(MOJIBAKE_MAP).forEach(([bad, good]) => {
+    fixed = fixed.split(bad).join(good);
+  });
+  return fixed;
+}
+
+function repairMojibakeDeep(input) {
+  if (typeof input === 'string') return repairMojibakeText(input);
+  if (Array.isArray(input)) return input.map((item) => repairMojibakeDeep(item));
+  if (!input || typeof input !== 'object') return input;
+  const output = {};
+  Object.entries(input).forEach(([key, value]) => {
+    output[key] = repairMojibakeDeep(value);
+  });
+  return output;
+}
+
 function escapeHtml(value) {
-  return String(value ?? '')
+  return repairMojibakeText(value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -171,12 +201,32 @@ function escapeHtml(value) {
 
 function setText(id, value) {
   const el = $(id);
-  if (el) el.textContent = value;
+  if (el) el.textContent = repairMojibakeText(value);
 }
 
 function setHtml(id, value) {
   const el = $(id);
   if (el) el.innerHTML = value;
+}
+
+function normalizeVisibleTextEncoding(root = document.body) {
+  if (!root) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    const original = node.nodeValue || '';
+    const fixed = repairMojibakeText(original);
+    if (fixed !== original) node.nodeValue = fixed;
+  }
+  const attrs = ['title', 'placeholder', 'aria-label'];
+  root.querySelectorAll('*').forEach((el) => {
+    attrs.forEach((attr) => {
+      const value = el.getAttribute(attr);
+      if (!value) return;
+      const fixed = repairMojibakeText(value);
+      if (fixed !== value) el.setAttribute(attr, fixed);
+    });
+  });
 }
 
 function perfLog(label, data = {}) {
@@ -377,7 +427,7 @@ function renderFinanceFixedColumn(prefix, rows = [], options = {}) {
         <span>${escapeHtml(row.label || '')}</span>
         ${row.actionHtml || ''}
       </td>
-      ${includeTotal ? `<td class="finance-fixed-total-col" style="text-align:right;font-weight:${row.bold ? 800 : 600};color:${row.color || '#334155'};background:${row.bg || (row.bold ? '#f4f8fc' : '#fff')}!important">${row.totalText || ''}</td>` : ''}
+      ${includeTotal ? `<td class="finance-fixed-total-col" style="text-align:right;font-weight:${row.bold ? 800 : 600};color:${row.color || '#334155'};background:${row.bg || (row.bold ? '#f4f8fc' : '#fff')}!important">${escapeHtml(row.totalText || '')}</td>` : ''}
     </tr>
   `).join(''));
   setHtml(`${prefix}-fixed-tfoot`, options.footerLabel ? `
@@ -688,13 +738,15 @@ function normalizeProject(project = {}) {
   const terrenoPrecioTotal = source.terreno_precio_total ?? 0;
   const terrenoPrecioUfM2 = source.terreno_precio_uf_m2
     ?? (terrenoM2Neto > 0 ? terrenoPrecioTotal / terrenoM2Neto : 0);
-  const direccion = String(source.direccion || '').trim();
+  const direccion = repairMojibakeText(String(source.direccion || '').trim());
+  const nombre = repairMojibakeText(String(source.nombre || '').trim());
   const direccionValidada = !!direccion && isExplicitTrue(source.direccionConfirmada) && isExplicitTrue(source.direccionValidada);
   const direccionCompleta = direccionValidada
     ? String(source.direccionCompleta || source.direccion || '').trim()
     : '';
   return {
     ...source,
+    nombre,
     direccion,
     direccionCompleta,
     direccionConfirmada: direccionValidada,
@@ -9036,6 +9088,7 @@ function renderAll() {
   renderKpis();
   renderCapitalModule();
   localizeNumberInputs(document);
+  normalizeVisibleTextEncoding(document.body);
 }
 
 function prepareStateForSave({ includeCostos = true } = {}) {
@@ -9817,7 +9870,7 @@ async function loadProject(projectId) {
   url.searchParams.set('projectId', projectId);
   window.history.replaceState({}, '', url);
 
-  const [proyecto, cabida, gantt, ventasData, construccion, costos, financiamiento, capital, calculos] = await Promise.all([
+  const [proyectoRaw, cabidaRaw, ganttRaw, ventasDataRaw, construccionRaw, costosRaw, financiamientoRaw, capitalRaw, calculosRaw] = await Promise.all([
     api(`/api/proyectos/${projectId}`),
     api(`/api/proyectos/${projectId}/cabida`),
     api(`/api/proyectos/${projectId}/gantt`),
@@ -9828,6 +9881,16 @@ async function loadProject(projectId) {
     api(`/api/proyectos/${projectId}/capital`).catch(() => ({})),
     api(`/api/proyectos/${projectId}/calculos`).catch(() => ({})),
   ]);
+
+  const proyecto = repairMojibakeDeep(proyectoRaw);
+  const cabida = repairMojibakeDeep(cabidaRaw);
+  const gantt = repairMojibakeDeep(ganttRaw);
+  const ventasData = repairMojibakeDeep(ventasDataRaw);
+  const construccion = repairMojibakeDeep(construccionRaw);
+  const costos = repairMojibakeDeep(costosRaw);
+  const financiamiento = repairMojibakeDeep(financiamientoRaw);
+  const capital = repairMojibakeDeep(capitalRaw);
+  const calculos = repairMojibakeDeep(calculosRaw);
 
   state.proyecto = applyProjectLocalMeta(proyecto);
   if (typeof window.applyPersistedFormulaOverrides === 'function') {
@@ -10189,6 +10252,7 @@ document.addEventListener('keydown', (event) => {
 });
 
 document.addEventListener('DOMContentLoaded', async () => {
+  normalizeVisibleTextEncoding(document.body);
   ensureProjectControls();
   ensureActionButtons();
   setupLocalizedNumberInputs();
