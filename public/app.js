@@ -437,7 +437,7 @@ function renderFinanceFixedColumn(prefix, rows = [], options = {}) {
   setHtml(`${prefix}-fixed-tfoot`, options.footerLabel ? `
     <tr class="tfoot-dark">
       <td class="finance-fixed-concept-col">${escapeHtml(options.footerLabel)}</td>
-      ${includeTotal ? '<td class="finance-fixed-total-col"></td>' : ''}
+      ${includeTotal ? `<td class="finance-fixed-total-col" style="text-align:right">${renderCellContent(options.footerTotalText || '')}</td>` : ''}
     </tr>
   ` : '');
 }
@@ -4277,7 +4277,7 @@ function renderVentasCashflow() {
   const cuotaEndMonth = promesaComputed ? promesaComputed.fin + cuotaMonths - 1 : 0;
   const months = buildTimelineMonths(cuotaEndMonth);
   const monthIndex = new Map(months.map((month, index) => [month, index]));
-  setHtml('flujo-ventas-header', months.map((month) => `<th>${escapeHtml(formatVentasCashflowMonth(month))}</th>`).join(''));
+  setHtml('flujo-ventas-header', months.map((month) => `<th data-month-col>${escapeHtml(formatVentasCashflowMonth(month))}</th>`).join(''));
 
   const pieUnidad = totals.precioPromedio * piePct / 100;
   const montoEscrituraUnidad = totals.precioPromedio * escrituraPct / 100;
@@ -4339,15 +4339,29 @@ function renderVentasCashflow() {
     { label: 'Acum. escrituras UF', values: acumuladoEscrituras, kind: 'income' },
   ];
 
+  const rowTotalValue = (row) => {
+    const values = row.values || [];
+    if (!values.length) return 0;
+    if (/^Acum\./i.test(String(row.label || ''))) return toNumber(values[values.length - 1]);
+    return values.reduce((sum, value) => sum + toNumber(value), 0);
+  };
+
   setHtml('flujo-ventas-tbody', rows.map((row) => `
     <tr>
-      ${row.values.map((value) => `<td>${row.kind === 'units' ? fmtNumber(value) : fmtTableAmount(value, { kind: 'income' })}</td>`).join('')}
+      ${row.values.map((value) => `<td data-month-cell style="text-align:center">${row.kind === 'units' ? fmtNumber(value) : fmtTableAmount(value, { kind: 'income' })}</td>`).join('')}
     </tr>
   `).join(''));
 
   const ingresos = months.map((_, index) => promesasUf[index] + escrituracionUf[index]);
-  renderFinanceFixedColumn('flujo-ventas', rows, { footerLabel: 'Total ingresos UF' });
-  setHtml('flujo-ventas-tfoot', ingresos.map((value) => `<td>${fmtTableAmount(value, { kind: 'income', total: true })}</td>`).join(''));
+  renderFinanceFixedColumn('flujo-ventas', rows.map((row) => ({
+    label: row.label,
+    totalText: row.kind === 'units' ? fmtNumber(rowTotalValue(row)) : fmtUf(rowTotalValue(row)),
+  })), {
+    includeTotal: true,
+    footerLabel: 'Total ingresos UF',
+    footerTotalText: fmtUf(ingresos.reduce((sum, value) => sum + toNumber(value), 0)),
+  });
+  setHtml('flujo-ventas-tfoot', ingresos.map((value) => `<td data-month-cell style="text-align:center">${fmtTableAmount(value, { kind: 'income', total: true })}</td>`).join(''));
 }
 
 function renderCostStructure() {

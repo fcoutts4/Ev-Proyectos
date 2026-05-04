@@ -917,7 +917,7 @@ table:not(.gantt-table) .tfoot-dark td,
 .badge{min-height:22px;line-height:1.2}
 .dist-row{min-height:24px}
 .dist-label{line-height:1.2;overflow-wrap:anywhere}
-.ventas-inline-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.ventas-inline-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;align-items:start}
 #ventas-precios-table tbody td{padding-top:5px!important;padding-bottom:5px!important;line-height:1.15}
 #ventas-precios-table .inp{min-height:28px!important;padding:3px 8px!important}
 #formas-pago-table tbody td{padding-top:5px!important;padding-bottom:5px!important;line-height:1.15}
@@ -1678,14 +1678,14 @@ table:not(.gantt-table) .tfoot-dark td,
     </div>
     <div id="flujo-ventas-scroll" class="finance-split-shell" style="border-top:none;border-radius:0 0 10px 10px">
       <div class="finance-split-fixed">
-        <table>
+        <table class="finance-date-table">
           <thead id="flujo-ventas-fixed-head"></thead>
           <tbody id="flujo-ventas-fixed-tbody"></tbody>
           <tfoot id="flujo-ventas-fixed-tfoot"></tfoot>
         </table>
       </div>
       <div id="flujo-ventas-month-scroll" class="finance-split-scroll">
-        <table id="flujo-ventas-table" style="min-width:980px">
+        <table id="flujo-ventas-table" class="finance-date-table" style="min-width:980px">
           <thead><tr id="flujo-ventas-header" style="background:#1e293b"></tr></thead>
           <tbody id="flujo-ventas-tbody"></tbody>
           <tfoot><tr class="tfoot-dark" id="flujo-ventas-tfoot" style="background:#0f172a"></tr></tfoot>
