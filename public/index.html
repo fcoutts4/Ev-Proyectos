@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+Ôªø<!DOCTYPE html>
 <html lang="es-CL">
 <head>
 <meta charset="UTF-8"/>
@@ -13,8 +13,9 @@ body{font-family:'Inter',system-ui,sans-serif;background:#f1f5f9;color:#1e293b}
 :root{--topnav-height:60px;--section-nav-height:48px}
 /* NAV */
 .topnav{position:sticky;top:0;z-index:90;background:#fff;border-bottom:1px solid #e2e8f0;min-height:var(--topnav-height);display:flex;align-items:center;padding:8px 24px;justify-content:space-between;gap:14px}
-.logo-box{width:30px;height:30px;background:#0f172a;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:12px;overflow:hidden;flex-shrink:0}
+.logo-box{width:92px;height:38px;background:#fff;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:12px;overflow:hidden;flex-shrink:0}
 .brand-logo-img{width:100%;height:100%;object-fit:contain;display:block;background:#fff}
+.topnav .logo-box{background:#fff!important;color:#0f172a!important}
 .logo-fallback{display:none;width:100%;height:100%;align-items:center;justify-content:center;font-weight:900;font-size:12px;color:#fff}
 /* PROJECT HEADER */
 .proj-header{position:sticky;top:var(--topnav-height);z-index:80;background:#fff;border-bottom:1px solid #e2e8f0;padding:6px 24px;display:block;min-height:var(--section-nav-height);box-shadow:0 8px 18px rgba(15,23,42,.04)}
@@ -196,7 +197,7 @@ tbody tr:hover{background:#f8fafc}
 .formula-chip-row .formula-token{min-height:22px;padding:2px 7px;font-size:10px;border-radius:6px}
 .formula-chip-empty{font-size:10px;color:#94a3b8;font-style:italic}
 .formula-chip-editor{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-height:36px;padding:8px 10px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px}
-.formula-chip-editor:empty::before{content:'Escribe abajo para construir la fÛrmula';color:#94a3b8;font-size:11px;font-style:italic}
+.formula-chip-editor:empty::before{content:'Escribe abajo para construir la f√≥rmula';color:#94a3b8;font-size:11px;font-style:italic}
 .formula-chip-editor.has-error{border-color:#fca5a5!important;box-shadow:0 0 0 2px rgba(239,68,68,.10)!important;background:#fff7f7!important}
 .formula-token-remove{margin-left:5px;border:0;background:transparent;color:inherit;font-size:12px;font-weight:900;line-height:1;cursor:pointer;padding:0 1px;opacity:.72}
 .formula-token-remove:hover{opacity:1}
@@ -331,7 +332,7 @@ tbody tr:hover{background:#f8fafc}
 #tab-gantt .gantt-sticky-left{z-index:45;background:#fff!important;overflow:visible;box-shadow:8px 0 12px -14px rgba(15,23,42,.45)}
 #tab-gantt .gantt-sticky-head{z-index:55;background:#f8fafc!important}
 #tab-gantt .gantt-sticky-right{z-index:56}
-/* clip-path se actualiza din·micamente via JS seg˙n scrollLeft */
+/* clip-path se actualiza din√°micamente via JS seg√∫n scrollLeft */
 #tab-gantt .gantt-timeline-head{position:relative;overflow:hidden;z-index:1}
 #tab-gantt .gantt-editor-shell{contain:paint}
 #tab-gantt .gantt-timeline-scale.has-grid{background-image:none}
@@ -344,7 +345,7 @@ tbody tr:hover{background:#f8fafc}
 .gantt-track{height:18px}
 .gantt-bar{top:2px;height:14px;border-radius:5px}
 
-/* Resumen ejecutivo: menos saturaciÛn y mejor jerarquÌa */
+/* Resumen ejecutivo: menos saturaci√≥n y mejor jerarqu√≠a */
 #tab-resumen .resumen-banner{margin-bottom:16px}
 #tab-resumen #kpi-grid{gap:10px;margin-bottom:16px}
 #tab-resumen .resumen-main-grid{display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:16px}
@@ -387,7 +388,7 @@ tbody tr:hover{background:#f8fafc}
   #tab-resumen .resumen-cabida-grid{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
   #tab-resumen .resumen-cabida-card .res-table-scroll table{min-width:0}
 }
-/* DISTRIBUCI”N DE COSTOS */
+/* DISTRIBUCI√ìN DE COSTOS */
 .dist-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
 .dist-label{font-size:11px;text-align:right;min-width:130px;color:#64748b}
 .dist-bar-wrap{flex:1;height:10px;background:#f1f5f9;border-radius:4px;overflow:hidden}
@@ -544,7 +545,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;heigh
 ::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
 
 
-/* ===== AJUSTES VISUALES PARA PANTALLAS CON POCA RESOLUCI”N Y MUCHO BRILLO ===== */
+/* ===== AJUSTES VISUALES PARA PANTALLAS CON POCA RESOLUCI√ìN Y MUCHO BRILLO ===== */
 :root{
   --bg-main:#e5ebf3;
   --bg-card:#ffffff;
@@ -726,7 +727,7 @@ table:not(.gantt-table) strong{color:#0b2545!important}
 .cat-total-cell,.cat-total-cell strong{background:#eef3f8!important;color:#0b2545!important}
 .amount-cost,.amount-negative{color:#334155!important}
 
-/* Menos negrita en celdas numÈricas; Ènfasis reservado a totales finales */
+/* Menos negrita en celdas num√©ricas; √©nfasis reservado a totales finales */
 table tbody td[style*="font-weight:700"],
 table tbody td[style*="font-weight:800"],
 table tbody td[style*="font-weight:900"]{font-weight:600!important}
@@ -925,7 +926,7 @@ table:not(.gantt-table) .tfoot-dark td,
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}
 }
 
-/* M·s legibilidad cuando la pantalla es angosta */
+/* M√°s legibilidad cuando la pantalla es angosta */
 @media (max-width: 1366px){
   :root{--topnav-height:56px}
   body{font-size:15px}
@@ -950,8 +951,8 @@ table:not(.gantt-table) .tfoot-dark td,
 /* ===== LOADING OVERLAY ===== */
 #app-loading-overlay{position:fixed;inset:0;background:var(--nav-bg,#f8fbff);z-index:500;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px;transition:opacity .22s ease}
 #app-loading-overlay.is-hidden{opacity:0;pointer-events:none}
-.app-loading-logo{width:88px;height:88px;background:#fff;border:1px solid #dbe4ef;border-radius:16px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(15,23,42,.08);flex-shrink:0;overflow:hidden;margin-bottom:4px}
-.app-loading-logo-img{width:100%;height:100%;object-fit:contain;display:block;padding:10px}
+.app-loading-logo{width:180px;height:96px;background:#fff;border:1px solid #dbe4ef;border-radius:18px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 26px rgba(15,23,42,.09);flex-shrink:0;overflow:hidden;margin-bottom:8px}
+.app-loading-logo-img{width:100%;height:100%;object-fit:contain;display:block;padding:14px}
 .app-loading-logo-fallback{display:none;width:100%;height:100%;align-items:center;justify-content:center;background:#0f172a;color:#fff;font-weight:900;font-size:26px;letter-spacing:.05em}
 .app-loading-spinner{width:32px;height:32px;border:3px solid #e2e8f0;border-top-color:#1d4ed8;border-radius:50%;animation:appSpin .72s linear infinite}
 @keyframes appSpin{to{transform:rotate(360deg)}}
@@ -1009,7 +1010,7 @@ table:not(.gantt-table) .tfoot-dark td,
 .proj-panel-empty{padding:24px;text-align:center;color:#94a3b8;font-size:13px;line-height:1.5;border:1px dashed var(--border-soft,#e2e8f0);border-radius:10px}
 .proj-panel-empty strong{display:block;color:#475569;font-size:14px;margin-bottom:6px}
 
-/* ===== ADDR STATE (validaciÛn visual de direcciÛn) ===== */
+/* ===== ADDR STATE (validaci√≥n visual de direcci√≥n) ===== */
 .addr-state{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;font-size:12px;font-weight:600;line-height:1.3;margin-bottom:8px}
 .addr-state-icon{font-size:14px;line-height:1;flex-shrink:0}
 .addr-state-body{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
@@ -1070,7 +1071,7 @@ table:not(.gantt-table) .tfoot-dark td,
 <a class="skip-link" href="#main-content">Saltar al contenido principal</a>
 
 <!-- LOADING OVERLAY -->
-<div id="app-loading-overlay" role="status" aria-live="polite" aria-label="Cargando aplicaciÛn">
+<div id="app-loading-overlay" role="status" aria-live="polite" aria-label="Cargando aplicaci√≥n">
   <div class="app-loading-logo">
     <img class="app-loading-logo-img" src="data:image/png;base64,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" alt="Logo BRICSA" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
     <span class="app-loading-logo-fallback">B</span>
@@ -1087,7 +1088,6 @@ table:not(.gantt-table) .tfoot-dark td,
       <img class="brand-logo-img" src="data:image/png;base64,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" alt="Logo BRICSA" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
       <span class="logo-fallback">B</span>
     </div>
-    <span style="font-weight:900;font-size:13px;letter-spacing:.05em;color:#0f172a">BRICSA</span>
     <div class="topnav-proj-info">
       <span id="proj-title" class="topnav-proj-name"></span>
       <span id="proj-dir" class="topnav-proj-addr"></span>
@@ -1099,7 +1099,7 @@ table:not(.gantt-table) .tfoot-dark td,
         <span id="sync-label">Sincronizado</span>
       </span>
       <button id="btn-save-now" type="button" onclick="saveNow()" title="Guardar cambios pendientes ahora" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#1e40af;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:6px 12px;cursor:pointer;letter-spacing:.03em">Guardar ahora</button>
-      <span id="sync-detail" class="topnav-sync-detail">⁄ltima sincronizaciÛn: sin registro</span>
+      <span id="sync-detail" class="topnav-sync-detail">√öltima sincronizaci√≥n: sin registro</span>
     </div>
     <button class="btn-projects" type="button" onclick="openProjectsPanel()" title="Gestionar proyectos" aria-haspopup="dialog" aria-controls="projects-panel">
       <span class="btn-projects-icon">?</span> Proyectos
@@ -1115,7 +1115,7 @@ table:not(.gantt-table) .tfoot-dark td,
         <button class="tab-btn active" type="button" data-tab-target="resumen" onclick="showTab('resumen',this)">Resumen Ejecutivo</button>
         <button class="tab-btn" type="button" data-tab-target="cabida" onclick="showTab('cabida',this)">Cabida Proyecto</button>
         <button class="tab-btn" type="button" data-tab-target="terreno" onclick="showTab('terreno',this)">Terreno</button>
-        <button class="tab-btn" type="button" data-tab-target="construccion" onclick="showTab('construccion',this)">ConstrucciÛn</button>
+        <button class="tab-btn" type="button" data-tab-target="construccion" onclick="showTab('construccion',this)">Construcci√≥n</button>
         <button class="tab-btn" type="button" data-tab-target="ventas" onclick="showTab('ventas',this)">Ventas</button>
         <button class="tab-btn" type="button" data-tab-target="gantt" onclick="showTab('gantt',this)">Carta Gantt</button>
         <button class="tab-btn" type="button" data-tab-target="costos" onclick="showTab('costos',this)">Costos del Proyecto</button>
@@ -1137,7 +1137,7 @@ table:not(.gantt-table) .tfoot-dark td,
     <div style="display:flex;align-items:center;gap:10px;min-width:0">
       <div>
         <div style="font-size:18px;font-weight:900;letter-spacing:.05em">RESUMEN</div>
-        <div style="font-size:11px;color:#94a3b8;letter-spacing:.1em">COMIT… DE INVERSIONES</div>
+        <div style="font-size:11px;color:#94a3b8;letter-spacing:.1em">COMIT√â DE INVERSIONES</div>
     </div>
   </div>
     <button class="btn-outline" onclick="window.print()" style="background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.2)"> Imprimir Reporte</button>
@@ -1165,7 +1165,7 @@ table:not(.gantt-table) .tfoot-dark td,
       <div class="kpi-sub">Anual</div>
   </div>
     <div class="kpi-card kpi-amber">
-      <div class="kpi-label">Aporte m·ximo</div>
+      <div class="kpi-label">Aporte m√°ximo</div>
       <div class="kpi-value" style="color:#b45309" id="kpi-cap">145.655 UF</div>
       <div class="kpi-sub" id="kpi-cap-sub">En Mes 40</div>
   </div>
@@ -1177,7 +1177,7 @@ table:not(.gantt-table) .tfoot-dark td,
     <!-- Gantt -->
     <div class="card resumen-gantt-card">
       <div class="sec-title"> CARTA GANTT
-        <span style="margin-left:auto;font-weight:400;font-size:10px;text-transform:none;color:#94a3b8">Pasa el cursor sobre el gr·fico para ver el detalle</span>
+        <span style="margin-left:auto;font-weight:400;font-size:10px;text-transform:none;color:#94a3b8">Pasa el cursor sobre el gr√°fico para ver el detalle</span>
     </div>
       <div class="resumen-gantt-scroll">
         <div id="gantt-preview"></div>
@@ -1205,7 +1205,7 @@ table:not(.gantt-table) .tfoot-dark td,
         <div class="resumen-cabida-panel">
           <p class="resumen-cabida-panel-title">Superficies</p>
           <div class="res-table-scroll"><table>
-            <thead><tr><th>Tipo</th><th>⁄tiles</th><th>Vendibles</th></tr></thead>
+            <thead><tr><th>Tipo</th><th>√ötiles</th><th>Vendibles</th></tr></thead>
             <tbody id="res-sup-tbody"></tbody>
             <tbody id="res-sup-extra"></tbody>
             <tfoot><tr class="tfoot-dark" id="res-sup-tfoot"></tr></tfoot>
@@ -1221,7 +1221,7 @@ table:not(.gantt-table) .tfoot-dark td,
       </div>
     </div>
       <div class="resumen-cabida-metrics">
-        <div class="resumen-cabida-metric"><span>⁄tiles</span><strong id="res-cabida-util-total">0 m2</strong></div>
+        <div class="resumen-cabida-metric"><span>√ötiles</span><strong id="res-cabida-util-total">0 m2</strong></div>
         <div class="resumen-cabida-metric"><span>Comunes</span><strong id="res-cabida-common-total">0 m2</strong></div>
         <div class="resumen-cabida-metric"><span>Vendibles</span><strong id="res-cabida-vendible-total">0 m2</strong></div>
       </div>
@@ -1239,7 +1239,7 @@ table:not(.gantt-table) .tfoot-dark td,
       <div class="sec-title" style="margin-bottom:0"> CABIDA Y SUPERFICIES DEL PROYECTO</div>
       <button class="btn-primary" onclick="guardarCabida()"> Guardar</button>
   </div>
-    <!-- Dos paneles en lÌnea: tabla principal + estac/bodegas -->
+    <!-- Dos paneles en l√≠nea: tabla principal + estac/bodegas -->
     <div style="display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start">
 
       <!-- Panel izquierdo: tabla unificada -->
@@ -1250,20 +1250,20 @@ table:not(.gantt-table) .tfoot-dark td,
             <thead><tr>
               <th style="text-align:left">TIPO</th>
               <th>CANT.</th>
-              <th>INT/UN (m≤)</th>
-              <th>TERR/UN (m≤)</th>
-              <th>⁄TIL/UN (m≤)</th>
-              <th style="color:#3b82f6">VEND/UN (m≤)</th>
-              <th style="color:#16a34a">TOTAL VEND (m≤)</th>
+              <th>INT/UN (m¬≤)</th>
+              <th>TERR/UN (m¬≤)</th>
+              <th>√öTIL/UN (m¬≤)</th>
+              <th style="color:#3b82f6">VEND/UN (m¬≤)</th>
+              <th style="color:#16a34a">TOTAL VEND (m¬≤)</th>
             </tr></thead>
             <tbody id="cabida-tabla-tbody"></tbody>
             <tfoot><tr class="tfoot-green" id="cabida-tabla-tfoot"></tr></tfoot>
           </table>
         </div>
         <div style="font-size:10px;color:#64748b;margin-top:8px;line-height:1.9">
-          M≤ comunes: <strong id="cabida-common-total">0 m≤</strong> ∑
-          M≤ ˙tiles: <strong id="cabida-util-total">0 m≤</strong> ∑
-          M≤ vendibles: <strong id="cabida-vendible-total">0 m≤</strong> ∑
+          M¬≤ comunes: <strong id="cabida-common-total">0 m¬≤</strong> ¬∑
+          M¬≤ √∫tiles: <strong id="cabida-util-total">0 m¬≤</strong> ¬∑
+          M¬≤ vendibles: <strong id="cabida-vendible-total">0 m¬≤</strong> ¬∑
           Vendible considera <strong id="cabida-vendible-pct">50%</strong> de terraza
         </div>
       </div>
@@ -1295,7 +1295,7 @@ table:not(.gantt-table) .tfoot-dark td,
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
     <div>
       <div style="font-size:16px;font-weight:800;color:#0f172a"> TERRENO Y FINANCIAMIENTO TERRENO</div>
-      <div style="font-size:11px;color:#94a3b8">La compra del terreno se define por mes-aÒo y se vincula directamente al bloque "Compra terreno" en la Carta Gantt.</div>
+      <div style="font-size:11px;color:#94a3b8">La compra del terreno se define por mes-a√±o y se vincula directamente al bloque "Compra terreno" en la Carta Gantt.</div>
     </div>
     <button class="btn-primary" onclick="guardarTerreno()"> Guardar</button>
   </div>
@@ -1305,11 +1305,11 @@ table:not(.gantt-table) .tfoot-dark td,
       <div class="sec-title"> COMPRA TERRENO</div>
       <div style="display:grid;grid-template-columns:1fr;gap:10px">
         <div>
-          <div style="font-size:10px;color:#94a3b8;margin-bottom:3px">Compra terreno (mes-aÒo)</div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:3px">Compra terreno (mes-a√±o)</div>
           <input type="month" class="inp" id="terreno-fecha-compra" onchange="onTerrenoInputChange()">
         </div>
         <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px">
-          <div style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;margin-bottom:4px">VÌnculo con Carta Gantt</div>
+          <div style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;margin-bottom:4px">V√≠nculo con Carta Gantt</div>
           <div id="terreno-gantt-sync" style="font-size:11px;color:#64748b">Sincronizado con el bloque Compra terreno.</div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -1318,22 +1318,22 @@ table:not(.gantt-table) .tfoot-dark td,
             <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="terreno-m2-bruto" step="0.01" oninput="onTerrenoInputChange()">
           </div>
           <div style="background:#f8fafc;border-radius:10px;padding:10px">
-            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">AfectaciÛn</div>
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">Afectaci√≥n</div>
             <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="terreno-m2-afectacion" step="0.01" oninput="onTerrenoInputChange()">
           </div>
           <div style="background:#f8fafc;border-radius:10px;padding:10px">
             <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">Superficie Neta</div>
             <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="terreno-m2-neto" step="0.01" readonly style="background:#fff;color:#0f172a;font-weight:700">
-            <div style="font-size:10px;color:#94a3b8;margin-top:3px">Bruta menos afectaciÛn</div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:3px">Bruta menos afectaci√≥n</div>
           </div>
           <div style="background:#f8fafc;border-radius:10px;padding:10px">
-            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">UF / m≤</div>
+            <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:3px">UF / m¬≤</div>
             <input type="text" class="inp" id="terreno-precio-uf-m2" step="0.01" inputmode="decimal" data-localized-number="1" oninput="onTerrenoInputChange()">
           </div>
           <div style="background:#eef6ff;border:1px solid #cfe2ff;border-radius:10px;padding:10px;grid-column:1 / -1">
             <div style="font-size:10px;color:#64748b;text-transform:uppercase;margin-bottom:3px">Precio total</div>
             <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="terreno-precio-total" step="0.01" readonly style="background:#fff;color:#0f172a;font-weight:800">
-            <div style="font-size:10px;color:#64748b;margin-top:3px">Resultado de superficie neta por UF / m≤</div>
+            <div style="font-size:10px;color:#64748b;margin-top:3px">Resultado de superficie neta por UF / m¬≤</div>
           </div>
         </div>
       </div>
@@ -1342,21 +1342,21 @@ table:not(.gantt-table) .tfoot-dark td,
     <div class="card" style="border:2px solid #fde68a;height:100%;min-height:400px;max-width:520px;justify-self:start">
       <div class="sec-title" style="margin-bottom:12px;color:#b45309"> FINANCIAMIENTO TERRENO</div>
       <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px;margin-bottom:12px;font-size:11px;color:#92400e">
-        Este financiamiento se refleja autom·ticamente en los costos del proyecto dentro de la categorÌa de gastos financieros.
+        Este financiamiento se refleja autom√°ticamente en los costos del proyecto dentro de la categor√≠a de gastos financieros.
       </div>
       <div id="fin-terreno-partidas" style="margin-bottom:12px;font-size:11px;color:#475569"></div>
       <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px">
         <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Costo</div><div style="font-weight:800;color:#b45309" id="fin-terreno-costo">0 UF</div></div>
         <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Monto a financiar</div><div style="font-weight:800;color:#22c55e" id="fin-terreno-monto">0 UF</div></div>
       </div>
-      <div style="font-size:10px;color:#94a3b8;margin-bottom:10px" id="fin-terreno-plazos">Plazo vinculado al inicio de construcciÛn</div>
+      <div style="font-size:10px;color:#94a3b8;margin-bottom:10px" id="fin-terreno-plazos">Plazo vinculado al inicio de construcci√≥n</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div>
           <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">% a financiar</div>
           <div style="display:flex;align-items:center;gap:4px"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="fin-terreno-pct" min="0" max="100" oninput="onTerrenoInputChange()"><span style="font-size:11px">%</span></div>
         </div>
         <div>
-          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Tasa interÈs</div>
+          <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Tasa inter√©s</div>
           <div style="display:flex;align-items:center;gap:4px"><input type="text" class="inp" id="fin-terreno-tasa" step="0.01" inputmode="decimal" data-localized-number="1" oninput="onTerrenoInputChange()" onchange="onTerrenoInputChange()" onblur="onTerrenoInputChange()"><span style="font-size:11px">anual</span></div>
         </div>
         <div>
@@ -1373,7 +1373,7 @@ table:not(.gantt-table) .tfoot-dark td,
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div>
         <div class="sec-title" style="margin-bottom:4px"> GASTOS FINANCIEROS TERRENO</div>
-        <div style="font-size:11px;color:#94a3b8">Esta categorÌa se configura en Terreno y se replica autom·ticamente en Costos del Proyecto.</div>
+        <div style="font-size:11px;color:#94a3b8">Esta categor√≠a se configura en Terreno y se replica autom√°ticamente en Costos del Proyecto.</div>
       </div>
       <div class="planilla-nav">
         <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('terreno-fin-planilla-scroll', -480)">? Mes</button>
@@ -1403,7 +1403,7 @@ table:not(.gantt-table) .tfoot-dark td,
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
     <div>
       <div style="font-size:16px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:8px"> VENTAS E INGRESOS</div>
-      <div style="font-size:11px;color:#94a3b8">Aseg˙rate de guardar tus cambios</div>
+      <div style="font-size:11px;color:#94a3b8">Aseg√∫rate de guardar tus cambios</div>
   </div>
     <button class="btn-primary" onclick="guardarVentas()"> Guardar</button>
 </div>
@@ -1464,15 +1464,15 @@ table:not(.gantt-table) .tfoot-dark td,
           <input class="inp" id="ventas-velocidad-promesas" type="text" inputmode="numeric" data-localized-number="1" min="1" step="1" oninput="onVentasVelocityChange()">
           <span style="font-size:11px;color:#64748b">un/mes</span>
         </div>
-        <div style="font-size:10px;color:#64748b;margin-top:6px">Controla la duraciÛn del bloque <strong>Promesas</strong> en Carta Gantt.</div>
+        <div style="font-size:10px;color:#64748b;margin-top:6px">Controla la duraci√≥n del bloque <strong>Promesas</strong> en Carta Gantt.</div>
       </div>
       <div style="background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:12px">
-        <div style="font-size:10px;font-weight:700;color:#c2410c;text-transform:uppercase;margin-bottom:6px">Velocidad de escrituraciÛn</div>
+        <div style="font-size:10px;font-weight:700;color:#c2410c;text-transform:uppercase;margin-bottom:6px">Velocidad de escrituraci√≥n</div>
         <div style="display:flex;align-items:center;gap:6px">
           <input class="inp" id="ventas-velocidad-escrituracion" type="text" inputmode="numeric" data-localized-number="1" min="1" step="1" oninput="onVentasVelocityChange()">
           <span style="font-size:11px;color:#64748b">un/mes</span>
         </div>
-        <div style="font-size:10px;color:#64748b;margin-top:6px">Controla la duraciÛn de <strong>EscrituraciÛn</strong> y parte cuando termina <strong>RecepciÛn municipal</strong>.</div>
+        <div style="font-size:10px;color:#64748b;margin-top:6px">Controla la duraci√≥n de <strong>Escrituraci√≥n</strong> y parte cuando termina <strong>Recepci√≥n municipal</strong>.</div>
       </div>
     </div>
 
@@ -1491,7 +1491,7 @@ table:not(.gantt-table) .tfoot-dark td,
           <col class="col-vel">
         </colgroup>
         <thead><tr>
-          <th style="text-align:left">VÕNCULO EN GANTT</th>
+          <th style="text-align:left">V√çNCULO EN GANTT</th>
           <th>INICIO (MES)</th>
           <th style="color:#22c55e">FIN (AUTO)</th>
           <th>TOTAL UNIDADES</th>
@@ -1501,11 +1501,11 @@ table:not(.gantt-table) .tfoot-dark td,
     </table>
   </div>
 
-    <!-- Cronograma de EscrituraciÛn -->
+    <!-- Cronograma de Escrituraci√≥n -->
     <div>
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
         <div style="width:10px;height:10px;border-radius:50%;background:#f97316"></div>
-        <span style="font-size:12px;font-weight:700;color:#475569">CRONOGRAMA DE ESCRITURACI”N</span>
+        <span style="font-size:12px;font-weight:700;color:#475569">CRONOGRAMA DE ESCRITURACI√ìN</span>
     </div>
       <table class="ventas-crono-table">
         <colgroup>
@@ -1516,7 +1516,7 @@ table:not(.gantt-table) .tfoot-dark td,
           <col class="col-vel">
         </colgroup>
         <thead><tr>
-          <th style="text-align:left">VÕNCULO EN GANTT</th>
+          <th style="text-align:left">V√çNCULO EN GANTT</th>
           <th>INICIO (MES)</th>
           <th style="color:#22c55e">FIN (AUTO)</th>
           <th>TOTAL UNIDADES</th>
@@ -1544,30 +1544,30 @@ table:not(.gantt-table) .tfoot-dark td,
       <div style="font-size:11px;color:#94a3b8">UF / mes</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;width:100%;text-align:center">
         <div><div style="font-size:10px;color:#94a3b8">Vel. Unidades</div><div style="font-weight:800" id="vel-global-un">1.3 un/m</div></div>
-        <div><div style="font-size:10px;color:#94a3b8">DuraciÛn Total</div><div style="font-weight:800" id="vel-duracion">39 meses</div></div>
+        <div><div style="font-size:10px;color:#94a3b8">Duraci√≥n Total</div><div style="font-weight:800" id="vel-duracion">39 meses</div></div>
     </div>
-      <div style="font-size:10px;color:#94a3b8;margin-top:6px" id="vel-analisis">An·lisis desde Mes 1 al 39</div>
+      <div style="font-size:10px;color:#94a3b8;margin-top:6px" id="vel-analisis">An√°lisis desde Mes 1 al 39</div>
   </div>
 
-    <!-- EscrituraciÛn -->
+    <!-- Escrituraci√≥n -->
     <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px">
-      <div class="sec-title" style="width:100%"> PROCESO DE ESCRITURACI”N</div>
+      <div class="sec-title" style="width:100%"> PROCESO DE ESCRITURACI√ìN</div>
       <div style="width:56px;height:56px;background:#f1f5f9;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px"></div>
       <div style="text-align:center">
-        <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em">Velocidad real de escrituraciÛn</div>
+        <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.08em">Velocidad real de escrituraci√≥n</div>
         <div style="font-size:2.5rem;font-weight:900;color:#0f172a" id="vel-entregas">8</div>
         <div style="font-size:11px;color:#94a3b8">un/mes</div>
         <div style="margin-top:4px;font-size:10px;color:#64748b;letter-spacing:.02em" id="vel-promesas-mini">Vel. promesas: 0,0 un/mes</div>
     </div>
       <div style="width:100%;border-top:1px solid #f1f5f9;padding-top:10px">
-        <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:6px">Ciclo de EscrituraciÛn</div>
+        <div style="font-size:10px;color:#94a3b8;text-transform:uppercase;margin-bottom:6px">Ciclo de Escrituraci√≥n</div>
         <div style="display:flex;align-items:center;gap:8px;justify-content:center">
           <span style="font-size:1.1rem;font-weight:800" id="escrit-inicio">Mes 38</span>
           <span style="color:#94a3b8">?</span>
           <span style="font-size:1.1rem;font-weight:800" id="escrit-fin">Mes 44</span>
       </div>
         <div style="text-align:center;margin-top:6px">
-          <span class="badge badge-blue" id="escrit-dur">DuraciÛn: 7 meses</span>
+          <span class="badge badge-blue" id="escrit-dur">Duraci√≥n: 7 meses</span>
       </div>
     </div>
   </div>
@@ -1578,7 +1578,7 @@ table:not(.gantt-table) .tfoot-dark td,
     <div class="planilla-header">
       <div>
         <div style="font-size:13px;font-weight:900;color:#fff;letter-spacing:.08em;text-transform:uppercase"> FLUJO DE CAJA DE VENTAS (UF)</div>
-        <div style="font-size:10px;color:#94a3b8;margin-top:2px">Ingresos distribuidos por perÌodo seg˙n cronograma de promesas y escrituraciÛn</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:2px">Ingresos distribuidos por per√≠odo seg√∫n cronograma de promesas y escrituraci√≥n</div>
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('flujo-ventas-scroll',-480)" style="font-size:11px">? Mes</button>
@@ -1610,10 +1610,10 @@ table:not(.gantt-table) .tfoot-dark td,
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
     <div>
       <div style="font-size:16px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:8px"> Cronograma del Proyecto</div>
-      <div style="font-size:11px;color:#94a3b8">Arrastra los bloques en la lÌnea de tiempo para moverlos manualmente. Aseg˙rate de guardar tus cambios.</div>
+      <div style="font-size:11px;color:#94a3b8">Arrastra los bloques en la l√≠nea de tiempo para moverlos manualmente. Aseg√∫rate de guardar tus cambios.</div>
   </div>
     <div style="display:flex;gap:8px">
-      <button class="btn-outline" onclick="agregarHito()">+ AÒadir Hito</button>
+      <button class="btn-outline" onclick="agregarHito()">+ A√±adir Hito</button>
       <button class="btn-primary" onclick="guardarGantt()"> Guardar</button>
   </div>
 </div>
@@ -1634,7 +1634,7 @@ table:not(.gantt-table) .tfoot-dark td,
           <th class="gantt-sticky-left gantt-sticky-head" style="left:204px;width:132px">DEPENDENCIA</th>
           <th class="gantt-sticky-left gantt-sticky-head" style="left:336px;width:72px">DESFASE</th>
           <th class="gantt-sticky-left gantt-sticky-head" style="left:408px;width:72px">INICIO</th>
-          <th class="gantt-sticky-left gantt-sticky-head" style="left:480px;width:78px">DURACI”N</th>
+          <th class="gantt-sticky-left gantt-sticky-head" style="left:480px;width:78px">DURACI√ìN</th>
           <th class="gantt-timeline-head"><div id="gantt-timeline-head"></div></th>
           <th class="gantt-sticky-right gantt-sticky-head" style="width:42px">X</th>
       </tr>
@@ -1649,8 +1649,8 @@ table:not(.gantt-table) .tfoot-dark td,
 <div id="tab-construccion" class="tab-pane">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
     <div>
-      <div style="font-size:16px;font-weight:800;color:#0f172a"> CONTRATO DE CONSTRUCCI”N</div>
-      <div style="font-size:11px;color:#94a3b8">Aseg˙rate de guardar tus cambios</div>
+      <div style="font-size:16px;font-weight:800;color:#0f172a"> CONTRATO DE CONSTRUCCI√ìN</div>
+      <div style="font-size:11px;color:#94a3b8">Aseg√∫rate de guardar tus cambios</div>
   </div>
     <button class="btn-primary" onclick="guardarConstruccion()"> Guardar</button>
 </div>
@@ -1664,20 +1664,20 @@ table:not(.gantt-table) .tfoot-dark td,
         <thead><tr>
           <th style="text-align:left">PARTIDA</th>
           <th>SUPERFICIE</th>
-          <th style="color:#3b82f6">PRECIO / M≤</th>
+          <th style="color:#3b82f6">PRECIO / M¬≤</th>
           <th style="color:#22c55e">COSTO NETO</th>
       </tr></thead>
         <tbody>
           <tr>
             <td style="font-weight:600">Superficie Sobre Tierra</td>
-            <td style="text-align:center"><input type="text" inputmode="numeric" data-localized-number="1" class="inp" id="constr-sup-st" min="0" step="1" style="width:90px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">m≤</span></td>
-            <td style="text-align:center"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="constr-uf-st" value="27" style="width:80px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">/m≤</span></td>
+            <td style="text-align:center"><input type="text" inputmode="numeric" data-localized-number="1" class="inp" id="constr-sup-st" min="0" step="1" style="width:90px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">m¬≤</span></td>
+            <td style="text-align:center"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="constr-uf-st" value="27" style="width:80px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">/m¬≤</span></td>
             <td style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-st">192.942 UF</td>
         </tr>
           <tr>
             <td style="font-weight:600">Superficie Bajo Tierra</td>
-            <td style="text-align:center"><input type="text" inputmode="numeric" data-localized-number="1" class="inp" id="constr-sup-bt" min="0" step="1" style="width:90px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">m≤</span></td>
-            <td style="text-align:center"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="constr-uf-bt" value="15" style="width:80px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">/m≤</span></td>
+            <td style="text-align:center"><input type="text" inputmode="numeric" data-localized-number="1" class="inp" id="constr-sup-bt" min="0" step="1" style="width:90px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">m¬≤</span></td>
+            <td style="text-align:center"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="constr-uf-bt" value="15" style="width:80px;text-align:center" oninput="updateConstrParams()"> <span style="font-size:10px;color:#94a3b8">/m¬≤</span></td>
             <td style="text-align:center;font-weight:700;color:#22c55e" id="constr-total-bt">48.615 UF</td>
         </tr>
           <tr>
@@ -1694,14 +1694,14 @@ table:not(.gantt-table) .tfoot-dark td,
       <tfoot>
           <tr style="background:#f0fdf4;border-top:2px solid #86efac">
             <td style="font-weight:700;color:#15803d;font-size:11px;text-transform:uppercase;padding:8px 10px">Neto</td>
-            <td style="text-align:center;font-weight:700;color:#374151;font-size:12px" id="constr-sup-total">ó</td>
-            <td style="text-align:center;font-weight:700;color:#3b82f6;font-size:12px" id="constr-uf-prom">ó</td>
-            <td style="text-align:center;font-weight:800;color:#15803d;font-size:13px" id="constr-total-neto">ó</td>
+            <td style="text-align:center;font-weight:700;color:#374151;font-size:12px" id="constr-sup-total">‚Äî</td>
+            <td style="text-align:center;font-weight:700;color:#3b82f6;font-size:12px" id="constr-uf-prom">‚Äî</td>
+            <td style="text-align:center;font-weight:800;color:#15803d;font-size:13px" id="constr-total-neto">‚Äî</td>
         </tr>
           <tr style="background:#f8fafc">
             <td style="font-weight:600;color:#64748b;font-size:11px;padding:6px 10px">Bruto (IVA inc.)</td>
-            <td colspan="2" style="text-align:center;font-weight:600;color:#3b82f6;font-size:11px" id="constr-uf-bruto">ó</td>
-            <td style="text-align:center;font-weight:700;color:#374151;font-size:12px" id="constr-total-bruto">ó</td>
+            <td colspan="2" style="text-align:center;font-weight:600;color:#3b82f6;font-size:11px" id="constr-uf-bruto">‚Äî</td>
+            <td style="text-align:center;font-weight:700;color:#374151;font-size:12px" id="constr-total-bruto">‚Äî</td>
         </tr>
       </tfoot>
     </table>
@@ -1717,7 +1717,7 @@ table:not(.gantt-table) .tfoot-dark td,
 
       <div style="margin-bottom:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-          <span style="font-size:12px;font-weight:700;color:#475569">PLAZO DE CONSTRUCCI”N</span>
+          <span style="font-size:12px;font-weight:700;color:#475569">PLAZO DE CONSTRUCCI√ìN</span>
           <div style="display:flex;align-items:center;gap:6px">
             <input type="text" inputmode="numeric" data-localized-number="1" class="inp" id="constr-plazo-meses" min="1" step="1" value="20" style="width:86px;text-align:center" oninput="updateConstrParams()">
             <span style="font-size:10px;color:#94a3b8">MESES</span>
@@ -1725,7 +1725,7 @@ table:not(.gantt-table) .tfoot-dark td,
           <span class="badge badge-green" style="font-size:10px">SINCRONIZADO GANTT</span>
       </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;gap:10px">
-          <div style="font-size:10px;color:#94a3b8">Sincronizado con el hito <strong>ConstrucciÛn</strong> en Carta Gantt.</div>
+          <div style="font-size:10px;color:#94a3b8">Sincronizado con el hito <strong>Construcci√≥n</strong> en Carta Gantt.</div>
           <div style="font-size:12px;font-weight:800;color:#22c55e" id="plazo-label">20 MESES</div>
         </div>
     </div>
@@ -1737,7 +1737,7 @@ table:not(.gantt-table) .tfoot-dark td,
             <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="anticipo-slider" min="0" max="50" step="0.1" value="15" oninput="updateConstrParams()">
             <span style="font-weight:800;font-size:14px" id="anticipo-label">15%</span>
           </div>
-          <div style="font-size:10px;color:#166534;margin-top:6px" id="anticipo-meta">15% del contrato | pago ˙nico inicial, sin devoluciÛn ni descuento posterior</div>
+          <div style="font-size:10px;color:#166534;margin-top:6px" id="anticipo-meta">15% del contrato | pago √∫nico inicial, sin devoluci√≥n ni descuento posterior</div>
           <div style="font-size:11px;font-weight:700;color:#15803d;margin-top:4px" id="anticipo-monto">0 UF</div>
       </div>
         <div style="background:#fef2f2;border-radius:8px;padding:12px">
@@ -1746,7 +1746,7 @@ table:not(.gantt-table) .tfoot-dark td,
             <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="retencion-slider" min="0" max="20" step="0.1" value="5" oninput="updateConstrParams()">
             <span style="font-weight:800;font-size:14px" id="retencion-label">5%</span>
           </div>
-          <div style="font-size:10px;color:#991b1b;margin-top:6px" id="retencion-meta">RetenciÛn aplicada sobre cada EDPP</div>
+          <div style="font-size:10px;color:#991b1b;margin-top:6px" id="retencion-meta">Retenci√≥n aplicada sobre cada EDPP</div>
           <div style="font-size:11px;font-weight:700;color:#991b1b;margin-top:4px" id="retencion-monto">0 UF</div>
       </div>
     </div>
@@ -1758,21 +1758,21 @@ table:not(.gantt-table) .tfoot-dark td,
       <span class="badge badge-green" style="font-size:10px">ACTIVO</span>
     </div>
     <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px;margin-bottom:12px;font-size:11px;color:#166534">
-      Este financiamiento se usa para las referencias autom·ticas de gastos financieros dentro de la planilla de costos.
+      Este financiamiento se usa para las referencias autom√°ticas de gastos financieros dentro de la planilla de costos.
     </div>
     <div id="fin-constr-partidas" style="margin-bottom:10px;font-size:11px;color:#475569"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
       <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">Costo real</div><div style="font-weight:800;color:#22c55e" id="fin-constr-costo">0 UF</div></div>
       <div><div style="font-size:10px;color:#94a3b8;margin-bottom:2px">A financiar</div><div style="font-weight:800;color:#22c55e" id="fin-constr-monto">0 UF</div></div>
     </div>
-    <div style="font-size:10px;color:#94a3b8;margin-bottom:10px" id="fin-constr-plazos">Plazo vinculado al hito de construcciÛn</div>
+    <div style="font-size:10px;color:#94a3b8;margin-bottom:10px" id="fin-constr-plazos">Plazo vinculado al hito de construcci√≥n</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div>
         <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">% a financiar</div>
         <div style="display:flex;align-items:center;gap:4px"><input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="fin-constr-pct" min="0" max="100" oninput="updateConstrParams()"><span style="font-size:11px">%</span></div>
       </div>
       <div>
-        <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Tasa interÈs</div>
+        <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Tasa inter√©s</div>
           <div style="display:flex;align-items:center;gap:4px"><input type="text" class="inp" id="fin-constr-tasa" step="0.01" inputmode="decimal" data-localized-number="1" onchange="updateConstrParams()" onblur="updateConstrParams()"><span style="font-size:11px">anual</span></div>
       </div>
       <div>
@@ -1782,22 +1782,22 @@ table:not(.gantt-table) .tfoot-dark td,
         </select>
       </div>
       <div style="grid-column:1/-1;border-top:1px solid #e2e8f0;padding-top:8px;margin-top:4px">
-        <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">% Alzamiento (pago lÌnea)</div>
+        <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">% Alzamiento (pago l√≠nea)</div>
         <div style="display:flex;align-items:center;gap:4px"><input type="text" inputmode="numeric" data-localized-number="1" class="inp" id="fin-constr-alzamiento" value="90" min="0" max="100" step="1" oninput="updateConstrParams()"><span style="font-size:11px">%</span></div>
-        <div style="font-size:10px;color:#64748b;margin-top:4px">Pago lÌnea = % alz. ◊ escrituraciÛn mes ant. (100% valor)</div>
+        <div style="font-size:10px;color:#64748b;margin-top:4px">Pago l√≠nea = % alz. √ó escrituraci√≥n mes ant. (100% valor)</div>
       </div>
     </div>
   </div>
 </div>
 
-  <!-- Par·metros globales de la tabla EP/GF -->
+  <!-- Par√°metros globales de la tabla EP/GF -->
   <div class="card" style="margin-bottom:16px;background:#f8fafc">
-    <div class="sec-title" style="margin-bottom:8px">? PAR¡METROS FINANCIEROS GLOBALES</div>
+    <div class="sec-title" style="margin-bottom:8px">? PAR√ÅMETROS FINANCIEROS GLOBALES</div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
       <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">% Impuesto timbres</label><input type="text" inputmode="decimal" data-localized-number="1" step="0.01" class="inp" id="cfg-pct-timbres" oninput="onConfigParamChange(); syncGfParamMirror()"/></div>
       <div><label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">% CEEC (beneficio IVA)</label><input type="text" inputmode="decimal" data-localized-number="1" step="0.01" class="inp" id="cfg-pct-ceec" oninput="onConfigParamChange()"/></div>
     </div>
-    <div style="font-size:10px;color:#94a3b8;margin-top:8px">Las tasas de interÈs se definen en cada bloque de financiamiento. El impuesto a la renta se configura en Flujo de Caja.</div>
+    <div style="font-size:10px;color:#94a3b8;margin-top:8px">Las tasas de inter√©s se definen en cada bloque de financiamiento. El impuesto a la renta se configura en Flujo de Caja.</div>
     <!-- Hidden inputs to keep data binding working -->
     <input type="hidden" id="cfg-tasa-terreno"/><input type="hidden" id="cfg-tasa-construccion"/><input type="hidden" id="cfg-pct-renta"/>
   </div>
@@ -1836,8 +1836,8 @@ table:not(.gantt-table) .tfoot-dark td,
   <div class="card" style="margin-bottom:16px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
       <div>
-        <div class="sec-title" style="margin-bottom:4px">?? GASTOS FINANCIEROS CONSTRUCCI”N</div>
-        <div style="font-size:11px;color:#94a3b8">GIROS conectado din·micamente al TOTAL_A_PAGO de Estados de Pago. El acumulado mantiene los pagos de lÌnea en el c·lculo interno.</div>
+        <div class="sec-title" style="margin-bottom:4px">?? GASTOS FINANCIEROS CONSTRUCCI√ìN</div>
+        <div style="font-size:11px;color:#94a3b8">GIROS conectado din√°micamente al TOTAL_A_PAGO de Estados de Pago. El acumulado mantiene los pagos de l√≠nea en el c√°lculo interno.</div>
       </div>
       <div class="planilla-nav">
         <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-fin-planilla-scroll', -480)">? Mes</button>
@@ -1845,7 +1845,7 @@ table:not(.gantt-table) .tfoot-dark td,
       </div>
     </div>
     <div class="gf-param-panel">
-      <div class="sec-title" style="margin-bottom:10px">PAR¡METROS GASTOS FINANCIEROS</div>
+      <div class="sec-title" style="margin-bottom:10px">PAR√ÅMETROS GASTOS FINANCIEROS</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px">
         <div>
           <label style="font-size:10px;color:#64748b;display:block;margin-bottom:4px">Tasa_interes_construccion</label>
@@ -1883,8 +1883,8 @@ table:not(.gantt-table) .tfoot-dark td,
 
   <!-- Curva S -->
   <div class="card" style="border-radius:12px;margin-bottom:16px">
-    <div class="sec-title"> CURVA S DE CONSTRUCCI”N</div>
-    <div style="font-size:11px;color:#64748b;margin-bottom:12px">EDPP, anticipo y retenciones expresados netos; avance acumulado de obra sobre el plazo de construcciÛn.</div>
+    <div class="sec-title"> CURVA S DE CONSTRUCCI√ìN</div>
+    <div style="font-size:11px;color:#64748b;margin-bottom:12px">EDPP, anticipo y retenciones expresados netos; avance acumulado de obra sobre el plazo de construcci√≥n.</div>
     <div class="chart-shell" style="height:320px;max-height:320px">
       <canvas id="curvaS-chart"></canvas>
     </div>
@@ -1918,10 +1918,10 @@ table:not(.gantt-table) .tfoot-dark td,
   <datalist id="cost-formula-refs"></datalist>
 </div>
 
-  <!-- Top: Total Neto/Bruto + DistribuciÛn + Flujo -->
+  <!-- Top: Total Neto/Bruto + Distribuci√≥n + Flujo -->
   <div style="display:grid;grid-template-columns:minmax(320px,420px) minmax(0,1fr);gap:16px;margin-bottom:16px;align-items:start">
 
-    <!-- Left: Totales + DistribuciÛn -->
+    <!-- Left: Totales + Distribuci√≥n -->
     <div style="display:flex;flex-direction:column;gap:12px;min-width:320px">
       <!-- Totales -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -1935,9 +1935,9 @@ table:not(.gantt-table) .tfoot-dark td,
       </div>
     </div>
 
-      <!-- DistribuciÛn de Costos -->
+      <!-- Distribuci√≥n de Costos -->
       <div class="card" style="flex:1">
-        <div class="sec-title">= DISTRIBUCI”N DE COSTOS</div>
+        <div class="sec-title">= DISTRIBUCI√ìN DE COSTOS</div>
         <div id="dist-costos-list" style="font-size:11px"></div>
     </div>
   </div>
@@ -1965,7 +1965,7 @@ table:not(.gantt-table) .tfoot-dark td,
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
     <div>
       <div style="font-size:16px;font-weight:800;color:#0f172a"> FLUJO DE CAJA DEL PROYECTO</div>
-      <div style="font-size:11px;color:#94a3b8">MÈtricas y consolidado mensual (Lectura R·pida)</div>
+      <div style="font-size:11px;color:#94a3b8">M√©tricas y consolidado mensual (Lectura R√°pida)</div>
   </div>
     <button class="btn-outline" onclick="exportarExcel()"> Exportar Excel (.xlsx)</button>
 </div>
@@ -1978,12 +1978,12 @@ table:not(.gantt-table) .tfoot-dark td,
       <div style="font-size:10px;font-weight:700;color:#22c55e;text-transform:uppercase;margin-bottom:8px"> MARGEN DEL PROYECTO</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div>
-          <div style="font-size:10px;color:#94a3b8">SIN FINANCIACI”N</div>
+          <div style="font-size:10px;color:#94a3b8">SIN FINANCIACI√ìN</div>
           <div style="font-size:1.4rem;font-weight:900;color:#fff" id="flujo-margen-sin">100.661 UF</div>
           <div style="font-size:10px;color:#22c55e" id="flujo-margen-sin-pct">15.5%</div>
       </div>
         <div>
-          <div style="font-size:10px;color:#94a3b8">CON FINANCIACI”N</div>
+          <div style="font-size:10px;color:#94a3b8">CON FINANCIACI√ìN</div>
           <div style="font-size:1.4rem;font-weight:900;color:#3b82f6" id="flujo-margen-con">81.569 UF</div>
           <div style="font-size:10px;color:#3b82f6" id="flujo-margen-con-pct">12.6%</div>
       </div>
@@ -2011,7 +2011,7 @@ table:not(.gantt-table) .tfoot-dark td,
     <div class="planilla-header">
       <div>
         <div style="font-size:13px;font-weight:900;color:#fff;letter-spacing:.08em;text-transform:uppercase">FLUJO DE CAJA COMPLETO</div>
-        <div style="font-size:10px;color:#94a3b8;margin-top:2px">FÛrmulas visibles y editables; secciones colapsables igual que la planilla de costos.</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:2px">F√≥rmulas visibles y editables; secciones colapsables igual que la planilla de costos.</div>
       </div>
     </div>
     <div class="flow-planilla">
@@ -2029,11 +2029,11 @@ table:not(.gantt-table) .tfoot-dark td,
   <!-- KPIs -->
   <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:16px">
     <div class="req-kpi">
-      <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px">Req. M·ximo (Sin Buffer)</div>
+      <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px">Req. M√°ximo (Sin Buffer)</div>
       <div style="font-size:1.1rem;font-weight:900;color:#0f172a" id="cap-max-sin">143.356</div>
   </div>
     <div class="req-kpi">
-      <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px">Req. M·ximo (Con Buffer)</div>
+      <div style="font-size:9px;color:#64748b;font-weight:700;text-transform:uppercase;margin-bottom:3px">Req. M√°ximo (Con Buffer)</div>
       <div style="font-size:1.1rem;font-weight:900;color:#3b82f6" id="cap-max-con">145.356</div>
   </div>
     <div class="req-kpi">
@@ -2049,9 +2049,9 @@ table:not(.gantt-table) .tfoot-dark td,
       <div style="font-size:1.1rem;font-weight:900;color:#22c55e" id="cap-margen-bruto">83.869</div>
   </div>
     <div class="card-dark" style="border-radius:10px;padding:12px">
-      <div style="font-size:9px;color:#f59e0b;font-weight:700;text-transform:uppercase;margin-bottom:3px">$ M⁄LTIPLO (MOIC)</div>
+      <div style="font-size:9px;color:#f59e0b;font-weight:700;text-transform:uppercase;margin-bottom:3px">$ M√öLTIPLO (MOIC)</div>
       <div style="font-size:1.5rem;font-weight:900;color:#fff" id="cap-moic-tab">1.57x</div>
-      <div style="font-size:9px;color:#94a3b8">M˙ltiplo Retorno</div>
+      <div style="font-size:9px;color:#94a3b8">M√∫ltiplo Retorno</div>
   </div>
     <div class="card-dark" style="border-radius:10px;padding:12px">
       <div style="font-size:9px;color:#22c55e;font-weight:700;text-transform:uppercase;margin-bottom:3px">% TIR INVERSIONISTA</div>
@@ -2060,55 +2060,55 @@ table:not(.gantt-table) .tfoot-dark td,
   </div>
 </div>
 
-  <!-- Par·metros -->
+  <!-- Par√°metros -->
   <div class="card" style="margin-bottom:16px;background:#fffbeb;border-color:#fde68a">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <div>
-        <div style="font-size:13px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:6px"> AJUSTA TUS PAR¡METROS DE INVERSI”N</div>
-        <div style="font-size:11px;color:#94a3b8">Modifica los par·metros para simular escenarios. Los cambios solo se aplican al hacer clic en guardar.</div>
+        <div style="font-size:13px;font-weight:800;color:#0f172a;display:flex;align-items:center;gap:6px"> AJUSTA TUS PAR√ÅMETROS DE INVERSI√ìN</div>
+        <div style="font-size:11px;color:#94a3b8">Modifica los par√°metros para simular escenarios. Los cambios solo se aplican al hacer clic en guardar.</div>
     </div>
       <button class="btn-primary" onclick="guardarCapital()"> Guardar Ajustes</button>
   </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
       <div>
-        <div class="sec-title" style="color:#3b82f6">? PAR¡METROS DE LLAMADOS (CAPITAL CALLS)</div>
+        <div class="sec-title" style="color:#3b82f6">? PAR√ÅMETROS DE LLAMADOS (CAPITAL CALLS)</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
           <div>
-            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">CAJA MÕNIMA (BUFFER) </div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">CAJA M√çNIMA (BUFFER) </div>
             <div style="display:flex;gap:4px"><input type="text" inputmode="numeric" data-localized-number="1" class="inp" id="cap-buffer" value="2.000" oninput="calcularCapital()"><span style="font-size:10px;padding-top:8px">UF</span></div>
             <div style="font-size:10px;color:#94a3b8;margin-top:3px">Piso intocable de la cta. cte.</div>
         </div>
           <div>
-            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">PROYECCI”N (MESES) </div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">PROYECCI√ìN (MESES) </div>
             <div style="display:flex;gap:4px"><input type="text" inputmode="numeric" data-localized-number="1" class="inp" id="cap-proyeccion" value="6" oninput="calcularCapital()"><span style="font-size:10px;padding-top:8px">Mes</span></div>
             <div style="font-size:10px;color:#94a3b8;margin-top:3px">Look-ahead para el llamado.</div>
         </div>
           <div>
-            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">LLAMADO MÕNIMO </div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">LLAMADO M√çNIMO </div>
             <div style="display:flex;gap:4px"><input type="text" inputmode="numeric" data-localized-number="1" class="inp" id="cap-llamado-min" value="5.000" oninput="calcularCapital()"><span style="font-size:10px;padding-top:8px">UF</span></div>
-            <div style="font-size:10px;color:#94a3b8;margin-top:3px">Monto mÌnimo para pedir.</div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:3px">Monto m√≠nimo para pedir.</div>
         </div>
       </div>
     </div>
       <div>
-        <div class="sec-title" style="color:#22c55e">? PAR¡METROS DE DISTRIBUCI”N (RETURNS)</div>
+        <div class="sec-title" style="color:#22c55e">? PAR√ÅMETROS DE DISTRIBUCI√ìN (RETURNS)</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div>
-            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">CAJA FUERTE (RETENCI”N) </div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">CAJA FUERTE (RETENCI√ìN) </div>
             <div style="display:flex;gap:4px"><input type="text" inputmode="numeric" data-localized-number="1" class="inp" id="cap-caja-fuerte" value="10.000" oninput="calcularCapital()"><span style="font-size:10px;padding-top:8px">UF</span></div>
             <div style="font-size:10px;color:#94a3b8;margin-top:3px">Caja retenida antes de repartir excedentes.</div>
         </div>
           <div>
-            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">DEVOLUCI”N MÕNIMA </div>
+            <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">DEVOLUCI√ìN M√çNIMA </div>
             <div style="display:flex;gap:4px"><input type="text" inputmode="numeric" data-localized-number="1" class="inp" id="cap-dev-min" value="3.000" oninput="calcularCapital()"><span style="font-size:10px;padding-top:8px">UF</span></div>
-            <div style="font-size:10px;color:#94a3b8;margin-top:3px">No se har·n repartos menores a este monto.</div>
+            <div style="font-size:10px;color:#94a3b8;margin-top:3px">No se har√°n repartos menores a este monto.</div>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-  <!-- Gr·ficos Capital -->
+  <!-- Gr√°ficos Capital -->
   <div class="card" style="margin-bottom:16px">
     <div style="display:flex;gap:16px;border-bottom:1px solid #f1f5f9;margin-bottom:16px">
       <button class="tab-btn active" onclick="setCapTab('ciclo',this)" id="cap-btn-ciclo" style="font-size:12px">CICLO OPERATIVO REAL</button>
@@ -2117,7 +2117,7 @@ table:not(.gantt-table) .tfoot-dark td,
     <div id="cap-tab-ciclo">
       <canvas id="cicloOperativo-chart" height="250"></canvas>
       <div style="display:flex;gap:16px;margin-top:8px;font-size:10px;justify-content:center">
-        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:20px;height:2px;background:#ef4444;border-radius:1px;border-top:1px dashed #ef4444"></span> Caja Acum. TeÛrica</span>
+        <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:20px;height:2px;background:#ef4444;border-radius:1px;border-top:1px dashed #ef4444"></span> Caja Acum. Te√≥rica</span>
         <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:20px;height:2px;background:#3b82f6;border-radius:1px"></span> Caja Real (Cta. Corriente)</span>
         <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:12px;height:12px;background:#22c55e;border-radius:2px"></span> Devoluciones</span>
         <span style="display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:12px;height:12px;background:#8b5cf6;border-radius:2px"></span> Llamados de Capital</span>
@@ -2147,14 +2147,14 @@ table:not(.gantt-table) .tfoot-dark td,
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
     <div>
       <div style="font-size:16px;font-weight:800;color:#0f172a"> DATA ROOM</div>
-      <div style="font-size:11px;color:#94a3b8">GestiÛn de documentos del proyecto</div>
+      <div style="font-size:11px;color:#94a3b8">Gesti√≥n de documentos del proyecto</div>
   </div>
     <button class="btn-primary" onclick="document.getElementById('file-upload').click()"> Subir Documento</button>
     <input type="file" id="file-upload" style="display:none" multiple onchange="handleFileUpload(event)">
 </div>
 
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px" id="dataroom-grid">
-    <!-- CategorÌas generadas por JS -->
+    <!-- Categor√≠as generadas por JS -->
 </div>
 </div><!-- end tab dataroom -->
 
@@ -2169,21 +2169,21 @@ table:not(.gantt-table) .tfoot-dark td,
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         <span id="cost-config-status" class="cost-config-state estado-pendiente">Pendiente</span>
-        <button class="btn-outline btn-plus" type="button" onclick="closeCostConfigModal()">◊</button>
+        <button class="btn-outline btn-plus" type="button" onclick="closeCostConfigModal()">√ó</button>
       </div>
     </div>
     <div class="modal-body cost-config-body">
       <div class="cost-config-main">
         <div class="cost-config-panel">
-          <label for="cost-config-method" class="cost-config-label">MÈtodo de c·lculo e imputaciÛn</label>
+          <label for="cost-config-method" class="cost-config-label">M√©todo de c√°lculo e imputaci√≥n</label>
           <select id="cost-config-method" class="inp" onchange="renderCostConfigFields(); updateCostConfigPreview()">
-            <option value="manual">Monto ˙nico</option>
-            <option value="monthly_amount">Monto mensual durante perÌodo</option>
-            <option value="monthly_formula">FÛrmula mensual</option>
+            <option value="manual">Monto √∫nico</option>
+            <option value="monthly_amount">Monto mensual durante per√≠odo</option>
+            <option value="monthly_formula">F√≥rmula mensual</option>
             <option value="global_formula">Distribuido</option>
-            <option value="periodic">Pago periÛdico</option>
+            <option value="periodic">Pago peri√≥dico</option>
             <option value="milestones">Pago por hitos</option>
-            <option value="manual_distribution">DistribuciÛn manual</option>
+            <option value="manual_distribution">Distribuci√≥n manual</option>
           </select>
         </div>
         <div id="cost-config-fields" class="cost-config-fields"></div>
@@ -2216,10 +2216,10 @@ table:not(.gantt-table) .tfoot-dark td,
   <div class="modal-card" style="max-width:1040px">
     <div class="modal-head">
       <div>
-        <div id="cost-formula-title" style="font-size:22px;font-weight:900;color:#0f172a">Ver fÛrmula</div>
-        <div id="cost-formula-subtitle" style="font-size:12px;color:#64748b;margin-top:4px">RevisiÛn y ediciÛn de fÛrmula</div>
+        <div id="cost-formula-title" style="font-size:22px;font-weight:900;color:#0f172a">Ver f√≥rmula</div>
+        <div id="cost-formula-subtitle" style="font-size:12px;color:#64748b;margin-top:4px">Revisi√≥n y edici√≥n de f√≥rmula</div>
       </div>
-      <button class="btn-outline btn-plus" type="button" onclick="closeCostFormulaModal()">◊</button>
+      <button class="btn-outline btn-plus" type="button" onclick="closeCostFormulaModal()">√ó</button>
     </div>
     <div class="modal-body">
       <div class="formula-modal-layout">
@@ -2234,16 +2234,16 @@ table:not(.gantt-table) .tfoot-dark td,
           </div>
           <div class="formula-cell">
             <div class="formula-imputation-box">
-              <div style="font-size:10px;color:#94a3b8;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Tipo de imputaciÛn</div>
+              <div style="font-size:10px;color:#94a3b8;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Tipo de imputaci√≥n</div>
               <select id="cost-formula-imputation-type" class="inp" onchange="updateCostFormulaModalPreview(); autosaveCostFormulaModal()">
                 <option value="global">Total global</option>
-                <option value="monthly">Mensual por fÛrmula</option>
+                <option value="monthly">Mensual por f√≥rmula</option>
                 <option value="manual">Manual</option>
               </select>
             </div>
-            <div style="font-size:10px;color:#94a3b8;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Editar fÛrmula</div>
+            <div style="font-size:10px;color:#94a3b8;font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Editar f√≥rmula</div>
             <div id="cost-formula-modal-preview" class="formula-chip-editor" style="margin-bottom:8px"></div>
-            <input id="cost-formula-modal-input" class="inp" placeholder="Ej: 25% * (ingresos_promesa_mes + ingresos_escrituracion_mes)  ∑  SI(ingresos_mes > 0, 50, 0)  ∑  -4,3% * valor_promedio_total_unidad * unidades_escrituradas_mes" oninput="handleCostFormulaInput(this); updateCostFormulaModalPreview(); autosaveCostFormulaModal()" onfocus="handleCostFormulaInput(this); updateCostFormulaModalPreview()" onblur="hideCostFormulaSuggestionsLater()"/>
+            <input id="cost-formula-modal-input" class="inp" placeholder="Ej: 25% * (ingresos_promesa_mes + ingresos_escrituracion_mes)  ¬∑  SI(ingresos_mes > 0, 50, 0)  ¬∑  -4,3% * valor_promedio_total_unidad * unidades_escrituradas_mes" oninput="handleCostFormulaInput(this); updateCostFormulaModalPreview(); autosaveCostFormulaModal()" onfocus="handleCostFormulaInput(this); updateCostFormulaModalPreview()" onblur="hideCostFormulaSuggestionsLater()"/>
             <div class="formula-suggest"></div>
             <div id="cost-formula-monthly-preview" class="formula-monthly-preview" style="display:none"></div>
           </div>
@@ -2256,8 +2256,8 @@ table:not(.gantt-table) .tfoot-dark td,
         <div class="formula-modal-sidebar">
           <div class="formula-modal-sidebar-title">Referencias disponibles</div>
           <button class="formula-si-btn" type="button" onmousedown="event.preventDefault(); insertFormulaTemplate('SI')">
-            <strong>SI(</strong>condiciÛn<strong>, </strong>valor_si<strong>, </strong>valor_no<strong>)</strong>
-            <small style="display:block;color:#94a3b8;margin-top:3px">Condicional mes a mes ∑ Ej: SI(_ingresos_mes > 0, 50, 0)</small>
+            <strong>SI(</strong>condici√≥n<strong>, </strong>valor_si<strong>, </strong>valor_no<strong>)</strong>
+            <small style="display:block;color:#94a3b8;margin-top:3px">Condicional mes a mes ¬∑ Ej: SI(_ingresos_mes > 0, 50, 0)</small>
           </button>
           <div id="cost-formula-ref-panel" class="formula-ref-panel"></div>
         </div>
@@ -2270,7 +2270,7 @@ table:not(.gantt-table) .tfoot-dark td,
 <div id="projects-panel-backdrop" onclick="closeProjectsPanel()" aria-hidden="true"></div>
 
 <!-- PROJECTS PANEL -->
-<div id="projects-panel" role="dialog" aria-modal="true" aria-label="GestiÛn de proyectos" hidden>
+<div id="projects-panel" role="dialog" aria-modal="true" aria-label="Gesti√≥n de proyectos" hidden>
   <div class="proj-panel-head">
     <span class="proj-panel-title">Proyectos</span>
     <button class="proj-panel-close" type="button" onclick="closeProjectsPanel()" title="Cerrar panel" aria-label="Cerrar panel de proyectos">&times;</button>
@@ -2290,10 +2290,10 @@ table:not(.gantt-table) .tfoot-dark td,
           <input class="inp" id="new-project-nombre" type="text" placeholder="Ej: Edificio Miraflores" autocomplete="off" maxlength="120" style="min-height:34px;font-size:12px">
         </div>
         <div class="proj-new-form-field">
-          <label class="proj-new-form-label" for="new-project-direccion">DirecciÛn del proyecto</label>
+          <label class="proj-new-form-label" for="new-project-direccion">Direcci√≥n del proyecto</label>
           <div class="proj-new-addr-row">
             <div class="addr-search-wrap">
-              <input class="inp" id="new-project-direccion" type="text" placeholder="Buscar direcciÛn del proyecto" autocomplete="off" maxlength="240" onfocus="focusAddressSearch('new', this.value)" oninput="updateNewProjectAddrStatus()">
+              <input class="inp" id="new-project-direccion" type="text" placeholder="Buscar direcci√≥n del proyecto" autocomplete="off" maxlength="240" onfocus="focusAddressSearch('new', this.value)" oninput="updateNewProjectAddrStatus()">
               <div id="new-project-addr-suggestions" class="addr-suggestions" hidden></div>
             </div>
           </div>
@@ -2555,9 +2555,9 @@ table:not(.gantt-table) .tfoot-dark td,
     let expr = String(rawFormula || '').trim();
     if (!expr) return null;
     expr = expr
-      .replace(/[-ñó]/g, '-')
-      .replace(/◊/g, '*')
-      .replace(/˜/g, '/');
+      .replace(/[-‚Äì‚Äî]/g, '-')
+      .replace(/√ó/g, '*')
+      .replace(/√∑/g, '/');
     expr = normalizeInlineFormulaSyntax(expr);
 
     expr = expr.replace(/\[([^\]]+)\]/g, (_, token) => {
@@ -2623,18 +2623,18 @@ table:not(.gantt-table) .tfoot-dark td,
       : { ib: 0, terreno: 0, ingresoNeto: 0, iva: 0, factor: 0, productRows: [] };
     return `
       <div class="flow-origin-stack">
-        <div class="flow-origin">Ingresos brutos escriturados ◊ Factor IVA DÈbito (IVA / IB)</div>
+        <div class="flow-origin">Ingresos brutos escriturados √ó Factor IVA D√©bito (IVA / IB)</div>
         <details class="flow-calc-details">
-          <summary>C·lculo</summary>
+          <summary>C√°lculo</summary>
           <div class="flow-calc-panel">
-            <div class="flow-calc-formula">IN = (IB + 0,19 ◊ T) / 1,19</div>
+            <div class="flow-calc-formula">IN = (IB + 0,19 √ó T) / 1,19</div>
             <div class="flow-calc-formula">IVA = IB - IN</div>
-            <div class="flow-calc-formula">Factor IVA DÈbito = IVA / IB</div>
+            <div class="flow-calc-formula">Factor IVA D√©bito = IVA / IB</div>
             <div class="flow-calc-grid">
               <span>IB ingresos brutos</span><strong>${fmtUf(analysis.ib)}</strong>
               <span>T terreno</span><strong>${fmtUf(analysis.terreno)}</strong>
               <span>IN ingresos netos</span><strong>${fmtUf(analysis.ingresoNeto)}</strong>
-              <span>IVA dÈbito</span><strong>${fmtUf(analysis.iva)}</strong>
+              <span>IVA d√©bito</span><strong>${fmtUf(analysis.iva)}</strong>
               <span>Factor aplicado</span><strong>${fmtNumber(analysis.factor, 4)}</strong>
             </div>
             <div class="flow-calc-note">El factor se aplica sobre los ingresos brutos escriturados de cada mes.</div>
@@ -2816,7 +2816,7 @@ table:not(.gantt-table) .tfoot-dark td,
         return values;
       }
 
-      // Buscar Ìndices GASTOS FINANCIEROS para botones de configuraciÛn
+      // Buscar √≠ndices GASTOS FINANCIEROS para botones de configuraci√≥n
       const gfCatGF = (typeof ensureCostosState === 'function' ? ensureCostosState() : []).find((item) => item.nombre === 'GASTOS FINANCIEROS');
       const gfPartidasGF = gfCatGF?.partidas || [];
       const gfGirosIdx = gfPartidasGF.findIndex((p) => /Construccion.*Linea aprobada/i.test(p.nombre || ''));
@@ -2825,13 +2825,13 @@ table:not(.gantt-table) .tfoot-dark td,
         ? `<button type="button" title="Configurar costo: ${lbl}" onclick="openPaymentPlanModal('GASTOS FINANCIEROS',${idx})" style="font-size:9px;padding:1px 5px;background:#eff6ff;border:1px solid #93c5fd;color:#1d4ed8;border-radius:3px;cursor:pointer;flex-shrink:0">config</button>`
         : '';
 
-      pushRow({ key: 'giros', label: 'GIROS (desde EP)', fallback: giros, formula: '[GIROS fuente]', mode: 'signed', actionHtml: mkPlanBtn(gfGirosIdx, 'Giro lÌnea construcciÛn') });
+      pushRow({ key: 'giros', label: 'GIROS (desde EP)', fallback: giros, formula: '[GIROS fuente]', mode: 'signed', actionHtml: mkPlanBtn(gfGirosIdx, 'Giro l√≠nea construcci√≥n') });
 
       const pagosLineaFormula = getFormula('gf', 'pagos_linea', '[PAGOS LINEA fuente]');
       const pagosLinea = evaluateSeries(pagosLineaFormula, series, scalars, pagosLineaDefault);
       addSeries(series, 'PAGOS LINEA', pagosLinea, 'pagos_linea');
-      // Pago lÌnea va justo despuÈs de GIROS
-      rows.push({ key: 'pagos_linea', label: 'PAGOS LÕNEA', formula: pagosLineaFormula, values: pagosLinea, mode: 'signed', color: '#ef4444', actionHtml: mkPlanBtn(gfPagoLineaIdx, 'Pago de lÌnea construcciÛn') });
+      // Pago l√≠nea va justo despu√©s de GIROS
+      rows.push({ key: 'pagos_linea', label: 'PAGOS L√çNEA', formula: pagosLineaFormula, values: pagosLinea, mode: 'signed', color: '#ef4444', actionHtml: mkPlanBtn(gfPagoLineaIdx, 'Pago de l√≠nea construcci√≥n') });
 
       const acumFormula = getFormula('gf', 'acumulado', '[Acumulado anterior] + [GIROS (desde EP)] + [PAGOS LINEA]');
       const acumulado = [];
@@ -2938,7 +2938,7 @@ table:not(.gantt-table) .tfoot-dark td,
                 key: `${categoryKey}_manual_${partidaIndex}`,
                 label: partida.nombre || `Subpartida ${partidaIndex + 1}`,
                 values: partidaValues,
-                origin: partida.tiene_iva ? 'Neto sin IVA ∑ IVA activo' : 'Neto sin IVA',
+                origin: partida.tiene_iva ? 'Neto sin IVA ¬∑ IVA activo' : 'Neto sin IVA',
               });
             });
           return {
@@ -2952,9 +2952,9 @@ table:not(.gantt-table) .tfoot-dark td,
           const values = getBuildingPaymentFlowForCashflow(monthCount);
           const partidas = [{
             key: `${categoryKey}_edificacion`,
-            label: 'EdificaciÛn',
+            label: 'Edificaci√≥n',
             values,
-            origin: 'EP + anticipo de construcciÛn',
+            origin: 'EP + anticipo de construcci√≥n',
           }];
           (category.partidas || [])
             .filter((partida) => !(typeof isLinkedConstructionBasePartida === 'function' ? isLinkedConstructionBasePartida(partida) : partida?.source === 'construccion'))
@@ -2964,7 +2964,7 @@ table:not(.gantt-table) .tfoot-dark td,
                 key: `${categoryKey}_manual_${partidaIndex}`,
                 label: partida.nombre || `Subpartida ${partidaIndex + 1}`,
                 values: partidaValues,
-                origin: partida.tiene_iva ? 'Neto sin IVA ∑ IVA activo' : 'Neto sin IVA',
+                origin: partida.tiene_iva ? 'Neto sin IVA ¬∑ IVA activo' : 'Neto sin IVA',
               });
             });
           return {
@@ -2980,7 +2980,7 @@ table:not(.gantt-table) .tfoot-dark td,
             key: `flow_gastos_${categoryIndex}_${partidaIndex}`,
             label: partida.nombre || `Subpartida ${partidaIndex + 1}`,
             values,
-            origin: partida.tiene_iva ? 'Neto sin IVA ∑ IVA activo' : 'Neto sin IVA',
+            origin: partida.tiene_iva ? 'Neto sin IVA ¬∑ IVA activo' : 'Neto sin IVA',
           };
         });
         return {
@@ -3211,15 +3211,15 @@ table:not(.gantt-table) .tfoot-dark td,
         ['Gastos financieros', totalFinancial, '#f59e0b'],
         ['Subtotal egresos neto', totalSubtotal, '#0f766e'],
         ['Total egresos brutos', -totalEgresosBrutosValue, '#dc2626'],
-        ['IVA crÈdito', -total(ivaCreditoSource), '#2563eb'],
-        ['IVA dÈbito', total(ivaDebitoSource), '#7c3aed'],
+        ['IVA cr√©dito', -total(ivaCreditoSource), '#2563eb'],
+        ['IVA d√©bito', total(ivaDebitoSource), '#7c3aed'],
         ['Pago IVA', -total(ivaSettlement.pagoIva), '#0ea5e9'],
       ].map(([label, value, color]) => {
         const pct = totalIncome ? toNumber(value) / totalIncome * 100 : 0;
         return `<div class="dist-row"><div class="dist-label">${escapeHtml(label)}</div><div class="dist-bar-wrap"><div class="dist-bar" style="width:${Math.max(2, Math.min(100, Math.abs(pct)))}%;background:${color}"></div></div><div class="dist-pct">${fmtPct(pct)}</div></div>`;
       }).join(''));
 
-      setHtml('flujo-tabla-header', `<tr><th style="text-align:left;min-width:280px">Concepto</th><th style="text-align:left;min-width:260px">Origen / lÛgica</th><th class="flow-total-col">Total</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}</tr>`);
+      setHtml('flujo-tabla-header', `<tr><th style="text-align:left;min-width:280px">Concepto</th><th style="text-align:left;min-width:260px">Origen / l√≥gica</th><th class="flow-total-col">Total</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}</tr>`);
 
       const rows = [];
       const parentStack = [];
@@ -3251,7 +3251,7 @@ table:not(.gantt-table) .tfoot-dark td,
       pushRow({
         key: 'gastos',
         label: 'Gastos',
-        origin: 'Hoja Costos ∑ valores netos sin IVA',
+        origin: 'Hoja Costos ¬∑ valores netos sin IVA',
         values: costStructure.total,
         mode: 'cost',
         sign: '-',
@@ -3309,8 +3309,8 @@ table:not(.gantt-table) .tfoot-dark td,
         const interestCollapsed = isFlowCollapsedKey('flow_gf_intereses', true);
         pushRow({
           key: 'gf_intereses',
-          label: 'Intereses CrÈdito Banco',
-          origin: 'Hoja Terreno + Hoja ConstrucciÛn',
+          label: 'Intereses Cr√©dito Banco',
+          origin: 'Hoja Terreno + Hoja Construcci√≥n',
           values: interestTotal,
           mode: 'cost',
           sign: '-',
@@ -3320,15 +3320,15 @@ table:not(.gantt-table) .tfoot-dark td,
           collapsed: interestCollapsed,
         });
         pushGroupChildren('flow_gf_intereses', true, () => {
-          pushRow({ key: 'gf_intereses_terreno', label: 'Intereses CrÈdito Banco - Terreno', origin: 'Hoja Terreno', values: terrainFinancial.interest, mode: 'cost', sign: '-', level: 2, muted: true });
-          pushRow({ key: 'gf_intereses_construccion', label: 'Intereses CrÈdito Banco - ConstrucciÛn', origin: 'Hoja ConstrucciÛn', values: constructionFinancial.interest, mode: 'cost', sign: '-', level: 2, muted: true });
+          pushRow({ key: 'gf_intereses_terreno', label: 'Intereses Cr√©dito Banco - Terreno', origin: 'Hoja Terreno', values: terrainFinancial.interest, mode: 'cost', sign: '-', level: 2, muted: true });
+          pushRow({ key: 'gf_intereses_construccion', label: 'Intereses Cr√©dito Banco - Construcci√≥n', origin: 'Hoja Construcci√≥n', values: constructionFinancial.interest, mode: 'cost', sign: '-', level: 2, muted: true });
         });
 
         const stampCollapsed = isFlowCollapsedKey('flow_gf_timbres', true);
         pushRow({
           key: 'gf_timbres',
           label: 'Impto. Timbre Y Estampillas',
-          origin: 'Hoja Terreno + Hoja ConstrucciÛn',
+          origin: 'Hoja Terreno + Hoja Construcci√≥n',
           values: stampTotal,
           mode: 'cost',
           sign: '-',
@@ -3339,7 +3339,7 @@ table:not(.gantt-table) .tfoot-dark td,
         });
         pushGroupChildren('flow_gf_timbres', true, () => {
           pushRow({ key: 'gf_timbres_terreno', label: 'Impto. Timbre Y Estampillas - Terreno', origin: 'Hoja Terreno', values: terrainFinancial.stamp, mode: 'cost', sign: '-', level: 2, muted: true });
-          pushRow({ key: 'gf_timbres_construccion', label: 'Impto. Timbre Y Estampillas - ConstrucciÛn', origin: 'Hoja ConstrucciÛn', values: constructionFinancial.stamp, mode: 'cost', sign: '-', level: 2, muted: true });
+          pushRow({ key: 'gf_timbres_construccion', label: 'Impto. Timbre Y Estampillas - Construcci√≥n', origin: 'Hoja Construcci√≥n', values: constructionFinancial.stamp, mode: 'cost', sign: '-', level: 2, muted: true });
         });
 
         pushRow({
@@ -3356,7 +3356,7 @@ table:not(.gantt-table) .tfoot-dark td,
       pushRow({
         key: 'subtotal_egresos_neto',
         label: 'Subtotal Egresos Neto',
-        origin: 'Gastos + Gastos financieros ∑ neto sin IVA',
+        origin: 'Gastos + Gastos financieros ¬∑ neto sin IVA',
         values: subtotalEgresos,
         mode: 'cost',
         sign: '-',
@@ -3377,7 +3377,7 @@ table:not(.gantt-table) .tfoot-dark td,
       pushGroupChildren('flow_pago_iva', true, () => {
         pushRow({
           key: 'iva_credito',
-          label: 'IVA CrÈdito',
+          label: 'IVA Cr√©dito',
           origin: '19% solo sobre costos con IVA activado',
           values: ivaCreditoSource,
           mode: 'cost',
@@ -3388,8 +3388,8 @@ table:not(.gantt-table) .tfoot-dark td,
         });
         pushRow({
           key: 'iva_debito',
-          label: 'IVA DÈbito',
-          origin: 'Ingresos brutos escriturados ◊ Factor IVA DÈbito (IVA / IB)',
+          label: 'IVA D√©bito',
+          origin: 'Ingresos brutos escriturados √ó Factor IVA D√©bito (IVA / IB)',
           originHtml: renderIvaDebitoFlowCalcDetails(),
           values: ivaDebitoSource,
           mode: 'signed',
@@ -3401,7 +3401,7 @@ table:not(.gantt-table) .tfoot-dark td,
         pushRow({
           key: 'iva_mensual',
           label: 'IVA mensual',
-          origin: 'IVA DÈbito + IVA CrÈdito (crÈdito como egreso negativo)',
+          origin: 'IVA D√©bito + IVA Cr√©dito (cr√©dito como egreso negativo)',
           values: ivaSettlement.ivaMensual,
           mode: 'signed',
           sign: '=',
@@ -3424,7 +3424,7 @@ table:not(.gantt-table) .tfoot-dark td,
       pushRow({
         key: 'total_egresos_brutos',
         label: 'Total Egresos Brutos',
-        origin: 'Subtotal Egresos Neto + IVA CrÈdito + Pago IVA',
+        origin: 'Subtotal Egresos Neto + IVA Cr√©dito + Pago IVA',
         values: totalEgresosBrutos,
         mode: 'cost',
         sign: '-',
@@ -3659,14 +3659,14 @@ table:not(.gantt-table) .tfoot-dark td,
   function enhanceButtonsAccessibility(scope = document) {
     scopedQueryAll(scope, 'button').forEach((button) => {
       const text = button.textContent.trim();
-      if (!hasAccessibleName(button) || /^[+\-∑◊??]*$/.test(text)) {
+      if (!hasAccessibleName(button) || /^[+\-¬∑√ó??]*$/.test(text)) {
         const title = button.title ? button.title.trim() : '';
         const onclick = button.getAttribute('onclick') || '';
         let label = title || text || 'Accion';
         if (/toggleCostCategoryCollapse/.test(onclick) || /toggleFlowCategory/.test(onclick)) label = `${text === '+' ? 'Desplegar' : 'Colapsar'} seccion`;
         if (/scroll/.test(onclick)) label = text.includes('?') ? 'Desplazar tabla hacia meses anteriores' : 'Desplazar tabla hacia meses posteriores';
         if (/print/.test(onclick)) label = 'Imprimir reporte';
-        if (/remove|eliminar/i.test(onclick) || text === '◊') label = title || 'Eliminar';
+        if (/remove|eliminar/i.test(onclick) || text === '√ó') label = title || 'Eliminar';
         button.setAttribute('aria-label', label);
       }
       if (button.disabled) button.setAttribute('aria-disabled', 'true');
