@@ -789,10 +789,137 @@ function getFormulaOverridesForSave() {
 }
 
 function getProjectSavePayload() {
-  return normalizeProject({
+  return getPersistableProject({
     ...(state.proyecto || {}),
     formula_overrides: getFormulaOverridesForSave(),
   });
+}
+
+const PERSISTABLE_PROJECT_KEYS = [
+  'id',
+  'nombre',
+  'direccion',
+  'direccionCompleta',
+  'direccionConfirmada',
+  'direccionValidada',
+  'direccionPlaceId',
+  'direccionLat',
+  'direccionLng',
+  'compra_terreno_fecha',
+  'terreno_m2_bruto',
+  'terreno_m2_bruto_afecto',
+  'terreno_m2_afectacion',
+  'terreno_m2_neto',
+  'terreno_precio_uf_m2',
+  'terreno_precio_total',
+  'terraza_util_pct',
+  'comunes_tipo',
+  'comunes_valor',
+  'estacionamientos_cantidad',
+  'estacionamientos_sup_interior',
+  'estacionamientos_sup_terrazas',
+  'bodegas_cantidad',
+  'bodegas_sup_interior',
+  'bodegas_sup_terrazas',
+  'tasa_interes_terreno',
+  'tasa_interes_construccion',
+  'pct_timbres',
+  'pct_ceec',
+  'pct_impuesto_renta',
+  'formula_overrides',
+  'updated_at',
+  'updatedAt',
+  'fechaActualizacion',
+  'fecha_actualizacion',
+];
+
+function pickObjectKeys(source = {}, keys = []) {
+  const out = {};
+  keys.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(source, key)) out[key] = source[key];
+  });
+  return out;
+}
+
+function getPersistableProject(project = {}) {
+  const normalized = normalizeProject(project);
+  return pickObjectKeys(normalized, PERSISTABLE_PROJECT_KEYS);
+}
+
+function getPersistableCabidaRows(rows = []) {
+  return (rows || []).map((row) => ({
+    id: row.id || '',
+    uso: String(row.uso || '').trim(),
+    cantidad: toNumber(row.cantidad),
+    sup_interior: toNumber(row.sup_interior),
+    sup_terrazas: toNumber(row.sup_terrazas),
+    vendible: toNumber(row.vendible),
+  })).filter((row) => row.uso);
+}
+
+function getPersistableFinanciamiento(fin = {}) {
+  return normalizeFinanciamiento(fin);
+}
+
+function getPersistableConstruccion(construccion = {}) {
+  return normalizeConstruccion(construccion);
+}
+
+function getPersistableGanttRows(rows = []) {
+  return normalizeGanttRows(rows).map((row) => ({
+    id: row.id || '',
+    nombre: String(row.nombre || '').trim(),
+    color: row.color || '#3b82f6',
+    dependencia: row.dependencia || null,
+    dependencia_tipo: row.dependencia_tipo || 'fin',
+    desfase: toNumber(row.desfase),
+    inicio: toNumber(row.inicio),
+    duracion: Math.max(1, toNumber(row.duracion || 1)),
+    fin: toNumber(row.fin),
+  }));
+}
+
+function getPersistableVentasConfig(rows = []) {
+  return (rows || []).map((row) => ({
+    id: row.id || '',
+    uso: row.uso || '',
+    precio_uf_m2: toNumber(row.precio_uf_m2),
+    precio_estacionamiento: toNumber(row.precio_estacionamiento),
+    precio_bodega: toNumber(row.precio_bodega),
+    reserva_uf: toNumber(row.reserva_uf),
+    pie_promesa_pct: toNumber(row.pie_promesa_pct),
+    pie_cuotas_pct: toNumber(row.pie_cuotas_pct),
+    hipotecario_pct: toNumber(row.hipotecario_pct),
+    pie_cuoton_pct: toNumber(row.pie_cuoton_pct),
+    forma_pago_promesa: row.forma_pago_promesa || 'unico',
+  }));
+}
+
+function getPersistableVentasCronograma(rows = []) {
+  return (rows || []).map((row) => ({
+    id: row.id || '',
+    tipo: row.tipo || '',
+    uso: row.uso || '',
+    vinculo_gantt: row.vinculo_gantt || null,
+    mes_inicio: toNumber(row.mes_inicio),
+    duracion: Math.max(0, toNumber(row.duracion)),
+    porcentaje: toNumber(row.porcentaje),
+    velocidad: toNumber(row.velocidad),
+  }));
+}
+
+function getPersistableCapital(capital = {}) {
+  return normalizeCapital(capital);
+}
+
+function compactMonthlyDistribution(values = []) {
+  const arr = Array.isArray(values) ? values.map((value) => toNumber(value)) : [];
+  let lastNonZero = -1;
+  arr.forEach((value, index) => {
+    if (Math.abs(value) > 1e-9) lastNonZero = index;
+  });
+  const trimmed = arr.slice(0, lastNonZero + 1);
+  return trimmed;
 }
 
 function getGlobalFinancialParams() {
@@ -1334,13 +1461,68 @@ function renderSyncStatus() {
 }
 
 function queueAutosaveRequest(requests, key, path, method, body) {
+  let payload = body;
+  if (key === 'proyecto') payload = getPersistableProject(body || {});
+  if (key === 'cabida') payload = getPersistableCabidaRows(body || []);
+  if (key === 'financiamiento') payload = getPersistableFinanciamiento(body || {});
+  if (key === 'construccion') payload = getPersistableConstruccion(body || {});
+  if (key === 'gantt') payload = getPersistableGanttRows(body || []);
+  if (key === 'ventas-config') payload = getPersistableVentasConfig(body || []);
+  if (key === 'ventas-cronograma') payload = getPersistableVentasCronograma(body || []);
+  if (key === 'costos') payload = getCostosPayloadForSave();
+  if (key === 'capital') payload = getPersistableCapital(body || {});
   requests.set(key, {
     path,
+    key,
+    payload,
     options: {
       method,
-      body: JSON.stringify(body ?? {}),
+      body: JSON.stringify(payload ?? {}),
     },
   });
+}
+
+function isEntityTooLargeError(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return message.includes('request entity too large') || message.includes('payload too large') || message.includes('413');
+}
+
+function buildSlimRetryPayload(key, payload) {
+  if (key === 'costos') {
+    return (Array.isArray(payload) ? payload : []).map((category) => ({
+      id: category.id || '',
+      nombre: category.nombre || '',
+      partidas: (category.partidas || []).map((partida) => ({
+        id: partida.id || '',
+        nombre: partida.nombre || '',
+        formula_tipo: partida.formula_tipo || '',
+        formula_valor: toNumber(partida.formula_valor),
+        formula_referencia: partida.formula_referencia || '',
+        plan_pago: partida.plan_pago || '',
+        tiene_iva: !!partida.tiene_iva,
+        es_terreno: !!partida.es_terreno,
+        total_neto: toNumber(partida.total_neto),
+        distribucion_mensual: compactMonthlyDistribution(partida.distribucion_mensual).slice(0, 60),
+      })),
+    }));
+  }
+  return payload;
+}
+
+async function executeAutosaveRequests(requests) {
+  for (const req of requests) {
+    try {
+      await api(req.path, req.options);
+    } catch (error) {
+      if (!isEntityTooLargeError(error)) throw error;
+      setSyncStatus('saving', 'GUARDANDO', 'El proyecto es demasiado pesado para guardar. Se limpiarán datos temporales y se reintentará.');
+      const retryPayload = buildSlimRetryPayload(req.key, req.payload);
+      await api(req.path, {
+        ...req.options,
+        body: JSON.stringify(retryPayload ?? {}),
+      });
+    }
+  }
 }
 
 async function persistAutosaveScopes(scopes, { silent = true } = {}) {
@@ -1427,7 +1609,7 @@ async function persistAutosaveScopes(scopes, { silent = true } = {}) {
   }
 
   setSyncStatus('saving', 'GUARDANDO', `Persistiendo ${scopeSet.size} cambio(s) agrupados`);
-  await Promise.all(Array.from(requests.values()).map(({ path, options }) => api(path, options)));
+  await executeAutosaveRequests(Array.from(requests.values()));
   perfLog('autosave:batch', {
     scopes: Array.from(scopeSet),
     requests: requests.size,
@@ -1634,6 +1816,17 @@ async function api(path, options = {}) {
   }
 
   return response.json();
+}
+
+async function saveApiWithRetry(path, method, payload, key = '') {
+  try {
+    return await api(path, { method, body: JSON.stringify(payload ?? {}) });
+  } catch (error) {
+    if (!isEntityTooLargeError(error)) throw error;
+    setSyncStatus('saving', 'GUARDANDO', 'El proyecto es demasiado pesado para guardar. Se limpiarán datos temporales y se reintentará.');
+    const retryPayload = buildSlimRetryPayload(key, payload);
+    return api(path, { method, body: JSON.stringify(retryPayload ?? {}) });
+  }
 }
 
 // â”€â”€â”€ Loading overlay â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -2555,7 +2748,32 @@ function stripDerivedLargeData(value, depth = 0) {
 }
 
 function getCostosPayloadForSave() {
-  return stripDerivedLargeData(state.costos || []);
+  const raw = stripDerivedLargeData(state.costos || []);
+  return (raw || []).map((category) => ({
+    id: category.id || '',
+    nombre: category.nombre || '',
+    partidas: (category.partidas || []).map((partida) => ({
+      id: partida.id || '',
+      nombre: partida.nombre || '',
+      formula_tipo: partida.formula_tipo || '',
+      formula_valor: toNumber(partida.formula_valor),
+      formula_referencia: partida.formula_referencia || '',
+      formula_display: partida.formula_display || '',
+      plan_pago: partida.plan_pago || '',
+      tiene_iva: !!partida.tiene_iva,
+      es_terreno: !!partida.es_terreno,
+      auto_origen: !!partida.auto_origen,
+      editable_source: partida.editable_source || '',
+      source_label: partida.source_label || '',
+      source_detail: partida.source_detail || '',
+      isDefault: !!partida.isDefault,
+      isProtected: !!partida.isProtected,
+      isLinked: !!partida.isLinked,
+      total_neto: toNumber(partida.total_neto),
+      cost_config: partida.cost_config ? stripDerivedLargeData(partida.cost_config) : undefined,
+      distribucion_mensual: compactMonthlyDistribution(partida.distribucion_mensual),
+    })),
+  }));
 }
 
 function resolveGooglePlace(suggestion) {
@@ -4453,7 +4671,6 @@ function onConfigParamChange(force = false) {
   state.financiamiento.linea_construccion_tasa = toNumber(state.proyecto.tasa_interes_construccion);
   scheduleAutosave('proyecto');
   scheduleAutosave('terreno');
-  scheduleAutosave('costos');
   scheduleRenderJob('global-config-dependencies', () => {
     renderConstruccion();
     if (typeof renderTerrainModule === 'function') renderTerrainModule();
@@ -9238,7 +9455,6 @@ function onCabidaInputChange(force = false) {
   });
   scheduleAutosave('cabida');
   scheduleAutosave('ventas');
-  scheduleAutosave('costos');
 }
 
 function onTerrenoInputChange(force = false) {
@@ -9262,7 +9478,6 @@ function onTerrenoInputChange(force = false) {
     localizeNumberInputs($('tab-terreno') || document);
   });
   scheduleAutosave('terreno');
-  scheduleAutosave('costos');
 }
 
 function readConstruccionFromEditor() {
@@ -9303,7 +9518,6 @@ function updateConstrParams(force = false) {
   });
   scheduleAutosave('construccion');
   scheduleAutosave('gantt');
-  scheduleAutosave('costos');
 }
 
 function onGanttInputChange(force = false) {
@@ -9328,7 +9542,6 @@ function onGanttInputChange(force = false) {
   });
   scheduleAutosave('gantt');
   scheduleAutosave('ventas');
-  scheduleAutosave('costos');
 }
 
 function agregarHito() {
@@ -9494,7 +9707,6 @@ function onVentasInputChange(force = false) {
   });
   scheduleAutosave('ventas');
   scheduleAutosave('gantt');
-  scheduleAutosave('costos');
 }
 
 function onVentasVelocityChange(force = false) {
@@ -9515,7 +9727,6 @@ function onVentasVelocityChange(force = false) {
   });
   scheduleAutosave('ventas');
   scheduleAutosave('gantt');
-  scheduleAutosave('costos');
 }
 
 const MONTHLY_FORMULA_TOKENS = [
@@ -9933,10 +10144,7 @@ async function guardarCapital({ silent = false } = {}) {
   if (!$('tab-capital')) return;
   state.capital = readCapitalFromEditor();
   setSyncStatus('saving', 'GUARDANDO', 'Persistiendo parametros de capital');
-  await api(`/api/proyectos/${state.proyectoId}/capital`, {
-    method: 'POST',
-    body: JSON.stringify(state.capital),
-  });
+  await saveApiWithRetry(`/api/proyectos/${state.proyectoId}/capital`, 'POST', getPersistableCapital(state.capital), 'capital');
   await finishSave({ silent });
 }
 
@@ -9944,39 +10152,24 @@ async function guardarFormulaOverrides({ silent = false } = {}) {
   if (!state.proyectoId) return;
   state.proyecto = getProjectSavePayload();
   setSyncStatus('saving', 'GUARDANDO', 'Persistiendo formulas editables');
-  await api(`/api/proyectos/${state.proyectoId}/formula-overrides`, {
-    method: 'POST',
-    body: JSON.stringify(state.proyecto.formula_overrides || {}),
-  });
+  await saveApiWithRetry(`/api/proyectos/${state.proyectoId}/formula-overrides`, 'POST', state.proyecto.formula_overrides || {}, 'formula-overrides');
   await finishSave({ silent });
 }
 
 async function guardarCabida({ silent = false } = {}) {
   if (!state.proyectoId) return;
   prepareStateForSave();
-  const rows = state.cabida.filter((row) => row.uso);
+  const rows = getPersistableCabidaRows(state.cabida.filter((row) => row.uso));
   const proyecto = getProjectSavePayload();
   setSyncStatus('saving', 'GUARDANDO', 'Persistiendo cambios en la base');
   const requests = [
-    api(`/api/proyectos/${state.proyectoId}`, {
-      method: 'PUT',
-      body: JSON.stringify(proyecto),
-    }),
-    api(`/api/proyectos/${state.proyectoId}/cabida`, {
-      method: 'POST',
-      body: JSON.stringify(rows),
-    }),
+    saveApiWithRetry(`/api/proyectos/${state.proyectoId}`, 'PUT', proyecto, 'proyecto'),
+    saveApiWithRetry(`/api/proyectos/${state.proyectoId}/cabida`, 'POST', rows, 'cabida'),
   ];
   if (!silent) {
     requests.push(
-      api(`/api/proyectos/${state.proyectoId}/ventas/config`, {
-        method: 'POST',
-        body: JSON.stringify(state.ventasConfig),
-      }),
-      api(`/api/proyectos/${state.proyectoId}/ventas/cronograma`, {
-        method: 'POST',
-        body: JSON.stringify(state.ventasCronograma),
-      })
+      saveApiWithRetry(`/api/proyectos/${state.proyectoId}/ventas/config`, 'POST', getPersistableVentasConfig(state.ventasConfig), 'ventas-config'),
+      saveApiWithRetry(`/api/proyectos/${state.proyectoId}/ventas/cronograma`, 'POST', getPersistableVentasCronograma(state.ventasCronograma), 'ventas-cronograma')
     );
   }
   await Promise.all(requests);
@@ -9987,25 +10180,13 @@ async function guardarTerreno({ silent = false } = {}) {
   if (!state.proyectoId) return;
   prepareStateForSave();
   const proyecto = getProjectSavePayload();
-  const financiamiento = state.financiamiento;
+  const financiamiento = getPersistableFinanciamiento(state.financiamiento);
   setSyncStatus('saving', 'GUARDANDO', 'Actualizando terreno y financiamiento terreno');
   const requests = [
-    api(`/api/proyectos/${state.proyectoId}`, {
-      method: 'PUT',
-      body: JSON.stringify(proyecto),
-    }),
-    api(`/api/proyectos/${state.proyectoId}/financiamiento`, {
-      method: 'POST',
-      body: JSON.stringify(financiamiento),
-    }),
-    api(`/api/proyectos/${state.proyectoId}/gantt`, {
-      method: 'POST',
-      body: JSON.stringify(state.gantt),
-    }),
-    api(`/api/proyectos/${state.proyectoId}/ventas/cronograma`, {
-      method: 'POST',
-      body: JSON.stringify(state.ventasCronograma || []),
-    }),
+    saveApiWithRetry(`/api/proyectos/${state.proyectoId}`, 'PUT', proyecto, 'proyecto'),
+    saveApiWithRetry(`/api/proyectos/${state.proyectoId}/financiamiento`, 'POST', financiamiento, 'financiamiento'),
+    saveApiWithRetry(`/api/proyectos/${state.proyectoId}/gantt`, 'POST', getPersistableGanttRows(state.gantt), 'gantt'),
+    saveApiWithRetry(`/api/proyectos/${state.proyectoId}/ventas/cronograma`, 'POST', getPersistableVentasCronograma(state.ventasCronograma || []), 'ventas-cronograma'),
   ];
   await Promise.all(requests);
   await finishSave({ silent });
@@ -10014,27 +10195,15 @@ async function guardarTerreno({ silent = false } = {}) {
 async function guardarConstruccion({ silent = false } = {}) {
   if (!state.proyectoId) return;
   prepareStateForSave();
-  const payload = { ...state.construccion };
-  const financiamiento = state.financiamiento;
+  const payload = getPersistableConstruccion(state.construccion);
+  const financiamiento = getPersistableFinanciamiento(state.financiamiento);
   const proyecto = getProjectSavePayload();
   setSyncStatus('saving', 'GUARDANDO', 'Actualizando parametros de construccion');
   const requests = [
-    api(`/api/proyectos/${state.proyectoId}`, {
-      method: 'PUT',
-      body: JSON.stringify(proyecto),
-    }),
-    api(`/api/proyectos/${state.proyectoId}/construccion`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
-    api(`/api/proyectos/${state.proyectoId}/gantt`, {
-      method: 'POST',
-      body: JSON.stringify(state.gantt),
-    }),
-    api(`/api/proyectos/${state.proyectoId}/financiamiento`, {
-      method: 'POST',
-      body: JSON.stringify(financiamiento),
-    }),
+    saveApiWithRetry(`/api/proyectos/${state.proyectoId}`, 'PUT', proyecto, 'proyecto'),
+    saveApiWithRetry(`/api/proyectos/${state.proyectoId}/construccion`, 'POST', payload, 'construccion'),
+    saveApiWithRetry(`/api/proyectos/${state.proyectoId}/gantt`, 'POST', getPersistableGanttRows(state.gantt), 'gantt'),
+    saveApiWithRetry(`/api/proyectos/${state.proyectoId}/financiamiento`, 'POST', financiamiento, 'financiamiento'),
   ];
   await Promise.all(requests);
   await finishSave({ silent });
@@ -10043,13 +10212,10 @@ async function guardarConstruccion({ silent = false } = {}) {
 async function guardarGantt({ silent = false } = {}) {
   if (!state.proyectoId) return;
   prepareStateForSave();
-  const rows = state.gantt;
+  const rows = getPersistableGanttRows(state.gantt);
   setSyncStatus('saving', 'GUARDANDO', 'Actualizando cronograma del proyecto');
   const requests = [
-    api(`/api/proyectos/${state.proyectoId}/gantt`, {
-      method: 'POST',
-      body: JSON.stringify(rows),
-    }),
+    saveApiWithRetry(`/api/proyectos/${state.proyectoId}/gantt`, 'POST', rows, 'gantt'),
   ];
   await Promise.all(requests);
   await finishSave({ silent });
@@ -10058,18 +10224,12 @@ async function guardarGantt({ silent = false } = {}) {
 async function guardarVentas({ silent = false } = {}) {
   if (!state.proyectoId) return;
   prepareStateForSave();
-  const config = state.ventasConfig;
-  const cronograma = state.ventasCronograma;
+  const config = getPersistableVentasConfig(state.ventasConfig);
+  const cronograma = getPersistableVentasCronograma(state.ventasCronograma);
   setSyncStatus('saving', 'GUARDANDO', 'Actualizando estrategia comercial y cronogramas');
   const requests = [
-    api(`/api/proyectos/${state.proyectoId}/ventas/config`, {
-      method: 'POST',
-      body: JSON.stringify(config),
-    }),
-    api(`/api/proyectos/${state.proyectoId}/ventas/cronograma`, {
-      method: 'POST',
-      body: JSON.stringify(cronograma),
-    }),
+    saveApiWithRetry(`/api/proyectos/${state.proyectoId}/ventas/config`, 'POST', config, 'ventas-config'),
+    saveApiWithRetry(`/api/proyectos/${state.proyectoId}/ventas/cronograma`, 'POST', cronograma, 'ventas-cronograma'),
   ];
   await Promise.all(requests);
   await finishSave({ silent });
@@ -10081,10 +10241,7 @@ async function guardarCostos({ silent = false } = {}) {
   readCostosEditor();
   const payload = getCostosPayloadForSave();
   setSyncStatus('saving', 'GUARDANDO', 'Persistiendo planilla de costos');
-  await api(`/api/proyectos/${state.proyectoId}/costos`, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+  await saveApiWithRetry(`/api/proyectos/${state.proyectoId}/costos`, 'POST', payload, 'costos');
   await finishSave({ silent });
 }
 
