@@ -202,7 +202,7 @@ tbody tr:hover{background:#f8fafc}
 .formula-token-remove{margin-left:5px;border:0;background:transparent;color:inherit;font-size:12px;font-weight:900;line-height:1;cursor:pointer;padding:0 1px;opacity:.72}
 .formula-token-remove:hover{opacity:1}
 .cost-config-formula-editor{background:#fff;min-height:42px;cursor:text}
-.cost-config-formula-editor .formula-token{min-height:24px;padding:3px 8px;font-size:10px}
+.cost-config-formula-editor .formula-token{min-height:20px;padding:2px 6px;font-size:9px}
 .cost-config-formula-inline{flex:1;min-width:150px;height:24px;border:0;outline:0;background:transparent;font-size:11px;color:#0f172a;padding:0}
 .cost-config-formula-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px}
 .cost-config-formula-hint{font-size:10px;color:#94a3b8;line-height:1.3}
@@ -210,17 +210,17 @@ tbody tr:hover{background:#f8fafc}
 .cost-config-link-btn:hover{text-decoration:underline}
 .fa-field{display:flex;flex-direction:column;gap:4px}
 .fa-result-row{display:flex;align-items:center;gap:6px}
-.fa-result-chip{display:inline-flex;align-items:center;padding:2px 8px;background:#d1fae5;color:#065f46;border-radius:5px;font-size:11px;font-weight:700;white-space:nowrap;transition:background .15s,color .15s;pointer-events:none}
+.fa-result-chip{display:inline-flex;align-items:center;padding:1px 6px;background:#d1fae5;color:#065f46;border-radius:4px;font-size:10px;font-weight:700;white-space:nowrap;transition:background .15s,color .15s;pointer-events:none}
 .fa-result-chip.is-error{background:#fee2e2;color:#991b1b}
 .fa-result-chip.is-formula{background:#eff6ff;color:#1d4ed8}
 .fa-result-chip.is-zero{background:#f1f5f9;color:#94a3b8}
 .fa-result-label{font-size:10px;color:#94a3b8}
-.fa-display{display:flex;flex-wrap:wrap;align-items:center;gap:5px;min-height:36px;padding:4px 10px;border:1.5px solid #cbd5e1;border-radius:8px;background:#fff;cursor:text;transition:border-color .15s}
+.fa-display{display:flex;flex-wrap:wrap;align-items:center;gap:4px;min-height:32px;padding:3px 8px;border:1.5px solid #cbd5e1;border-radius:8px;background:#fff;cursor:text;transition:border-color .15s}
 .fa-display:hover{border-color:#94a3b8}
 .fa-display.has-error{border-color:#ef4444}
 .fa-display.is-empty::after{content:attr(data-placeholder);color:#94a3b8;font-size:12px}
-.fa-display-token{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;white-space:nowrap}
-.fa-display-op{font-size:12px;color:#475569;font-variant-numeric:tabular-nums;font-weight:500}
+.fa-display-token{display:inline-flex;align-items:center;gap:2px;padding:1px 5px;border-radius:4px;font-size:10px;font-weight:600;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;white-space:nowrap}
+.fa-display-op{font-size:11px;color:#475569;font-variant-numeric:tabular-nums;font-weight:500}
 .fa-input-wrap{display:flex;align-items:center;min-height:36px;border:1.5px solid #3b82f6;border-radius:8px;padding:4px 10px;cursor:text;background:#fff;box-shadow:0 0 0 3px rgba(59,130,246,.15);transition:border-color .15s,box-shadow .15s}
 .fa-input-wrap.has-error{border-color:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.12)}
 .fa-input{flex:1;border:none;outline:none;background:transparent;font-size:13px;font-variant-numeric:tabular-nums;color:#0f172a;min-width:0}
@@ -2327,14 +2327,14 @@ table:not(.gantt-table) .tfoot-dark td,
     <div class="modal-body cost-config-body">
       <div class="cost-config-main">
         <div class="cost-config-panel">
-          <label for="cost-config-method" class="cost-config-label">MÃ©todo de cÃ¡lculo e imputaciÃ³n</label>
+          <label for="cost-config-method" class="cost-config-label">Método de cálculo e imputación</label>
           <select id="cost-config-method" class="inp" onchange="renderCostConfigFields(); updateCostConfigPreview()">
             <option value="manual">Monto Ãºnico</option>
-            <option value="period_amount">Monto durante perÃ­odo</option>
-            <option value="monthly_formula">FÃ³rmula mensual</option>
-            <option value="periodic">Pago periÃ³dico</option>
+            <option value="period_amount">Monto durante período</option>
+            <option value="monthly_formula">Fórmula mensual</option>
+            <option value="periodic">Pago periódico</option>
             <option value="milestones">Pago por hitos</option>
-            <option value="monthly_amount" hidden>Monto mensual durante perÃ­odo (legacy)</option>
+            <option value="monthly_amount" hidden>Monto mensual durante período (legacy)</option>
             <option value="global_formula" hidden>Distribuido (legacy)</option>
           </select>
         </div>
