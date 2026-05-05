@@ -4538,9 +4538,11 @@ function renderCostStructure() {
     .reduce((sum, partida) => sum + (toNumber(partida.total_neto) * (partida.tiene_iva ? 1.19 : 1)), 0);
 
   const colors = ['#0f172a', '#22c55e', '#3b82f6', '#f59e0b', '#a855f7', '#ef4444'];
-  const rowsHtml = visibleCategories.map((categoria, index) => {
+
+  // Helper: build the rows HTML for a given subset of categories.
+  const buildRows = (categories, sumTotal) => categories.map((categoria, index) => {
     const subtotal = (categoria.partidas || []).reduce((sum, partida) => sum + toNumber(partida.total_neto), 0);
-    const pct = total ? (subtotal / total) * 100 : 0;
+    const pct = sumTotal ? (subtotal / sumTotal) * 100 : 0;
     return `
       <div class="dist-row">
         <div class="dist-label">${escapeHtml(getCostCategoryDisplayName(categoria.nombre))}</div>
@@ -4550,11 +4552,48 @@ function renderCostStructure() {
     `;
   }).join('');
 
+  // 1) Distribución total (todas las categorías).
+  const rowsHtml = buildRows(visibleCategories, total);
+
+  // 2) Distribución sin TERRENO ni CONSTRUCCION (solo egresos operativos).
+  const isTerrainOrBuild = (categoria) => {
+    const key = getCostCategoryKey(categoria.nombre);
+    return key === 'TERRENO' || key === 'CONSTRUCCION' || key.includes('CONSTRUCCI');
+  };
+  const netCategories = visibleCategories.filter((cat) => !isTerrainOrBuild(cat));
+  const netTotal = netCategories
+    .flatMap((cat) => cat.partidas || [])
+    .reduce((sum, partida) => sum + toNumber(partida.total_neto), 0);
+  const rowsHtmlNet = buildRows(netCategories, netTotal)
+    || '<div style="font-size:11px;color:#94a3b8;text-align:center;padding:10px">Sin egresos operativos</div>';
+
   if ($('estructura-costos-list')) setHtml('estructura-costos-list', rowsHtml);
   setHtml('dist-costos-list', rowsHtml);
+  setHtml('dist-costos-list-net', rowsHtmlNet);
   setText('costos-total-neto', fmtUf(total));
   setText('costos-total-bruto', fmtUf(totalBruto));
 }
+
+function setCostDistView(view) {
+  const isNet = view === 'net';
+  const totalList = $('dist-costos-list');
+  const netList = $('dist-costos-list-net');
+  const tabTotal = $('dist-tab-total');
+  const tabNet = $('dist-tab-net');
+  if (totalList) totalList.style.display = isNet ? 'none' : '';
+  if (netList) netList.style.display = isNet ? '' : 'none';
+  if (tabTotal) {
+    tabTotal.classList.toggle('is-active', !isNet);
+    tabTotal.style.background = !isNet ? '#0f172a' : 'transparent';
+    tabTotal.style.color = !isNet ? '#fff' : '#475569';
+  }
+  if (tabNet) {
+    tabNet.classList.toggle('is-active', isNet);
+    tabNet.style.background = isNet ? '#0f172a' : 'transparent';
+    tabNet.style.color = isNet ? '#fff' : '#475569';
+  }
+}
+window.setCostDistView = setCostDistView;
 
 function renderConstruccion() {
   const metrics = getConstructionMetrics();

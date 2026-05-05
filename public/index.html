@@ -2094,8 +2094,15 @@ table:not(.gantt-table) .tfoot-dark td,
 
       <!-- DistribuciÃ³n de Costos -->
       <div class="card" style="flex:1">
-        <div class="sec-title">= DISTRIBUCIÃ“N DE COSTOS</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px">
+          <div class="sec-title" style="margin-bottom:0">= DISTRIBUCIÃ“N DE COSTOS</div>
+          <div class="dist-tabs" style="display:inline-flex;border:1px solid #e2e8f0;border-radius:8px;padding:2px;background:#f8fafc">
+            <button id="dist-tab-total" type="button" class="dist-tab-btn is-active" onclick="setCostDistView('total')" style="padding:4px 10px;font-size:10px;font-weight:700;border:0;border-radius:6px;cursor:pointer;background:#0f172a;color:#fff">Total</button>
+            <button id="dist-tab-net" type="button" class="dist-tab-btn" onclick="setCostDistView('net')" style="padding:4px 10px;font-size:10px;font-weight:700;border:0;border-radius:6px;cursor:pointer;background:transparent;color:#475569">Sin terreno/construcciÃ³n</button>
+          </div>
+        </div>
         <div id="dist-costos-list" style="font-size:11px"></div>
+        <div id="dist-costos-list-net" style="font-size:11px;display:none"></div>
     </div>
   </div>
 
