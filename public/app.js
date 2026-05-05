@@ -7591,7 +7591,7 @@ function insertCostFormulaReference(input, token) {
   const match = beforeCursor.match(/(?:_|[a-z\u00C0-\u017F])[a-z0-9_\u00C0-\u017F]*$/i);
   const replaceStart = match ? match.index : start;
   input.value = `${value.slice(0, replaceStart)}${token}${value.slice(end)}`;
-  if (input.id === 'cost-config-formula-inline') {
+  if (input.id === 'cost-config-formula-inline' || input.id === 'cost-config-formula') {
     commitCostConfigFormulaInlineInput(input, true);
     hideCostFormulaSuggestionsLater();
     return;
@@ -8937,14 +8937,9 @@ function handleInlineFormulaEditorKeydown(event, input, targetId) {
 }
 
 function getCostConfigFormulaValueFromEditor() {
-  const editor = $('cost-config-formula-editor');
-  const hidden = $('cost-config-formula');
-  if (!editor || !hidden) return hidden?.value || '';
-  const inline = $('cost-config-formula-inline');
-  const base = editor.dataset.baseFormula || '';
-  const pending = inline?.value || '';
-  hidden.value = `${base}${pending}`;
-  return hidden.value;
+  const input = $('cost-config-formula');
+  if (!input) return '';
+  return String(input.value || '');
 }
 
 function renderCostConfigFormulaToken(token, tokenIndex = 0) {
@@ -8961,30 +8956,23 @@ function renderCostConfigFormulaChips(rawValue = '') {
 }
 
 function refreshCostConfigFormulaEditor(rawValue = '', focusInline = false) {
-  const editor = $('cost-config-formula-editor');
-  const hidden = $('cost-config-formula');
-  if (!editor || !hidden) return;
-  const value = String(rawValue || '');
-  hidden.value = value;
-  editor.dataset.baseFormula = value;
-  editor.innerHTML = `
-    ${renderCostConfigFormulaChips(value)}
-    <input id="cost-config-formula-inline" class="cost-config-formula-inline" value="" placeholder="${value ? ' +, -, *, /, %, número...' : 'Escribe o selecciona una referencia'}" oninput="handleCostConfigFormulaInlineInput(this)" onfocus="handleCostFormulaInput(this)" onkeydown="handleCostConfigFormulaInlineKeydown(event, this)" onblur="commitCostConfigFormulaInlineLater(this)">
-  `;
+  const input = $('cost-config-formula');
+  if (!input) return;
+  input.value = String(rawValue || '');
+  refreshCostConfigFormulaChipPreview(input.value || '');
   if (focusInline) focusCostConfigFormulaInline();
 }
 
 function focusCostConfigFormulaInline() {
-  const input = $('cost-config-formula-inline');
+  const input = $('cost-config-formula');
   if (!input) return;
   input.focus();
-  const cursor = String(input.value || '').length;
-  input.setSelectionRange(cursor, cursor);
 }
 
 function handleCostConfigFormulaInlineInput(input) {
   getCostConfigFormulaValueFromEditor();
   handleCostFormulaInput(input);
+  refreshCostConfigFormulaChipPreview(input.value || '');
   if (shouldAutoCommitFormulaInline(input.value)) {
     commitCostConfigFormulaInlineInput(input, true);
     return;
@@ -8992,14 +8980,28 @@ function handleCostConfigFormulaInlineInput(input) {
   updateCostConfigPreview();
 }
 
-function commitCostConfigFormulaInlineInput(input = $('cost-config-formula-inline'), focusInline = false) {
-  const editor = $('cost-config-formula-editor');
-  const hidden = $('cost-config-formula');
-  if (!editor || !hidden || !input) return;
-  if (input.id === 'cost-config-formula-inline' && input !== $('cost-config-formula-inline')) return;
-  const nextValue = canonicalizeFormulaReferenceText(`${editor.dataset.baseFormula || ''}${input.value || ''}`);
-  refreshCostConfigFormulaEditor(nextValue, focusInline);
+function shouldAutoCommitFormulaInline() {
+  // Keep editing behavior identical to a normal input: commit strongly on blur/save.
+  return false;
+}
+
+function refreshCostConfigFormulaChipPreview(rawValue = '') {
+  const row = $('cost-config-formula-chips');
+  if (!row) return;
+  const value = String(rawValue || '').trim();
+  row.innerHTML = value
+    ? renderCostConfigFormulaChips(value)
+    : '<span class="formula-chip-empty">Sin fórmula</span>';
+}
+
+function commitCostConfigFormulaInlineInput(input = $('cost-config-formula'), focusInline = false) {
+  const targetInput = input || $('cost-config-formula');
+  if (!targetInput) return;
+  const nextValue = canonicalizeFormulaReferenceText(String(targetInput.value || ''));
+  targetInput.value = nextValue;
+  refreshCostConfigFormulaChipPreview(nextValue);
   updateCostConfigPreview();
+  if (focusInline) focusCostConfigFormulaInline();
 }
 
 function commitCostConfigFormulaInlineLater(input) {
@@ -9010,26 +9012,24 @@ function commitCostConfigFormulaInlineLater(input) {
 }
 
 function removeLastCostConfigFormulaToken() {
-  const editor = $('cost-config-formula-editor');
-  if (!editor) return;
-  const base = editor.dataset.baseFormula || '';
-  const tokens = splitFormulaTokens(base);
-  if (!tokens.length) return;
-  const lastToken = tokens[tokens.length - 1];
-  const lastIndex = base.lastIndexOf(lastToken);
-  const nextValue = lastIndex >= 0 ? base.slice(0, lastIndex).trimEnd() : '';
-  refreshCostConfigFormulaEditor(nextValue, true);
-  updateCostConfigPreview();
+  const input = $('cost-config-formula');
+  if (!input) return;
+  const start = input.selectionStart ?? 0;
+  const end = input.selectionEnd ?? 0;
+  if (start !== end || start <= 0) return;
+  input.value = `${input.value.slice(0, start - 1)}${input.value.slice(end)}`;
+  input.setSelectionRange(start - 1, start - 1);
+  handleCostConfigFormulaInlineInput(input);
 }
 
 function removeCostConfigFormulaToken(tokenIndex) {
-  const editor = $('cost-config-formula-editor');
-  const hidden = $('cost-config-formula');
-  if (!editor || !hidden) return;
-  const tokens = splitFormulaTokens(editor.dataset.baseFormula || hidden.value || '');
+  const input = $('cost-config-formula');
+  if (!input) return;
+  const tokens = splitFormulaTokens(input.value || '');
   tokens.splice(tokenIndex, 1);
-  refreshCostConfigFormulaEditor(tokens.join(' '), true);
-  updateCostConfigPreview();
+  input.value = tokens.join(' ');
+  handleCostConfigFormulaInlineInput(input);
+  focusCostConfigFormulaInline();
 }
 
 function handleCostConfigFormulaInlineKeydown(event, input) {
@@ -9044,7 +9044,11 @@ function handleCostConfigFormulaInlineKeydown(event, input) {
 }
 
 function clearCostConfigFormula() {
-  refreshCostConfigFormulaEditor('', true);
+  const input = $('cost-config-formula');
+  if (!input) return;
+  input.value = '';
+  refreshCostConfigFormulaChipPreview('');
+  focusCostConfigFormulaInline();
   updateCostConfigPreview();
 }
 
@@ -9063,8 +9067,8 @@ function insertCostConfigFormulaReference(token) {
       activeInput.focus();
       return;
     }
-    // Legacy: cost-config-formula-inline (the main formula field in monthly_formula / milestones)
-    if (activeInput.id === 'cost-config-formula-inline') {
+    // Main formula field in cost config modal
+    if (activeInput.id === 'cost-config-formula' || activeInput.id === 'cost-config-formula-inline') {
       insertCostFormulaReference(activeInput, token);
       commitCostConfigFormulaInlineInput(activeInput, true);
     } else if (/-inline$/.test(activeInput.id || '')) {
@@ -9076,16 +9080,12 @@ function insertCostConfigFormulaReference(token) {
     updateCostConfigPreview();
     return;
   }
-  const inline = $('cost-config-formula-inline');
-  if (inline) {
-    insertCostFormulaReference(inline, token);
-    commitCostConfigFormulaInlineInput(inline, true);
+  const formulaInput = $('cost-config-formula');
+  if (formulaInput) {
+    insertCostFormulaReference(formulaInput, token);
+    commitCostConfigFormulaInlineInput(formulaInput, true);
     return;
   }
-  const input = $('cost-config-formula');
-  if (!input) return;
-  insertCostFormulaReference(input, token);
-  updateCostConfigPreview();
 }
 
 function readCostConfigForm() {
@@ -9162,11 +9162,10 @@ function renderCostConfigFormulaInput(value = '', label = 'FÃ³rmula', options 
     return `
       <div class="cost-config-panel formula-cell">
         <div class="cost-config-label">${escapeHtml(label)}</div>
-        <input id="cost-config-formula" type="hidden" value="${escapeHtml(rawValue)}">
-        <div id="cost-config-formula-editor" class="formula-chip-editor cost-config-formula-editor" data-base-formula="${escapeHtml(rawValue)}" onclick="focusCostConfigFormulaInline()">
-          ${renderCostConfigFormulaChips(rawValue)}
-          <input id="cost-config-formula-inline" class="cost-config-formula-inline" value="" placeholder="${rawValue ? ' +, -, *, /, %, número...' : 'Escribe o selecciona una referencia'}" oninput="handleCostConfigFormulaInlineInput(this)" onfocus="handleCostFormulaInput(this)" onkeydown="handleCostConfigFormulaInlineKeydown(event, this)" onblur="commitCostConfigFormulaInlineLater(this)">
+        <div id="cost-config-formula-editor" class="formula-chip-editor cost-config-formula-editor" onclick="focusCostConfigFormulaInline()">
+          <input id="cost-config-formula" class="cost-config-formula-inline" value="${escapeHtml(rawValue)}" placeholder="${rawValue ? ' +, -, *, /, %, número...' : 'Escribe o selecciona una referencia'}" oninput="handleCostConfigFormulaInlineInput(this)" onfocus="handleCostFormulaInput(this)" onkeydown="handleCostConfigFormulaInlineKeydown(event, this)" onblur="commitCostConfigFormulaInlineLater(this)">
         </div>
+        <div id="cost-config-formula-chips" class="formula-chip-row" style="margin-top:6px">${rawValue ? renderCostConfigFormulaChips(rawValue) : '<span class="formula-chip-empty">Sin fórmula</span>'}</div>
         <div class="formula-suggest"></div>
         <div class="cost-config-formula-actions">
           <span class="cost-config-formula-hint">Selecciona referencia y sigue escribiendo.</span>
