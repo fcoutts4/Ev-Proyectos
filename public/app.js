@@ -8687,8 +8687,8 @@ function renderFormulaEditorChips(rawValue = '', editorTargetId = '') {
 }
 
 // ─── Formula-Amount Input (fa-input) ────────────────────────────────────────
-// Single <input type="text"> showing the full formula string.
-// An absolute-positioned <span class="fa-result-chip"> shows the evaluated value.
+// Row 1: result chip (shows evaluated value) + optional label
+// Row 2: full-width <input type="text"> for the formula string
 // No innerHTML re-renders during typing → cursor/focus is never lost.
 
 function renderInlineFormulaAmountEditor({
@@ -8701,18 +8701,25 @@ function renderInlineFormulaAmountEditor({
   const dataFieldAttr = dataField ? `data-field="${escapeHtml(dataField)}"` : '';
   const chipText = _computeFormulaAmountChipText(rawValue);
   const chipClass = _computeFormulaAmountChipClass(rawValue);
+  const isFormula = isFormulaLikeAmountInput(rawValue);
+  const resultLabel = isFormula ? 'resultado' : 'UF';
   return `
-    <div class="fa-input-wrap" id="${escapeHtml(id)}-wrap">
-      <span class="fa-result-chip ${chipClass}" id="${escapeHtml(id)}-chip">${escapeHtml(chipText)}</span>
-      <input id="${escapeHtml(id)}" ${dataFieldAttr} type="text" data-formula-amount="1" class="fa-input"
-        value="${escapeHtml(rawValue)}" data-original-value="${escapeHtml(rawValue)}"
-        placeholder="${escapeHtml(placeholder)}" autocomplete="off" spellcheck="false"
-        oninput="handleFormulaAmountInput(this)"
-        onkeydown="handleFormulaAmountKeydown(event,this)"
-        onblur="handleFormulaAmountBlur(this)"
-        onfocus="handleFormulaAmountFocus(this)">
+    <div class="fa-field">
+      <div class="fa-result-row">
+        <span class="fa-result-chip ${chipClass}" id="${escapeHtml(id)}-chip">${escapeHtml(chipText)}</span>
+        <span class="fa-result-label">${isFormula ? 'resultado' : 'UF'}</span>
+      </div>
+      <div class="fa-input-wrap" id="${escapeHtml(id)}-wrap">
+        <input id="${escapeHtml(id)}" ${dataFieldAttr} type="text" data-formula-amount="1" class="fa-input"
+          value="${escapeHtml(rawValue)}" data-original-value="${escapeHtml(rawValue)}"
+          placeholder="${escapeHtml(placeholder)}" autocomplete="off" spellcheck="false"
+          oninput="handleFormulaAmountInput(this)"
+          onkeydown="handleFormulaAmountKeydown(event,this)"
+          onblur="handleFormulaAmountBlur(this)"
+          onfocus="handleFormulaAmountFocus(this)">
+      </div>
+      <div class="formula-suggest"></div>
     </div>
-    <div class="formula-suggest"></div>
   `;
 }
 
@@ -8748,9 +8755,15 @@ function _updateFormulaAmountChip(input) {
   const wrap = $(`${input.id}-wrap`);
   if (!chip) return;
   const rawValue = String(input.value || '').trim();
+  const chipClass = _computeFormulaAmountChipClass(rawValue);
   chip.textContent = _computeFormulaAmountChipText(rawValue);
-  chip.className = `fa-result-chip ${_computeFormulaAmountChipClass(rawValue)}`;
-  if (wrap) wrap.classList.toggle('has-error', chip.classList.contains('is-error'));
+  chip.className = `fa-result-chip ${chipClass}`;
+  // Update the label next to chip
+  const label = chip.nextElementSibling;
+  if (label && label.classList.contains('fa-result-label')) {
+    label.textContent = isFormulaLikeAmountInput(rawValue) ? 'resultado' : 'UF';
+  }
+  if (wrap) wrap.classList.toggle('has-error', chipClass === 'is-error');
 }
 
 function handleFormulaAmountFocus(input) {
