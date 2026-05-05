@@ -20,5 +20,7 @@ if not exist "node_modules" (
   )
 )
 
+REM Modo dev: nodemon reinicia el servidor automaticamente cuando editas server.js o db.js.
+REM No vigila public/ porque el front se sirve estatico (basta con recargar el browser).
 start "" "http://localhost:3000"
-"C:\Program Files\nodejs\npm.cmd" start
+"C:\Program Files\nodejs\npm.cmd" run dev

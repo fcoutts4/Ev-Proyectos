@@ -1,0 +1,7 @@
+{
+  "watch": ["server.js", "db.js"],
+  "ext": "js,json",
+  "ignore": ["node_modules", "public", "logo", "docs", "legacy", "*.bat"],
+  "delay": 300,
+  "verbose": false
+}
