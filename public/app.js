@@ -4785,8 +4785,8 @@ function renderConstructionEP() {
     { label: 'Retenciones netas', values: data.retenciones, formula: 'Retencion neta mensual y devolucion neta total al final de obra.', color: '#fbbf24' },
     { label: 'Subtotal neto', values: data.subtotal, formula: 'EDPP neto + Anticipo neto + Retenciones netas', bold: true, color: '#22c55e' },
     { label: 'IVA bruto (19%)', values: data.ivaBruto, formula: 'Subtotal neto Ã— 19%', color: '#94a3b8' },
-    { label: `CEEC (${cfg.pct_ceec}%)`, values: data.ceec, formula: `|IVA bruto| Ã— ${cfg.pct_ceec}%  Â·  CrÃ©dito tributario (positivo) que compensa el IVA`, color: '#a855f7' },
-    { label: 'IVA efectivo', values: data.ivaEfectivo, formula: 'IVA bruto + CEEC  Â·  IVA neto a pagar al SII despuÃ©s del beneficio', color: '#94a3b8' },
+    { label: `CEEC (${cfg.pct_ceec}%)`, values: data.ceec, formula: `${cfg.pct_ceec}% Ã— |IVA bruto|  Â·  CrÃ©dito tributario en UF (siempre positivo)`, color: '#a855f7' },
+    { label: 'IVA efectivo', values: data.ivaEfectivo, formula: `IVA bruto + CEEC  =  IVA bruto Ã— (1 âˆ’ ${cfg.pct_ceec}%)  Â·  IVA neto a pagar al SII`, color: '#94a3b8' },
     { label: 'TOTAL A PAGO (c/IVA)', values: data.totalPago, formula: 'Subtotal neto + IVA efectivo  â†’  alimenta GIROS', bold: true, color: '#22c55e' },
   ];
 
