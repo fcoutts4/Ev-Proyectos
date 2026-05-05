@@ -5692,7 +5692,9 @@ function normalizeFormulaExpressionSyntax(expression) {
     .replace(/[×✕]/g, '*')
     .replace(/([0-9)\]_\u00C0-\u017F])\s*[xX]\s*([0-9([_\u00C0-\u017F])/g, '$1*$2')
     .replace(/(-?(?:(?:\d{1,3}(?:[.\s]\d{3})+)(?:,\d+)?|\d+(?:[.,]\d+)?|[.,]\d+))\s*%/g, (_, value) => `(${normalizeFormulaNumberLiteral(String(value || '').replace(/\s+/g, ''))}/100)`)
-    .replace(/-?\d{1,3}(?:\.\d{3})+(?:,\d+)?|-?\d+,\d+/g, (value) => normalizeFormulaNumberLiteral(value));
+    .replace(/-?\d{1,3}(?:\.\d{3})+(?:,\d+)?|-?\d+,\d+/g, (value) => normalizeFormulaNumberLiteral(value))
+    // Final safety pass: if any numeric percent remains, always convert it.
+    .replace(/(-?(?:\d+(?:[.,]\d+)?|[.,]\d+))\s*%/g, (_, value) => `(${normalizeFormulaNumberLiteral(value)}/100)`);
 }
 
 function normalizeFormulaIdentifier(value) {
