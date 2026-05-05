@@ -5682,7 +5682,11 @@ function normalizeFormulaNumberLiteral(value) {
 }
 
 function normalizeFormulaExpressionSyntax(expression) {
-  return String(expression || '')
+  const source = String(expression || '')
+    // Normalize decimal comma percentages before any further parsing.
+    // Example: 0,488% -> 0.488%
+    .replace(/(\d),(\d+)\s*%/g, '$1.$2%');
+  return source
     .trim()
     .replace(/^=/, '')
     .replace(/[×✕]/g, '*')
