@@ -2312,12 +2312,13 @@ table:not(.gantt-table) .tfoot-dark td,
           <label for="cost-config-method" class="cost-config-label">MÃ©todo de cÃ¡lculo e imputaciÃ³n</label>
           <select id="cost-config-method" class="inp" onchange="renderCostConfigFields(); updateCostConfigPreview()">
             <option value="manual">Monto Ãºnico</option>
-            <option value="monthly_amount">Monto mensual durante perÃ­odo</option>
+            <option value="period_amount">Monto durante perÃ­odo</option>
             <option value="monthly_formula">FÃ³rmula mensual</option>
-            <option value="global_formula">Distribuido</option>
             <option value="periodic">Pago periÃ³dico</option>
             <option value="milestones">Pago por hitos</option>
-            <option value="manual_distribution">DistribuciÃ³n manual</option>
+            <option value="monthly_amount" hidden>Monto mensual durante perÃ­odo (legacy)</option>
+            <option value="global_formula" hidden>Distribuido (legacy)</option>
+            <option value="manual_distribution" hidden>DistribuciÃ³n manual (legacy)</option>
           </select>
         </div>
         <div id="cost-config-fields" class="cost-config-fields"></div>

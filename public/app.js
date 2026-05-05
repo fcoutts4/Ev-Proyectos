@@ -5650,6 +5650,8 @@ function buildCostContext() {
     valor_promedio_total_unidad: toNumber(salesMetrics.precioPromedio),
     precio_estacionamiento: toNumber(accessorySales.precio_estacionamiento),
     precio_bodega: toNumber(accessorySales.precio_bodega),
+    total_estacionamientos: toNumber(proyecto.estacionamientos_cantidad),
+    total_bodegas: toNumber(proyecto.bodegas_cantidad),
     ventas_totales: toNumber(salesMetrics.total),
     valor_venta_total_proyecto: toNumber(salesMetrics.total),
     ventas_totales_deptos: toNumber(salesMetrics.totalDeptos),
@@ -6993,6 +6995,8 @@ function getCostFormulaCatalog(contextOverride = null) {
     { label: 'Construccion UF/m2 promedio', token: '_construccion_uf_m2_promedio', value: context.construccion_uf_m2_promedio, unit: 'UF/m2' },
     { label: 'Unidades totales', token: '_unidades_totales', value: context.unidades_totales, unit: 'un' },
     { label: 'Total unidades', token: '_total_unidades', value: context.total_unidades, unit: 'un' },
+    { label: 'Total estacionamientos', token: '_total_estacionamientos', value: context.total_estacionamientos, unit: 'un' },
+    { label: 'Total bodegas', token: '_total_bodegas', value: context.total_bodegas, unit: 'un' },
     { label: 'Precio promedio unidad', token: '_precio_promedio_unidad', value: context.precio_promedio_unidad, unit: 'UF/un' },
     { label: 'Valor promedio total unidad', token: '_valor_promedio_total_unidad', value: context.valor_promedio_total_unidad, unit: 'UF/un' },
     { label: 'Precio estacionamiento', token: '_precio_estacionamiento', value: context.precio_estacionamiento, unit: 'UF/un' },
@@ -7329,7 +7333,7 @@ const FORMULA_REF_GROUPS = [
     label: 'Escrituracion',
   },
   {
-    tokens: ['_unidades_promesadas_escrituradas_mes', '_unidades_no_vendidas_mes', '_unidades_totales', '_total_unidades', '_precio_promedio_unidad', '_valor_promedio_total_unidad', '_precio_estacionamiento', '_precio_bodega'],
+    tokens: ['_unidades_promesadas_escrituradas_mes', '_unidades_no_vendidas_mes', '_unidades_totales', '_total_unidades', '_total_estacionamientos', '_total_bodegas', '_precio_promedio_unidad', '_valor_promedio_total_unidad', '_precio_estacionamiento', '_precio_bodega'],
     label: 'Unidades',
   },
   {
@@ -7900,8 +7904,10 @@ function isFormulaLikeAmountInput(rawValue) {
 
 function costConfigNeedsFormulaContext(config = {}) {
   if (!config || typeof config !== 'object') return false;
-  const method = String(config.method || '').trim();
-  const usesFormulaTotal = method === 'global_formula' && String(config.total_source || '').trim() === 'formula';
+  const method = normalizeCostMethod(config.method);
+  const usesFormulaTotal = method === 'period_amount'
+    && String(config.period_mode || 'monthly').trim() === 'total'
+    && String(config.total_source || '').trim() === 'formula';
   if ((method === 'monthly_formula' || usesFormulaTotal) && String(config.formula || '').trim()) return true;
   if (isFormulaLikeAmountInput(getCostAmountRawInput(config, 'amount'))) return true;
   return Array.isArray(config.payments)
@@ -7997,13 +8003,20 @@ function resolveCostConfigPoint(point) {
   return resolvePaymentReference(safePoint.ref, safePoint.offset);
 }
 
+function normalizeCostMethod(rawMethod) {
+  const method = String(rawMethod || '').trim();
+  if (method === 'monthly_amount' || method === 'global_formula') return 'period_amount';
+  return method;
+}
+
 function normalizeCostConfig(rawConfig, context) {
   if (!rawConfig) return null;
   const parsed = typeof rawConfig === 'string'
     ? (() => { try { return JSON.parse(rawConfig); } catch { return null; } })()
     : rawConfig;
   if (!parsed || typeof parsed !== 'object') return null;
-  const method = String(parsed.method || '').trim();
+  const rawMethod = String(parsed.method || '').trim();
+  const method = normalizeCostMethod(rawMethod);
   if (!method) return null;
   let ctx = context;
   const ensureCtx = () => (ctx || (ctx = buildCostContext()));
@@ -8030,6 +8043,12 @@ function normalizeCostConfig(rawConfig, context) {
     total_source: ['amount', 'formula'].includes(String(parsed.total_source || '').trim())
       ? String(parsed.total_source || '').trim()
       : (String(parsed.formula || '').trim() ? 'formula' : 'amount'),
+    period_mode: (() => {
+      const explicitMode = String(parsed.period_mode || '').trim();
+      if (explicitMode === 'monthly' || explicitMode === 'total') return explicitMode;
+      if (rawMethod === 'global_formula') return 'total';
+      return 'monthly';
+    })(),
     periodicity: Math.max(1, Math.round(toNumber(parsed.periodicity) || 1)),
     payment_count: Math.max(0, Math.round(toNumber(parsed.payment_count ?? parsed.repetitions ?? parsed.count ?? parsed.cantidad_pagos))),
     start: makeCostPoint(parsed.start),
@@ -8145,7 +8164,17 @@ function buildDistributionFromCostConfig(config, monthCount = getCostMonthCount(
     return months;
   }
 
-  if (safeConfig.method === 'monthly_amount') {
+  if (safeConfig.method === 'period_amount') {
+    const periodMode = safeConfig.period_mode === 'total' ? 'total' : 'monthly';
+    if (periodMode === 'total') {
+      const total = evaluateCostConfigBaseAmount(safeConfig, context);
+      if (safeConfig.legacy_plan) {
+        const legacy = buildDistributionFromInteractivePlan(JSON.stringify(safeConfig.legacy_plan), total);
+        if (legacy) return legacy.slice(0, monthCount).concat(createMonthlyArray(Math.max(0, monthCount - legacy.length), 0));
+      }
+      distributeEvenly(months, total, startMonth, Math.max(1, endMonth - startMonth + 1));
+      return months;
+    }
     for (let month = startMonth; month <= endMonth && month < monthCount; month += 1) {
       placeMonthlyValue(months, month, amount);
     }
@@ -8165,16 +8194,6 @@ function buildDistributionFromCostConfig(config, monthCount = getCostMonthCount(
         placeMonthlyValue(months, month, amount);
       }
     }
-    return months;
-  }
-
-  if (safeConfig.method === 'global_formula') {
-    const total = evaluateCostConfigBaseAmount(safeConfig, context);
-    if (safeConfig.legacy_plan) {
-      const legacy = buildDistributionFromInteractivePlan(JSON.stringify(safeConfig.legacy_plan), total);
-      if (legacy) return legacy.slice(0, monthCount).concat(createMonthlyArray(Math.max(0, monthCount - legacy.length), 0));
-    }
-    distributeEvenly(months, total, startMonth, Math.max(1, endMonth - startMonth + 1));
     return months;
   }
 
@@ -8217,7 +8236,7 @@ function getEstadoCosto(partida, total = 0, monthCount = getCostMonthCount(), co
   const hasFlow = Array.isArray(monthly) && monthly.some((value) => Math.abs(toNumber(value)) > 0.0001);
   if (!hasFlow && !toNumber(total)) return { activo: false, label: 'Pendiente', className: 'estado-pendiente' };
   if (config.method === 'monthly_formula') return { activo: true, label: 'FÃ³rmula mensual', className: 'estado-monthly' };
-  if (config.method === 'monthly_amount') return { activo: true, label: 'Monto mensual', className: 'estado-ok' };
+  if (config.method === 'period_amount') return { activo: true, label: config.period_mode === 'total' ? 'Monto distribuido' : 'Monto mensual', className: 'estado-ok' };
   if (config.method === 'periodic') return { activo: true, label: 'PeriÃ³dico', className: 'estado-periodic' };
   if (config.method === 'milestones') return { activo: true, label: config.tramos?.length ? 'Combinado' : 'Hitos', className: 'estado-hitos' };
   return { activo: true, label: 'Configurado', className: 'estado-ok' };
@@ -8597,7 +8616,7 @@ function getCostConfigValidation(config, context = null) {
     const formulaCheck = evaluateExpressionFormulaDetailed(safeConfig.formula, buildMonthlyContext(0, getCostMonthCount()), getSharedCatalog());
     if (!formulaCheck.ok) return { ok: false, label: 'Formula invalida', message: formulaCheck.error };
   }
-  if (safeConfig.method === 'global_formula' && safeConfig.total_source === 'formula' && safeConfig.formula) {
+  if (safeConfig.method === 'period_amount' && safeConfig.period_mode === 'total' && safeConfig.total_source === 'formula' && safeConfig.formula) {
     const formulaCheck = evaluateExpressionFormulaDetailed(safeConfig.formula, getSharedContext(), getSharedCatalog());
     if (!formulaCheck.ok) return { ok: false, label: 'Formula invalida', message: formulaCheck.error };
   }
@@ -8907,7 +8926,7 @@ function readCostConfigForm() {
   const draft = normalizeCostConfig(state.costosUi.costConfigDraft) || { method: 'manual', start: makeCostPoint(), end: makeCostPoint() };
   let formContext = null;
   const getFormContext = () => (formContext || (formContext = buildCostContext()));
-  const method = $('cost-config-method')?.value || draft.method || 'manual';
+  const method = $('cost-config-method')?.value || normalizeCostMethod(draft.method) || 'manual';
   const amountMeta = evaluateCostAmountInput(
     $('cost-config-amount')?.value ?? getCostAmountRawInput(draft, 'amount'),
     getFormContext,
@@ -8918,6 +8937,7 @@ function readCostConfigForm() {
     method,
     formula: canonicalizeFormulaReferenceText($('cost-config-formula')?.value ?? draft.formula ?? ''),
     total_source: $('cost-config-total-source')?.value || draft.total_source || (draft.formula ? 'formula' : 'amount'),
+    period_mode: $('cost-config-period-mode')?.value || draft.period_mode || 'monthly',
     periodicity: Math.max(1, Math.round(toNumber($('cost-config-periodicity')?.value ?? draft.periodicity) || 1)),
     payment_count: Math.max(0, Math.round(toNumber($('cost-config-payment-count')?.value ?? draft.payment_count))),
   };
@@ -9002,7 +9022,7 @@ function renderCostConfigFields(options = {}) {
   const previous = fromDraft
     ? (normalizeCostConfig(state.costosUi.costConfigDraft) || { method: 'manual', start: makeCostPoint(), end: makeCostPoint() })
     : readCostConfigForm();
-  const method = $('cost-config-method')?.value || previous.method || 'manual';
+  const method = $('cost-config-method')?.value || normalizeCostMethod(previous.method) || 'manual';
   const config = normalizeCostConfig({ ...previous, method }) || { method, start: makeCostPoint(), end: makeCostPoint() };
   state.costosUi.costConfigDraft = config;
   const deleteButton = (type, idx, title) => `<button class="btn-outline btn-plus cost-config-delete" type="button" title="${escapeHtml(title)}" onclick="removeCostConfigLine('${type}', ${idx}); return false;">&times;</button>`;
@@ -9015,30 +9035,33 @@ function renderCostConfigFields(options = {}) {
         ${renderCostPointControls('start', 'Fecha de imputaciÃ³n', config.start)}
       </div>
     `;
-  } else if (method === 'monthly_amount') {
+  } else if (method === 'period_amount') {
+    const periodMode = config.period_mode === 'total' ? 'total' : 'monthly';
+    const totalSource = config.total_source === 'formula' ? 'formula' : 'amount';
     html = `
+      <div class="cost-config-grid">
+        <div class="cost-config-panel">
+          ${renderCostConfigField('Modo de monto', `
+            <select id="cost-config-period-mode" class="inp" onchange="renderCostConfigFields({ fromDraft: true }); updateCostConfigPreview()">
+              <option value="monthly" ${periodMode === 'monthly' ? 'selected' : ''}>Monto mensual</option>
+              <option value="total" ${periodMode === 'total' ? 'selected' : ''}>Monto total a distribuir</option>
+            </select>
+          `)}
+        </div>
+        ${periodMode === 'total' ? renderCostConfigTotalSourceControl(totalSource) : ''}
+      </div>
       <div class="cost-config-grid three">
-        ${renderCostConfigAmountField({ label: 'Monto mensual UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula mensual, ej: 2500 o 15 * meses preventa' })}
+        ${periodMode === 'total'
+          ? (totalSource === 'formula'
+            ? renderCostConfigFormulaInput(config.formula, 'Monto total por fÃ³rmula', { chipEditor: true })
+            : renderCostConfigAmountField({ label: 'Monto total UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto total o formula, ej: 2500 o 15 * meses preventa' }))
+          : renderCostConfigAmountField({ label: 'Monto mensual UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto mensual o formula, ej: 2500 o 15 * meses preventa' })}
         ${renderCostPointControls('start', 'Desde', config.start)}
         ${renderCostPointControls('end', 'Hasta', config.end)}
       </div>
     `;
   } else if (method === 'monthly_formula') {
     html = renderCostConfigFormulaInput(config.formula, 'FÃ³rmula mensual', { chipEditor: true });
-  } else if (method === 'global_formula') {
-    const totalSource = config.total_source === 'formula' ? 'formula' : 'amount';
-    html = `
-      <div class="cost-config-grid">
-        ${renderCostConfigTotalSourceControl(totalSource)}
-        ${totalSource === 'formula'
-          ? renderCostConfigFormulaInput(config.formula, 'Total por fÃ³rmula', { chipEditor: true })
-          : renderCostConfigAmountField({ label: 'Monto total UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto o formula, ej: 2500 o 15 * meses preventa' })}
-      </div>
-      <div class="cost-config-grid">
-        ${renderCostPointControls('start', 'Distribuir desde', config.start)}
-        ${renderCostPointControls('end', 'Distribuir hasta', config.end)}
-      </div>
-    `;
   } else if (method === 'periodic') {
     html = `
       <div class="cost-config-grid three">
@@ -9211,7 +9234,10 @@ function openCostConfigModal(categoryName, index) {
   setText('cost-config-title', `Configurar Costo Â· ${partida.nombre || 'Subpartida'}`);
   setText('cost-config-subtitle', 'Define cÃ³mo nace el costo; el flujo mensual y el total se calculan automÃ¡ticamente.');
   const methodSelect = $('cost-config-method');
-  if (methodSelect) methodSelect.value = state.costosUi.costConfigDraft.method || 'manual';
+  if (methodSelect) {
+    const methodValue = normalizeCostMethod(state.costosUi.costConfigDraft.method) || 'manual';
+    methodSelect.value = methodValue;
+  }
   renderCostConfigFields({ fromDraft: true });
   updateCostConfigPreview();
   $('cost-config-modal').style.display = 'flex';
@@ -9247,7 +9273,10 @@ function saveCostConfigModal() {
   partida.total_neto = total;
   partida.distribucion_mensual = monthly;
   partida.plan_pago = JSON.stringify(partida.cost_config);
-  const usesFormulaTotal = config.method === 'global_formula' && config.total_source === 'formula' && config.formula;
+  const usesFormulaTotal = config.method === 'period_amount'
+    && config.period_mode === 'total'
+    && config.total_source === 'formula'
+    && config.formula;
   partida.formula_valor = config.method === 'manual' ? toNumber(config.amount) : total;
   partida.formula_referencia = config.method === 'monthly_formula' || usesFormulaTotal ? config.formula : '';
   partida.formula_tipo = config.method === 'monthly_formula'
