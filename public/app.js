@@ -3791,14 +3791,15 @@ function getReceptionCompletionActivationMonth() {
   const escrituracionCrono = getCronogramaByType('ESCRITURACION')[0];
   if (escrituracionCrono) {
     const inicio = Math.max(0, Math.round(toNumber(escrituracionCrono.mes_inicio)));
-    // Activa desde el mes siguiente al inicio de escrituracion.
-    return inicio + 1;
+    // Activa DESDE el mes en que comienza la escrituración (inclusive).
+    // Antes de ese mes, _unidades_no_vendidas_mes devuelve 0.
+    return inicio;
   }
   const escrituracion = getEscrituracionMilestone();
   if (!escrituracion) return Number.POSITIVE_INFINITY;
   const escrituracionInicio = toNumber(escrituracion.inicio);
-  // Respaldo por Gantt: mes siguiente al inicio.
-  return escrituracionInicio + 1;
+  // Respaldo por Gantt: desde el mes de inicio.
+  return escrituracionInicio;
 }
 
 function getUnidadesNoEscrituradasMes(monthIndex, escriturasAcumuladas, totalUnidades) {
@@ -6087,8 +6088,9 @@ function buildMonthlyContext(monthIndex, monthCount) {
   const baseContext = buildCostContext();
   const salesFlow = getProjectMonthlySalesFlows(monthCount);
   const firstEscrituraMonth = (salesFlow.unidadesEscrituradas || []).findIndex((value) => toNumber(value) > 0);
+  // Activación desde el primer mes con escrituración real (inclusive).
   ensureCostosUiState().escrituracionActivationMonth = firstEscrituraMonth >= 0
-    ? firstEscrituraMonth + 1
+    ? firstEscrituraMonth
     : getReceptionCompletionActivationMonth();
   const unidadesPromesa = toNumber(salesFlow.unidadesPromesadas[monthIndex]);
   const unidadesEscritura = toNumber(salesFlow.unidadesEscrituradas[monthIndex]);
@@ -6118,8 +6120,9 @@ function evaluateMonthlyExpressionFormula(expression, monthCount, baseContext = 
   const contextBase = baseContext || buildCostContext();
   const flow = salesFlow || getProjectMonthlySalesFlows(safeMonthCount);
   const firstEscrituraMonth = (flow.unidadesEscrituradas || []).findIndex((value) => toNumber(value) > 0);
+  // Activación desde el primer mes con escrituración real (inclusive).
   ensureCostosUiState().escrituracionActivationMonth = firstEscrituraMonth >= 0
-    ? firstEscrituraMonth + 1
+    ? firstEscrituraMonth
     : getReceptionCompletionActivationMonth();
   const catalog = formulaCatalog || getFormulaCatalogForContext(contextBase);
   let escriturasAcumuladas = 0;
