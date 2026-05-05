@@ -9021,6 +9021,26 @@ function setCaretToEndOfElement(element) {
   selection.addRange(range);
 }
 
+function saveCostConfigFormulaSelection() {
+  const editor = $('cost-config-formula-inline-editor');
+  const selection = window.getSelection();
+  if (!editor || !selection || !selection.rangeCount) return;
+  const range = selection.getRangeAt(0);
+  if (!editor.contains(range.startContainer) || !editor.contains(range.endContainer)) return;
+  state.costosUi.formulaInlineSelection = range.cloneRange();
+}
+
+function restoreCostConfigFormulaSelection() {
+  const editor = $('cost-config-formula-inline-editor');
+  const selection = window.getSelection();
+  const stored = state.costosUi.formulaInlineSelection;
+  if (!editor || !selection || !stored) return false;
+  if (!editor.contains(stored.startContainer) || !editor.contains(stored.endContainer)) return false;
+  selection.removeAllRanges();
+  selection.addRange(stored);
+  return true;
+}
+
 function refreshCostConfigFormulaEditor(rawValue = '', focusInline = false) {
   const hidden = $('cost-config-formula');
   const editor = $('cost-config-formula-inline-editor');
@@ -9040,6 +9060,7 @@ function handleCostConfigFormulaInlineInput(input) {
   if (!input) return;
   state.costosUi.formulaInputId = input.id;
   getCostConfigFormulaValueFromEditor();
+  saveCostConfigFormulaSelection();
   if (shouldAutoCommitFormulaInline(getCostConfigFormulaInlineEditorRawValue())) {
     commitCostConfigFormulaInlineInput(input, true);
     return;
@@ -9090,6 +9111,7 @@ function removeCostConfigFormulaToken(tokenIndex) {
 }
 
 function handleCostConfigFormulaInlineKeydown(event, input) {
+  saveCostConfigFormulaSelection();
   if (event.key === 'Backspace' && !getCostConfigFormulaInlineEditorRawValue().trim()) {
     event.preventDefault();
     removeLastCostConfigFormulaToken();
@@ -9129,6 +9151,7 @@ function insertCostConfigFormulaReference(token) {
     if (activeInput.id === 'cost-config-formula-inline-editor') {
       const editor = activeInput;
       editor.focus();
+      restoreCostConfigFormulaSelection();
       const selection = window.getSelection();
       const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
       const chipHtml = renderCostConfigFormulaInlineEditorHtml(token);
@@ -9145,10 +9168,12 @@ function insertCostConfigFormulaReference(token) {
         nextRange.collapse(true);
         selection.removeAllRanges();
         selection.addRange(nextRange);
+        state.costosUi.formulaInlineSelection = nextRange.cloneRange();
       } else {
         editor.appendChild(chip);
         editor.appendChild(document.createTextNode(' '));
         setCaretToEndOfElement(editor);
+        saveCostConfigFormulaSelection();
       }
       getCostConfigFormulaValueFromEditor();
       updateCostConfigPreview();
@@ -9167,6 +9192,7 @@ function insertCostConfigFormulaReference(token) {
   const inlineEditor = $('cost-config-formula-inline-editor');
   if (inlineEditor) {
     inlineEditor.focus();
+    restoreCostConfigFormulaSelection();
     state.costosUi.formulaInputId = inlineEditor.id;
     insertCostConfigFormulaReference(token);
     return;
@@ -9248,7 +9274,7 @@ function renderCostConfigFormulaInput(value = '', label = 'FÃ³rmula', options 
       <div class="cost-config-panel formula-cell">
         <div class="cost-config-label">${escapeHtml(label)}</div>
         <div id="cost-config-formula-editor" class="formula-chip-editor cost-config-formula-editor" onclick="focusCostConfigFormulaInline()">
-          <div id="cost-config-formula-inline-editor" class="cost-config-formula-inline-ce" contenteditable="true" spellcheck="false" oninput="handleCostConfigFormulaInlineInput(this)" onfocus="state.costosUi.formulaInputId=this.id" onkeydown="handleCostConfigFormulaInlineKeydown(event, this)" onblur="commitCostConfigFormulaInlineLater(this)">${renderCostConfigFormulaInlineEditorHtml(rawValue)}</div>
+          <div id="cost-config-formula-inline-editor" class="cost-config-formula-inline-ce" contenteditable="true" spellcheck="false" oninput="handleCostConfigFormulaInlineInput(this)" onfocus="state.costosUi.formulaInputId=this.id; saveCostConfigFormulaSelection()" onmouseup="saveCostConfigFormulaSelection()" onkeyup="saveCostConfigFormulaSelection()" onkeydown="handleCostConfigFormulaInlineKeydown(event, this)" onblur="commitCostConfigFormulaInlineLater(this)">${renderCostConfigFormulaInlineEditorHtml(rawValue)}</div>
           <input id="cost-config-formula" type="hidden" value="${escapeHtml(rawValue)}">
         </div>
         <div class="formula-suggest"></div>
