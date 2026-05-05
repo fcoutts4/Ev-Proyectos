@@ -8941,7 +8941,7 @@ function getCostConfigFormulaValueFromEditor() {
   const editor = $('cost-config-formula-inline-editor');
   if (!hidden) return '';
   if (!editor) return String(hidden.value || '');
-  const raw = getCostConfigFormulaInlineEditorRawValue();
+  const raw = sanitizeFormulaEditorRawText(getCostConfigFormulaInlineEditorRawValue());
   hidden.value = raw;
   return raw;
 }
@@ -8982,25 +8982,32 @@ function renderCostConfigFormulaInlineEditorHtml(rawValue = '') {
   return html;
 }
 
+function sanitizeFormulaEditorRawText(rawValue = '') {
+  return String(rawValue || '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/\r?\n+/g, ' ')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
+}
+
+function readFormulaRawFromNode(node) {
+  if (!node) return '';
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent || '';
+  if (node.nodeType !== Node.ELEMENT_NODE) return '';
+  const token = node.getAttribute?.('data-formula-token');
+  if (token) return token;
+  let acc = '';
+  node.childNodes.forEach((child) => {
+    acc += readFormulaRawFromNode(child);
+  });
+  return acc;
+}
+
 function getCostConfigFormulaInlineEditorRawValue() {
   const editor = $('cost-config-formula-inline-editor');
   if (!editor) return '';
-  let raw = '';
-  editor.childNodes.forEach((node) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      raw += node.textContent || '';
-      return;
-    }
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      const token = node.getAttribute('data-formula-token');
-      if (token) {
-        raw += token;
-        return;
-      }
-      raw += node.textContent || '';
-    }
-  });
-  return raw.replace(/\u00a0/g, ' ');
+  return sanitizeFormulaEditorRawText(readFormulaRawFromNode(editor));
 }
 
 function setCaretToEndOfElement(element) {
@@ -9049,7 +9056,7 @@ function commitCostConfigFormulaInlineInput(input = $('cost-config-formula'), fo
   const hidden = $('cost-config-formula');
   if (!hidden) return;
   const raw = getCostConfigFormulaValueFromEditor();
-  const nextValue = canonicalizeFormulaReferenceText(String(raw || ''));
+  const nextValue = canonicalizeFormulaReferenceText(sanitizeFormulaEditorRawText(String(raw || '')));
   hidden.value = nextValue;
   const editor = $('cost-config-formula-inline-editor');
   if (editor) editor.innerHTML = renderCostConfigFormulaInlineEditorHtml(nextValue);
