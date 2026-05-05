@@ -6864,7 +6864,7 @@ function renderCostPlanilla() {
   const context = buildCostContext();
   const monthCount = getCostMonthCount();
   const monthLabels = getCostMonthLabels();
-  const monthlyTotals = createMonthlyArray(monthCount, 0);
+  const monthlyOperativeTotals = createMonthlyArray(monthCount, 0);
   const collapsedState = costosUi.collapsed || {};
   let totalNeto = 0;
   let totalIva = 0;
@@ -6940,7 +6940,7 @@ function renderCostPlanilla() {
       totalIva += partida.tiene_iva ? total * 0.19 : 0;
       categoryTotalNeto += total;
       categoryTotalIva += partida.tiene_iva ? total * 0.19 : 0;
-      distribucion.forEach((value, monthIndex) => { monthlyTotals[monthIndex] += value; });
+      distribucion.forEach((value, monthIndex) => { monthlyOperativeTotals[monthIndex] += value; });
       distribucion.forEach((value, monthIndex) => { categoryMonthlyTotals[monthIndex] += value; });
       const isActiveIva = costosUi.activeIvaCategory === categoria.nombre
         && Number.parseInt(costosUi.activeIvaIndex, 10) === index;
@@ -6983,16 +6983,41 @@ function renderCostPlanilla() {
     `;
   }).join(''));
 
+  const { financial } = getProjectMonthlyCostBreakdown();
+  const totalFinancial = financial.reduce((sum, value) => sum + toNumber(value), 0);
+  const monthlyTotalsWithFinancial = monthlyOperativeTotals.map((value, index) => (
+    toNumber(value) + toNumber(financial[index])
+  ));
+  const totalNetoWithFinancial = totalNeto + totalFinancial;
+
+  const financialRow = `
+    <tr class="cat-row">
+      <td colspan="3" style="padding:2px 6px">
+        <div class="cost-category-header">
+          <div class="cost-category-title">
+            <button class="btn-collapse-cost" type="button" disabled style="opacity:.45;cursor:not-allowed">&middot;</button>
+            <span class="cost-category-name">GASTOS FINANCIEROS</span>
+          </div>
+        </div>
+      </td>
+      <td class="cat-total-cell cat-total-neto"><strong>${fmtTableAmount(totalFinancial, { kind: 'cost', total: true })}</strong></td>
+      <td class="cat-total-cell"><strong>${fmtTableAmount(0, { kind: 'cost' })}</strong></td>
+      ${financial.map((value) => `<td class="cat-total-cell"><strong>${fmtTableAmount(value, { kind: 'cost' })}</strong></td>`).join('')}
+    </tr>
+  `;
+  const tbody = $('planilla-tbody');
+  if (tbody) tbody.insertAdjacentHTML('beforeend', financialRow);
+
   setHtml('planilla-tfoot', `
     <tr class="tfoot-dark">
       <td colspan="3">Totales</td>
-      <td>${fmtTableAmount(totalNeto, { kind: 'cost', total: true })}</td>
+      <td>${fmtTableAmount(totalNetoWithFinancial, { kind: 'cost', total: true })}</td>
       <td>${fmtTableAmount(totalIva, { kind: 'cost' })}</td>
-      ${monthlyTotals.map((value) => `<td>${fmtTableAmount(value, { kind: 'cost' })}</td>`).join('')}
+      ${monthlyTotalsWithFinancial.map((value) => `<td>${fmtTableAmount(value, { kind: 'cost' })}</td>`).join('')}
     </tr>
   `);
 
-  const flowTotals = monthlyTotals.slice();
+  const flowTotals = monthlyTotalsWithFinancial.slice();
   scheduleRenderJob('cost-flow-chart', () => renderCostFlow(flowTotals), 120);
 }
 
