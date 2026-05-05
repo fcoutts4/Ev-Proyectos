@@ -2652,6 +2652,8 @@ table:not(.gantt-table) .tfoot-dark td,
     return String(expression || '')
       .trim()
       .replace(/^=/, '')
+      .replace(/[×✕]/g, '*')
+      .replace(/([0-9)\]_\u00C0-\u017F])\s*[xX]\s*([0-9([_\u00C0-\u017F])/g, '$1*$2')
       .replace(/(-?(?:(?:\d{1,3}(?:\.\d{3})+)(?:,\d+)?|\d+(?:[.,]\d+)?))\s*%/g, (_, value) => `(${normalizeLiteral(value)}/100)`)
       .replace(/-?\d{1,3}(?:\.\d{3})+(?:,\d+)?|-?\d+,\d+/g, (value) => normalizeLiteral(value));
   }
@@ -2710,7 +2712,8 @@ table:not(.gantt-table) .tfoot-dark td,
     if (!expr) return null;
     expr = expr
       .replace(/[-â€“â€”]/g, '-')
-      .replace(/Ã—/g, '*')
+      .replace(/[Ã—×✕]/g, '*')
+      .replace(/([0-9)\]_\u00C0-\u017F])\s*[xX]\s*([0-9([_\u00C0-\u017F])/g, '$1*$2')
       .replace(/Ã·/g, '/');
     expr = normalizeInlineFormulaSyntax(expr);
 

@@ -5685,6 +5685,8 @@ function normalizeFormulaExpressionSyntax(expression) {
   return String(expression || '')
     .trim()
     .replace(/^=/, '')
+    .replace(/[×✕]/g, '*')
+    .replace(/([0-9)\]_\u00C0-\u017F])\s*[xX]\s*([0-9([_\u00C0-\u017F])/g, '$1*$2')
     .replace(/(-?(?:(?:\d{1,3}(?:\.\d{3})+)(?:,\d+)?|\d+(?:[.,]\d+)?))\s*%/g, (_, value) => `(${normalizeFormulaNumberLiteral(value)}/100)`)
     .replace(/-?\d{1,3}(?:\.\d{3})+(?:,\d+)?|-?\d+,\d+/g, (value) => normalizeFormulaNumberLiteral(value));
 }
@@ -7098,8 +7100,7 @@ function renderFormulaToken(token, isAuto = false) {
   if (!value) return '';
   if (isAuto) return `<span class="formula-token auto">${escapeHtml(value.replace(/^_+/, ''))}</span>`;
   if (/^(>=|<=|==|!=|[()+\-*/<>,%])$/.test(value)) {
-    const operatorLabel = value === '*' ? 'x' : value;
-    return `<span class="formula-token operator">${escapeHtml(operatorLabel)}</span>`;
+    return `<span class="formula-token operator">${escapeHtml(value)}</span>`;
   }
 
   const match = findFormulaCatalogEntry(value);
@@ -7943,7 +7944,9 @@ function buildFormulaTokenMeta(rawValue = '') {
 }
 
 function canonicalizeFormulaReferenceText(rawValue = '') {
-  let value = String(rawValue || '');
+  let value = String(rawValue || '')
+    .replace(/[×✕]/g, '*')
+    .replace(/([0-9)\]_\u00C0-\u017F])\s*[xX]\s*([0-9([_\u00C0-\u017F])/g, '$1*$2');
   const entries = getCostFormulaCatalog()
     .filter((entry) => entry.visible !== false)
     .map((entry) => ({
