@@ -9211,9 +9211,6 @@ function renderCostConfigFields(options = {}) {
               <option value="total" ${periodMode === 'total' ? 'selected' : ''}>Monto total a distribuir</option>
             </select>
           `)}
-          ${periodMode === 'monthly'
-            ? '<div class="cost-config-hint" style="margin-top:6px">Monto mensual permite definir el valor que se imputa mes a mes entre las fechas seleccionadas.</div>'
-            : ''}
         </div>
       </div>
       <div class="cost-config-grid three">
