@@ -8756,9 +8756,19 @@ function commitInlineFormulaEditorLater(input, targetId) {
   }, 130);
 }
 
+function shouldAutoCommitFormulaInline(rawValue = '') {
+  const value = String(rawValue || '');
+  if (!value.trim()) return false;
+  return /[\s+\-*/(),%]$/.test(value);
+}
+
 function handleInlineFormulaEditorInput(input, targetId) {
   getInlineFormulaEditorValue(targetId);
   handleCostFormulaInput(input);
+  if (shouldAutoCommitFormulaInline(input.value)) {
+    commitInlineFormulaEditorInput(input, targetId, true);
+    return;
+  }
   updateCostConfigPreview();
 }
 
@@ -8843,6 +8853,10 @@ function focusCostConfigFormulaInline() {
 function handleCostConfigFormulaInlineInput(input) {
   getCostConfigFormulaValueFromEditor();
   handleCostFormulaInput(input);
+  if (shouldAutoCommitFormulaInline(input.value)) {
+    commitCostConfigFormulaInlineInput(input, true);
+    return;
+  }
   updateCostConfigPreview();
 }
 
@@ -8906,12 +8920,21 @@ function insertCostConfigFormulaReference(token) {
   const activeInput = $(state.costosUi.formulaInputId);
   if (activeInput && activeInput.closest('#cost-config-modal')) {
     insertCostFormulaReference(activeInput, token);
+    if (activeInput.id === 'cost-config-formula-inline') {
+      commitCostConfigFormulaInlineInput(activeInput, true);
+    } else if (/-inline$/.test(activeInput.id || '')) {
+      const targetId = String(activeInput.id || '').replace(/-inline$/, '');
+      if ($(targetId) && $(`${targetId}-editor`)) {
+        commitInlineFormulaEditorInput(activeInput, targetId, true);
+      }
+    }
     updateCostConfigPreview();
     return;
   }
   const inline = $('cost-config-formula-inline');
   if (inline) {
     insertCostFormulaReference(inline, token);
+    commitCostConfigFormulaInlineInput(inline, true);
     return;
   }
   const input = $('cost-config-formula');
@@ -9236,7 +9259,7 @@ function openCostConfigModal(categoryName, index) {
   const methodSelect = $('cost-config-method');
   if (methodSelect) {
     const methodValue = normalizeCostMethod(state.costosUi.costConfigDraft.method) || 'manual';
-    methodSelect.value = methodValue;
+    methodSelect.value = methodValue === 'manual_distribution' ? 'period_amount' : methodValue;
   }
   renderCostConfigFields({ fromDraft: true });
   updateCostConfigPreview();
