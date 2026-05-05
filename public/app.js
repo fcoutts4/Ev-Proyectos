@@ -9166,7 +9166,7 @@ function renderCostConfigFormulaInput(value = '', label = 'FÃ³rmula', options 
         </div>
         <div class="formula-suggest"></div>
         <div class="cost-config-formula-actions">
-          <span class="cost-config-formula-hint">Selecciona una referencia para insertarla como chip y continÃºa escribiendo a la derecha.</span>
+          <span class="cost-config-formula-hint">Selecciona referencia y sigue escribiendo.</span>
           <button class="cost-config-link-btn" type="button" onclick="clearCostConfigFormula()">Limpiar</button>
         </div>
       </div>
@@ -9275,12 +9275,12 @@ function renderCostConfigFields(options = {}) {
           <div class="cost-config-label" style="margin-bottom:0">Pagos por hito</div>
           <button class="btn-outline cost-config-add" type="button" onclick="addCostConfigLine('hito'); return false;">+ Hito</button>
         </div>
-        <div id="cost-config-hitos" class="cost-config-list compact">${rows || '<div class="cost-config-empty">Sin hitos. Usa + Hito para agregar un pago puntual por porcentaje.</div>'}</div>
+        <div id="cost-config-hitos" class="cost-config-list compact">${rows || '<div class="cost-config-empty">Sin hitos. Usa + Hito.</div>'}</div>
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin:10px 0 8px">
           <div class="cost-config-label" style="margin-bottom:0">Distribuido dentro del total</div>
           <button class="btn-outline cost-config-add" type="button" onclick="addCostConfigLine('tramo'); return false;">+ Tramo</button>
         </div>
-        <div id="cost-config-tramos" class="cost-config-list compact">${tramoRows || '<div class="cost-config-empty">Sin tramo distribuido. Usa + Tramo para repartir un porcentaje entre dos fechas.</div>'}</div>
+        <div id="cost-config-tramos" class="cost-config-list compact">${tramoRows || '<div class="cost-config-empty">Sin tramos. Usa + Tramo.</div>'}</div>
       </div>
     `;
   } else if (method === 'manual_distribution') {
@@ -9299,7 +9299,7 @@ function renderCostConfigFields(options = {}) {
           <div class="cost-config-label" style="margin-bottom:0">Pagos puntuales</div>
           <button class="btn-outline cost-config-add" type="button" onclick="addCostConfigLine('payment'); return false;">+ Pago</button>
         </div>
-        <div id="cost-config-payments" class="cost-config-list">${rows || '<div class="cost-config-empty">Sin pagos puntuales. Usa + Pago para agregar una fecha y monto.</div>'}</div>
+        <div id="cost-config-payments" class="cost-config-list">${rows || '<div class="cost-config-empty">Sin pagos. Usa + Pago.</div>'}</div>
       </div>
     `;
   }
