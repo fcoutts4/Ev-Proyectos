@@ -4901,8 +4901,11 @@ function renderConstructionGF(epData) {
     const saldoDisponible = Math.max(0, prevAcum + g);
     const pago = Math.max(0, Math.min(saldoDisponible, pagoObjetivo));
     pagosLinea[t] = -pago;
+    const apertura = Math.max(0, prevAcum);
     acumulado[t] = prevAcum + g + pagosLinea[t];
-    interesMensual[t] = Math.max(0, acumulado[t]) * tasaMensual;
+    const cierre = Math.max(0, acumulado[t]);
+    const saldoPromedio = (apertura + cierre) / 2;
+    interesMensual[t] = saldoPromedio * tasaMensual;
     prevAcum = acumulado[t];
   }
 

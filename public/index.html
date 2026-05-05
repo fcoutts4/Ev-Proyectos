@@ -3053,7 +3053,12 @@ table:not(.gantt-table) .tfoot-dark td,
       addSeries(series, 'ACUMULADO', acumulado, 'acumulado');
       rows.push({ key: 'acumulado', label: 'ACUMULADO', formula: acumFormula, values: acumulado, mode: 'signed', bold: true });
 
-      const interesDefault = acumulado.map((value) => value * (cfg.tasa_construccion / 100) / 12);
+      const interesDefault = acumulado.map((value, index) => {
+        const apertura = Math.max(0, toNumber(index > 0 ? acumulado[index - 1] : 0));
+        const cierre = Math.max(0, toNumber(value));
+        const saldoPromedio = (apertura + cierre) / 2;
+        return saldoPromedio * (cfg.tasa_construccion / 100) / 12;
+      });
       pushRow({ key: 'interes', label: `INTERES (${fmtInputNumber(cfg.tasa_construccion, 2)}% anual)`, fallback: interesDefault, formula: '[ACUMULADO] * [Tasa_interes_construccion] / 12 / 100', mode: 'cost' });
       const timbresDefault = giros.map((value) => value * (cfg.pct_timbres / 100));
       pushRow({ key: 'timbres', label: `IMP. TIMBRES (${fmtInputNumber(cfg.pct_timbres, 2)}%)`, fallback: timbresDefault, formula: '[GIROS (desde EP)] * [Timbres] / 100', mode: 'cost' });
@@ -3347,7 +3352,12 @@ table:not(.gantt-table) .tfoot-dark td,
     });
     addSeries(series, 'ACUMULADO', acumulado, 'acumulado');
 
-    const interestDefault = acumulado.map((value) => Math.max(0, toNumber(value)) * (toNumber(cfg.tasa_construccion) / 100) / 12);
+    const interestDefault = acumulado.map((value, index) => {
+      const apertura = Math.max(0, toNumber(index > 0 ? acumulado[index - 1] : 0));
+      const cierre = Math.max(0, toNumber(value));
+      const saldoPromedio = (apertura + cierre) / 2;
+      return saldoPromedio * (toNumber(cfg.tasa_construccion) / 100) / 12;
+    });
     const interest = normalizeMonthlySeries(evaluateSeries(
       getFormula('gf', 'interes', '[ACUMULADO] * [Tasa_interes_construccion] / 12 / 100'),
       series,
