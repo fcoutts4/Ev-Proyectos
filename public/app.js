@@ -4772,12 +4772,13 @@ function computeConstructionEP() {
   const meses = Math.max(1, metrics.plazo_meses);
   const monthCount = getCostMonthCount();
   const startMonth = getConstructionStartMonth();
+  const constructionStartIndex = Math.max(0, Math.min(monthCount - 1, toNumber(startMonth) - 1));
   const dist = buildConstructionSCurve(metrics, meses);
   const cfg = getGlobalFinancialParams();
   const ceecPct = getEffectiveCeecPct() / 100;
   const anticipoPct = Math.max(0, toNumber(metrics.anticipo_pct)) / 100;
   const anticipoTotal = metrics.total_neto * anticipoPct;
-  const anticipoMonth = Math.max(0, Math.min(monthCount - 1, startMonth - 1));
+  const anticipoMonth = Math.max(0, constructionStartIndex - 1);
 
   const ep = createMonthlyArray(monthCount, 0);
   const anticipo = createMonthlyArray(monthCount, 0);
@@ -4788,7 +4789,7 @@ function computeConstructionEP() {
 
   // Durante la obra: EDPP neto del saldo de contrato despues de anticipo.
   for (let i = 0; i < meses; i += 1) {
-    const m = Math.min(monthCount - 1, startMonth + i);
+    const m = Math.min(monthCount - 1, constructionStartIndex + i);
     ep[m] += toNumber(dist.monthlyCosts[i]); // EDPP neto del mes
     anticipo[m] -= toNumber(dist.monthlyAnticipoRecovery[i]); // compatibilidad: normalmente 0, el EP ya descuenta anticipo
     retenciones[m] -= toNumber(dist.monthlyRetention[i]); // retenciÃ³n del mes
@@ -4796,7 +4797,7 @@ function computeConstructionEP() {
 
   // DevoluciÃ³n de retenciones al final de obra
   const totalRet = dist.retentionAmount;
-  const finalM = Math.min(monthCount - 1, startMonth + meses);
+  const finalM = Math.min(monthCount - 1, constructionStartIndex + meses);
   retenciones[finalM] += totalRet;
 
   // Calcular columnas derivadas
@@ -4825,7 +4826,7 @@ function computeConstructionEP() {
     totalPago[m] = sub + ivaE;
   }
 
-  return { ep, anticipo, retenciones, subtotal, ivaBruto, ceec, ivaEfectivo, totalPago, startMonth, meses, anticipoMonth, anticipoTotal };
+  return { ep, anticipo, retenciones, subtotal, ivaBruto, ceec, ivaEfectivo, totalPago, startMonth, constructionStartIndex, meses, anticipoMonth, anticipoTotal };
 }
 
 function renderConstructionEP() {
