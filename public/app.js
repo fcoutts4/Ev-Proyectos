@@ -5687,7 +5687,7 @@ function normalizeFormulaExpressionSyntax(expression) {
     .replace(/^=/, '')
     .replace(/[×✕]/g, '*')
     .replace(/([0-9)\]_\u00C0-\u017F])\s*[xX]\s*([0-9([_\u00C0-\u017F])/g, '$1*$2')
-    .replace(/(-?(?:(?:\d{1,3}(?:\.\d{3})+)(?:,\d+)?|\d+(?:[.,]\d+)?))\s*%/g, (_, value) => `(${normalizeFormulaNumberLiteral(value)}/100)`)
+    .replace(/(-?(?:(?:\d{1,3}(?:[.\s]\d{3})+)(?:,\d+)?|\d+(?:[.,]\d+)?|[.,]\d+))\s*%/g, (_, value) => `(${normalizeFormulaNumberLiteral(String(value || '').replace(/\s+/g, ''))}/100)`)
     .replace(/-?\d{1,3}(?:\.\d{3})+(?:,\d+)?|-?\d+,\d+/g, (value) => normalizeFormulaNumberLiteral(value));
 }
 
@@ -8986,7 +8986,7 @@ function shouldAutoCommitFormulaInline() {
 }
 
 function refreshCostConfigFormulaChipPreview(rawValue = '') {
-  const row = $('cost-config-formula-chips');
+  const row = $('cost-config-formula-chip-row');
   if (!row) return;
   const value = String(rawValue || '').trim();
   row.innerHTML = value
@@ -9163,9 +9163,9 @@ function renderCostConfigFormulaInput(value = '', label = 'FÃ³rmula', options 
       <div class="cost-config-panel formula-cell">
         <div class="cost-config-label">${escapeHtml(label)}</div>
         <div id="cost-config-formula-editor" class="formula-chip-editor cost-config-formula-editor" onclick="focusCostConfigFormulaInline()">
+          <span id="cost-config-formula-chip-row" class="formula-chip-row">${rawValue ? renderCostConfigFormulaChips(rawValue) : '<span class="formula-chip-empty">Sin fórmula</span>'}</span>
           <input id="cost-config-formula" class="cost-config-formula-inline" value="${escapeHtml(rawValue)}" placeholder="${rawValue ? ' +, -, *, /, %, número...' : 'Escribe o selecciona una referencia'}" oninput="handleCostConfigFormulaInlineInput(this)" onfocus="handleCostFormulaInput(this)" onkeydown="handleCostConfigFormulaInlineKeydown(event, this)" onblur="commitCostConfigFormulaInlineLater(this)">
         </div>
-        <div id="cost-config-formula-chips" class="formula-chip-row" style="margin-top:6px">${rawValue ? renderCostConfigFormulaChips(rawValue) : '<span class="formula-chip-empty">Sin fórmula</span>'}</div>
         <div class="formula-suggest"></div>
         <div class="cost-config-formula-actions">
           <span class="cost-config-formula-hint">Selecciona referencia y sigue escribiendo.</span>
