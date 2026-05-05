@@ -9202,24 +9202,23 @@ function renderCostConfigFields(options = {}) {
     `;
   } else if (method === 'period_amount') {
     const periodMode = config.period_mode === 'total' ? 'total' : 'monthly';
-    const totalSource = config.total_source === 'formula' ? 'formula' : 'amount';
     html = `
       <div class="cost-config-grid">
         <div class="cost-config-panel">
           ${renderCostConfigField('Modo de monto', `
-            <select id="cost-config-period-mode" class="inp" onchange="renderCostConfigFields({ fromDraft: true }); updateCostConfigPreview()">
+            <select id="cost-config-period-mode" class="inp" onchange="renderCostConfigFields(); updateCostConfigPreview()">
               <option value="monthly" ${periodMode === 'monthly' ? 'selected' : ''}>Monto mensual</option>
               <option value="total" ${periodMode === 'total' ? 'selected' : ''}>Monto total a distribuir</option>
             </select>
           `)}
+          ${periodMode === 'monthly'
+            ? '<div class="cost-config-hint" style="margin-top:6px">Monto mensual permite definir el valor que se imputa mes a mes entre las fechas seleccionadas.</div>'
+            : ''}
         </div>
-        ${periodMode === 'total' ? renderCostConfigTotalSourceControl(totalSource) : ''}
       </div>
       <div class="cost-config-grid three">
         ${periodMode === 'total'
-          ? (totalSource === 'formula'
-            ? renderCostConfigFormulaInput(config.formula, 'Monto total por fÃ³rmula', { chipEditor: true })
-            : renderCostConfigAmountField({ label: 'Monto total UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto total o formula, ej: 2500 o 15 * meses preventa' }))
+          ? renderCostConfigAmountField({ label: 'Monto total UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto total o formula, ej: 2500 o 15 * meses preventa' })
           : renderCostConfigAmountField({ label: 'Monto mensual UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto mensual o formula, ej: 2500 o 15 * meses preventa' })}
         ${renderCostPointControls('start', 'Desde', config.start)}
         ${renderCostPointControls('end', 'Hasta', config.end)}
