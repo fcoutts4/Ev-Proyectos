@@ -215,10 +215,15 @@ tbody tr:hover{background:#f8fafc}
 .fa-result-chip.is-formula{background:#eff6ff;color:#1d4ed8}
 .fa-result-chip.is-zero{background:#f1f5f9;color:#94a3b8}
 .fa-result-label{font-size:10px;color:#94a3b8}
-.fa-input-wrap{display:flex;align-items:center;height:36px;border:1.5px solid #cbd5e1;border-radius:8px;padding:0 10px;cursor:text;background:#fff;transition:border-color .15s,box-shadow .15s}
-.fa-input-wrap:focus-within{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.15)}
+.fa-display{display:flex;flex-wrap:wrap;align-items:center;gap:5px;min-height:36px;padding:4px 10px;border:1.5px solid #cbd5e1;border-radius:8px;background:#fff;cursor:text;transition:border-color .15s}
+.fa-display:hover{border-color:#94a3b8}
+.fa-display.has-error{border-color:#ef4444}
+.fa-display.is-empty::after{content:attr(data-placeholder);color:#94a3b8;font-size:12px}
+.fa-display-token{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:600;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;white-space:nowrap}
+.fa-display-op{font-size:12px;color:#475569;font-variant-numeric:tabular-nums;font-weight:500}
+.fa-input-wrap{display:flex;align-items:center;min-height:36px;border:1.5px solid #3b82f6;border-radius:8px;padding:4px 10px;cursor:text;background:#fff;box-shadow:0 0 0 3px rgba(59,130,246,.15);transition:border-color .15s,box-shadow .15s}
 .fa-input-wrap.has-error{border-color:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.12)}
-.fa-input{flex:1;border:none;outline:none;background:transparent;font-size:13px;font-variant-numeric:tabular-nums;color:#0f172a;min-width:0;height:100%}
+.fa-input{flex:1;border:none;outline:none;background:transparent;font-size:13px;font-variant-numeric:tabular-nums;color:#0f172a;min-width:0}
 .fa-error-msg{font-size:11px;color:#dc2626;font-weight:600;min-height:14px}
 .formula-preview{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc}
 .formula-preview-head{display:flex;justify-content:space-between;align-items:center;gap:8px}

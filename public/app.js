@@ -8687,9 +8687,9 @@ function renderFormulaEditorChips(rawValue = '', editorTargetId = '') {
 }
 
 // ─── Formula-Amount Input (fa-input) ────────────────────────────────────────
-// Row 1: result chip (shows evaluated value) + optional label
-// Row 2: full-width <input type="text"> for the formula string
-// No innerHTML re-renders during typing → cursor/focus is never lost.
+// Display mode (not focused): shows formula tokens as styled chips + plain numbers.
+// Edit mode (focused): shows full-width plain text input — no innerHTML re-renders.
+// Row above input: result chip (evaluated value) + "UF" / "resultado" label.
 
 function renderInlineFormulaAmountEditor({
   id,
@@ -8702,14 +8702,18 @@ function renderInlineFormulaAmountEditor({
   const chipText = _computeFormulaAmountChipText(rawValue);
   const chipClass = _computeFormulaAmountChipClass(rawValue);
   const isFormula = isFormulaLikeAmountInput(rawValue);
-  const resultLabel = isFormula ? 'resultado' : 'UF';
+  const displayHtml = _renderFormulaDisplayRow(rawValue);
+  const isEmpty = !rawValue.trim();
   return `
     <div class="fa-field">
       <div class="fa-result-row">
         <span class="fa-result-chip ${chipClass}" id="${escapeHtml(id)}-chip">${escapeHtml(chipText)}</span>
-        <span class="fa-result-label">${isFormula ? 'resultado' : 'UF'}</span>
+        <span class="fa-result-label" id="${escapeHtml(id)}-rlabel">${isFormula ? 'resultado' : 'UF'}</span>
       </div>
-      <div class="fa-input-wrap" id="${escapeHtml(id)}-wrap">
+      <div class="fa-display${isEmpty ? ' is-empty' : ''}" id="${escapeHtml(id)}-display"
+        data-placeholder="${escapeHtml(placeholder)}"
+        onclick="focusFormulaAmountInput('${escapeHtml(id)}')">${displayHtml}</div>
+      <div class="fa-input-wrap" id="${escapeHtml(id)}-wrap" style="display:none">
         <input id="${escapeHtml(id)}" ${dataFieldAttr} type="text" data-formula-amount="1" class="fa-input"
           value="${escapeHtml(rawValue)}" data-original-value="${escapeHtml(rawValue)}"
           placeholder="${escapeHtml(placeholder)}" autocomplete="off" spellcheck="false"
@@ -8721,6 +8725,38 @@ function renderInlineFormulaAmountEditor({
       <div class="formula-suggest"></div>
     </div>
   `;
+}
+
+function _renderFormulaDisplayRow(rawValue) {
+  const v = String(rawValue || '').trim();
+  if (!v) return '';
+  const normalized = canonicalizeFormulaReferenceText(v);
+  const tokens = (normalized.match(/_[A-Za-z0-9_]+|[()+\-*/%,]|-?\d+(?:[.,]\d+)?/g) || [])
+    .filter((token) => String(token || '').trim());
+  if (!tokens.length) return `<span class="fa-display-op">${escapeHtml(v)}</span>`;
+  return tokens.map((token) => {
+    const t = String(token || '').trim();
+    if (!t) return '';
+    const entry = findFormulaCatalogEntry(t);
+    if (entry) {
+      const label = String(entry.label || t).replace(/^_+/, '');
+      return `<span class="fa-display-token" title="${escapeHtml(t)}">${escapeHtml(label)}</span>`;
+    }
+    // plain number or operator — render as-is
+    return `<span class="fa-display-op">${escapeHtml(t)}</span>`;
+  }).join('');
+}
+
+function focusFormulaAmountInput(id) {
+  const display = $(`${id}-display`);
+  const wrap = $(`${id}-wrap`);
+  const input = $(id);
+  if (!input || !display || !wrap) return;
+  display.style.display = 'none';
+  wrap.style.display = 'flex';
+  input.focus();
+  const len = String(input.value || '').length;
+  input.setSelectionRange(len, len);
 }
 
 function _computeFormulaAmountChipText(rawValue) {
@@ -8779,11 +8815,27 @@ function handleFormulaAmountInput(input) {
 }
 
 function handleFormulaAmountBlur(input) {
-  const canonical = canonicalizeFormulaReferenceText(input.value || '');
-  if (canonical !== input.value) input.value = canonical;
-  _updateFormulaAmountChip(input);
-  hideCostFormulaSuggestionsLater();
-  updateCostConfigPreview();
+  // Small delay to let suggestion clicks register before hiding
+  window.setTimeout(() => {
+    const canonical = canonicalizeFormulaReferenceText(input.value || '');
+    if (canonical !== input.value) input.value = canonical;
+    _updateFormulaAmountChip(input);
+    _switchFormulaAmountToDisplay(input);
+    hideCostFormulaSuggestionsLater();
+    updateCostConfigPreview();
+  }, 150);
+}
+
+function _switchFormulaAmountToDisplay(input) {
+  const display = $(`${input.id}-display`);
+  const wrap = $(`${input.id}-wrap`);
+  if (!display || !wrap) return;
+  const rawValue = String(input.value || '').trim();
+  display.innerHTML = _renderFormulaDisplayRow(rawValue);
+  display.classList.toggle('is-empty', !rawValue);
+  display.classList.toggle('has-error', _computeFormulaAmountChipClass(rawValue) === 'is-error');
+  wrap.style.display = 'none';
+  display.style.display = '';
 }
 
 function handleFormulaAmountKeydown(event, input) {
@@ -8825,18 +8877,14 @@ function refreshInlineFormulaEditor(targetId, rawValue = '', focusInline = false
   input.dataset.originalValue = value;
   _updateFormulaAmountChip(input);
   if (focusInline) {
-    input.focus();
-    const len = value.length;
-    input.setSelectionRange(len, len);
+    focusFormulaAmountInput(targetId);
+  } else {
+    _switchFormulaAmountToDisplay(input);
   }
 }
 
 function focusInlineFormulaEditor(targetId) {
-  const input = $(targetId);
-  if (!input) return;
-  input.focus();
-  const len = String(input.value || '').length;
-  input.setSelectionRange(len, len);
+  focusFormulaAmountInput(targetId);
 }
 
 // Legacy stubs kept for backward compatibility
@@ -9002,6 +9050,8 @@ function insertCostConfigFormulaReference(token) {
   if (activeInput && activeInput.closest('#cost-config-modal')) {
     // New fa-input pattern: input is directly editable type=text
     if (activeInput.dataset.formulaAmount === '1') {
+      // Make sure the edit view is visible before inserting
+      focusFormulaAmountInput(activeInput.id);
       insertCostFormulaReference(activeInput, token);
       const canonical = canonicalizeFormulaReferenceText(activeInput.value || '');
       activeInput.value = canonical;
