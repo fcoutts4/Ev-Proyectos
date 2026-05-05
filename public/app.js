@@ -5591,7 +5591,7 @@ function getGanttLockConfig(row, index = -1, allRows = []) {
 function getPartidaFormulaText(partida) {
   if (partida.auto_origen) return partida.formula_display || 'extraido';
   if (partida.formula_tipo === 'expr') return partida.formula_referencia || '';
-  if (partida.formula_tipo === 'manual') return partida.formula_valor ? fmtInputNumber(partida.formula_valor, 2) : '';
+  if (partida.formula_tipo === 'manual') return partida.formula_valor ? fmtInputNumber(partida.formula_valor, 3) : '';
   return partida.formula_referencia || partida.formula_tipo || '';
 }
 
@@ -7863,7 +7863,7 @@ function getCostAmountRawInput(source = {}, key = 'amount') {
     if (source[inputKey] != null && String(source[inputKey]).trim() !== '') return String(source[inputKey]);
   }
   const value = source[key] ?? source[`${key}_value`] ?? source[`${key}Value`] ?? source[`${key}_calculated`] ?? source[`${key}Calculated`];
-  return value == null || value === '' ? '' : fmtInputNumber(value, 2);
+  return value == null || value === '' ? '' : fmtInputNumber(value, 3);
 }
 
 function evaluateCostAmountInput(rawValue, context, fallbackValue = 0) {
@@ -8528,7 +8528,7 @@ function renderCostConfigField(label, controlHtml) {
   `;
 }
 
-function renderCostConfigAmountField({ id = 'cost-config-amount', label = 'Monto total UF', value = 0, decimals = 2, placeholder = '0,00' } = {}) {
+function renderCostConfigAmountField({ id = 'cost-config-amount', label = 'Monto total UF', value = 0, decimals = 3, placeholder = '0,000' } = {}) {
   const rawValue = typeof value === 'string' ? value : fmtInputNumber(value, decimals);
   return `
     <div class="cost-config-panel formula-cell">
