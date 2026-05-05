@@ -7674,6 +7674,10 @@ function pickCostFormulaSuggestion(button) {
   insertCostFormulaReference(input, button.dataset.token);
   if (input.id === 'cost-formula-modal-input') updateCostFormulaModalPreview();
   if (input.id === 'cost-config-formula' || input.id === 'cost-config-formula-inline') updateCostConfigPreview();
+  if (input.dataset.formulaAmount === '1' && input.type === 'text') {
+    _updateFormulaAmountChip(input);
+    updateCostConfigPreview();
+  }
   hideCostFormulaSuggestionsLater();
 }
 
@@ -8526,10 +8530,9 @@ function renderCostConfigAmountField({ id = 'cost-config-amount', label = 'Monto
   return `
     <div class="cost-config-panel formula-cell">
       ${renderCostConfigField(label, `
-        ${renderInlineFormulaAmountEditor({ id, value: rawValue, placeholder: placeholder || 'Monto o formula, ej: 2500 o 15 * meses preventa' })}
-        <div id="${escapeHtml(id)}-feedback" class="cost-inline-result"></div>
+        ${renderInlineFormulaAmountEditor({ id, value: rawValue, placeholder: placeholder || 'Monto o fórmula, ej: 2500' })}
+        <div id="${escapeHtml(id)}-feedback" class="fa-error-msg"></div>
       `)}
-      <div class="formula-suggest"></div>
     </div>
   `;
 }
@@ -8646,24 +8649,25 @@ function updateCostConfigPctWarning(config, context = null, validationOverride =
 
 function updateCostAmountFeedback(input, meta) {
   if (!input) return;
-  const field = input.closest('.cost-config-field');
-  const editor = input.closest('.formula-cell')?.querySelector(`[data-formula-editor-target="${escapeHtml(input.id)}"]`);
-  const feedback = $(`${input.id}-feedback`) || field?.querySelector('.cost-inline-result');
-  field?.classList.toggle('has-error', !!meta?.error);
-  editor?.classList.toggle('has-error', !!meta?.error);
-  if (!feedback) return;
-  if (meta?.error) {
-    feedback.textContent = meta.error;
-    feedback.className = 'cost-inline-result is-error';
-    return;
+  // For new fa-input pattern: update chip to reflect current value
+  if (input.dataset.formulaAmount === '1' && input.type === 'text') {
+    _updateFormulaAmountChip(input);
   }
-  if (meta?.formula) {
-    feedback.textContent = `Resultado: ${fmtUf(meta.value)}`;
-    feedback.className = 'cost-inline-result is-ok';
+  const field = input.closest('.cost-config-field');
+  const wrap = $(`${input.id}-wrap`);
+  const feedback = $(`${input.id}-feedback`) || field?.querySelector('.fa-error-msg') || field?.querySelector('.cost-inline-result');
+  // meta.error comes from normalizeCostConfig's amount_error field
+  const errorMsg = meta?.error || meta?.amount_error || '';
+  field?.classList.toggle('has-error', !!errorMsg);
+  wrap?.classList.toggle('has-error', !!errorMsg);
+  if (!feedback) return;
+  if (errorMsg) {
+    feedback.textContent = errorMsg;
+    feedback.className = feedback.classList.contains('fa-error-msg') ? 'fa-error-msg' : 'cost-inline-result is-error';
     return;
   }
   feedback.textContent = '';
-  feedback.className = 'cost-inline-result';
+  feedback.className = feedback.classList.contains('fa-error-msg') ? 'fa-error-msg' : 'cost-inline-result';
 }
 
 function renderFormulaEditorToken(token, editorTargetId = '', tokenIndex = 0) {
@@ -8682,71 +8686,156 @@ function renderFormulaEditorChips(rawValue = '', editorTargetId = '') {
   return splitFormulaTokens(value).map((token, index) => renderFormulaEditorToken(token, editorTargetId, index)).join('');
 }
 
+// ─── Formula-Amount Input (fa-input) ────────────────────────────────────────
+// Single <input type="text"> showing the full formula string.
+// An absolute-positioned <span class="fa-result-chip"> shows the evaluated value.
+// No innerHTML re-renders during typing → cursor/focus is never lost.
+
 function renderInlineFormulaAmountEditor({
   id,
   value = '',
-  placeholder = 'Monto o formula, ej: 2500 o 15 * meses preventa',
+  placeholder = 'Monto o fórmula, ej: 2500',
   dataField = '',
 } = {}) {
   const rawValue = canonicalizeFormulaReferenceText(value || '');
   const dataFieldAttr = dataField ? `data-field="${escapeHtml(dataField)}"` : '';
+  const chipText = _computeFormulaAmountChipText(rawValue);
+  const chipClass = _computeFormulaAmountChipClass(rawValue);
   return `
-    <div class="formula-cell inline-formula-host">
-      <input id="${escapeHtml(id)}" ${dataFieldAttr} type="hidden" data-formula-amount="1" value="${escapeHtml(rawValue)}">
-      <div id="${escapeHtml(id)}-editor" class="formula-chip-editor cost-config-formula-editor" data-formula-editor-target="${escapeHtml(id)}" data-base-formula="${escapeHtml(rawValue)}" onclick="focusInlineFormulaEditor('${escapeHtml(id)}')">
-        ${renderFormulaEditorChips(rawValue, id)}
-        <input id="${escapeHtml(id)}-inline" class="cost-config-formula-inline" value="" placeholder="${escapeHtml(rawValue ? ' +, -, *, /, %, nÃºmero...' : placeholder)}" oninput="handleInlineFormulaEditorInput(this, '${escapeHtml(id)}')" onfocus="handleCostFormulaInput(this)" onkeydown="handleInlineFormulaEditorKeydown(event, this, '${escapeHtml(id)}')" onblur="commitInlineFormulaEditorLater(this, '${escapeHtml(id)}')">
-      </div>
-      <div class="formula-suggest"></div>
+    <div class="fa-input-wrap" id="${escapeHtml(id)}-wrap">
+      <span class="fa-result-chip ${chipClass}" id="${escapeHtml(id)}-chip">${escapeHtml(chipText)}</span>
+      <input id="${escapeHtml(id)}" ${dataFieldAttr} type="text" data-formula-amount="1" class="fa-input"
+        value="${escapeHtml(rawValue)}" data-original-value="${escapeHtml(rawValue)}"
+        placeholder="${escapeHtml(placeholder)}" autocomplete="off" spellcheck="false"
+        oninput="handleFormulaAmountInput(this)"
+        onkeydown="handleFormulaAmountKeydown(event,this)"
+        onblur="handleFormulaAmountBlur(this)"
+        onfocus="handleFormulaAmountFocus(this)">
     </div>
+    <div class="formula-suggest"></div>
   `;
 }
 
+function _computeFormulaAmountChipText(rawValue) {
+  const v = String(rawValue || '').trim();
+  if (!v) return '—';
+  const ctx = buildCostContext();
+  const catalog = getFormulaCatalogForContext(ctx);
+  const result = evaluateExpressionFormulaDetailed(v, ctx, catalog);
+  if (result.ok) {
+    const n = result.value;
+    if (Math.abs(n) >= 1000) return fmtNumber(n, 0);
+    return fmtNumber(n, n % 1 === 0 ? 0 : 2);
+  }
+  return '!';
+}
+
+function _computeFormulaAmountChipClass(rawValue) {
+  const v = String(rawValue || '').trim();
+  if (!v) return 'is-zero';
+  const isFormula = isFormulaLikeAmountInput(v);
+  const ctx = buildCostContext();
+  const catalog = getFormulaCatalogForContext(ctx);
+  const result = evaluateExpressionFormulaDetailed(v, ctx, catalog);
+  if (!result.ok) return 'is-error';
+  if (result.value === 0) return 'is-zero';
+  if (isFormula) return 'is-formula';
+  return '';
+}
+
+function _updateFormulaAmountChip(input) {
+  const chip = $(`${input.id}-chip`);
+  const wrap = $(`${input.id}-wrap`);
+  if (!chip) return;
+  const rawValue = String(input.value || '').trim();
+  chip.textContent = _computeFormulaAmountChipText(rawValue);
+  chip.className = `fa-result-chip ${_computeFormulaAmountChipClass(rawValue)}`;
+  if (wrap) wrap.classList.toggle('has-error', chip.classList.contains('is-error'));
+}
+
+function handleFormulaAmountFocus(input) {
+  state.costosUi.formulaInputId = input.id;
+  handleCostFormulaInput(input);
+}
+
+function handleFormulaAmountInput(input) {
+  state.costosUi.formulaInputId = input.id;
+  _updateFormulaAmountChip(input);
+  handleCostFormulaInput(input);
+  updateCostConfigPreview();
+}
+
+function handleFormulaAmountBlur(input) {
+  const canonical = canonicalizeFormulaReferenceText(input.value || '');
+  if (canonical !== input.value) input.value = canonical;
+  _updateFormulaAmountChip(input);
+  hideCostFormulaSuggestionsLater();
+  updateCostConfigPreview();
+}
+
+function handleFormulaAmountKeydown(event, input) {
+  if (event.key === 'Escape') {
+    const original = input.dataset.originalValue ?? '';
+    input.value = original;
+    _updateFormulaAmountChip(input);
+    input.blur();
+    return;
+  }
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    const canonical = canonicalizeFormulaReferenceText(input.value || '');
+    input.value = canonical;
+    _updateFormulaAmountChip(input);
+    updateCostConfigPreview();
+    input.blur();
+  }
+}
+
+// Keep legacy API aliases so existing callers continue to work
 function getInlineFormulaEditorValue(targetId) {
-  const hidden = $(targetId);
-  const editor = $(`${targetId}-editor`);
-  if (!hidden || !editor) return hidden?.value || '';
-  const inline = $(`${targetId}-inline`);
-  hidden.value = `${editor.dataset.baseFormula || ''}${inline?.value || ''}`;
-  return hidden.value;
+  const input = $(targetId);
+  return input ? String(input.value || '') : '';
 }
 
 function syncInlineFormulaAmountEditors(root = document) {
-  root.querySelectorAll('[data-formula-editor-target]').forEach((editor) => {
-    const targetId = editor.dataset.formulaEditorTarget;
-    if (targetId) getInlineFormulaEditorValue(targetId);
+  // New pattern: input.value IS the value — nothing to sync
+  root.querySelectorAll('[data-formula-amount="1"]').forEach((input) => {
+    _updateFormulaAmountChip(input);
   });
 }
 
 function refreshInlineFormulaEditor(targetId, rawValue = '', focusInline = false) {
-  const hidden = $(targetId);
-  const editor = $(`${targetId}-editor`);
-  if (!hidden || !editor) return;
-  const value = String(rawValue || '');
-  hidden.value = value;
-  editor.dataset.baseFormula = value;
-  editor.innerHTML = `
-    ${renderFormulaEditorChips(value, targetId)}
-    <input id="${escapeHtml(targetId)}-inline" class="cost-config-formula-inline" value="" placeholder="${escapeHtml(value ? ' +, -, *, /, %, nÃºmero...' : 'Escribe monto o referencia')}" oninput="handleInlineFormulaEditorInput(this, '${escapeHtml(targetId)}')" onfocus="handleCostFormulaInput(this)" onkeydown="handleInlineFormulaEditorKeydown(event, this, '${escapeHtml(targetId)}')" onblur="commitInlineFormulaEditorLater(this, '${escapeHtml(targetId)}')">
-  `;
-  if (focusInline) focusInlineFormulaEditor(targetId);
+  const input = $(targetId);
+  if (!input) return;
+  const value = canonicalizeFormulaReferenceText(String(rawValue || ''));
+  input.value = value;
+  input.dataset.originalValue = value;
+  _updateFormulaAmountChip(input);
+  if (focusInline) {
+    input.focus();
+    const len = value.length;
+    input.setSelectionRange(len, len);
+  }
 }
 
 function focusInlineFormulaEditor(targetId) {
-  const input = $(`${targetId}-inline`);
+  const input = $(targetId);
   if (!input) return;
   input.focus();
-  const cursor = String(input.value || '').length;
-  input.setSelectionRange(cursor, cursor);
+  const len = String(input.value || '').length;
+  input.setSelectionRange(len, len);
 }
 
+// Legacy stubs kept for backward compatibility
 function commitInlineFormulaEditorInput(input, targetId, focusInline = false) {
-  const editor = $(`${targetId}-editor`);
-  const hidden = $(targetId);
-  if (!editor || !hidden || !input) return;
-  const nextValue = canonicalizeFormulaReferenceText(`${editor.dataset.baseFormula || ''}${input.value || ''}`);
-  refreshInlineFormulaEditor(targetId, nextValue, focusInline);
+  const canonical = canonicalizeFormulaReferenceText(input ? String(input.value || '') : '');
+  const target = $(targetId);
+  if (target) {
+    target.value = canonical;
+    _updateFormulaAmountChip(target);
+  }
   updateCostConfigPreview();
+  if (focusInline) focusInlineFormulaEditor(targetId);
 }
 
 function commitInlineFormulaEditorLater(input, targetId) {
@@ -8756,52 +8845,31 @@ function commitInlineFormulaEditorLater(input, targetId) {
   }, 130);
 }
 
-function shouldAutoCommitFormulaInline(rawValue = '') {
-  const value = String(rawValue || '');
-  if (!value.trim()) return false;
-  return /[\s+\-*/(),%]$/.test(value);
-}
-
-function handleInlineFormulaEditorInput(input, targetId) {
-  getInlineFormulaEditorValue(targetId);
-  handleCostFormulaInput(input);
-  if (shouldAutoCommitFormulaInline(input.value)) {
-    commitInlineFormulaEditorInput(input, targetId, true);
-    return;
-  }
-  updateCostConfigPreview();
-}
-
 function removeFormulaEditorToken(targetId, tokenIndex) {
-  const editor = $(`${targetId}-editor`);
-  const hidden = $(targetId);
-  if (!editor || !hidden) return;
-  const tokens = splitFormulaTokens(editor.dataset.baseFormula || hidden.value || '');
+  const input = $(targetId);
+  if (!input) return;
+  const tokens = splitFormulaTokens(input.value || '');
   tokens.splice(tokenIndex, 1);
   refreshInlineFormulaEditor(targetId, tokens.join(' '), true);
   updateCostConfigPreview();
 }
 
 function removeLastInlineFormulaEditorToken(targetId) {
-  const editor = $(`${targetId}-editor`);
-  const hidden = $(targetId);
-  if (!editor || !hidden) return;
-  const tokens = splitFormulaTokens(editor.dataset.baseFormula || hidden.value || '');
+  const input = $(targetId);
+  if (!input) return;
+  const tokens = splitFormulaTokens(input.value || '');
   if (!tokens.length) return;
   tokens.pop();
   refreshInlineFormulaEditor(targetId, tokens.join(' '), true);
   updateCostConfigPreview();
 }
 
+function handleInlineFormulaEditorInput(input, targetId) {
+  handleFormulaAmountInput(input);
+}
+
 function handleInlineFormulaEditorKeydown(event, input, targetId) {
-  if (event.key === 'Backspace' && !input.value) {
-    event.preventDefault();
-    removeLastInlineFormulaEditorToken(targetId);
-  }
-  if (event.key === 'Enter') {
-    event.preventDefault();
-    commitInlineFormulaEditorInput(input, targetId, true);
-  }
+  handleFormulaAmountKeydown(event, input);
 }
 
 function getCostConfigFormulaValueFromEditor() {
@@ -8919,8 +8987,19 @@ function clearCostConfigFormula() {
 function insertCostConfigFormulaReference(token) {
   const activeInput = $(state.costosUi.formulaInputId);
   if (activeInput && activeInput.closest('#cost-config-modal')) {
-    insertCostFormulaReference(activeInput, token);
+    // New fa-input pattern: input is directly editable type=text
+    if (activeInput.dataset.formulaAmount === '1') {
+      insertCostFormulaReference(activeInput, token);
+      const canonical = canonicalizeFormulaReferenceText(activeInput.value || '');
+      activeInput.value = canonical;
+      _updateFormulaAmountChip(activeInput);
+      updateCostConfigPreview();
+      activeInput.focus();
+      return;
+    }
+    // Legacy: cost-config-formula-inline (the main formula field in monthly_formula / milestones)
     if (activeInput.id === 'cost-config-formula-inline') {
+      insertCostFormulaReference(activeInput, token);
       commitCostConfigFormulaInlineInput(activeInput, true);
     } else if (/-inline$/.test(activeInput.id || '')) {
       const targetId = String(activeInput.id || '').replace(/-inline$/, '');
