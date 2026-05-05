@@ -8675,7 +8675,7 @@ function renderFormulaEditorToken(token, editorTargetId = '', tokenIndex = 0) {
   if (!value) return '';
   const catalogEntry = findFormulaCatalogEntry(value);
   if (catalogEntry) {
-    return `<span class="formula-token reference" data-tech-token="${escapeHtml(catalogEntry.token)}" title="${escapeHtml(`${catalogEntry.label} = ${formatFormulaCatalogValue(catalogEntry)}`)}">${escapeHtml(String(catalogEntry.label || value).replace(/^_+/, ''))}<button type="button" class="formula-token-remove" onclick="removeFormulaEditorToken('${escapeHtml(editorTargetId)}', ${tokenIndex}); return false;" aria-label="Eliminar referencia">&times;</button></span>`;
+    return `<span class="formula-token reference" data-tech-token="${escapeHtml(catalogEntry.token)}" title="${escapeHtml(`${catalogEntry.label} = ${formatFormulaCatalogValue(catalogEntry)}`)}">${escapeHtml(String(catalogEntry.label || value).replace(/^_+/, ''))}</span>`;
   }
   return renderFormulaToken(token);
 }
@@ -8948,7 +8948,7 @@ function renderCostConfigFormulaToken(token, tokenIndex = 0) {
   const value = String(token || '').trim();
   const entry = findFormulaCatalogEntry(value);
   if (!entry) return renderFormulaToken(token);
-  return `<span class="formula-token reference" data-tech-token="${escapeHtml(entry.token)}" title="${escapeHtml(`${entry.label} = ${formatFormulaCatalogValue(entry)}`)}">${escapeHtml(String(entry.label || value).replace(/^_+/, ''))}<button type="button" class="formula-token-remove" onclick="removeCostConfigFormulaToken(${tokenIndex}); return false;" aria-label="Eliminar referencia">&times;</button></span>`;
+  return `<span class="formula-token reference" data-tech-token="${escapeHtml(entry.token)}" title="${escapeHtml(`${entry.label} = ${formatFormulaCatalogValue(entry)}`)}">${escapeHtml(String(entry.label || value).replace(/^_+/, ''))}</span>`;
 }
 
 function renderCostConfigFormulaChips(rawValue = '') {
