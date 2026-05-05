@@ -4747,11 +4747,18 @@ function computeConstructionEP() {
   for (let m = 0; m < monthCount; m += 1) {
     const sub = toNumber(ep[m]) + toNumber(anticipo[m]) + toNumber(retenciones[m]);
     subtotal[m] = sub;
+    // IVA bruto: 19% del subtotal neto. Como el subtotal es costo (negativo),
+    // el IVA bruto también es negativo.
     const ivaB = sub * 0.19;
     ivaBruto[m] = ivaB;
-    const ceecVal = ivaB > 0 ? ivaB * ceecPct : 0;
+    // CEEC: crédito tributario POSITIVO que compensa el IVA. Se calcula como
+    // ceec_pct × |IVA bruto|. Independiente del signo del subtotal.
+    const ceecVal = Math.abs(toNumber(ivaB)) * ceecPct;
     ceec[m] = ceecVal;
-    const ivaE = ivaB - ceecVal;
+    // IVA efectivo = IVA bruto + CEEC. Como IVA bruto es negativo y CEEC es
+    // positivo, el resultado es un IVA menos negativo (lo que efectivamente
+    // se paga al SII después del beneficio).
+    const ivaE = ivaB + ceecVal;
     ivaEfectivo[m] = ivaE;
     totalPago[m] = sub + ivaE;
   }
@@ -4778,8 +4785,8 @@ function renderConstructionEP() {
     { label: 'Retenciones netas', values: data.retenciones, formula: 'Retencion neta mensual y devolucion neta total al final de obra.', color: '#fbbf24' },
     { label: 'Subtotal neto', values: data.subtotal, formula: 'EDPP neto + Anticipo neto + Retenciones netas', bold: true, color: '#22c55e' },
     { label: 'IVA bruto (19%)', values: data.ivaBruto, formula: 'Subtotal neto Ã— 19%', color: '#94a3b8' },
-    { label: `CEEC (${cfg.pct_ceec}%)`, values: data.ceec, formula: `IVA bruto Ã— ${cfg.pct_ceec}%  Â·  Beneficio que reduce el IVA`, color: '#a855f7' },
-    { label: 'IVA efectivo', values: data.ivaEfectivo, formula: 'IVA bruto âˆ’ CEEC', color: '#94a3b8' },
+    { label: `CEEC (${cfg.pct_ceec}%)`, values: data.ceec, formula: `|IVA bruto| Ã— ${cfg.pct_ceec}%  Â·  CrÃ©dito tributario (positivo) que compensa el IVA`, color: '#a855f7' },
+    { label: 'IVA efectivo', values: data.ivaEfectivo, formula: 'IVA bruto + CEEC  Â·  IVA neto a pagar al SII despuÃ©s del beneficio', color: '#94a3b8' },
     { label: 'TOTAL A PAGO (c/IVA)', values: data.totalPago, formula: 'Subtotal neto + IVA efectivo  â†’  alimenta GIROS', bold: true, color: '#22c55e' },
   ];
 
