@@ -1522,8 +1522,8 @@ function isEntityTooLargeError(error) {
   return message.includes('request entity too large') || message.includes('payload too large') || message.includes('413');
 }
 
-// Slimmest possible costos payload — used as a 413 retry fallback.
-// Drops distribucion_mensual entirely (recomputable from plan_pago on load).
+// Slimmest possible payload — used as a 413 retry fallback.
+// Drops everything that's recomputable on load. Different shape per key.
 function buildSlimRetryPayload(key, payload) {
   if (key === 'costos') {
     return (Array.isArray(payload) ? payload : []).map((category) => ({
@@ -1535,13 +1535,39 @@ function buildSlimRetryPayload(key, payload) {
         formula_tipo: partida.formula_tipo || '',
         formula_valor: toNumber(partida.formula_valor),
         formula_referencia: partida.formula_referencia || '',
+        // plan_pago carries the canonical cost_config — never strip it.
         plan_pago: typeof partida.plan_pago === 'string' ? partida.plan_pago : '',
         tiene_iva: !!partida.tiene_iva,
         es_terreno: !!partida.es_terreno,
         total_neto: toNumber(partida.total_neto),
-        distribucion_mensual: [],
+        distribucion_mensual: [], // recomputable from plan_pago on load
       })),
     }));
+  }
+  if (key === 'proyecto' || key === 'formula-overrides') {
+    // formula_overrides can grow with many manual edits. Try to keep only
+    // non-empty values to shrink the payload.
+    const obj = (payload && typeof payload === 'object') ? payload : {};
+    const slim = {};
+    Object.keys(obj).forEach((k) => {
+      const v = obj[k];
+      if (v == null || v === '') return;
+      if (typeof v === 'object' && !Array.isArray(v)) {
+        const nested = {};
+        Object.keys(v).forEach((nk) => {
+          const nv = v[nk];
+          if (nv != null && nv !== '') nested[nk] = nv;
+        });
+        if (Object.keys(nested).length) slim[k] = nested;
+      } else {
+        slim[k] = v;
+      }
+    });
+    return slim;
+  }
+  if (key === 'gantt' || key === 'cabida' || key === 'ventas-config' || key === 'ventas-cronograma') {
+    // Trim arrays of all keys that look like cached/computed/preview data.
+    return (Array.isArray(payload) ? payload : []).map((row) => stripDerivedLargeData(row));
   }
   return payload;
 }
@@ -1557,20 +1583,26 @@ function _measurePayloadKb(body) {
 async function executeAutosaveRequests(requests) {
   for (const req of requests) {
     const sizeKb = _measurePayloadKb(req.options?.body);
-    if (sizeKb > 2048) {
-      console.warn(`[autosave] payload "${req.key}" is ${sizeKb}KB — investigate bloat`);
+    if (sizeKb > 1024) {
+      console.warn(`[autosave] payload "${req.key}" → ${sizeKb}KB`);
     }
     try {
       await api(req.path, req.options);
     } catch (error) {
       if (!isEntityTooLargeError(error)) throw error;
-      console.warn(`[autosave] 413 on "${req.key}" (${sizeKb}KB) — retrying with slim payload`);
-      setSyncStatus('saving', 'GUARDANDO', 'El proyecto es demasiado pesado para guardar. Se limpiarán datos temporales y se reintentará.');
-      const retryPayload = buildSlimRetryPayload(req.key, req.payload);
-      await api(req.path, {
-        ...req.options,
-        body: JSON.stringify(retryPayload ?? {}),
-      });
+      const slim = buildSlimRetryPayload(req.key, req.payload);
+      const slimKb = _measurePayloadKb(JSON.stringify(slim ?? {}));
+      console.warn(`[autosave] 413 on "${req.key}" (${sizeKb}KB) → reintentando con slim (${slimKb}KB)`);
+      setSyncStatus('saving', 'GUARDANDO', `Optimizando "${req.key}" para guardar...`);
+      try {
+        await api(req.path, { ...req.options, body: JSON.stringify(slim ?? {}) });
+        console.info(`[autosave] retry slim "${req.key}" OK`);
+      } catch (retryError) {
+        console.error(`[autosave] retry slim "${req.key}" FAILED:`, retryError.message);
+        // Re-throw with a clearer message so the user sees which endpoint failed.
+        const detail = retryError.message || 'Error desconocido';
+        throw new Error(`Endpoint "${req.key}" rechazó el guardado incluso optimizado (${slimKb}KB): ${detail}`);
+      }
     }
   }
 }
@@ -1827,6 +1859,7 @@ async function saveNow() {
   }
   try {
     if (!state.proyectoId) return;
+
     // 1) Cancel any pending debounce timers — we are about to save synchronously.
     window.clearTimeout(state.autosave.batchTimer);
     state.autosave.batchTimer = null;
@@ -1838,18 +1871,19 @@ async function saveNow() {
     // 2) Flush any in-progress edit session so blur/commits land first.
     try { flushDeferredEditWork(); } catch (_) { /* ignore */ }
 
-    // 3) Read all live editor state into the in-memory model.
-    try { prepareStateForSave({ includeCostos: true }); } catch (_) { /* readers may not be ready */ }
-
-    // 4) Determine scopes to save. If anything is pending, save those.
-    //    Otherwise the user explicitly clicked "Guardar ahora" — save EVERYTHING
-    //    (idempotent; covers cases where dirty flagging was missed).
+    // 3) If there are pending changes, save just those (preserves the original
+    //    "slow but reliable" behavior: small targeted payloads).
     const pending = getPendingAutosaveScopes();
-    const scopesToSave = pending.length
-      ? pending
-      : Object.keys(AUTOSAVE_SCOPE_LABELS);
+    if (pending.length) {
+      await flushPendingAutosaves();
+      setSyncStatus('ok', 'GUARDADO', `Guardado manual ${new Date().toLocaleTimeString()}`);
+      return;
+    }
 
-    await persistAutosaveScopes(scopesToSave, { silent: true });
+    // 4) No pending changes — user explicitly clicked. Save proyecto only
+    //    (lightweight, idempotent). Big-payload saves only run when truly dirty.
+    try { prepareStateForSave({ includeCostos: false }); } catch (_) { /* ignore */ }
+    await persistAutosaveScopes(['proyecto'], { silent: true });
     setSyncStatus('ok', 'GUARDADO', `Guardado manual ${new Date().toLocaleTimeString()}`);
   } catch (error) {
     console.error('saveNow', error);
