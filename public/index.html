@@ -130,12 +130,13 @@ tbody tr:hover{background:#f8fafc}
 .plan-status-pill{display:inline-flex;align-items:center;justify-content:center;max-width:96px;padding:2px 7px;border-radius:999px;font-size:9px;font-weight:800;line-height:1.15;cursor:pointer;border:1px solid transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 .plan-status-pill.estado-ok{background:#dcfce7;color:#166534;border-color:#bbf7d0}
 .plan-status-pill.estado-pendiente{background:#fee2e2;color:#991b1b;border-color:#fecaca}
-.cost-config-card{max-width:1240px;width:min(1240px,calc(100vw - 18px));max-height:calc(100vh - 18px);overflow:hidden}
+.cost-config-card{max-width:1240px;width:min(1240px,calc(100vw - 18px));height:calc(100vh - 18px);max-height:calc(100vh - 18px);overflow:hidden;display:flex;flex-direction:column}
 .cost-config-card .modal-head{padding:14px 18px}
-.cost-config-card .modal-body{padding:12px}
-.cost-config-body{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:12px;background:#f8fafc;max-height:calc(100vh - 96px);overflow:hidden}
-.cost-config-main,.cost-config-side{display:flex;flex-direction:column;gap:10px;min-width:0;overflow:hidden}
+.cost-config-card .modal-body{padding:12px;flex:1;min-height:0;overflow:hidden}
+.cost-config-body{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:12px;background:#f8fafc;height:100%;max-height:100%;min-height:0;overflow:hidden}
+.cost-config-main,.cost-config-side{display:flex;flex-direction:column;gap:10px;min-width:0;min-height:0;overflow:hidden}
 .cost-config-main{overflow-y:auto;overflow-x:hidden;padding-right:2px}
+.cost-config-side{overflow-y:auto;overflow-x:hidden}
 .cost-config-panel{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px}
 .cost-config-fields{display:flex;flex-direction:column;gap:8px;min-height:0;overflow:hidden}
 .cost-config-label{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#64748b;margin-bottom:6px}
