@@ -1522,6 +1522,8 @@ function isEntityTooLargeError(error) {
   return message.includes('request entity too large') || message.includes('payload too large') || message.includes('413');
 }
 
+// Slimmest possible costos payload — used as a 413 retry fallback.
+// Drops distribucion_mensual entirely (recomputable from plan_pago on load).
 function buildSlimRetryPayload(key, payload) {
   if (key === 'costos') {
     return (Array.isArray(payload) ? payload : []).map((category) => ({
@@ -1533,23 +1535,36 @@ function buildSlimRetryPayload(key, payload) {
         formula_tipo: partida.formula_tipo || '',
         formula_valor: toNumber(partida.formula_valor),
         formula_referencia: partida.formula_referencia || '',
-        plan_pago: partida.plan_pago || '',
+        plan_pago: typeof partida.plan_pago === 'string' ? partida.plan_pago : '',
         tiene_iva: !!partida.tiene_iva,
         es_terreno: !!partida.es_terreno,
         total_neto: toNumber(partida.total_neto),
-        distribucion_mensual: compactMonthlyDistribution(partida.distribucion_mensual).slice(0, 60),
+        distribucion_mensual: [],
       })),
     }));
   }
   return payload;
 }
 
+// Warn proactively when a payload is approaching the server limit (10MB).
+// Above 2MB, log so we can detect bloat before users hit a 413 error.
+function _measurePayloadKb(body) {
+  if (!body || typeof body !== 'string') return 0;
+  // Approximation: 1 char ≈ 1 byte for JSON ASCII. Good enough for warnings.
+  return Math.round(body.length / 1024);
+}
+
 async function executeAutosaveRequests(requests) {
   for (const req of requests) {
+    const sizeKb = _measurePayloadKb(req.options?.body);
+    if (sizeKb > 2048) {
+      console.warn(`[autosave] payload "${req.key}" is ${sizeKb}KB — investigate bloat`);
+    }
     try {
       await api(req.path, req.options);
     } catch (error) {
       if (!isEntityTooLargeError(error)) throw error;
+      console.warn(`[autosave] 413 on "${req.key}" (${sizeKb}KB) — retrying with slim payload`);
       setSyncStatus('saving', 'GUARDANDO', 'El proyecto es demasiado pesado para guardar. Se limpiarán datos temporales y se reintentará.');
       const retryPayload = buildSlimRetryPayload(req.key, req.payload);
       await api(req.path, {
@@ -1812,14 +1827,29 @@ async function saveNow() {
   }
   try {
     if (!state.proyectoId) return;
+    // 1) Cancel any pending debounce timers — we are about to save synchronously.
+    window.clearTimeout(state.autosave.batchTimer);
+    state.autosave.batchTimer = null;
+    Object.keys(state.autosave.timers || {}).forEach((scope) => {
+      window.clearTimeout(state.autosave.timers[scope]);
+      state.autosave.timers[scope] = null;
+    });
+
+    // 2) Flush any in-progress edit session so blur/commits land first.
+    try { flushDeferredEditWork(); } catch (_) { /* ignore */ }
+
+    // 3) Read all live editor state into the in-memory model.
+    try { prepareStateForSave({ includeCostos: true }); } catch (_) { /* readers may not be ready */ }
+
+    // 4) Determine scopes to save. If anything is pending, save those.
+    //    Otherwise the user explicitly clicked "Guardar ahora" — save EVERYTHING
+    //    (idempotent; covers cases where dirty flagging was missed).
     const pending = getPendingAutosaveScopes();
-    if (pending.length) {
-      await flushPendingAutosaves();
-      setSyncStatus('ok', 'GUARDADO', `Guardado manual ${new Date().toLocaleTimeString()}`);
-      return;
-    }
-    try { prepareStateForSave({ includeCostos: false }); } catch (_) { /* readers may not be ready */ }
-    await persistAutosaveScopes(['proyecto'], { silent: true });
+    const scopesToSave = pending.length
+      ? pending
+      : Object.keys(AUTOSAVE_SCOPE_LABELS);
+
+    await persistAutosaveScopes(scopesToSave, { silent: true });
     setSyncStatus('ok', 'GUARDADO', `Guardado manual ${new Date().toLocaleTimeString()}`);
   } catch (error) {
     console.error('saveNow', error);
@@ -2782,32 +2812,51 @@ function stripDerivedLargeData(value, depth = 0) {
   return result;
 }
 
+// Builds the persistable costos payload.
+//
+// Source of truth: `cost_config` on each partida (in client memory). The DB does NOT
+// have a `cost_config` column — it only stores `plan_pago` (TEXT) which is the
+// canonical serialization. On load, `migrateLegacyCostConfig` rebuilds `cost_config`
+// from `plan_pago`. So we only ship `plan_pago` (single source) — never both.
+//
+// Also removed: source_label, source_detail, isDefault, isProtected, isLinked
+// (these are NOT in the DB schema; the server silently dropped them).
 function getCostosPayloadForSave() {
   const raw = stripDerivedLargeData(state.costos || []);
   return (raw || []).map((category) => ({
     id: category.id || '',
     nombre: category.nombre || '',
-    partidas: (category.partidas || []).map((partida) => ({
-      id: partida.id || '',
-      nombre: partida.nombre || '',
-      formula_tipo: partida.formula_tipo || '',
-      formula_valor: toNumber(partida.formula_valor),
-      formula_referencia: partida.formula_referencia || '',
-      formula_display: partida.formula_display || '',
-      plan_pago: partida.plan_pago || '',
-      tiene_iva: !!partida.tiene_iva,
-      es_terreno: !!partida.es_terreno,
-      auto_origen: !!partida.auto_origen,
-      editable_source: partida.editable_source || '',
-      source_label: partida.source_label || '',
-      source_detail: partida.source_detail || '',
-      isDefault: !!partida.isDefault,
-      isProtected: !!partida.isProtected,
-      isLinked: !!partida.isLinked,
-      total_neto: toNumber(partida.total_neto),
-      cost_config: partida.cost_config ? stripDerivedLargeData(partida.cost_config) : undefined,
-      distribucion_mensual: compactMonthlyDistribution(partida.distribucion_mensual),
-    })),
+    partidas: (category.partidas || []).map((partida) => {
+      // plan_pago = canonical JSON string of cost_config. Single source of truth.
+      let planPago = '';
+      if (partida.cost_config) {
+        try {
+          planPago = JSON.stringify(stripDerivedLargeData(partida.cost_config));
+        } catch (_) {
+          planPago = typeof partida.plan_pago === 'string' ? partida.plan_pago : '';
+        }
+      } else if (typeof partida.plan_pago === 'string') {
+        planPago = partida.plan_pago;
+      }
+      return {
+        id: partida.id || '',
+        nombre: partida.nombre || '',
+        formula_tipo: partida.formula_tipo || '',
+        formula_valor: toNumber(partida.formula_valor),
+        formula_referencia: partida.formula_referencia || '',
+        formula_multiplicador: toNumber(partida.formula_multiplicador) || 1,
+        formula_inicio_gantt: partida.formula_inicio_gantt || null,
+        formula_fin_gantt: partida.formula_fin_gantt || null,
+        formula_display: partida.formula_display || '',
+        plan_pago: planPago,
+        tiene_iva: !!partida.tiene_iva,
+        es_terreno: !!partida.es_terreno,
+        auto_origen: !!partida.auto_origen,
+        editable_source: partida.editable_source || '',
+        total_neto: toNumber(partida.total_neto),
+        distribucion_mensual: compactMonthlyDistribution(partida.distribucion_mensual),
+      };
+    }),
   }));
 }
 
@@ -3731,15 +3780,35 @@ function getPreventaUnitsTotal() {
 }
 
 function getPromiseMilestone() {
-  return state.gantt.find((row) => /INICIO PROMESAS/i.test(String(row.nombre || '').trim())) || null;
+  return state.gantt.find((row) => normalizeFormulaIdentifier(row.nombre).includes('inicio_promesas')) || null;
 }
 
 function getMunicipalReceptionMilestone() {
-  return state.gantt.find((row) => /RECEPCI[Ã“O]N MUNICIPAL/i.test(String(row.nombre || '').trim())) || null;
+  return state.gantt.find((row) => normalizeFormulaIdentifier(row.nombre).includes('recepcion_municipal')) || null;
+}
+
+function getReceptionCompletionActivationMonth() {
+  const escrituracionCrono = getCronogramaByType('ESCRITURACION')[0];
+  if (escrituracionCrono) {
+    const inicio = Math.max(0, Math.round(toNumber(escrituracionCrono.mes_inicio)));
+    // Activa desde el mes siguiente al inicio de escrituracion.
+    return inicio + 1;
+  }
+  const escrituracion = getEscrituracionMilestone();
+  if (!escrituracion) return Number.POSITIVE_INFINITY;
+  const escrituracionInicio = toNumber(escrituracion.inicio);
+  // Respaldo por Gantt: mes siguiente al inicio.
+  return escrituracionInicio + 1;
+}
+
+function getUnidadesNoEscrituradasMes(monthIndex, escriturasAcumuladas, totalUnidades) {
+  const activationMonth = Math.max(0, Math.round(toNumber(ensureCostosUiState().escrituracionActivationMonth)));
+  if (toNumber(monthIndex) < activationMonth) return 0;
+  return Math.max(0, toNumber(totalUnidades) - toNumber(escriturasAcumuladas));
 }
 
 function getEscrituracionMilestone() {
-  return state.gantt.find((row) => /^ESCRITURACI[Ã“O]N$/i.test(String(row.nombre || '').trim())) || null;
+  return state.gantt.find((row) => normalizeFormulaIdentifier(row.nombre) === 'escrituracion') || null;
 }
 
 function ensureVentasState() {
@@ -6017,16 +6086,16 @@ function getProjectMonthlySalesFlows(monthCount) {
 function buildMonthlyContext(monthIndex, monthCount) {
   const baseContext = buildCostContext();
   const salesFlow = getProjectMonthlySalesFlows(monthCount);
+  const firstEscrituraMonth = (salesFlow.unidadesEscrituradas || []).findIndex((value) => toNumber(value) > 0);
+  ensureCostosUiState().escrituracionActivationMonth = firstEscrituraMonth >= 0
+    ? firstEscrituraMonth + 1
+    : getReceptionCompletionActivationMonth();
   const unidadesPromesa = toNumber(salesFlow.unidadesPromesadas[monthIndex]);
   const unidadesEscritura = toNumber(salesFlow.unidadesEscrituradas[monthIndex]);
   const escriturasAcumuladas = salesFlow.unidadesEscrituradas
     .slice(0, monthIndex + 1)
     .reduce((sum, value) => sum + toNumber(value), 0);
-  const recepcionMunicipal = getMunicipalReceptionMilestone();
-  const recepcionMes = recepcionMunicipal ? toNumber(recepcionMunicipal.inicio) : Number.POSITIVE_INFINITY;
-  const unidadesNoVendidasMes = monthIndex >= recepcionMes
-    ? Math.max(0, toNumber(baseContext.total_unidades) - escriturasAcumuladas)
-    : 0;
+  const unidadesNoVendidasMes = getUnidadesNoEscrituradasMes(monthIndex, escriturasAcumuladas, baseContext.total_unidades);
   const ingresosPromesa = toNumber(salesFlow.ingresosPromesa[monthIndex]);
   const ingresosEscrituracion = toNumber(salesFlow.ingresosEscrituracion[monthIndex]);
   return {
@@ -6048,18 +6117,18 @@ function evaluateMonthlyExpressionFormula(expression, monthCount, baseContext = 
   const safeMonthCount = Math.max(0, Math.round(toNumber(monthCount) || getCostMonthCount()));
   const contextBase = baseContext || buildCostContext();
   const flow = salesFlow || getProjectMonthlySalesFlows(safeMonthCount);
+  const firstEscrituraMonth = (flow.unidadesEscrituradas || []).findIndex((value) => toNumber(value) > 0);
+  ensureCostosUiState().escrituracionActivationMonth = firstEscrituraMonth >= 0
+    ? firstEscrituraMonth + 1
+    : getReceptionCompletionActivationMonth();
   const catalog = formulaCatalog || getFormulaCatalogForContext(contextBase);
-  const recepcionMunicipal = getMunicipalReceptionMilestone();
-  const recepcionMes = recepcionMunicipal ? toNumber(recepcionMunicipal.inicio) : Number.POSITIVE_INFINITY;
   let escriturasAcumuladas = 0;
 
   return Array.from({ length: safeMonthCount }, (_, month) => {
     const unidadesPromesa = toNumber(flow.unidadesPromesadas?.[month]);
     const unidadesEscritura = toNumber(flow.unidadesEscrituradas?.[month]);
     escriturasAcumuladas += unidadesEscritura;
-    const unidadesNoVendidasMes = month >= recepcionMes
-      ? Math.max(0, toNumber(contextBase.total_unidades) - escriturasAcumuladas)
-      : 0;
+    const unidadesNoVendidasMes = getUnidadesNoEscrituradasMes(month, escriturasAcumuladas, contextBase.total_unidades);
     const ingresosPromesa = toNumber(flow.ingresosPromesa?.[month]);
     const ingresosEscrituracion = toNumber(flow.ingresosEscrituracion?.[month]);
     const ctx = {
@@ -8016,6 +8085,17 @@ function resolveCostConfigPoint(point) {
   return resolvePaymentReference(safePoint.ref, safePoint.offset);
 }
 
+function getProjectMonthNumber(monthOffset = 0) {
+  const offset = Math.max(0, Math.round(toNumber(monthOffset)));
+  return addMonths(getGanttBaseDate(), offset).getMonth() + 1;
+}
+
+function getTerrainPurchaseMonthOffset() {
+  const purchaseDate = String(state.proyecto?.compra_terreno_fecha || '').slice(0, 7);
+  if (/^\d{4}-\d{2}$/.test(purchaseDate)) return Math.max(0, monthDiffFromProjectStart(purchaseDate));
+  return 0;
+}
+
 function normalizeCostMethod(rawMethod) {
   const method = String(rawMethod || '').trim();
   if (method === 'monthly_amount' || method === 'global_formula') return 'period_amount';
@@ -8210,6 +8290,22 @@ function buildDistributionFromCostConfig(config, monthCount = getCostMonthCount(
     return months;
   }
 
+  if (safeConfig.method === 'terrain_contributions') {
+    const dueMonths = new Set([4, 6, 9, 12]); // abril, junio, septiembre, diciembre
+    const purchaseOffset = getTerrainPurchaseMonthOffset();
+    const firstEligibleMonth = Math.max(startMonth, purchaseOffset + 1);
+    const amountInput = getCostAmountRawInput(safeConfig, 'amount');
+    const hasFormulaAmount = isFormulaLikeAmountInput(amountInput);
+    for (let month = firstEligibleMonth; month <= endMonth && month < monthCount; month += 1) {
+      if (!dueMonths.has(getProjectMonthNumber(month))) continue;
+      const installmentAmount = hasFormulaAmount
+        ? toNumber(evaluateExpressionFormula(amountInput, buildMonthlyContext(month, monthCount)))
+        : amount;
+      placeMonthlyValue(months, month, installmentAmount);
+    }
+    return months;
+  }
+
   if (safeConfig.method === 'milestones') {
     const total = evaluateCostConfigBaseAmount(safeConfig, context);
     safeConfig.tramos.forEach((tramo) => {
@@ -8243,14 +8339,15 @@ function evaluateCostConfigTotal(config, monthCount = getCostMonthCount(), conte
 function getEstadoCosto(partida, total = 0, monthCount = getCostMonthCount(), context = null, monthlyDistribution = null) {
   const config = migrateLegacyCostConfig(partida, context);
   if (!config) return { activo: false, label: 'Pendiente', className: 'estado-pendiente' };
+  if (config.method === 'monthly_formula') return { activo: true, label: 'FÃ³rmula mensual', className: 'estado-monthly' };
   const monthly = Array.isArray(monthlyDistribution)
     ? monthlyDistribution
     : buildDistributionFromCostConfig(config, monthCount, context);
   const hasFlow = Array.isArray(monthly) && monthly.some((value) => Math.abs(toNumber(value)) > 0.0001);
   if (!hasFlow && !toNumber(total)) return { activo: false, label: 'Pendiente', className: 'estado-pendiente' };
-  if (config.method === 'monthly_formula') return { activo: true, label: 'FÃ³rmula mensual', className: 'estado-monthly' };
   if (config.method === 'period_amount') return { activo: true, label: config.period_mode === 'total' ? 'Monto distribuido' : 'Monto mensual', className: 'estado-ok' };
   if (config.method === 'periodic') return { activo: true, label: 'PeriÃ³dico', className: 'estado-periodic' };
+  if (config.method === 'terrain_contributions') return { activo: true, label: 'Contribuciones', className: 'estado-periodic' };
   if (config.method === 'milestones') return { activo: true, label: config.tramos?.length ? 'Combinado' : 'Hitos', className: 'estado-hitos' };
   return { activo: true, label: 'Configurado', className: 'estado-ok' };
 }
@@ -9350,11 +9447,30 @@ function renderCostConfigFields(options = {}) {
           ${renderCostConfigField('Repetir cada X meses', `<input id="cost-config-periodicity" class="inp" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(config.periodicity || 1, 0)}" placeholder="Ej: 3" oninput="updateCostConfigPreview()" onchange="updateCostConfigPreview()">`)}
         </div>
         <div class="cost-config-panel">
-          ${renderCostConfigField('Cantidad de pagos', `<input id="cost-config-payment-count" class="inp" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(config.payment_count || 1, 0)}" placeholder="Ej: 3" oninput="updateCostConfigPreview()" onchange="updateCostConfigPreview()">`)}
+          ${renderCostConfigField('Cantidad de pagos (opcional)', `<input id="cost-config-payment-count" class="inp" type="text" inputmode="numeric" data-localized-number="1" value="${fmtInputNumber(config.payment_count || 0, 0)}" placeholder="0 = hasta fecha fin" oninput="updateCostConfigPreview()" onchange="updateCostConfigPreview()">`)}
         </div>
       </div>
-      <div class="cost-config-grid" style="grid-template-columns:minmax(0,1fr)">
-        ${renderCostPointControls('start', 'Fecha inicio', config.start)}
+      <div class="cost-config-grid two">
+        ${renderCostPointControls('start', 'Desde', config.start)}
+        ${renderCostPointControls('end', 'Hasta', config.end)}
+      </div>
+    `;
+  } else if (method === 'terrain_contributions') {
+    const purchaseDate = String(state.proyecto?.compra_terreno_fecha || '').slice(0, 7);
+    const purchaseLabel = purchaseDate || 'Sin fecha de compra';
+    html = `
+      <div class="cost-config-grid three">
+        ${renderCostConfigAmountField({ label: 'Monto por cuota UF', value: getCostAmountRawInput(config, 'amount'), placeholder: 'Monto por cuota, ej: 250' })}
+        <div class="cost-config-panel">
+          ${renderCostConfigField('Meses de cobro', `<input class="inp" value="Abril, Junio, Septiembre y Diciembre" readonly disabled>`)}
+        </div>
+        <div class="cost-config-panel">
+          ${renderCostConfigField('Regla base', `<input class="inp" value="No antes del mes siguiente a compra terreno (${escapeHtml(purchaseLabel)})" readonly disabled>`)}
+        </div>
+      </div>
+      <div class="cost-config-grid two">
+        ${renderCostPointControls('start', 'Desde', config.start)}
+        ${renderCostPointControls('end', 'Hasta', config.end)}
       </div>
     `;
   } else if (method === 'milestones') {

@@ -19,7 +19,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(bodyParser.json());
+// Saved projects with many partidas + monthly distributions can exceed default 100kb.
+// 10mb is well above any realistic project payload while still bounded.
+app.use(bodyParser.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 function asyncHandler(handler) {
