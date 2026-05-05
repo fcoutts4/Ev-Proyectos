@@ -57,6 +57,7 @@
 };
 
 const DEBUG_PERFORMANCE = false;
+const DEBUG_PAGOS_LINEA = false;
 const DEFAULT_AUTOSAVE_DELAY = 700;
 const INPUT_RENDER_DEBOUNCE_MS = 180;
 const UI_STATE_STORAGE_KEY = 'evproyectos.uiState.v1';
@@ -968,6 +969,35 @@ function getGlobalFinancialParams() {
   };
 }
 
+function normalizePercent(value) {
+  const numeric = Math.max(0, toNumber(value));
+  if (!Number.isFinite(numeric)) return 0;
+  return numeric > 1 ? numeric / 100 : numeric;
+}
+
+function getUnidadesEscrituradasPorMes(monthCount = getCostMonthCount()) {
+  const size = Math.max(0, Math.round(toNumber(monthCount) || getCostMonthCount()));
+  const fromCronograma = getPromesasEscrituracionUnidades(size).escrituras || [];
+  const normalized = createMonthlyArray(size, 0).map((_, index) => Math.max(0, toNumber(fromCronograma[index])));
+  if (normalized.some((value) => value > 0)) return normalized;
+  const salesFlow = getProjectMonthlySalesFlows(size);
+  return createMonthlyArray(size, 0).map((_, index) => Math.max(0, toNumber(salesFlow.unidadesEscrituradas?.[index])));
+}
+
+function getValorPromedioTotalUnidad() {
+  const totals = getTotalSalesMetrics();
+  return Math.max(0, toNumber(totals.precioPromedio));
+}
+
+function getEffectiveCeecPct() {
+  const input = $('cfg-pct-ceec');
+  if (input) {
+    const liveValue = toNumber(input.value);
+    if (Number.isFinite(liveValue)) return liveValue;
+  }
+  return toNumber(getGlobalFinancialParams().pct_ceec);
+}
+
 // ---- IRR (Newton-Raphson) ----
 function npv(rate, flows) {
   return flows.reduce((acc, f, i) => acc + toNumber(f) / Math.pow(1 + rate, i), 0);
@@ -1470,7 +1500,8 @@ function renderSyncStatus() {
   const badge = $('sync-badge');
   const label = $('sync-label');
   const detail = $('sync-detail');
-  if (!badge || !label || !detail) return;
+  const saveBtn = $('btn-save-now');
+  if (!label || !detail) return;
 
   const variantsOld = {
     loading: { color: '#475569', bg: '#f8fafc', border: '#cbd5e1', icon: 'â˜' },
@@ -1488,11 +1519,26 @@ function renderSyncStatus() {
   };
 
   const variant = variants[state.sync.status] || variants.loading;
-  badge.style.color = variant.color;
-  badge.style.background = variant.bg;
-  badge.style.borderColor = variant.border;
+  if (badge) badge.style.display = 'none';
   label.textContent = variant.label;
   detail.textContent = getSyncDetailText();
+
+  if (saveBtn) {
+    const buttonVariants = {
+      loading: { text: 'Sincronizando', color: '#475569', bg: '#f8fafc', border: '#cbd5e1' },
+      dirty: { text: 'Cambios pendientes', color: '#92400e', bg: '#fffbeb', border: '#fde68a' },
+      ok: { text: 'Guardado', color: '#166534', bg: '#f0fdf4', border: '#bbf7d0' },
+      saving: { text: 'Guardando...', color: '#b45309', bg: '#fffbeb', border: '#fde68a' },
+      error: { text: 'Error al guardar', color: '#b91c1c', bg: '#fef2f2', border: '#fecaca' },
+    };
+    const buttonState = buttonVariants[state.sync.status] || buttonVariants.loading;
+    saveBtn.textContent = buttonState.text;
+    saveBtn.style.color = buttonState.color;
+    saveBtn.style.background = buttonState.bg;
+    saveBtn.style.borderColor = buttonState.border;
+    saveBtn.disabled = state.sync.status === 'saving';
+    saveBtn.dataset.saving = state.sync.status === 'saving' ? '1' : '';
+  }
 }
 
 function queueAutosaveRequest(requests, key, path, method, body) {
@@ -1849,14 +1895,29 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+function getActiveTabId() {
+  const activePane = document.querySelector('.tab-pane.active');
+  if (!activePane?.id) return '';
+  return String(activePane.id).replace(/^tab-/, '');
+}
+
+function getManualSaveHandlerForTab(tabId) {
+  const handlers = {
+    cabida: { fn: guardarCabida, savesProject: true },
+    terreno: { fn: guardarTerreno, savesProject: true },
+    construccion: { fn: guardarConstruccion, savesProject: true },
+    ventas: { fn: guardarVentas, savesProject: false },
+    gantt: { fn: guardarGantt, savesProject: false },
+    costos: { fn: guardarCostos, savesProject: false },
+    capital: { fn: guardarCapital, savesProject: false },
+  };
+  return handlers[String(tabId || '').trim()] || null;
+}
+
 async function saveNow() {
   const btn = document.getElementById('btn-save-now');
   if (btn?.dataset.saving === '1') return;
-  if (btn) {
-    btn.dataset.saving = '1';
-    btn.disabled = true;
-    btn.textContent = 'Guardando...';
-  }
+  setSyncStatus('saving', 'GUARDANDO', 'Guardando cambios pendientes');
   try {
     if (!state.proyectoId) return;
 
@@ -1871,29 +1932,30 @@ async function saveNow() {
     // 2) Flush any in-progress edit session so blur/commits land first.
     try { flushDeferredEditWork(); } catch (_) { /* ignore */ }
 
-    // 3) If there are pending changes, save just those (preserves the original
-    //    "slow but reliable" behavior: small targeted payloads).
-    const pending = getPendingAutosaveScopes();
-    if (pending.length) {
-      await flushPendingAutosaves();
+    const activeTabId = getActiveTabId();
+    const tabHandler = getManualSaveHandlerForTab(activeTabId);
+
+    // 3) Save exactly like the active section "Guardar" button when available.
+    if (tabHandler?.fn) {
+      await tabHandler.fn({ silent: true });
+      // 4) Force global project save if the section save doesn't already include it.
+      if (!tabHandler.savesProject) {
+        try { prepareStateForSave({ includeCostos: false }); } catch (_) { /* ignore */ }
+        await persistAutosaveScopes(['proyecto'], { silent: true });
+      }
       setSyncStatus('ok', 'GUARDADO', `Guardado manual ${new Date().toLocaleTimeString()}`);
       return;
     }
 
-    // 4) No pending changes — user explicitly clicked. Save proyecto only
-    //    (lightweight, idempotent). Big-payload saves only run when truly dirty.
+    // Fallback for tabs without explicit section save button.
+    const pending = getPendingAutosaveScopes();
+    if (pending.length) await flushPendingAutosaves();
     try { prepareStateForSave({ includeCostos: false }); } catch (_) { /* ignore */ }
     await persistAutosaveScopes(['proyecto'], { silent: true });
     setSyncStatus('ok', 'GUARDADO', `Guardado manual ${new Date().toLocaleTimeString()}`);
   } catch (error) {
     console.error('saveNow', error);
     setSyncStatus('error', 'SIN CONEXION', error.message || 'Error al guardar');
-  } finally {
-    if (btn) {
-      btn.dataset.saving = '';
-      btn.disabled = false;
-      btn.textContent = 'Guardar ahora';
-    }
   }
 }
 window.saveNow = saveNow;
@@ -4712,7 +4774,7 @@ function computeConstructionEP() {
   const startMonth = getConstructionStartMonth();
   const dist = buildConstructionSCurve(metrics, meses);
   const cfg = getGlobalFinancialParams();
-  const ceecPct = cfg.pct_ceec / 100;
+  const ceecPct = getEffectiveCeecPct() / 100;
   const anticipoPct = Math.max(0, toNumber(metrics.anticipo_pct)) / 100;
   const anticipoTotal = metrics.total_neto * anticipoPct;
   const anticipoMonth = Math.max(0, Math.min(monthCount - 1, startMonth - 1));
@@ -4785,8 +4847,8 @@ function renderConstructionEP() {
     { label: 'Retenciones netas', values: data.retenciones, formula: 'Retencion neta mensual y devolucion neta total al final de obra.', color: '#fbbf24' },
     { label: 'Subtotal neto', values: data.subtotal, formula: 'EDPP neto + Anticipo neto + Retenciones netas', bold: true, color: '#22c55e' },
     { label: 'IVA bruto (19%)', values: data.ivaBruto, formula: 'Subtotal neto Ã— 19%', color: '#94a3b8' },
-    { label: `CEEC (${cfg.pct_ceec}%)`, values: data.ceec, formula: `${cfg.pct_ceec}% Ã— |IVA bruto|  Â·  CrÃ©dito tributario en UF (siempre positivo)`, color: '#a855f7' },
-    { label: 'IVA efectivo', values: data.ivaEfectivo, formula: `IVA bruto + CEEC  =  IVA bruto Ã— (1 âˆ’ ${cfg.pct_ceec}%)  Â·  IVA neto a pagar al SII`, color: '#94a3b8' },
+    { label: `CEEC (${cfg.pct_ceec}%)`, values: data.ceec, formula: `${cfg.pct_ceec}% Ã— IVA bruto (en valor absoluto)  Â·  CrÃ©dito tributario en UF (siempre positivo)`, color: '#a855f7' },
+    { label: 'IVA efectivo', values: data.ivaEfectivo, formula: 'IVA bruto + CEEC', color: '#94a3b8' },
     { label: 'TOTAL A PAGO (c/IVA)', values: data.totalPago, formula: 'Subtotal neto + IVA efectivo  â†’  alimenta GIROS', bold: true, color: '#22c55e' },
   ];
 
@@ -4817,12 +4879,12 @@ function renderConstructionGF(epData) {
   const tasaMensual = (cfg.tasa_construccion / 100) / 12;
   const timbrePct = cfg.pct_timbres / 100;
 
-  const giros = epData ? epData.totalPago.slice() : createMonthlyArray(monthCount, 0);
-  const pctAlzamiento = toNumber(state.financiamiento.pct_alzamiento ?? 90) / 100;
-  // EscrituraciÃ³n income al 100% del valor de la propiedad (para alzamiento)
-  const totalesVentas = getTotalSalesMetrics();
-  const { escrituras: escriturasArr } = getPromesasEscrituracionUnidades(monthCount);
-  const escrituracionIncome100 = escriturasArr.map((u) => u * totalesVentas.precioPromedio);
+  const giros = epData
+    ? epData.totalPago.map((value) => Math.abs(toNumber(value)))
+    : createMonthlyArray(monthCount, 0);
+  const pctAlzamiento = normalizePercent(state.financiamiento.pct_alzamiento ?? 90);
+  const valorPromedioUnidad = getValorPromedioTotalUnidad();
+  const escriturasArr = getUnidadesEscrituradasPorMes(monthCount);
 
   const pagosLinea = createMonthlyArray(monthCount, 0);
   const acumulado = createMonthlyArray(monthCount, 0);
@@ -4833,15 +4895,24 @@ function renderConstructionGF(epData) {
   for (let t = 0; t < monthCount; t += 1) {
     const g = toNumber(giros[t]);
     impTimbres[t] = g * timbrePct;
-    // Pago lÃ­nea = % alzamiento Ã— escrituraciÃ³n 100% del mes anterior
-    const prevEscrit = t > 0 ? toNumber(escrituracionIncome100[t - 1]) : 0;
-    let pago = pctAlzamiento * prevEscrit;
-    const newAcum = prevAcum + g - pago;
-    if (newAcum < 0) pago = Math.max(0, prevAcum + g); // no superar deuda
+    // Pago línea: unidades escrituradas del mes × valor promedio unidad × % alzamiento
+    const unidadesMes = Math.max(0, toNumber(escriturasArr[t]));
+    const pagoObjetivo = unidadesMes * valorPromedioUnidad * pctAlzamiento;
+    const saldoDisponible = Math.max(0, prevAcum + g);
+    const pago = Math.max(0, Math.min(saldoDisponible, pagoObjetivo));
     pagosLinea[t] = -pago;
     acumulado[t] = prevAcum + g + pagosLinea[t];
-    interesMensual[t] = acumulado[t] * tasaMensual;
+    interesMensual[t] = Math.max(0, acumulado[t]) * tasaMensual;
     prevAcum = acumulado[t];
+  }
+
+  if (DEBUG_PAGOS_LINEA) {
+    console.log('PAGOS LINEA DEBUG', {
+      escrituras: escriturasArr,
+      valorUnidad: valorPromedioUnidad,
+      alzamiento: pctAlzamiento,
+      pagosLinea,
+    });
   }
 
   setHtml('constr-fin-planilla-head', `
@@ -4871,7 +4942,7 @@ function renderConstructionGF(epData) {
     bold: r.bold,
     color: r.color,
     bg: r.bold ? '#f8fafc' : '#fff',
-    totalText: fmtUf(total(r.values)),
+    totalText: r.label === 'ACUMULADO' ? '' : fmtUf(total(r.values)),
   })), { includeTotal: true });
   setHtml('constr-fin-planilla-tfoot', '');
 }
