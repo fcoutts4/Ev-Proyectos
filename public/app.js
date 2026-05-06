@@ -814,8 +814,14 @@ function normalizeProject(project = {}) {
     construction_payment_links: source.construction_payment_links && typeof source.construction_payment_links === 'object'
       ? { ...source.construction_payment_links }
       : {},
+    construction_payment_link_offsets: source.construction_payment_link_offsets && typeof source.construction_payment_link_offsets === 'object'
+      ? { ...source.construction_payment_link_offsets }
+      : {},
     land_finance_links: source.land_finance_links && typeof source.land_finance_links === 'object'
       ? { ...source.land_finance_links }
+      : {},
+    land_finance_link_offsets: source.land_finance_link_offsets && typeof source.land_finance_link_offsets === 'object'
+      ? { ...source.land_finance_link_offsets }
       : {},
     formula_overrides: normalizeFormulaOverrides(source.formula_overrides),
   };
@@ -869,7 +875,9 @@ const PERSISTABLE_PROJECT_KEYS = [
   'pct_ceec',
   'pct_impuesto_renta',
   'construction_payment_links',
+  'construction_payment_link_offsets',
   'land_finance_links',
+  'land_finance_link_offsets',
   'formula_overrides',
   'updated_at',
   'updatedAt',
@@ -1009,31 +1017,58 @@ function findGanttLinkRow(linkKey) {
     || null;
 }
 
+function getGanttOffsetGroup(group) {
+  if (group === 'construction_payment_links') return 'construction_payment_link_offsets';
+  if (group === 'land_finance_links') return 'land_finance_link_offsets';
+  return `${group}_offsets`;
+}
+
+function getGanttLinkOffset(group, key) {
+  const offsetGroup = getGanttOffsetGroup(group);
+  return toNumber(state.proyecto?.[offsetGroup]?.[key]);
+}
+
 function renderTinyGanttLinkControl(group, key, selectedKey = '') {
   const options = getGanttLinkOptions();
   const selectedRow = findGanttLinkRow(selectedKey);
+  const offset = getGanttLinkOffset(group, key);
   return `
-    <select
-      class="gantt-link-mini"
-      data-link-group="${escapeHtml(group)}"
-      data-link-key="${escapeHtml(key)}"
-      onchange="onMiniGanttLinkChange(this)"
-      title="Vincular a actividad Gantt"
-      aria-label="Vincular fila a actividad Gantt"
-    >
-      <option value="">Vincular</option>
-      ${options.map((option) => {
-        const selected = selectedRow ? option.row === selectedRow : String(selectedKey) === String(option.key);
-        return `<option value="${escapeHtml(option.key)}" ${selected ? 'selected' : ''}>${escapeHtml(option.name)}</option>`;
-      }).join('')}
-    </select>
+    <span class="gantt-link-control">
+      <select
+        class="gantt-link-mini"
+        data-link-group="${escapeHtml(group)}"
+        data-link-key="${escapeHtml(key)}"
+        onchange="onMiniGanttLinkChange(this)"
+        title="Vincular a actividad Gantt"
+        aria-label="Vincular fila a actividad Gantt"
+      >
+        <option value="">Vincular</option>
+        ${options.map((option) => {
+          const selected = selectedRow ? option.row === selectedRow : String(selectedKey) === String(option.key);
+          return `<option value="${escapeHtml(option.key)}" ${selected ? 'selected' : ''}>${escapeHtml(option.name)}</option>`;
+        }).join('')}
+      </select>
+      <input
+        class="gantt-link-offset"
+        type="text"
+        inputmode="numeric"
+        data-link-group="${escapeHtml(group)}"
+        data-link-key="${escapeHtml(key)}"
+        value="${offset ? escapeHtml(fmtInputNumber(offset, 0)) : ''}"
+        placeholder="+0"
+        title="Desfase en meses"
+        aria-label="Desfase en meses"
+        onchange="onMiniGanttLinkOffsetChange(this)"
+        onblur="onMiniGanttLinkOffsetChange(this)"
+      >
+    </span>
   `;
 }
 
-function getLinkedGanttStartIndex(linkKey, fallbackIndex = 0) {
+function getLinkedGanttStartIndex(linkKey, fallbackIndex = 0, offset = 0) {
   const row = findGanttLinkRow(linkKey);
   if (!row) return Math.max(0, toNumber(fallbackIndex));
-  return Math.max(0, toNumber(row.inicio));
+  return Math.max(0, toNumber(row.inicio) + toNumber(offset));
 }
 
 function getFirstNonZeroMonth(series = []) {
@@ -1066,6 +1101,25 @@ function onMiniGanttLinkChange(select) {
   if (value) state.proyecto[group][key] = value;
   else delete state.proyecto[group][key];
 
+  rerenderGanttLinkedFinancials(group);
+}
+
+function onMiniGanttLinkOffsetChange(input) {
+  if (!input) return;
+  const group = String(input.dataset.linkGroup || '').trim();
+  const key = String(input.dataset.linkKey || '').trim();
+  if (!group || !key) return;
+  state.proyecto = normalizeProject(state.proyecto || {});
+  const offsetGroup = getGanttOffsetGroup(group);
+  if (!state.proyecto[offsetGroup] || typeof state.proyecto[offsetGroup] !== 'object') state.proyecto[offsetGroup] = {};
+  const value = toNumber(input.value);
+  if (value) state.proyecto[offsetGroup][key] = value;
+  else delete state.proyecto[offsetGroup][key];
+
+  rerenderGanttLinkedFinancials(group);
+}
+
+function rerenderGanttLinkedFinancials(group) {
   if (group === 'land_finance_links') {
     renderTerrainModule();
   } else if (group === 'construction_payment_links') {
@@ -4882,7 +4936,9 @@ function computeConstructionEP() {
   const defaultStartIndex = Math.max(0, Math.min(monthCount - 1, toNumber(startMonth) - 1));
   const epLinkKey = state.proyecto?.construction_payment_links?.edppNeto || '';
   const anticipoLinkKey = state.proyecto?.construction_payment_links?.anticipoNeto || '';
-  const epStartIndex = Math.max(0, Math.min(monthCount - 1, getLinkedGanttStartIndex(epLinkKey, defaultStartIndex)));
+  const epOffset = getGanttLinkOffset('construction_payment_links', 'edppNeto');
+  const anticipoOffset = getGanttLinkOffset('construction_payment_links', 'anticipoNeto');
+  const epStartIndex = Math.max(0, Math.min(monthCount - 1, getLinkedGanttStartIndex(epLinkKey, defaultStartIndex, epOffset)));
   const constructionStartIndex = Math.max(0, Math.min(monthCount - 1, toNumber(startMonth) - 1));
   const dist = buildConstructionSCurve(metrics, meses);
   const cfg = getGlobalFinancialParams();
@@ -4890,7 +4946,7 @@ function computeConstructionEP() {
   const anticipoPct = Math.max(0, toNumber(metrics.anticipo_pct)) / 100;
   const anticipoTotal = metrics.total_neto * anticipoPct;
   const anticipoMonth = anticipoLinkKey
-    ? Math.max(0, Math.min(monthCount - 1, getLinkedGanttStartIndex(anticipoLinkKey, Math.max(0, defaultStartIndex - 1))))
+    ? Math.max(0, Math.min(monthCount - 1, getLinkedGanttStartIndex(anticipoLinkKey, Math.max(0, defaultStartIndex - 1), anticipoOffset)))
     : Math.max(0, defaultStartIndex - 1);
 
   const epBase = createMonthlyArray(monthCount, 0);
@@ -5289,16 +5345,18 @@ function renderFinancingSourcePlanilla(sourceType) {
     // Giro: mismo mes de compra de terreno (desde Gantt)
     const terrainPurchaseMonthDefault = Math.min(monthCount - 1, Math.max(0, toNumber(getTerrainMilestone()?.inicio || 0)));
     const terrainGirosLink = state.proyecto?.land_finance_links?.giros || '';
+    const terrainGirosOffset = getGanttLinkOffset('land_finance_links', 'giros');
     const terrainPurchaseMonth = Math.min(
       monthCount - 1,
-      Math.max(0, getLinkedGanttStartIndex(terrainGirosLink, terrainPurchaseMonthDefault))
+      Math.max(0, getLinkedGanttStartIndex(terrainGirosLink, terrainPurchaseMonthDefault, terrainGirosOffset))
     );
     // Pago lÃ­nea: mismo mes del anticipo de construcciÃ³n (mes antes del inicio de obra)
     const anticipoLineaMonthDefault = Math.max(0, Math.min(monthCount - 1, getConstructionStartMonth() - 1));
     const terrenoPagoLineaLink = state.proyecto?.land_finance_links?.pagoLinea || '';
+    const terrenoPagoLineaOffset = getGanttLinkOffset('land_finance_links', 'pagoLinea');
     const anticipoLineaMonth = Math.max(
       0,
-      Math.min(monthCount - 1, getLinkedGanttStartIndex(terrenoPagoLineaLink, anticipoLineaMonthDefault))
+      Math.min(monthCount - 1, getLinkedGanttStartIndex(terrenoPagoLineaLink, anticipoLineaMonthDefault, terrenoPagoLineaOffset))
     );
 
     const girosBase = createMonthlyArray(monthCount, 0);

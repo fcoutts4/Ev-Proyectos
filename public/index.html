@@ -735,9 +735,10 @@ tbody tr:hover{background:#f3f7fb!important}
 .ventas-crono-table col.col-vel{width:20%}
 
 /* Tablas uniformes en toda la app: fondo claro, sin franjas de color por seccion */
+.gantt-link-control{display:inline-flex;align-items:center;gap:4px;flex:0 0 auto}
 .gantt-link-mini{
-  min-width:92px;
-  max-width:120px;
+  min-width:78px;
+  max-width:106px;
   height:22px;
   padding:1px 18px 1px 6px;
   border:1px solid #9ec5fe;
@@ -749,6 +750,20 @@ tbody tr:hover{background:#f3f7fb!important}
 }
 .gantt-link-mini:hover{border-color:#7db3f4;background:#f6fbff}
 .gantt-link-mini:focus{outline:2px solid rgba(59,130,246,.25);outline-offset:1px}
+.gantt-link-offset{
+  width:36px;
+  height:22px;
+  padding:1px 4px;
+  border:1px solid #b7d6b9;
+  border-radius:6px;
+  background:#fbfffb;
+  color:#476447;
+  font-size:10px;
+  font-weight:700;
+  text-align:center;
+}
+.gantt-link-offset:hover{border-color:#93c596;background:#f7fff7}
+.gantt-link-offset:focus{outline:2px solid rgba(34,197,94,.2);outline-offset:1px}
 table:not(.gantt-table){background:#f8fafc;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden}
 table:not(.gantt-table) thead th{background:#eef3f8!important;color:#0b2545!important;border-bottom:1px solid var(--border-strong)!important}
 table:not(.gantt-table) tbody td,
@@ -3244,18 +3259,24 @@ table:not(.gantt-table) .tfoot-dark td,
     const terrainMilestone = typeof getTerrainMilestone === 'function' ? getTerrainMilestone() : null;
     const terrainPurchaseMonthDefault = Math.min(maxMonth, Math.max(0, toNumber(terrainMilestone?.inicio || 0)));
     const terrainGirosLink = state.proyecto?.land_finance_links?.giros || '';
+    const terrainGirosOffset = typeof getGanttLinkOffset === 'function'
+      ? getGanttLinkOffset('land_finance_links', 'giros')
+      : 0;
     const terrainPurchaseMonth = Math.min(
       maxMonth,
       Math.max(0, typeof getLinkedGanttStartIndex === 'function'
-        ? getLinkedGanttStartIndex(terrainGirosLink, terrainPurchaseMonthDefault)
+        ? getLinkedGanttStartIndex(terrainGirosLink, terrainPurchaseMonthDefault, terrainGirosOffset)
         : terrainPurchaseMonthDefault)
     );
     const anticipoLineaMonthDefault = Math.max(0, Math.min(maxMonth, getConstructionStartMonth() - 1));
     const terrenoPagoLineaLink = state.proyecto?.land_finance_links?.pagoLinea || '';
+    const terrenoPagoLineaOffset = typeof getGanttLinkOffset === 'function'
+      ? getGanttLinkOffset('land_finance_links', 'pagoLinea')
+      : 0;
     const anticipoLineaMonth = Math.max(
       0,
       Math.min(maxMonth, typeof getLinkedGanttStartIndex === 'function'
-        ? getLinkedGanttStartIndex(terrenoPagoLineaLink, anticipoLineaMonthDefault)
+        ? getLinkedGanttStartIndex(terrenoPagoLineaLink, anticipoLineaMonthDefault, terrenoPagoLineaOffset)
         : anticipoLineaMonthDefault)
     );
     const girosBase = createMonthlyArray(monthCount, 0);
