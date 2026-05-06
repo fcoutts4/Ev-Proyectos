@@ -811,6 +811,16 @@ function normalizeProject(project = {}) {
     pct_timbres: 0.8,
     pct_ceec: source.pct_ceec ?? 65,
     pct_impuesto_renta: source.pct_impuesto_renta ?? 27,
+    construction_payment_links: source.construction_payment_links && typeof source.construction_payment_links === 'object'
+      ? { ...source.construction_payment_links }
+      : (state?.proyecto?.construction_payment_links && typeof state.proyecto.construction_payment_links === 'object'
+        ? { ...state.proyecto.construction_payment_links }
+        : {}),
+    land_finance_links: source.land_finance_links && typeof source.land_finance_links === 'object'
+      ? { ...source.land_finance_links }
+      : (state?.proyecto?.land_finance_links && typeof state.proyecto.land_finance_links === 'object'
+        ? { ...state.proyecto.land_finance_links }
+        : {}),
     formula_overrides: normalizeFormulaOverrides(source.formula_overrides),
   };
 }
@@ -862,6 +872,8 @@ const PERSISTABLE_PROJECT_KEYS = [
   'pct_timbres',
   'pct_ceec',
   'pct_impuesto_renta',
+  'construction_payment_links',
+  'land_finance_links',
   'formula_overrides',
   'updated_at',
   'updatedAt',
@@ -967,6 +979,53 @@ function getGlobalFinancialParams() {
     pct_ceec: toNumber(p.pct_ceec),
     pct_impuesto_renta: toNumber(p.pct_impuesto_renta),
   };
+}
+
+function getGanttLinkOptions() {
+  return (state.gantt || [])
+    .map((row) => ({
+      key: String(row.id || row.nombre || '').trim(),
+      name: String(row.nombre || '').trim() || 'Hito',
+    }))
+    .filter((item) => item.key);
+}
+
+function renderTinyGanttLinkControl(group, key, selectedKey = '') {
+  const options = getGanttLinkOptions();
+  return `
+    <select
+      class="gantt-link-mini"
+      data-link-group="${escapeHtml(group)}"
+      data-link-key="${escapeHtml(key)}"
+      onchange="onMiniGanttLinkChange(this)"
+      title="Vincular a actividad Gantt"
+      aria-label="Vincular fila a actividad Gantt"
+    >
+      <option value="">Vincular</option>
+      ${options.map((option) => `<option value="${escapeHtml(option.key)}" ${String(selectedKey) === String(option.key) ? 'selected' : ''}>${escapeHtml(option.name)}</option>`).join('')}
+    </select>
+  `;
+}
+
+function getLinkedGanttStartIndex(linkKey, fallbackIndex = 0) {
+  const key = String(linkKey || '').trim();
+  if (!key) return Math.max(0, toNumber(fallbackIndex));
+  return resolvePaymentReference(`START:${key}`, 0);
+}
+
+function onMiniGanttLinkChange(select) {
+  if (!select) return;
+  const group = String(select.dataset.linkGroup || '').trim();
+  const key = String(select.dataset.linkKey || '').trim();
+  if (!group || !key) return;
+  state.proyecto = normalizeProject(state.proyecto || {});
+  if (!state.proyecto[group] || typeof state.proyecto[group] !== 'object') state.proyecto[group] = {};
+  const value = String(select.value || '').trim();
+  if (value) state.proyecto[group][key] = value;
+  else delete state.proyecto[group][key];
+
+  if (typeof renderConstructionModule === 'function') renderConstructionModule();
+  scheduleAutosave('proyecto');
 }
 
 function normalizePercent(value) {
@@ -4772,13 +4831,19 @@ function computeConstructionEP() {
   const meses = Math.max(1, metrics.plazo_meses);
   const monthCount = getCostMonthCount();
   const startMonth = getConstructionStartMonth();
+  const defaultStartIndex = Math.max(0, Math.min(monthCount - 1, toNumber(startMonth) - 1));
+  const epLinkKey = state.proyecto?.construction_payment_links?.edppNeto || '';
+  const anticipoLinkKey = state.proyecto?.construction_payment_links?.anticipoNeto || '';
+  const epStartIndex = getLinkedGanttStartIndex(epLinkKey, defaultStartIndex);
   const constructionStartIndex = Math.max(0, Math.min(monthCount - 1, toNumber(startMonth) - 1));
   const dist = buildConstructionSCurve(metrics, meses);
   const cfg = getGlobalFinancialParams();
   const ceecPct = getEffectiveCeecPct() / 100;
   const anticipoPct = Math.max(0, toNumber(metrics.anticipo_pct)) / 100;
   const anticipoTotal = metrics.total_neto * anticipoPct;
-  const anticipoMonth = Math.max(0, constructionStartIndex - 1);
+  const anticipoMonth = anticipoLinkKey
+    ? Math.max(0, Math.min(monthCount - 1, getLinkedGanttStartIndex(anticipoLinkKey, Math.max(0, defaultStartIndex - 1))))
+    : Math.max(0, defaultStartIndex - 1);
 
   const ep = createMonthlyArray(monthCount, 0);
   const anticipo = createMonthlyArray(monthCount, 0);
@@ -4789,7 +4854,7 @@ function computeConstructionEP() {
 
   // Durante la obra: EDPP neto del saldo de contrato despues de anticipo.
   for (let i = 0; i < meses; i += 1) {
-    const m = Math.min(monthCount - 1, constructionStartIndex + i);
+    const m = Math.min(monthCount - 1, epStartIndex + i);
     ep[m] += toNumber(dist.monthlyCosts[i]); // EDPP neto del mes
     anticipo[m] -= toNumber(dist.monthlyAnticipoRecovery[i]); // compatibilidad: normalmente 0, el EP ya descuenta anticipo
     retenciones[m] -= toNumber(dist.monthlyRetention[i]); // retenciÃ³n del mes
@@ -4797,7 +4862,7 @@ function computeConstructionEP() {
 
   // DevoluciÃ³n de retenciones al final de obra
   const totalRet = dist.retentionAmount;
-  const finalM = Math.min(monthCount - 1, constructionStartIndex + meses);
+  const finalM = Math.min(monthCount - 1, epStartIndex + meses);
   retenciones[finalM] += totalRet;
 
   // Calcular columnas derivadas
@@ -4826,7 +4891,7 @@ function computeConstructionEP() {
     totalPago[m] = sub + ivaE;
   }
 
-  return { ep, anticipo, retenciones, subtotal, ivaBruto, ceec, ivaEfectivo, totalPago, startMonth, constructionStartIndex, meses, anticipoMonth, anticipoTotal };
+  return { ep, anticipo, retenciones, subtotal, ivaBruto, ceec, ivaEfectivo, totalPago, startMonth, constructionStartIndex, epStartIndex, meses, anticipoMonth, anticipoTotal };
 }
 
 function renderConstructionEP() {
@@ -4867,6 +4932,11 @@ function renderConstructionEP() {
     color: r.bold ? '#166534' : '#334155',
     bg: r.bold ? '#f0fdf4' : '#fff',
     totalText: fmtUf(total(r.values)),
+    actionHtml: r.label === 'EP (EDPP neto)'
+      ? renderTinyGanttLinkControl('construction_payment_links', 'edppNeto', state.proyecto?.construction_payment_links?.edppNeto || '')
+      : (r.label === 'Anticipo neto'
+        ? renderTinyGanttLinkControl('construction_payment_links', 'anticipoNeto', state.proyecto?.construction_payment_links?.anticipoNeto || '')
+        : ''),
   })), { includeTotal: true });
   setHtml('constr-ep-tfoot', '');
   return data;
@@ -5165,9 +5235,19 @@ function renderFinancingSourcePlanilla(sourceType) {
       ? terrainBase * toNumber(state.financiamiento.credito_terreno_pct) / 100
       : 0;
     // Giro: mismo mes de compra de terreno (desde Gantt)
-    const terrainPurchaseMonth = Math.min(monthCount - 1, Math.max(0, toNumber(getTerrainMilestone()?.inicio || 0)));
+    const terrainPurchaseMonthDefault = Math.min(monthCount - 1, Math.max(0, toNumber(getTerrainMilestone()?.inicio || 0)));
+    const terrainGirosLink = state.proyecto?.land_finance_links?.giros || '';
+    const terrainPurchaseMonth = Math.min(
+      monthCount - 1,
+      Math.max(0, getLinkedGanttStartIndex(terrainGirosLink, terrainPurchaseMonthDefault))
+    );
     // Pago lÃ­nea: mismo mes del anticipo de construcciÃ³n (mes antes del inicio de obra)
-    const anticipoLineaMonth = Math.max(0, Math.min(monthCount - 1, getConstructionStartMonth() - 1));
+    const anticipoLineaMonthDefault = Math.max(0, Math.min(monthCount - 1, getConstructionStartMonth() - 1));
+    const terrenoPagoLineaLink = state.proyecto?.land_finance_links?.pagoLinea || '';
+    const anticipoLineaMonth = Math.max(
+      0,
+      Math.min(monthCount - 1, getLinkedGanttStartIndex(terrenoPagoLineaLink, anticipoLineaMonthDefault))
+    );
 
     const giros = createMonthlyArray(monthCount, 0);
     giros[terrainPurchaseMonth] = approved;
@@ -5228,6 +5308,11 @@ function renderFinancingSourcePlanilla(sourceType) {
       color: r.color,
       bg: r.bold ? '#f8fafc' : '#fff',
       totalText: fmtUf((r.values || []).reduce((acc, value) => acc + toNumber(value), 0)),
+      actionHtml: /GIROS/i.test(String(r.label || ''))
+        ? renderTinyGanttLinkControl('land_finance_links', 'giros', state.proyecto?.land_finance_links?.giros || '')
+        : (/PAGO/i.test(String(r.label || '')) && /L[ÍIÃ]NEA/i.test(String(r.label || ''))
+          ? renderTinyGanttLinkControl('land_finance_links', 'pagoLinea', state.proyecto?.land_finance_links?.pagoLinea || '')
+          : ''),
     })), { includeTotal: true });
     setHtml('terreno-fin-planilla-tfoot', '');
     return;

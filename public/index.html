@@ -735,6 +735,19 @@ tbody tr:hover{background:#f3f7fb!important}
 .ventas-crono-table col.col-vel{width:20%}
 
 /* Tablas uniformes en toda la app: fondo claro, sin franjas de color por seccion */
+.gantt-link-mini{
+  min-width:92px;
+  max-width:120px;
+  height:22px;
+  padding:1px 18px 1px 6px;
+  border:1px solid #cbd5e1;
+  border-radius:6px;
+  background:#fff;
+  color:#475569;
+  font-size:10px;
+  font-weight:600;
+}
+.gantt-link-mini:focus{outline:2px solid rgba(59,130,246,.25);outline-offset:1px}
 table:not(.gantt-table){background:#f8fafc;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden}
 table:not(.gantt-table) thead th{background:#eef3f8!important;color:#0b2545!important;border-bottom:1px solid var(--border-strong)!important}
 table:not(.gantt-table) tbody td,
@@ -2978,6 +2991,11 @@ table:not(.gantt-table) .tfoot-dark td,
         color: row.bold ? '#166534' : '#334155',
         bg: row.bold ? '#f0fdf4' : '#fff',
         totalText: formatAmount(total(row.values), row.mode, true),
+        actionHtml: row.label === 'EP (EDPP neto)'
+          ? renderTinyGanttLinkControl('construction_payment_links', 'edppNeto', state.proyecto?.construction_payment_links?.edppNeto || '')
+          : (row.label === 'Anticipo neto'
+            ? renderTinyGanttLinkControl('construction_payment_links', 'anticipoNeto', state.proyecto?.construction_payment_links?.anticipoNeto || '')
+            : ''),
       })), { includeTotal: true });
       setHtml('constr-ep-tfoot', '');
       return Object.assign({}, data, { totalPago, subtotal: series.subtotal || data.subtotal, ivaEfectivo: series.iva_efectivo || data.ivaEfectivo });
