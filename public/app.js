@@ -460,7 +460,7 @@ function renderFinanceFixedColumn(prefix, rows = [], options = {}) {
   setHtml(`${prefix}-fixed-tbody`, rows.map((row) => `
     <tr class="${row.bold ? 'finance-total-row' : ''}">
       <td class="finance-fixed-concept-cell finance-fixed-concept-col" style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.color || '#334155'};background:${row.bg || (row.bold ? '#f4f8fc' : '#fff')}!important;display:flex;align-items:center;justify-content:space-between;gap:4px">
-        <span>${escapeHtml(row.label || '')}</span>
+        <span class="finance-fixed-label">${escapeHtml(row.label || '')}</span>
         ${row.actionHtml || ''}
       </td>
       ${includeTotal ? `<td class="finance-fixed-total-col" style="text-align:right;font-weight:${row.bold ? 800 : 600};color:${row.color || '#334155'};background:${row.bg || (row.bold ? '#f4f8fc' : '#fff')}!important">${renderCellContent(row.totalHtml ?? row.totalText ?? '')}</td>` : ''}
@@ -1028,41 +1028,137 @@ function getGanttLinkOffset(group, key) {
   return toNumber(state.proyecto?.[offsetGroup]?.[key]);
 }
 
+function formatGanttOffsetLabel(offset) {
+  const value = Math.round(toNumber(offset));
+  if (value > 0) return `+${value}`;
+  if (value < 0) return `${value}`;
+  return '0';
+}
+
+function getGanttLinkChipLabel(group, key, selectedKey = '') {
+  const row = findGanttLinkRow(selectedKey);
+  if (!row) return 'Vincular';
+  const offset = getGanttLinkOffset(group, key);
+  return `${String(row.nombre || 'Gantt').trim()} · ${formatGanttOffsetLabel(offset)}`;
+}
+
 function renderTinyGanttLinkControl(group, key, selectedKey = '') {
-  const options = getGanttLinkOptions();
+  const selectedRow = findGanttLinkRow(selectedKey);
+  const label = getGanttLinkChipLabel(group, key, selectedKey);
+  const title = selectedRow
+    ? `Referencia Gantt: ${label}`
+    : 'Vincular a actividad Gantt';
+  return `
+    <button
+      class="gantt-link-chip ${selectedRow ? 'is-linked' : ''}"
+      type="button"
+      data-link-group="${escapeHtml(group)}"
+      data-link-key="${escapeHtml(key)}"
+      onclick="openMiniGanttLinkPopover(this)"
+      title="${escapeHtml(title)}"
+      aria-label="${escapeHtml(title)}"
+    ><span>${escapeHtml(label)}</span></button>
+  `;
+}
+
+function closeMiniGanttLinkPopover() {
+  const popover = $('gantt-link-popover');
+  if (popover) popover.remove();
+  if (window.__ganttLinkPopoverOutside) {
+    document.removeEventListener('mousedown', window.__ganttLinkPopoverOutside, true);
+    window.__ganttLinkPopoverOutside = null;
+  }
+  if (window.__ganttLinkPopoverKeydown) {
+    document.removeEventListener('keydown', window.__ganttLinkPopoverKeydown, true);
+    window.__ganttLinkPopoverKeydown = null;
+  }
+}
+
+function positionMiniGanttLinkPopover(popover, anchor) {
+  if (!popover || !anchor) return;
+  const rect = anchor.getBoundingClientRect();
+  const width = Math.min(260, window.innerWidth - 16);
+  popover.style.width = `${width}px`;
+  const left = Math.max(8, Math.min(window.innerWidth - width - 8, rect.left));
+  let top = rect.bottom + 6;
+  const height = popover.offsetHeight || 170;
+  if (top + height > window.innerHeight - 8) top = Math.max(8, rect.top - height - 6);
+  popover.style.left = `${left}px`;
+  popover.style.top = `${top}px`;
+}
+
+function openMiniGanttLinkPopover(anchor) {
+  if (!anchor) return;
+  const group = String(anchor.dataset.linkGroup || '').trim();
+  const key = String(anchor.dataset.linkKey || '').trim();
+  if (!group || !key) return;
+  closeMiniGanttLinkPopover();
+
+  const selectedKey = String(state.proyecto?.[group]?.[key] || '').trim();
   const selectedRow = findGanttLinkRow(selectedKey);
   const offset = getGanttLinkOffset(group, key);
-  return `
-    <span class="gantt-link-control">
-      <select
-        class="gantt-link-mini"
-        data-link-group="${escapeHtml(group)}"
-        data-link-key="${escapeHtml(key)}"
-        onchange="onMiniGanttLinkChange(this)"
-        title="Vincular a actividad Gantt"
-        aria-label="Vincular fila a actividad Gantt"
-      >
-        <option value="">Vincular</option>
-        ${options.map((option) => {
-          const selected = selectedRow ? option.row === selectedRow : String(selectedKey) === String(option.key);
-          return `<option value="${escapeHtml(option.key)}" ${selected ? 'selected' : ''}>${escapeHtml(option.name)}</option>`;
-        }).join('')}
-      </select>
-      <input
-        class="gantt-link-offset"
-        type="text"
-        inputmode="numeric"
-        data-link-group="${escapeHtml(group)}"
-        data-link-key="${escapeHtml(key)}"
-        value="${offset ? escapeHtml(fmtInputNumber(offset, 0)) : ''}"
-        placeholder="+0"
-        title="Desfase en meses"
-        aria-label="Desfase en meses"
-        onchange="onMiniGanttLinkOffsetChange(this)"
-        onblur="onMiniGanttLinkOffsetChange(this)"
-      >
-    </span>
+  const options = getGanttLinkOptions();
+  const popover = document.createElement('div');
+  popover.id = 'gantt-link-popover';
+  popover.className = 'gantt-link-popover';
+  popover.dataset.linkGroup = group;
+  popover.dataset.linkKey = key;
+  popover.innerHTML = `
+    <div class="gantt-link-popover-title">Referencia Gantt</div>
+    <label class="gantt-link-popover-label">Actividad</label>
+    <select class="gantt-link-popover-select" data-gantt-popover-field="activity">
+      <option value="">Sin vínculo</option>
+      ${options.map((option) => {
+        const selected = selectedRow ? option.row === selectedRow : String(selectedKey) === String(option.key);
+        return `<option value="${escapeHtml(option.key)}" ${selected ? 'selected' : ''}>${escapeHtml(option.name)}</option>`;
+      }).join('')}
+    </select>
+    <label class="gantt-link-popover-label">Desfase (meses)</label>
+    <input class="gantt-link-popover-offset" data-gantt-popover-field="offset" type="text" inputmode="numeric" value="${offset ? escapeHtml(fmtInputNumber(offset, 0)) : ''}" placeholder="0">
+    <div class="gantt-link-popover-actions">
+      <button type="button" class="gantt-link-popover-btn" onclick="closeMiniGanttLinkPopover()">Cancelar</button>
+      <button type="button" class="gantt-link-popover-btn primary" onclick="applyMiniGanttLinkPopover()">Aplicar</button>
+    </div>
   `;
+  document.body.appendChild(popover);
+  positionMiniGanttLinkPopover(popover, anchor);
+  popover.querySelector('[data-gantt-popover-field="activity"]')?.focus();
+
+  window.__ganttLinkPopoverOutside = (event) => {
+    if (popover.contains(event.target) || anchor.contains(event.target)) return;
+    closeMiniGanttLinkPopover();
+  };
+  window.__ganttLinkPopoverKeydown = (event) => {
+    if (event.key === 'Escape') closeMiniGanttLinkPopover();
+    if (event.key === 'Enter' && popover.contains(event.target)) applyMiniGanttLinkPopover();
+  };
+  window.setTimeout(() => {
+    document.addEventListener('mousedown', window.__ganttLinkPopoverOutside, true);
+    document.addEventListener('keydown', window.__ganttLinkPopoverKeydown, true);
+  }, 0);
+}
+
+function applyMiniGanttLinkPopover() {
+  const popover = $('gantt-link-popover');
+  if (!popover) return;
+  const group = String(popover.dataset.linkGroup || '').trim();
+  const key = String(popover.dataset.linkKey || '').trim();
+  if (!group || !key) return;
+
+  const selectedValue = String(popover.querySelector('[data-gantt-popover-field="activity"]')?.value || '').trim();
+  const offsetValue = toNumber(popover.querySelector('[data-gantt-popover-field="offset"]')?.value);
+  state.proyecto = normalizeProject(state.proyecto || {});
+  if (!state.proyecto[group] || typeof state.proyecto[group] !== 'object') state.proyecto[group] = {};
+  const offsetGroup = getGanttOffsetGroup(group);
+  if (!state.proyecto[offsetGroup] || typeof state.proyecto[offsetGroup] !== 'object') state.proyecto[offsetGroup] = {};
+
+  if (selectedValue) state.proyecto[group][key] = selectedValue;
+  else delete state.proyecto[group][key];
+  if (offsetValue) state.proyecto[offsetGroup][key] = offsetValue;
+  else delete state.proyecto[offsetGroup][key];
+
+  closeMiniGanttLinkPopover();
+  rerenderGanttLinkedFinancials(group);
 }
 
 function getLinkedGanttStartIndex(linkKey, fallbackIndex = 0, offset = 0) {
