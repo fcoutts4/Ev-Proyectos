@@ -66,6 +66,41 @@ const UI_STATE_SAVE_DELAY = 350;
 const ADDRESS_SEARCH_DEBOUNCE_MS = 400;
 const ADDRESS_SEARCH_MIN_CHARS = 3;
 const formulaCatalogCache = new WeakMap();
+const formulaReferenceMapsCache = new WeakMap();
+
+const calculationVersions = {
+  proyecto: 0,
+  cabida: 0,
+  terreno: 0,
+  construccion: 0,
+  ventas: 0,
+  gantt: 0,
+  costos: 0,
+  financiamiento: 0,
+  capital: 0,
+  calculos: 0,
+  formulas: 0,
+};
+
+const calculationCache = {
+  version: 0,
+  slots: Object.create(null),
+};
+
+const CALCULATION_INVALIDATION_GRAPH = {
+  proyecto: ['proyecto', 'terreno', 'construccion', 'ventas', 'gantt', 'costos', 'financiamiento', 'calculos', 'formulas'],
+  cabida: ['cabida', 'ventas', 'construccion', 'costos', 'calculos', 'formulas'],
+  terreno: ['terreno', 'gantt', 'costos', 'financiamiento', 'calculos', 'formulas'],
+  construccion: ['construccion', 'gantt', 'ventas', 'costos', 'financiamiento', 'calculos', 'formulas'],
+  ventas: ['ventas', 'gantt', 'costos', 'calculos', 'formulas'],
+  gantt: ['gantt', 'ventas', 'construccion', 'terreno', 'costos', 'calculos', 'formulas'],
+  costos: ['costos', 'calculos', 'formulas'],
+  financiamiento: ['financiamiento', 'terreno', 'construccion', 'costos', 'calculos', 'formulas'],
+  capital: ['capital'],
+  calculos: ['calculos'],
+  formulas: ['formulas', 'costos', 'calculos'],
+  all: Object.keys(calculationVersions),
+};
 
 const USER_STORAGE_KEYS = [
   'evproyectos.userName',
@@ -96,6 +131,7 @@ function scrollTabPaneBelowSticky(pane) {
 }
 
 function showTab(tabId, button) {
+  const startedAt = performance.now();
   const targetTabId = String(tabId || '').trim();
   const targetPaneId = `tab-${targetTabId}`;
   let activePane = null;
@@ -125,6 +161,7 @@ function showTab(tabId, button) {
   if (activeButton) activeButton.scrollIntoView({ block: 'nearest', inline: 'center' });
   if (button) scrollTabPaneBelowSticky(activePane);
   closeTabDock();
+  perfLog(`tab:${targetTabId}`, { ms: Math.round(performance.now() - startedAt) });
 }
 
 function closeTabDock() {
@@ -159,6 +196,45 @@ function createPendingAction(name) {
 
 function $(id) {
   return document.getElementById(id);
+}
+
+function expandCalculationScopes(scopes = []) {
+  const input = Array.isArray(scopes) ? scopes : [scopes];
+  const expanded = new Set();
+  input.filter(Boolean).forEach((scope) => {
+    const key = String(scope || '').trim();
+    const mapped = CALCULATION_INVALIDATION_GRAPH[key] || [key];
+    mapped.forEach((item) => {
+      if (Object.prototype.hasOwnProperty.call(calculationVersions, item)) expanded.add(item);
+    });
+  });
+  return expanded;
+}
+
+function markCalculationDirty(scopes = 'all', reason = '') {
+  const expanded = expandCalculationScopes(scopes);
+  if (!expanded.size) return;
+  expanded.forEach((scope) => {
+    calculationVersions[scope] = (calculationVersions[scope] || 0) + 1;
+  });
+  calculationCache.version += 1;
+  perfLog('cache:dirty', { reason, scopes: Array.from(expanded) });
+}
+
+function getCalculationCacheKey(scopes = [], extra = '') {
+  const keys = Array.isArray(scopes) ? scopes : [scopes];
+  return `${keys.map((scope) => `${scope}:${calculationVersions[scope] || 0}`).join('|')}|${extra}`;
+}
+
+function withCalculationCache(slotName, scopes, extra, producer) {
+  const key = getCalculationCacheKey(scopes, extra);
+  const slot = calculationCache.slots[slotName];
+  if (slot && slot.key === key) return slot.value;
+  const startedAt = performance.now();
+  const value = producer();
+  calculationCache.slots[slotName] = { key, value };
+  perfLog(`cache:miss:${slotName}`, { ms: Math.round(performance.now() - startedAt) });
+  return value;
 }
 
 const MOJIBAKE_HINT_RE = /[ÃÂ�]/;
@@ -232,7 +308,66 @@ function setText(id, value) {
 
 function setHtml(id, value) {
   const el = $(id);
-  if (el) el.innerHTML = value;
+  if (el) {
+    const html = String(value ?? '');
+    el.innerHTML = html;
+    const rootTable = el.matches?.('table') ? el : el.closest?.('table');
+    if (rootTable) normalizeAppTables(rootTable);
+    else if (html.includes('<table')) normalizeAppTables(el);
+  }
+}
+
+function normalizeAppTables(root = document) {
+  if (!root || typeof document === 'undefined') return;
+  const scope = root.nodeType === 1 ? root : document;
+  const tables = [
+    ...(scope.matches?.('table') ? [scope] : []),
+    ...Array.from(scope.querySelectorAll?.('table') || []),
+  ];
+  tables.forEach((table) => {
+    table.classList.add('app-table');
+    if (!table.classList.contains('gantt-table')) table.classList.add('financial-table');
+    const isMonthly = table.classList.contains('finance-date-table')
+      || !!table.querySelector('[data-month-col],[data-month-cell]')
+      || ['planilla-table', 'flujo-tabla', 'flujo-ventas-table', 'constr-ep-table', 'constr-fin-planilla-table', 'terreno-fin-planilla-table'].includes(table.id);
+    if (isMonthly) table.classList.add('monthly-table');
+    const isScrollable = !!table.closest('.tbl-scroll,.res-table-scroll,.finance-split-shell,.finance-date-scroll,.flow-planilla,.edp-curve-editor-scroll,.monthly-preview-scroll')
+      || table.classList.contains('gantt-table');
+    if (isScrollable) table.classList.add('sticky-table');
+    if (table.tFoot || table.querySelector('.tfoot-dark,.tfoot-green,.finance-total-row,.cat-total-cell')) {
+      table.classList.add('has-total-row');
+    }
+  });
+}
+
+let appTableObserver = null;
+let appTableNormalizeQueued = false;
+const appTableNormalizeRoots = new Set();
+function scheduleAppTableNormalization(root = document) {
+  appTableNormalizeRoots.add(root || document);
+  if (appTableNormalizeQueued) return;
+  appTableNormalizeQueued = true;
+  window.requestAnimationFrame(() => {
+    appTableNormalizeQueued = false;
+    const roots = Array.from(appTableNormalizeRoots);
+    appTableNormalizeRoots.clear();
+    roots.forEach((item) => normalizeAppTables(item));
+  });
+}
+
+function setupAppTableNormalization() {
+  normalizeAppTables(document);
+  if (appTableObserver || typeof MutationObserver === 'undefined') return;
+  appTableObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      Array.from(mutation.addedNodes || []).forEach((node) => {
+        if (node.nodeType === 1 && (node.matches?.('table') || node.querySelector?.('table'))) {
+          scheduleAppTableNormalization(node);
+        }
+      });
+    });
+  });
+  appTableObserver.observe(document.body, { childList: true, subtree: true });
 }
 
 function normalizeVisibleTextEncoding(root = document.body) {
@@ -451,6 +586,8 @@ function renderFinanceFixedColumn(prefix, rows = [], options = {}) {
     const source = String(value ?? '');
     return /<[^>]+>/.test(source) ? source : escapeHtml(source);
   };
+  const normalBg = 'var(--app-table-sticky-bg, #fff)';
+  const totalBg = 'var(--app-table-total-bg, #eef3f8)';
   setHtml(`${prefix}-fixed-head`, `
     <tr>
       <th class="finance-fixed-concept-col" style="text-align:left">Concepto</th>
@@ -459,11 +596,11 @@ function renderFinanceFixedColumn(prefix, rows = [], options = {}) {
   `);
   setHtml(`${prefix}-fixed-tbody`, rows.map((row) => `
     <tr class="${row.bold ? 'finance-total-row' : ''}">
-      <td class="finance-fixed-concept-cell finance-fixed-concept-col" style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.color || '#334155'};background:${row.bg || (row.bold ? '#f4f8fc' : '#fff')}!important;display:flex;align-items:center;justify-content:space-between;gap:4px">
+      <td class="finance-fixed-concept-cell finance-fixed-concept-col" style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.color || '#334155'};background:${row.bold ? totalBg : normalBg}!important;display:flex;align-items:center;justify-content:space-between;gap:4px">
         <span class="finance-fixed-label">${escapeHtml(row.label || '')}</span>
         ${row.actionHtml || ''}
       </td>
-      ${includeTotal ? `<td class="finance-fixed-total-col" style="text-align:right;font-weight:${row.bold ? 800 : 600};color:${row.color || '#334155'};background:${row.bg || (row.bold ? '#f4f8fc' : '#fff')}!important">${renderCellContent(row.totalHtml ?? row.totalText ?? '')}</td>` : ''}
+      ${includeTotal ? `<td class="finance-fixed-total-col" style="text-align:right;font-weight:${row.bold ? 800 : 600};color:${row.color || '#334155'};background:${row.bold ? totalBg : normalBg}!important">${renderCellContent(row.totalHtml ?? row.totalText ?? '')}</td>` : ''}
     </tr>
   `).join(''));
   setHtml(`${prefix}-fixed-tfoot`, options.footerLabel ? `
@@ -546,12 +683,62 @@ function toNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function normalizeGanttLinks(value = {}) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const normalizeSection = (section = {}) => {
+    const out = {};
+    if (!section || typeof section !== 'object' || Array.isArray(section)) return out;
+    Object.entries(section).forEach(([key, rawValue]) => {
+      if (rawValue && typeof rawValue === 'object' && !Array.isArray(rawValue)) {
+        const activityId = String(rawValue.activityId || rawValue.activity_id || '').trim();
+        const offset = Math.round(toNumber(rawValue.offset));
+        if (activityId || offset) out[key] = { activityId, offset };
+      } else {
+        const activityId = String(rawValue || '').trim();
+        if (activityId) out[key] = { activityId, offset: 0 };
+      }
+    });
+    return out;
+  };
+  return {
+    constructionPayments: normalizeSection(source.constructionPayments || source.construction_payments || {}),
+    landFinance: normalizeSection(source.landFinance || source.land_finance || {}),
+  };
+}
+
+function normalizeEdpCurveMode(value) {
+  const normalized = String(value || '').trim();
+  return ['auto', 'linear', 'smooth_s', 'front_loaded', 'back_loaded', 'custom'].includes(normalized)
+    ? normalized
+    : 'auto';
+}
+
+function normalizeEdpCurveConfig(value = {}, months = null) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const rawPercentages = Array.isArray(source.monthlyPercentages)
+    ? source.monthlyPercentages
+    : (Array.isArray(source.monthly_percentages) ? source.monthly_percentages : []);
+  let monthlyPercentages = rawPercentages.map((item) => Math.max(0, toNumber(item)));
+  if (months != null) {
+    const size = Math.max(1, Math.round(toNumber(months)));
+    monthlyPercentages = Array.from({ length: size }, (_, index) => toNumber(monthlyPercentages[index]));
+  }
+  const manualEnabled = source.manualEnabled === true || source.manual_enabled === true || normalizeEdpCurveMode(source.mode) === 'custom';
+  return {
+    mode: normalizeEdpCurveMode(source.mode),
+    manualEnabled,
+    monthlyPercentages,
+  };
+}
+
 function normalizeFormulaOverrides(value = {}) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   return {
     flow: source.flow && typeof source.flow === 'object' && !Array.isArray(source.flow) ? { ...source.flow } : {},
     ep: source.ep && typeof source.ep === 'object' && !Array.isArray(source.ep) ? { ...source.ep } : {},
     gf: source.gf && typeof source.gf === 'object' && !Array.isArray(source.gf) ? { ...source.gf } : {},
+    ganttLinks: normalizeGanttLinks(source.ganttLinks || source.gantt_links || {}),
+    edpCurve: normalizeEdpCurveConfig(source.edpCurve || source.edp_curve || {}),
   };
 }
 
@@ -767,6 +954,62 @@ function applyProjectLocalMeta(project = {}) {
 
 function normalizeProject(project = {}) {
   const source = project && typeof project === 'object' ? project : {};
+  const formulaGanttLinks = source.formula_overrides && typeof source.formula_overrides === 'object'
+    ? (source.formula_overrides.ganttLinks || source.formula_overrides.gantt_links || {})
+    : {};
+  const rawGanttLinks = normalizeGanttLinks(source.ganttLinks || source.gantt_links || formulaGanttLinks);
+  const legacyConstructionLinks = source.construction_payment_links && typeof source.construction_payment_links === 'object'
+    ? source.construction_payment_links
+    : {};
+  const legacyConstructionOffsets = source.construction_payment_link_offsets && typeof source.construction_payment_link_offsets === 'object'
+    ? source.construction_payment_link_offsets
+    : {};
+  const legacyLandLinks = source.land_finance_links && typeof source.land_finance_links === 'object'
+    ? source.land_finance_links
+    : {};
+  const legacyLandOffsets = source.land_finance_link_offsets && typeof source.land_finance_link_offsets === 'object'
+    ? source.land_finance_link_offsets
+    : {};
+  const mergedConstructionLinks = { ...rawGanttLinks.constructionPayments };
+  Object.keys(legacyConstructionLinks).forEach((key) => {
+    if (!mergedConstructionLinks[key] || typeof mergedConstructionLinks[key] !== 'object') {
+      mergedConstructionLinks[key] = {};
+    }
+    if (!mergedConstructionLinks[key].activityId) mergedConstructionLinks[key].activityId = String(legacyConstructionLinks[key] || '').trim();
+    if (!Object.prototype.hasOwnProperty.call(mergedConstructionLinks[key], 'offset')) {
+      mergedConstructionLinks[key].offset = toNumber(legacyConstructionOffsets[key]);
+    }
+  });
+  const mergedLandLinks = { ...rawGanttLinks.landFinance };
+  Object.keys(legacyLandLinks).forEach((key) => {
+    if (!mergedLandLinks[key] || typeof mergedLandLinks[key] !== 'object') {
+      mergedLandLinks[key] = {};
+    }
+    if (!mergedLandLinks[key].activityId) mergedLandLinks[key].activityId = String(legacyLandLinks[key] || '').trim();
+    if (!Object.prototype.hasOwnProperty.call(mergedLandLinks[key], 'offset')) {
+      mergedLandLinks[key].offset = toNumber(legacyLandOffsets[key]);
+    }
+  });
+  const normalizedGanttLinks = {
+    constructionPayments: mergedConstructionLinks,
+    landFinance: mergedLandLinks,
+  };
+  const normalizedConstructionLinks = {};
+  const normalizedConstructionOffsets = {};
+  Object.entries(mergedConstructionLinks).forEach(([key, value]) => {
+    const activityId = String(value?.activityId || '').trim();
+    const offset = Math.round(toNumber(value?.offset));
+    if (activityId) normalizedConstructionLinks[key] = activityId;
+    if (offset) normalizedConstructionOffsets[key] = offset;
+  });
+  const normalizedLandLinks = {};
+  const normalizedLandOffsets = {};
+  Object.entries(mergedLandLinks).forEach(([key, value]) => {
+    const activityId = String(value?.activityId || '').trim();
+    const offset = Math.round(toNumber(value?.offset));
+    if (activityId) normalizedLandLinks[key] = activityId;
+    if (offset) normalizedLandOffsets[key] = offset;
+  });
   const terrenoM2Bruto = source.terreno_m2_bruto ?? source.terreno_m2_bruto_afecto ?? 0;
   const terrenoM2Afectacion = source.terreno_m2_afectacion
     ?? Math.max(0, toNumber(terrenoM2Bruto) - toNumber(source.terreno_m2_neto ?? terrenoM2Bruto));
@@ -811,29 +1054,29 @@ function normalizeProject(project = {}) {
     pct_timbres: 0.8,
     pct_ceec: source.pct_ceec ?? 65,
     pct_impuesto_renta: source.pct_impuesto_renta ?? 27,
-    construction_payment_links: source.construction_payment_links && typeof source.construction_payment_links === 'object'
-      ? { ...source.construction_payment_links }
-      : {},
-    construction_payment_link_offsets: source.construction_payment_link_offsets && typeof source.construction_payment_link_offsets === 'object'
-      ? { ...source.construction_payment_link_offsets }
-      : {},
-    land_finance_links: source.land_finance_links && typeof source.land_finance_links === 'object'
-      ? { ...source.land_finance_links }
-      : {},
-    land_finance_link_offsets: source.land_finance_link_offsets && typeof source.land_finance_link_offsets === 'object'
-      ? { ...source.land_finance_link_offsets }
-      : {},
+    gantt_links: normalizedGanttLinks,
+    construction_payment_links: normalizedConstructionLinks,
+    construction_payment_link_offsets: normalizedConstructionOffsets,
+    land_finance_links: normalizedLandLinks,
+    land_finance_link_offsets: normalizedLandOffsets,
     formula_overrides: normalizeFormulaOverrides(source.formula_overrides),
   };
 }
 
 function getFormulaOverridesForSave() {
   const getter = window.getPersistedFormulaOverrides;
-  return normalizeFormulaOverrides(
+  const overrides = normalizeFormulaOverrides(
     typeof getter === 'function'
       ? getter()
       : (window.__bricsaFormulaPatch?.formulaOverrides || state.proyecto?.formula_overrides || {})
   );
+  const projectLinks = normalizeGanttLinks(state.proyecto?.gantt_links || state.proyecto?.ganttLinks || overrides.ganttLinks || {});
+  const edpCurve = normalizeEdpCurveConfig(state.construccion?.edp_curve || state.construccion?.edpCurve || overrides.edpCurve || {});
+  return {
+    ...overrides,
+    ganttLinks: projectLinks,
+    edpCurve,
+  };
 }
 
 function getProjectSavePayload() {
@@ -874,10 +1117,6 @@ const PERSISTABLE_PROJECT_KEYS = [
   'pct_timbres',
   'pct_ceec',
   'pct_impuesto_renta',
-  'construction_payment_links',
-  'construction_payment_link_offsets',
-  'land_finance_links',
-  'land_finance_link_offsets',
   'formula_overrides',
   'updated_at',
   'updatedAt',
@@ -910,11 +1149,48 @@ function getPersistableCabidaRows(rows = []) {
 }
 
 function getPersistableFinanciamiento(fin = {}) {
-  return normalizeFinanciamiento(fin);
+  const normalized = normalizeFinanciamiento(fin);
+  return {
+    credito_terreno_activo: !!normalized.credito_terreno_activo,
+    credito_terreno_pct: toNumber(normalized.credito_terreno_pct),
+    credito_terreno_tasa: toNumber(normalized.credito_terreno_tasa),
+    credito_terreno_pago_intereses: normalized.credito_terreno_pago_intereses || 'Semestral',
+    credito_terreno_pago_capital: normalized.credito_terreno_pago_capital || 'Inicio: ConstrucciÃ³n',
+    linea_construccion_activo: !!normalized.linea_construccion_activo,
+    linea_construccion_pct: toNumber(normalized.linea_construccion_pct),
+    linea_construccion_tasa: toNumber(normalized.linea_construccion_tasa),
+    linea_construccion_pago_intereses: normalized.linea_construccion_pago_intereses || 'Anual',
+    linea_construccion_pago_capital: normalized.linea_construccion_pago_capital || 'Contra Escrituraciones',
+    pct_alzamiento: toNumber(normalized.pct_alzamiento ?? 90),
+    linea_adicional_activo: !!(normalized.linea_adicional_activo ?? true),
+    linea_adicional_monto: toNumber(normalized.linea_adicional_monto ?? 10000),
+    linea_adicional_tasa: toNumber(normalized.linea_adicional_tasa ?? 3),
+    linea_adicional_mes_inicio: toNumber(normalized.linea_adicional_mes_inicio ?? 5),
+    linea_adicional_mes_fin: toNumber(normalized.linea_adicional_mes_fin ?? 8),
+    linea_adicional_pago_intereses: normalized.linea_adicional_pago_intereses || 'Semestral',
+    linea_adicional_pago_capital: normalized.linea_adicional_pago_capital || 'Contra Escrituraciones',
+    activar_tope_deuda: !!normalized.activar_tope_deuda,
+    tope_deuda_uf: toNumber(normalized.tope_deuda_uf),
+  };
 }
 
 function getPersistableConstruccion(construccion = {}) {
-  return normalizeConstruccion(construccion);
+  const normalized = normalizeConstruccion(construccion);
+  return {
+    sup_sobre_tierra: toNumber(normalized.sup_sobre_tierra),
+    costo_uf_m2_sobre_tierra: toNumber(normalized.costo_uf_m2_sobre_tierra),
+    sup_bajo_tierra: toNumber(normalized.sup_bajo_tierra),
+    pct_bajo_tierra_sobre_cota_0: toNumber(normalized.pct_bajo_tierra_sobre_cota_0),
+    costo_uf_m2_bajo_tierra: toNumber(normalized.costo_uf_m2_bajo_tierra),
+    gastos_generales_mensual: toNumber(normalized.gastos_generales_mensual),
+    utilidad_pct: toNumber(normalized.utilidad_pct),
+    plazo_meses: Math.max(1, Math.round(toNumber(normalized.plazo_meses || 1))),
+    anticipo_pct: toNumber(normalized.anticipo_pct),
+    retencion_pct: toNumber(normalized.retencion_pct),
+    ancho_curva: toNumber(normalized.ancho_curva ?? 0.5),
+    peak_gasto: toNumber(normalized.peak_gasto ?? 0.5),
+    pct_inicio_construccion: toNumber(normalized.pct_inicio_construccion ?? 25),
+  };
 }
 
 function getPersistableGanttRows(rows = []) {
@@ -1023,7 +1299,74 @@ function getGanttOffsetGroup(group) {
   return `${group}_offsets`;
 }
 
+function getGanttLinkSection(group) {
+  if (group === 'construction_payment_links') return 'constructionPayments';
+  if (group === 'land_finance_links') return 'landFinance';
+  return String(group || '').trim();
+}
+
+function ensureProjectGanttLinks(project = state.proyecto) {
+  if (!project || typeof project !== 'object') return {};
+  project.gantt_links = normalizeGanttLinks(
+    project.gantt_links
+    || project.ganttLinks
+    || project.formula_overrides?.ganttLinks
+    || project.formula_overrides?.gantt_links
+    || {}
+  );
+  if (!project.gantt_links.constructionPayments || typeof project.gantt_links.constructionPayments !== 'object') {
+    project.gantt_links.constructionPayments = {};
+  }
+  if (!project.gantt_links.landFinance || typeof project.gantt_links.landFinance !== 'object') {
+    project.gantt_links.landFinance = {};
+  }
+  return project.gantt_links;
+}
+
+function syncProjectGanttLinksToFormulaOverrides(project = state.proyecto) {
+  if (!project || typeof project !== 'object') return;
+  const ganttLinks = normalizeGanttLinks(project.gantt_links || project.ganttLinks || {});
+  project.gantt_links = ganttLinks;
+  project.formula_overrides = normalizeFormulaOverrides({
+    ...(project.formula_overrides || {}),
+    ganttLinks,
+  });
+  if (window.__bricsaFormulaPatch?.formulaOverrides) {
+    window.__bricsaFormulaPatch.formulaOverrides = normalizeFormulaOverrides({
+      ...window.__bricsaFormulaPatch.formulaOverrides,
+      ganttLinks,
+    });
+  }
+}
+
+function getGanttLinkValue(group, key) {
+  const section = getGanttLinkSection(group);
+  const links = normalizeGanttLinks(
+    state.proyecto?.gantt_links
+    || state.proyecto?.ganttLinks
+    || state.proyecto?.formula_overrides?.ganttLinks
+    || state.proyecto?.formula_overrides?.gantt_links
+    || {}
+  );
+  const node = links?.[section]?.[key];
+  const canonical = node && typeof node === 'object' ? String(node.activityId || '').trim() : '';
+  if (canonical) return canonical;
+  return String(state.proyecto?.[group]?.[key] || '').trim();
+}
+
 function getGanttLinkOffset(group, key) {
+  const section = getGanttLinkSection(group);
+  const links = normalizeGanttLinks(
+    state.proyecto?.gantt_links
+    || state.proyecto?.ganttLinks
+    || state.proyecto?.formula_overrides?.ganttLinks
+    || state.proyecto?.formula_overrides?.gantt_links
+    || {}
+  );
+  const node = links?.[section]?.[key];
+  if (node && typeof node === 'object' && Object.prototype.hasOwnProperty.call(node, 'offset')) {
+    return toNumber(node.offset);
+  }
   const offsetGroup = getGanttOffsetGroup(group);
   return toNumber(state.proyecto?.[offsetGroup]?.[key]);
 }
@@ -1035,16 +1378,84 @@ function formatGanttOffsetLabel(offset) {
   return '0';
 }
 
+function normalizeInterestPaymentMode(value, fallback = 'anual') {
+  const normalized = String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+  if (normalized.includes('mensual')) return 'mensual';
+  if (normalized.includes('trimestral')) return 'trimestral';
+  if (normalized.includes('semestral')) return 'semestral';
+  if (normalized.includes('anual')) return 'anual';
+  if (normalized.includes('vencimiento') || normalized.includes('escritur')) return 'al_vencimiento';
+  return fallback;
+}
+
+function getInterestPaymentInterval(mode) {
+  if (mode === 'mensual') return 1;
+  if (mode === 'trimestral') return 3;
+  if (mode === 'semestral') return 6;
+  if (mode === 'anual') return 12;
+  return 0;
+}
+
+function getInterestPaymentDisplay(mode) {
+  if (mode === 'mensual') return 'Mensual';
+  if (mode === 'trimestral') return 'Trimestral';
+  if (mode === 'semestral') return 'Semestral';
+  if (mode === 'al_vencimiento') return 'Al vencimiento';
+  return 'Anual';
+}
+
+function distributeAccruedInterest(monthlyAccrual = [], balance = [], modeValue = 'anual') {
+  const mode = normalizeInterestPaymentMode(modeValue, 'anual');
+  const interval = getInterestPaymentInterval(mode);
+  const size = Math.max(monthlyAccrual.length, balance.length);
+  const interest = createMonthlyArray(size, 0);
+  let accrued = 0;
+  let financedMonths = 0;
+
+  for (let index = 0; index < size; index += 1) {
+    const currentBalance = Math.max(0, toNumber(balance[index]));
+    accrued += Math.max(0, toNumber(monthlyAccrual[index]));
+    if (currentBalance > 0 || Math.max(0, toNumber(monthlyAccrual[index])) > 0) financedMonths += 1;
+
+    const wasPaidOff = currentBalance <= 0 && index > 0 && toNumber(balance[index - 1]) > 0;
+    const isPeriodicPayment = interval > 0 && financedMonths > 0 && financedMonths % interval === 0;
+    const isMaturityPayment = mode === 'al_vencimiento' && wasPaidOff;
+    if ((isPeriodicPayment || isMaturityPayment || wasPaidOff) && accrued > 0) {
+      interest[index] += accrued;
+      accrued = 0;
+    }
+  }
+
+  if (accrued > 0 && size > 0) {
+    let fallbackIndex = size - 1;
+    for (let index = size - 1; index >= 0; index -= 1) {
+      if (toNumber(balance[index]) > 0 || toNumber(monthlyAccrual[index]) > 0) {
+        fallbackIndex = index;
+        break;
+      }
+    }
+    interest[fallbackIndex] += accrued;
+  }
+
+  return interest;
+}
+
 function getGanttLinkChipLabel(group, key, selectedKey = '') {
-  const row = findGanttLinkRow(selectedKey);
+  const resolvedKey = String(selectedKey || '').trim() || getGanttLinkValue(group, key);
+  const row = findGanttLinkRow(resolvedKey);
   if (!row) return 'Vincular';
   const offset = getGanttLinkOffset(group, key);
   return `${String(row.nombre || 'Gantt').trim()} · ${formatGanttOffsetLabel(offset)}`;
 }
 
 function renderTinyGanttLinkControl(group, key, selectedKey = '') {
-  const selectedRow = findGanttLinkRow(selectedKey);
-  const label = getGanttLinkChipLabel(group, key, selectedKey);
+  const resolvedKey = String(selectedKey || '').trim() || getGanttLinkValue(group, key);
+  const selectedRow = findGanttLinkRow(resolvedKey);
+  const label = getGanttLinkChipLabel(group, key, resolvedKey);
   const title = selectedRow
     ? `Referencia Gantt: ${label}`
     : 'Vincular a actividad Gantt';
@@ -1094,7 +1505,7 @@ function openMiniGanttLinkPopover(anchor) {
   if (!group || !key) return;
   closeMiniGanttLinkPopover();
 
-  const selectedKey = String(state.proyecto?.[group]?.[key] || '').trim();
+  const selectedKey = getGanttLinkValue(group, key);
   const selectedRow = findGanttLinkRow(selectedKey);
   const offset = getGanttLinkOffset(group, key);
   const options = getGanttLinkOptions();
@@ -1151,11 +1562,23 @@ function applyMiniGanttLinkPopover() {
   if (!state.proyecto[group] || typeof state.proyecto[group] !== 'object') state.proyecto[group] = {};
   const offsetGroup = getGanttOffsetGroup(group);
   if (!state.proyecto[offsetGroup] || typeof state.proyecto[offsetGroup] !== 'object') state.proyecto[offsetGroup] = {};
+  const ganttLinks = ensureProjectGanttLinks(state.proyecto);
+  const section = getGanttLinkSection(group);
+  if (!ganttLinks[section] || typeof ganttLinks[section] !== 'object') ganttLinks[section] = {};
 
   if (selectedValue) state.proyecto[group][key] = selectedValue;
   else delete state.proyecto[group][key];
   if (offsetValue) state.proyecto[offsetGroup][key] = offsetValue;
   else delete state.proyecto[offsetGroup][key];
+  if (selectedValue || offsetValue) {
+    ganttLinks[section][key] = {
+      activityId: selectedValue || '',
+      offset: Math.round(toNumber(offsetValue)),
+    };
+  } else {
+    delete ganttLinks[section][key];
+  }
+  syncProjectGanttLinksToFormulaOverrides(state.proyecto);
 
   closeMiniGanttLinkPopover();
   rerenderGanttLinkedFinancials(group);
@@ -1193,9 +1616,21 @@ function onMiniGanttLinkChange(select) {
   if (!group || !key) return;
   state.proyecto = normalizeProject(state.proyecto || {});
   if (!state.proyecto[group] || typeof state.proyecto[group] !== 'object') state.proyecto[group] = {};
+  const offsetGroup = getGanttOffsetGroup(group);
+  if (!state.proyecto[offsetGroup] || typeof state.proyecto[offsetGroup] !== 'object') state.proyecto[offsetGroup] = {};
   const value = String(select.value || '').trim();
+  const offset = toNumber(state.proyecto[offsetGroup][key]);
+  const ganttLinks = ensureProjectGanttLinks(state.proyecto);
+  const section = getGanttLinkSection(group);
+  if (!ganttLinks[section] || typeof ganttLinks[section] !== 'object') ganttLinks[section] = {};
   if (value) state.proyecto[group][key] = value;
   else delete state.proyecto[group][key];
+  if (value || offset) {
+    ganttLinks[section][key] = { activityId: value || '', offset: Math.round(offset) };
+  } else {
+    delete ganttLinks[section][key];
+  }
+  syncProjectGanttLinksToFormulaOverrides(state.proyecto);
 
   rerenderGanttLinkedFinancials(group);
 }
@@ -1209,8 +1644,18 @@ function onMiniGanttLinkOffsetChange(input) {
   const offsetGroup = getGanttOffsetGroup(group);
   if (!state.proyecto[offsetGroup] || typeof state.proyecto[offsetGroup] !== 'object') state.proyecto[offsetGroup] = {};
   const value = toNumber(input.value);
+  const selected = String(state.proyecto?.[group]?.[key] || '').trim();
+  const ganttLinks = ensureProjectGanttLinks(state.proyecto);
+  const section = getGanttLinkSection(group);
+  if (!ganttLinks[section] || typeof ganttLinks[section] !== 'object') ganttLinks[section] = {};
   if (value) state.proyecto[offsetGroup][key] = value;
   else delete state.proyecto[offsetGroup][key];
+  if (selected || value) {
+    ganttLinks[section][key] = { activityId: selected || '', offset: Math.round(value) };
+  } else {
+    delete ganttLinks[section][key];
+  }
+  syncProjectGanttLinksToFormulaOverrides(state.proyecto);
 
   rerenderGanttLinkedFinancials(group);
 }
@@ -1254,35 +1699,93 @@ function getEffectiveCeecPct() {
   return toNumber(getGlobalFinancialParams().pct_ceec);
 }
 
-// ---- IRR (Newton-Raphson) ----
+// ---- IRR tipo Excel (TIR mensual con guess 0,0001) ----
 function npv(rate, flows) {
+  if (!Number.isFinite(rate) || rate <= -1) return NaN;
   return flows.reduce((acc, f, i) => acc + toNumber(f) / Math.pow(1 + rate, i), 0);
 }
-function irr(flows, guess = 0.1) {
-  if (!Array.isArray(flows) || flows.length < 2) return 0;
-  const hasPos = flows.some((v) => toNumber(v) > 0);
-  const hasNeg = flows.some((v) => toNumber(v) < 0);
-  if (!hasPos || !hasNeg) return 0;
-  let rate = guess;
-  for (let k = 0; k < 100; k += 1) {
+function irr(flows, guess = 0.0001) {
+  const values = Array.isArray(flows)
+    ? flows.map((value) => toNumber(value)).filter((value) => Number.isFinite(value))
+    : [];
+  if (values.length < 2) return null;
+  const hasPos = values.some((value) => value > 0);
+  const hasNeg = values.some((value) => value < 0);
+  if (!hasPos || !hasNeg) return null;
+
+  const tolerance = 1e-7;
+  let rate = Math.max(-0.999999, toNumber(guess));
+  for (let k = 0; k < 80; k += 1) {
     let f = 0, df = 0;
-    for (let i = 0; i < flows.length; i += 1) {
-      const d = Math.pow(1 + rate, i);
-      f += toNumber(flows[i]) / d;
-      if (i > 0) df += -i * toNumber(flows[i]) / (d * (1 + rate));
+    for (let i = 0; i < values.length; i += 1) {
+      const base = 1 + rate;
+      const d = Math.pow(base, i);
+      f += values[i] / d;
+      if (i > 0) df += -i * values[i] / (d * base);
     }
     if (!Number.isFinite(f) || !Number.isFinite(df) || Math.abs(df) < 1e-12) break;
     const next = rate - f / df;
-    if (!Number.isFinite(next)) break;
-    if (Math.abs(next - rate) < 1e-8) { rate = next; break; }
+    if (!Number.isFinite(next) || next <= -0.999999 || next > 100) break;
+    if (Math.abs(next - rate) < tolerance && Math.abs(npv(next, values)) < 1e-4) return next;
     rate = next;
-    if (rate < -0.99) rate = -0.99;
   }
-  return Number.isFinite(rate) ? rate : 0;
+
+  const candidates = [
+    -0.999999, -0.999, -0.99, -0.95, -0.9, -0.8, -0.7, -0.5, -0.3, -0.2, -0.1,
+    -0.05, -0.01, 0, 0.0001, 0.001, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2,
+    0.5, 1, 2, 5, 10, 20, 50, 100,
+  ];
+  const brackets = [];
+  let prevRate = candidates[0];
+  let prevValue = npv(prevRate, values);
+  for (let index = 1; index < candidates.length; index += 1) {
+    const currentRate = candidates[index];
+    const currentValue = npv(currentRate, values);
+    if (!Number.isFinite(prevValue)) {
+      prevRate = currentRate;
+      prevValue = currentValue;
+      continue;
+    }
+    if (Number.isFinite(currentValue)) {
+      if (Math.abs(currentValue) < 1e-4) return currentRate;
+      if (prevValue === 0 || currentValue === 0 || Math.sign(prevValue) !== Math.sign(currentValue)) {
+        brackets.push([prevRate, currentRate]);
+      }
+    }
+    prevRate = currentRate;
+    prevValue = currentValue;
+  }
+  if (!brackets.length) return null;
+
+  const preferredGuess = toNumber(guess);
+  const bracket = brackets
+    .map(([low, high]) => ({ low, high, distance: preferredGuess >= low && preferredGuess <= high ? 0 : Math.min(Math.abs(preferredGuess - low), Math.abs(preferredGuess - high)) }))
+    .sort((a, b) => a.distance - b.distance)[0];
+  let low = bracket.low;
+  let high = bracket.high;
+  let fLow = npv(low, values);
+  for (let k = 0; k < 160; k += 1) {
+    const mid = (low + high) / 2;
+    const fMid = npv(mid, values);
+    if (!Number.isFinite(fMid)) return null;
+    if (Math.abs(fMid) < 1e-5 || Math.abs(high - low) < tolerance) return mid;
+    if (Math.sign(fLow) === Math.sign(fMid)) {
+      low = mid;
+      fLow = fMid;
+    } else {
+      high = mid;
+    }
+  }
+  const result = (low + high) / 2;
+  return Number.isFinite(result) ? result : null;
+}
+function annualizeMonthlyIRR(monthlyRate) {
+  if (monthlyRate === null || monthlyRate === undefined || !Number.isFinite(toNumber(monthlyRate)) || toNumber(monthlyRate) <= -1) return null;
+  return Math.pow(1 + toNumber(monthlyRate), 12) - 1;
 }
 function irrAnualFromMensual(flowsMensuales) {
-  const r = irr(flowsMensuales);
-  return Math.pow(1 + r, 12) - 1;
+  const r = irr(flowsMensuales, 0.0001);
+  return annualizeMonthlyIRR(r);
 }
 
 // ---- Formula tooltip (generic, for any calculated cell) ----
@@ -1333,17 +1836,19 @@ window.addEventListener('scroll', closeGanttColorPopup, true);
 // ---- IVA / PPM / Impuesto Renta helpers ----
 function getMonthlyIvaCredito() {
   const monthCount = getCostMonthCount();
-  const monthly = createMonthlyArray(monthCount, 0);
-  const context = buildCostContext();
-  ensureCostosState().forEach((category) => {
-    (category.partidas || []).forEach((partida) => {
-      if (!partida.tiene_iva) return;
-      if (category.nombre === 'GASTOS FINANCIEROS' && /Linea aprobada|Pago de linea/i.test(partida.nombre || '')) return;
-      const dist = getMonthlyDistributionForPartida(partida, monthCount, context);
-      dist.forEach((v, i) => { if (i < monthly.length) monthly[i] += toNumber(v) * 0.19; });
+  return withCalculationCache('monthlyIvaCredito', ['proyecto', 'cabida', 'terreno', 'construccion', 'ventas', 'gantt', 'costos', 'financiamiento', 'formulas'], monthCount, () => {
+    const monthly = createMonthlyArray(monthCount, 0);
+    const context = buildCostContext();
+    ensureCostosState().forEach((category) => {
+      (category.partidas || []).forEach((partida) => {
+        if (!partida.tiene_iva) return;
+        if (category.nombre === 'GASTOS FINANCIEROS' && /Linea aprobada|Pago de linea/i.test(partida.nombre || '')) return;
+        const dist = getMonthlyDistributionForPartida(partida, monthCount, context);
+        dist.forEach((v, i) => { if (i < monthly.length) monthly[i] += toNumber(v) * 0.19; });
+      });
     });
+    return monthly;
   });
-  return monthly;
 }
 
 function getIvaDebitoTerrainCost() {
@@ -1361,116 +1866,262 @@ function getIvaDebitoProductType(uso) {
 }
 
 function getIvaDebitoAnalysis() {
-  const totals = getTotalSalesMetrics();
-  const addons = totals.addons || getAddonSalesMetrics();
-  const grossByProduct = {
-    Departamento: 0,
-    Bodega: toNumber(addons.bodegas?.total),
-    Local: 0,
-    Estacionamiento: toNumber(addons.estacionamientos?.total),
-  };
+  return withCalculationCache('ivaDebitoAnalysis', ['proyecto', 'terreno', 'ventas', 'cabida', 'costos'], '', () => {
+    const totals = getTotalSalesMetrics();
+    const addons = totals.addons || getAddonSalesMetrics();
+    const grossByProduct = {
+      Departamento: 0,
+      Bodega: toNumber(addons.bodegas?.total),
+      Local: 0,
+      Estacionamiento: toNumber(addons.estacionamientos?.total),
+    };
 
-  state.ventasConfig.forEach((row) => {
-    const productType = getIvaDebitoProductType(row.uso);
-    grossByProduct[productType] += toNumber(getUsoSaleMetrics(row.uso).total);
-  });
+    state.ventasConfig.forEach((row) => {
+      const productType = getIvaDebitoProductType(row.uso);
+      grossByProduct[productType] += toNumber(getUsoSaleMetrics(row.uso).total);
+    });
 
-  const ib = Object.values(grossByProduct).reduce((sum, value) => sum + toNumber(value), 0);
-  const terreno = getIvaDebitoTerrainCost();
-  const ingresoNeto = ib > 0 ? (ib + (0.19 * terreno)) / 1.19 : 0;
-  const iva = ib > 0 ? ib - ingresoNeto : 0;
-  const factor = ib ? iva / ib : 0;
-  const totalUnits = Math.max(0, toNumber(totals.totalUnidades));
-  const productRows = ['Departamento', 'Bodega', 'Local', 'Estacionamiento'].map((label) => {
-    const gross = toNumber(grossByProduct[label]);
-    const participation = ib ? gross / ib : 0;
-    const productIva = iva * participation;
+    const ib = Object.values(grossByProduct).reduce((sum, value) => sum + toNumber(value), 0);
+    const terreno = getIvaDebitoTerrainCost();
+    const ingresoNeto = ib > 0 ? (ib + (0.19 * terreno)) / 1.19 : 0;
+    const iva = ib > 0 ? ib - ingresoNeto : 0;
+    const factor = ib ? iva / ib : 0;
+    const totalUnits = Math.max(0, toNumber(totals.totalUnidades));
+    const productRows = ['Departamento', 'Bodega', 'Local', 'Estacionamiento'].map((label) => {
+      const gross = toNumber(grossByProduct[label]);
+      const participation = ib ? gross / ib : 0;
+      const productIva = iva * participation;
+      return {
+        label,
+        gross,
+        participation,
+        iva: productIva,
+        neto: gross - productIva,
+      };
+    });
+
     return {
-      label,
-      gross,
-      participation,
-      iva: productIva,
-      neto: gross - productIva,
+      ib,
+      terreno,
+      ingresoNeto,
+      iva,
+      factor,
+      productRows,
+      grossAverageUnit: totalUnits ? ib / totalUnits : 0,
+      totalUnits,
     };
   });
-
-  return {
-    ib,
-    terreno,
-    ingresoNeto,
-    iva,
-    factor,
-    productRows,
-    grossAverageUnit: totalUnits ? ib / totalUnits : 0,
-    totalUnits,
-  };
 }
 
 function getMonthlyGrossEscrituras(monthCount = getCostMonthCount()) {
-  const analysis = getIvaDebitoAnalysis();
-  const { escrituras } = getPromesasEscrituracionUnidades(monthCount);
-  return createMonthlyArray(monthCount, 0).map((_, index) => (
-    Math.max(0, toNumber(escrituras[index])) * analysis.grossAverageUnit
-  ));
+  const safeMonthCount = Math.max(0, Math.round(toNumber(monthCount) || getCostMonthCount()));
+  return withCalculationCache('monthlyGrossEscrituras', ['proyecto', 'terreno', 'ventas', 'cabida', 'costos', 'gantt'], safeMonthCount, () => {
+    const analysis = getIvaDebitoAnalysis();
+    const { escrituras } = getPromesasEscrituracionUnidades(safeMonthCount);
+    return createMonthlyArray(safeMonthCount, 0).map((_, index) => (
+      Math.max(0, toNumber(escrituras[index])) * analysis.grossAverageUnit
+    ));
+  });
 }
 
 function getMonthlyIvaDebito(monthlyIncome) {
   const monthCount = getCostMonthCount();
-  const analysis = getIvaDebitoAnalysis();
-  return getMonthlyGrossEscrituras(monthCount).map((gross) => toNumber(gross) * analysis.factor);
+  return withCalculationCache('monthlyIvaDebito', ['proyecto', 'terreno', 'ventas', 'cabida', 'costos'], monthCount, () => {
+    const analysis = getIvaDebitoAnalysis();
+    return getMonthlyGrossEscrituras(monthCount).map((gross) => toNumber(gross) * analysis.factor);
+  });
 }
 
 function renderIvaDebitoPanel() {
   // El detalle de IVA dÃ©bito se renderiza inline en la fila del flujo de caja.
 }
 
-function getMonthlyPPM(monthlyIncome) {
-  // PPM = -1% * Ingresos_escrituracion
-  const monthCount = getCostMonthCount();
-  const monthly = createMonthlyArray(monthCount, 0);
-  const totals = getTotalSalesMetrics();
-  const settings = getGlobalPaymentSettings();
-  const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct));
-  const escrituraPct = Math.max(0, 100 - piePct);
-  const escrituraUnidad = totals.precioPromedio * escrituraPct / 100;
-  const { escrituras } = getPromesasEscrituracionUnidades(monthCount);
-  Array.from({ length: monthCount }, (_, m) => {
-    const unidades = escrituras[m];
-    const ingresoEscr = unidades * escrituraUnidad;
-    // factor IVA: IN = (Ventas + 0.19*Terreno)/1.19
-    monthly[m] = -0.01 * (ingresoEscr / 1.19);
-  });
-  return monthly;
+function getAnnualIrrFromMonthlyOrNull(flowsMensuales) {
+  const flows = Array.isArray(flowsMensuales) ? flowsMensuales.map((value) => toNumber(value)) : [];
+  if (flows.length < 2) return null;
+  const hasPositive = flows.some((value) => value > 0);
+  const hasNegative = flows.some((value) => value < 0);
+  if (!hasPositive || !hasNegative) return null;
+  const annual = irrAnualFromMensual(flows);
+  return Number.isFinite(annual) ? annual : null;
 }
 
-function getMonthlyImpuestoRenta(flujoAntesImpuestos, monthlyIncome) {
-  // Se paga en abril del aÃ±o siguiente; tasa configurable
+function getFlowSeriesForAnnualTir(flowsMensuales) {
+  const flows = Array.isArray(flowsMensuales) ? flowsMensuales.map((value) => toNumber(value)) : [];
+  // Replica el rango Excel usado para validar TIR: parte en el segundo mes visible del flujo.
+  return flows.length > 1 ? flows.slice(1) : flows;
+}
+
+function getFinancialSummary(options = {}) {
+  const monthCount = Math.max(0, Math.round(toNumber(options.monthCount) || getCostMonthCount()));
+  const normalize = (values) => createMonthlyArray(monthCount, 0).map((_, index) => toNumber(values?.[index]));
+  const pickSeries = (...values) => values.find((value) => Array.isArray(value));
+  const sum = (values) => normalize(values).reduce((acc, value) => acc + toNumber(value), 0);
+
+  const income = normalize(pickSeries(options.incomeSource, options.ingresosBrutosSeries, options.series?.ingresosBrutos) || getProjectMonthlyIncome(monthCount));
+  const hasProvidedCostSeries = !!pickSeries(options.costs, options.operativeCosts, options.financialTotal, options.financialCosts, options.subtotalEgresos);
+  const breakdown = hasProvidedCostSeries
+    ? null
+    : getProjectMonthlyCostBreakdown();
+  const operativeCosts = normalize(pickSeries(options.costs, options.operativeCosts, options.series?.operativeCosts) || breakdown?.operative);
+  const financialCosts = normalize(pickSeries(options.financialTotal, options.financialCosts, options.series?.financialCosts) || breakdown?.financial);
+  const subtotalEgresos = normalize(pickSeries(options.subtotalEgresos, options.series?.subtotalEgresos) || operativeCosts.map((value, index) => toNumber(value) + toNumber(financialCosts[index])));
+  const ivaCredito = normalize(pickSeries(options.ivaCreditoSource, options.ivaCredito, options.series?.ivaCredito) || getMonthlyIvaCredito());
+  const ivaDebito = normalize(pickSeries(options.ivaDebitoSource, options.ivaDebito, options.series?.ivaDebito) || getMonthlyIvaDebito(income));
+  const ivaSettlement = options.ivaSettlement || getIvaSettlementSeries(ivaCredito, ivaDebito, monthCount);
+  const pagoIva = normalize(ivaSettlement.pagoIva);
+  const totalEgresosBrutos = normalize(pickSeries(options.totalEgresosBrutos, options.series?.totalEgresosBrutos) || subtotalEgresos.map((value, index) => (
+    toNumber(value) + toNumber(ivaCredito[index]) + toNumber(pagoIva[index])
+  )));
+  const flujoBruto = normalize(pickSeries(options.flujoBruto, options.series?.flujoBruto) || income.map((value, index) => toNumber(value) - toNumber(totalEgresosBrutos[index])));
+  const ppm = normalize(pickSeries(options.ppm, options.series?.ppm) || getMonthlyPPM(income));
+  const margenBrutoPct = sum(income) ? sum(flujoBruto) / sum(income) : 0;
+  const impRenta = normalize(pickSeries(options.impRenta, options.impuestoRenta, options.series?.impuestoRenta) || getMonthlyImpuestoRenta(
+    flujoBruto,
+    income,
+    ppm,
+    getMonthlyGrossEscrituras(monthCount),
+    margenBrutoPct
+  ));
+  const flujoDespuesImpuestos = normalize(pickSeries(options.flujoDespuesImpuestos, options.series?.flujoDespuesImpuestos) || flujoBruto.map((value, index) => (
+    toNumber(value) + toNumber(ppm[index]) + toNumber(impRenta[index])
+  )));
+  const ingresosNetosSeries = normalize(pickSeries(options.ingresosNetosSeries, options.series?.ingresosNetos) || income.map((value, index) => toNumber(value) - toNumber(ivaDebito[index])));
+  const ingresosBrutos = sum(income);
+  const ingresosNetos = sum(ingresosNetosSeries);
+  const utilidadBruta = sum(flujoBruto);
+  const utilidadNeta = sum(flujoDespuesImpuestos);
+
+  return {
+    monthCount,
+    series: {
+      ingresosBrutos: income,
+      ingresosNetos: ingresosNetosSeries,
+      flujoBruto,
+      flujoDespuesImpuestos,
+      ivaCredito,
+      ivaDebito,
+      pagoIva,
+      ppm,
+      impuestoRenta: impRenta,
+      totalEgresosBrutos,
+      subtotalEgresos,
+      financialCosts,
+    },
+    ingresosBrutos,
+    ingresosNetos,
+    utilidadBruta,
+    utilidadNeta,
+    margenBrutoPct,
+    margenNetoPct: ingresosBrutos ? utilidadNeta / ingresosBrutos : 0,
+    tirAntesImpuestos: getAnnualIrrFromMonthlyOrNull(getFlowSeriesForAnnualTir(flujoBruto)),
+    tirDespuesImpuestos: getAnnualIrrFromMonthlyOrNull(getFlowSeriesForAnnualTir(flujoDespuesImpuestos)),
+    egresosNetos: -sum(subtotalEgresos),
+    totalEgresosBrutos: -sum(totalEgresosBrutos),
+    flujoCajaFinal: utilidadNeta,
+    gastosFinancieros: -sum(financialCosts),
+    ivaDebito: sum(ivaDebito),
+    ivaCredito: -sum(ivaCredito),
+    pagoIva: -sum(pagoIva),
+    ppm: sum(ppm),
+    impuestoRenta: sum(impRenta),
+  };
+}
+
+function fmtSummaryPct(value) {
+  return value === null || value === undefined || !Number.isFinite(toNumber(value))
+    ? '-'
+    : fmtPct(toNumber(value) * 100);
+}
+
+function updateResumenFinancialKpis(summary = null) {
+  const metrics = summary || window.__lastFinancialSummary || getFinancialSummary();
+  setText('kpi-ingresos-brutos', fmtUf(metrics.ingresosBrutos));
+  setText('kpi-ingresos-netos', fmtUf(metrics.ingresosNetos));
+  setText('kpi-utilidad-bruta', fmtUf(metrics.utilidadBruta));
+  setText('kpi-utilidad-neta', fmtUf(metrics.utilidadNeta));
+  setText('kpi-margen-bruto', fmtSummaryPct(metrics.margenBrutoPct));
+  setText('kpi-tir-antes', fmtSummaryPct(metrics.tirAntesImpuestos));
+  setText('kpi-tir-despues', fmtSummaryPct(metrics.tirDespuesImpuestos));
+
+  setText('kpi-ventas', fmtUf(metrics.ingresosBrutos));
+  setText('kpi-margen', fmtUf(metrics.utilidadNeta));
+  setText('kpi-margen-pct', `${fmtSummaryPct(metrics.margenNetoPct)} s/ventas`);
+}
+
+function renderFlowSummaryCards(metrics = {}) {
+  if (!$('flujo-resumen-grid')) return;
+  const summary = { ...getFinancialSummary(metrics), ...metrics };
+  const rows = [
+    { label: 'Ingresos brutos', value: fmtUf(summary.ingresosBrutos), tone: 'main' },
+    { label: 'Ingresos netos', value: fmtUf(summary.ingresosNetos), tone: 'main' },
+    { label: 'Utilidad bruta', value: fmtUf(summary.utilidadBruta), tone: toNumber(summary.utilidadBruta) >= 0 ? 'good' : 'bad' },
+    { label: 'Utilidad neta', value: fmtUf(summary.utilidadNeta), tone: toNumber(summary.utilidadNeta) >= 0 ? 'good' : 'bad' },
+    { label: 'Margen bruto', value: fmtSummaryPct(summary.margenBrutoPct), tone: toNumber(summary.margenBrutoPct) >= 0 ? 'good' : 'bad' },
+    { label: 'TIR antes de impuestos', value: fmtSummaryPct(summary.tirAntesImpuestos), tone: summary.tirAntesImpuestos == null ? '' : (toNumber(summary.tirAntesImpuestos) >= 0 ? 'good' : 'bad') },
+    { label: 'TIR despuÃ©s de impuestos', value: fmtSummaryPct(summary.tirDespuesImpuestos), tone: summary.tirDespuesImpuestos == null ? '' : (toNumber(summary.tirDespuesImpuestos) >= 0 ? 'good' : 'bad') },
+  ];
+  setHtml('flujo-resumen-grid', rows.map((item) => `
+    <div class="flow-summary-card ${item.tone ? `is-${item.tone}` : ''}">
+      <div class="flow-summary-label">${escapeHtml(item.label)}</div>
+      <div class="flow-summary-value">${escapeHtml(item.value)}</div>
+    </div>
+  `).join(''));
+  window.__lastFinancialSummary = summary;
+  updateResumenFinancialKpis(summary);
+}
+
+function getMonthlyPPM(monthlyIncome) {
+  const monthCount = getCostMonthCount();
+  return withCalculationCache('monthlyPpm', ['ventas', 'cabida', 'gantt', 'proyecto', 'terreno', 'costos'], monthCount, () => {
+    const analysis = getIvaDebitoAnalysis();
+    const netRatio = analysis.ib > 0 ? analysis.ingresoNeto / analysis.ib : 0;
+    return getMonthlyGrossEscrituras(monthCount).map((gross) => {
+      const baseEscritura = toNumber(gross) * netRatio;
+      return baseEscritura > 0 ? -0.01 * baseEscritura : 0;
+    });
+  });
+}
+
+function getMonthlyImpuestoRenta(flujoBruto, monthlyIncome, ppmSeries = null, monthlyGrossEscrituras = null, marginPctOverride = null) {
   const monthCount = getCostMonthCount();
   const monthly = createMonthlyArray(monthCount, 0);
-  const tasa = getGlobalFinancialParams().pct_impuesto_renta / 100;
-  const totalIncome = monthlyIncome.reduce((a, b) => a + toNumber(b), 0);
-  const totalFlujo = flujoAntesImpuestos.reduce((a, b) => a + toNumber(b), 0);
-  if (totalIncome <= 0 || totalFlujo <= 0) return monthly;
-  // SimplificaciÃ³n: distribuir el impuesto proporcional a escrituraciones, con desfase de 12 meses
+  const tasa = 0.27;
+  const totalIncome = (monthlyIncome || []).reduce((sum, value) => sum + toNumber(value), 0);
+  const totalFlujoBruto = (flujoBruto || []).reduce((sum, value) => sum + toNumber(value), 0);
+  const marginPct = marginPctOverride != null
+    ? toNumber(marginPctOverride)
+    : (totalIncome ? totalFlujoBruto / totalIncome : 0);
+  if (marginPct <= 0) return monthly;
   const startDate = getCostStartDate();
   const baseYear = startDate.getFullYear();
-  // Agrupar ingresos por aÃ±o calendario
-  const anual = {};
-  monthlyIncome.forEach((v, i) => {
-    const d = addMonths(startDate, i);
-    const key = d.getFullYear();
-    anual[key] = (anual[key] || 0) + toNumber(v);
-  });
-  const margen = totalFlujo / totalIncome;
-  Object.keys(anual).forEach((yearKey) => {
-    const ingresos = anual[yearKey];
+  const ppm = Array.isArray(ppmSeries) ? ppmSeries : getMonthlyPPM(monthlyIncome);
+  const escriturasGross = Array.isArray(monthlyGrossEscrituras)
+    ? monthlyGrossEscrituras
+    : getMonthlyGrossEscrituras(monthCount);
+  const yearly = {};
+
+  for (let index = 0; index < monthCount; index += 1) {
+    const year = addMonths(startDate, index).getFullYear();
+    if (!yearly[year]) {
+      yearly[year] = { escriturasBrutas: 0, ppmPagado: 0 };
+    }
+    yearly[year].escriturasBrutas += toNumber(escriturasGross[index]);
+    yearly[year].ppmPagado += toNumber(ppm[index]);
+  }
+
+  Object.keys(yearly).forEach((yearKey) => {
     const year = Number(yearKey);
-    const tributo = -tasa * ingresos * margen;
-    // Pagadero en abril del aÃ±o siguiente: mes relativo desde startDate
-    const payDate = new Date(year + 1, 3, 1); // April (mes index 3)
+    const data = yearly[year] || {};
+    if (toNumber(data.escriturasBrutas) <= 0) return;
+    const taxableIncome = toNumber(data.escriturasBrutas) * marginPct;
+    const taxToPay = Math.max(0, (tasa * taxableIncome) - Math.abs(toNumber(data.ppmPagado)));
+    if (taxToPay <= 0) return;
+    const payDate = new Date(year + 1, 3, 1);
     const monthIndex = (payDate.getFullYear() - baseYear) * 12 + (payDate.getMonth() - startDate.getMonth());
-    if (monthIndex >= 0 && monthIndex < monthCount) monthly[monthIndex] += tributo;
+    if (monthIndex >= 0 && monthIndex < monthCount) monthly[monthIndex] -= taxToPay;
   });
+
   return monthly;
 }
 
@@ -1530,23 +2181,25 @@ function normalizeConstruccion(data = {}) {
     ancho_curva: data.ancho_curva ?? 0.5,
     peak_gasto: data.peak_gasto ?? 0.5,
     pct_inicio_construccion: data.pct_inicio_construccion ?? 25,
+    edp_curve: normalizeEdpCurveConfig(data.edp_curve || data.edpCurve || data.formula_overrides?.edpCurve || {}),
   };
 }
 
 function normalizeFinanciamiento(data = {}) {
+  const { gantt_links: _ganttLinks, ganttLinks: _ganttLinksCamel, ...source } = data && typeof data === 'object' ? data : {};
   return {
-    ...data,
-    credito_terreno_activo: data.credito_terreno_activo ?? true,
-    credito_terreno_pct: data.credito_terreno_pct ?? 70,
-    credito_terreno_tasa: data.credito_terreno_tasa ?? 3.5,
-    credito_terreno_pago_intereses: data.credito_terreno_pago_intereses || 'Semestral',
-    credito_terreno_pago_capital: data.credito_terreno_pago_capital || 'Inicio: ConstrucciÃ³n',
-    linea_construccion_activo: data.linea_construccion_activo ?? true,
-    linea_construccion_pct: data.linea_construccion_pct ?? 100,
-    linea_construccion_tasa: data.linea_construccion_tasa ?? 3.5,
-    linea_construccion_pago_intereses: data.linea_construccion_pago_intereses || 'Anual',
-    linea_construccion_pago_capital: data.linea_construccion_pago_capital || 'Contra Escrituraciones',
-    pct_alzamiento: data.pct_alzamiento ?? 90,
+    ...source,
+    credito_terreno_activo: source.credito_terreno_activo ?? true,
+    credito_terreno_pct: source.credito_terreno_pct ?? 70,
+    credito_terreno_tasa: source.credito_terreno_tasa ?? 3.5,
+    credito_terreno_pago_intereses: source.credito_terreno_pago_intereses || 'Semestral',
+    credito_terreno_pago_capital: source.credito_terreno_pago_capital || 'Inicio: ConstrucciÃ³n',
+    linea_construccion_activo: source.linea_construccion_activo ?? true,
+    linea_construccion_pct: source.linea_construccion_pct ?? 100,
+    linea_construccion_tasa: source.linea_construccion_tasa ?? 3.5,
+    linea_construccion_pago_intereses: source.linea_construccion_pago_intereses || 'Anual',
+    linea_construccion_pago_capital: source.linea_construccion_pago_capital || 'Contra Escrituraciones',
+    pct_alzamiento: source.pct_alzamiento ?? 90,
   };
 }
 
@@ -1567,39 +2220,41 @@ function getConstructionDuration() {
 }
 
 function getConstructionMetrics() {
-  const source = normalizeConstruccion(state.construccion);
-  const supSobreTierra = toNumber(source.sup_sobre_tierra);
-  const supBajoTierra = toNumber(source.sup_bajo_tierra);
-  const plazoMeses = getConstructionDuration();
-  const totalSt = supSobreTierra * toNumber(source.costo_uf_m2_sobre_tierra);
-  const totalBt = supBajoTierra * toNumber(source.costo_uf_m2_bajo_tierra);
-  const gastosGeneralesMensual = Math.max(0, toNumber(source.gastos_generales_mensual));
-  const totalGastosGenerales = gastosGeneralesMensual * plazoMeses;
-  const utilidadPct = Math.max(0, toNumber(source.utilidad_pct));
-  const baseContrato = totalSt + totalBt + totalGastosGenerales;
-  const totalUtilidad = baseContrato * utilidadPct / 100;
-  const totalNeto = baseContrato + totalUtilidad;
-  const totalBruto = totalNeto * 1.19;
-  const supTotal = supSobreTierra + supBajoTierra;
+  return withCalculationCache('constructionMetrics', ['construccion', 'gantt'], '', () => {
+    const source = normalizeConstruccion(state.construccion);
+    const supSobreTierra = toNumber(source.sup_sobre_tierra);
+    const supBajoTierra = toNumber(source.sup_bajo_tierra);
+    const plazoMeses = getConstructionDuration();
+    const totalSt = supSobreTierra * toNumber(source.costo_uf_m2_sobre_tierra);
+    const totalBt = supBajoTierra * toNumber(source.costo_uf_m2_bajo_tierra);
+    const gastosGeneralesMensual = Math.max(0, toNumber(source.gastos_generales_mensual));
+    const totalGastosGenerales = gastosGeneralesMensual * plazoMeses;
+    const utilidadPct = Math.max(0, toNumber(source.utilidad_pct));
+    const baseContrato = totalSt + totalBt + totalGastosGenerales;
+    const totalUtilidad = baseContrato * utilidadPct / 100;
+    const totalNeto = baseContrato + totalUtilidad;
+    const totalBruto = totalNeto * 1.19;
+    const supTotal = supSobreTierra + supBajoTierra;
 
-  return {
-    ...source,
-    sup_sobre_tierra: supSobreTierra,
-    sup_bajo_tierra: supBajoTierra,
-    total_st: totalSt,
-    total_bt: totalBt,
-    gastos_generales_mensual: gastosGeneralesMensual,
-    total_gastos_generales: totalGastosGenerales,
-    utilidad_pct: utilidadPct,
-    total_utilidad: totalUtilidad,
-    base_contrato: baseContrato,
-    total_neto: totalNeto,
-    total_bruto: totalBruto,
-    sup_total: supTotal,
-    uf_prom: supTotal ? totalNeto / supTotal : 0,
-    uf_bruto: supTotal ? totalBruto / supTotal : 0,
-    plazo_meses: plazoMeses,
-  };
+    return {
+      ...source,
+      sup_sobre_tierra: supSobreTierra,
+      sup_bajo_tierra: supBajoTierra,
+      total_st: totalSt,
+      total_bt: totalBt,
+      gastos_generales_mensual: gastosGeneralesMensual,
+      total_gastos_generales: totalGastosGenerales,
+      utilidad_pct: utilidadPct,
+      total_utilidad: totalUtilidad,
+      base_contrato: baseContrato,
+      total_neto: totalNeto,
+      total_bruto: totalBruto,
+      sup_total: supTotal,
+      uf_prom: supTotal ? totalNeto / supTotal : 0,
+      uf_bruto: supTotal ? totalBruto / supTotal : 0,
+      plazo_meses: plazoMeses,
+    };
+  });
 }
 
 function normalizeDisplayNumber(value, decimals = 0) {
@@ -1953,7 +2608,7 @@ async function persistAutosaveScopes(scopes, { silent = true } = {}) {
       'financiamiento',
       `/api/proyectos/${state.proyectoId}/financiamiento`,
       'POST',
-      state.financiamiento
+      getPersistableFinanciamiento(state.financiamiento)
     );
   }
   if (scopeSet.has('construccion')) {
@@ -1962,7 +2617,7 @@ async function persistAutosaveScopes(scopes, { silent = true } = {}) {
       'construccion',
       `/api/proyectos/${state.proyectoId}/construccion`,
       'POST',
-      { ...state.construccion }
+      getPersistableConstruccion(state.construccion)
     );
   }
   if (scopeSet.has('terreno') || scopeSet.has('construccion') || scopeSet.has('gantt')) {
@@ -2800,6 +3455,7 @@ async function deleteCurrentProject() {
       state.financiamiento = {};
       state.capital = {};
       state.calculos = {};
+      markCalculationDirty('all', 'delete last project');
       _addrEditingMode = false;
       _nameEditingMode = false;
       _activeProjectAddressSelection = null;
@@ -2897,6 +3553,7 @@ async function deleteCurrentProject(projectId = '') {
       state.financiamiento = {};
       state.capital = {};
       state.calculos = {};
+      markCalculationDirty('all', 'delete last project');
       _addrEditingMode = false;
       _nameEditingMode = false;
       resetProjectDeleteState();
@@ -3408,9 +4065,12 @@ function ensureActionButtons() {
 function setupAutosaveListeners() {
   const formulaInput = $('cost-formula-modal-input');
   if (formulaInput && !formulaInput.dataset.autosaveBound) {
-    const onFormulaDraftChange = () => autosaveCostFormulaModal();
-    formulaInput.addEventListener('input', onFormulaDraftChange);
-    formulaInput.addEventListener('change', onFormulaDraftChange);
+    const inlineHandler = formulaInput.getAttribute('oninput') || '';
+    if (!/autosaveCostFormulaModal/.test(inlineHandler)) {
+      const onFormulaDraftChange = () => autosaveCostFormulaModal();
+      formulaInput.addEventListener('input', onFormulaDraftChange);
+      formulaInput.addEventListener('change', onFormulaDraftChange);
+    }
     formulaInput.dataset.autosaveBound = '1';
   }
 
@@ -3434,6 +4094,7 @@ function setupAutosaveListeners() {
       const run = () => {
         costEditorSyncTimer = null;
         syncCostRowDraft(row, { recompute: isIvaToggle });
+        markCalculationDirty('costos', isIvaToggle ? 'cost iva toggle' : 'cost row edit');
         scheduleAutosave('costos');
         if (isIvaToggle) {
           scheduleRenderJob('costos-iva-toggle', () => {
@@ -4292,30 +4953,34 @@ function getAddonSalesMetrics() {
 }
 
 function getTotalSalesMetrics() {
-  const addons = getAddonSalesMetrics();
-  const totalDeptos = state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).total, 0);
-  const totalAccesorios = addons.estacionamientos.total + addons.bodegas.total;
-  const totalUnidades = getTotalCommercialUnits();
-  return {
-    addons,
-    totalDeptos,
-    totalAccesorios,
-    total: totalDeptos + totalAccesorios,
-    totalUnidades,
-    precioPromedio: totalUnidades ? (totalDeptos + totalAccesorios) / totalUnidades : 0,
-  };
+  return withCalculationCache('totalSalesMetrics', ['ventas', 'cabida', 'proyecto'], '', () => {
+    const addons = getAddonSalesMetrics();
+    const totalDeptos = state.ventasConfig.reduce((sum, row) => sum + getUsoSaleMetrics(row.uso).total, 0);
+    const totalAccesorios = addons.estacionamientos.total + addons.bodegas.total;
+    const totalUnidades = getTotalCommercialUnits();
+    return {
+      addons,
+      totalDeptos,
+      totalAccesorios,
+      total: totalDeptos + totalAccesorios,
+      totalUnidades,
+      precioPromedio: totalUnidades ? (totalDeptos + totalAccesorios) / totalUnidades : 0,
+    };
+  });
 }
 
 function getGlobalPaymentSettings() {
-  const source = state.ventasConfig[0] || {};
-  return {
-    pie_promesa_pct: toNumber(source.pie_promesa_pct),
-    pie_cuotas_pct: toNumber(source.pie_cuotas_pct),
-    pie_cuoton_pct: Math.max(1, toNumber(source.pie_cuoton_pct) || 1),
-    forma_pago_promesa: ['unico', 'cuotas'].includes(String(source.forma_pago_promesa || '').trim())
-      ? String(source.forma_pago_promesa).trim()
-      : 'unico',
-  };
+  return withCalculationCache('globalPaymentSettings', ['ventas'], '', () => {
+    const source = state.ventasConfig[0] || {};
+    return {
+      pie_promesa_pct: toNumber(source.pie_promesa_pct),
+      pie_cuotas_pct: toNumber(source.pie_cuotas_pct),
+      pie_cuoton_pct: Math.max(1, toNumber(source.pie_cuoton_pct) || 1),
+      forma_pago_promesa: ['unico', 'cuotas'].includes(String(source.forma_pago_promesa || '').trim())
+        ? String(source.forma_pago_promesa).trim()
+        : 'unico',
+    };
+  });
 }
 
 function findGanttByName(name) {
@@ -4604,26 +5269,27 @@ function getScheduledWholeUnits(totalUnits, computed, month) {
 }
 
 function getPromesasEscrituracionUnidades(monthCountOrMonths) {
-  // Retorna arrays de promesas y escrituras capeados
-  // Las escrituras nunca pueden exceder el acumulado de promesas acumuladas
-  // Escrituras usa velocidad definida por usuario (ej: 20/mes exacto)
-  // Acepta monthCount (nÃºmero) o array de meses
-  const promesaRows = getCronogramaByType('PREVENTA');
-  const escrituraRow = getCronogramaByType('ESCRITURACION')[0];
-  const promesaComputed = promesaRows.length ? getCronogramaComputed(promesaRows[0]) : null;
-  const escrituraComputed = escrituraRow ? getCronogramaComputed(escrituraRow) : null;
-
   const isArrayInput = Array.isArray(monthCountOrMonths);
-  const months = isArrayInput ? monthCountOrMonths : Array.from({ length: monthCountOrMonths }, (_, i) => i);
-  const emptyFlow = { promesas: months.map(() => 0), escrituras: months.map(() => 0) };
+  const monthsKey = isArrayInput ? monthCountOrMonths.join(',') : Math.max(0, Math.round(toNumber(monthCountOrMonths)));
+  return withCalculationCache('promesasEscrituracionFlow', ['ventas', 'gantt', 'cabida'], monthsKey, () => {
+    // Retorna arrays de promesas y escrituras capeados.
+    // Las escrituras nunca pueden exceder el acumulado de promesas acumuladas.
+    const promesaRows = getCronogramaByType('PREVENTA');
+    const escrituraRow = getCronogramaByType('ESCRITURACION')[0];
+    const promesaComputed = promesaRows.length ? getCronogramaComputed(promesaRows[0]) : null;
+    const escrituraComputed = escrituraRow ? getCronogramaComputed(escrituraRow) : null;
 
-  if (!promesaComputed || !escrituraComputed) return emptyFlow;
+    const months = isArrayInput ? monthCountOrMonths : Array.from({ length: monthsKey }, (_, i) => i);
+    const emptyFlow = { promesas: months.map(() => 0), escrituras: months.map(() => 0) };
 
-  return buildVentasUnitFlowForMonths(
-    months,
-    promesaComputed.inicio,
-    escrituraComputed.inicio
-  );
+    if (!promesaComputed || !escrituraComputed) return emptyFlow;
+
+    return buildVentasUnitFlowForMonths(
+      months,
+      promesaComputed.inicio,
+      escrituraComputed.inicio
+    );
+  });
 }
 
 function renderVentasSummaryCards() {
@@ -4950,6 +5616,7 @@ function renderConstruccion() {
   setText('anticipo-monto', fmtUf(distribution.anticipoAmount));
   setText('retencion-meta', '');
   setText('retencion-monto', fmtUf(distribution.retentionAmount));
+  renderEdpCurveControls(distribution);
   renderConstructionSCurveChart(metrics, distribution);
 
   renderConstructionFinancing();
@@ -4982,7 +5649,20 @@ function renderTerrainModule() {
 
   setLocalizedInputValue('fin-terreno-pct', state.financiamiento.credito_terreno_pct, 2);
   setLocalizedInputValue('fin-terreno-tasa', state.financiamiento.credito_terreno_tasa, 2);
-  if ($('fin-terreno-pago-int')) $('fin-terreno-pago-int').value = state.financiamiento.credito_terreno_pago_intereses || 'Semestral';
+  if ($('fin-terreno-pago-int')) {
+    const rawInterestMode = String(state.financiamiento.credito_terreno_pago_intereses || 'Semestral');
+    const normalizedInterestMode = rawInterestMode
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+    if (normalizedInterestMode.includes('mensual')) $('fin-terreno-pago-int').value = 'Mensual';
+    else if (normalizedInterestMode.includes('trimestral')) $('fin-terreno-pago-int').value = 'Trimestral';
+    else if (normalizedInterestMode.includes('semestral')) $('fin-terreno-pago-int').value = 'Semestral';
+    else if (normalizedInterestMode.includes('anual')) $('fin-terreno-pago-int').value = 'Anual';
+    else if (normalizedInterestMode.includes('vencimiento') || normalizedInterestMode.includes('escritur')) $('fin-terreno-pago-int').value = 'Al vencimiento';
+    else $('fin-terreno-pago-int').value = 'Semestral';
+  }
   if ($('cfg-tasa-terreno')) $('cfg-tasa-terreno').value = toNumber(state.financiamiento.credito_terreno_tasa);
   setText('fin-terreno-costo', fmtUf(terrainBase));
   setText('fin-terreno-monto', fmtUf(approved));
@@ -5003,7 +5683,9 @@ function renderConstructionFinancing() {
 
   setLocalizedInputValue('fin-constr-pct', state.financiamiento.linea_construccion_pct, 2);
   setLocalizedInputValue('fin-constr-tasa', state.financiamiento.linea_construccion_tasa, 2);
-  if ($('fin-constr-pago-int')) $('fin-constr-pago-int').value = state.financiamiento.linea_construccion_pago_intereses || 'Anual';
+  const constructionInterestMode = getInterestPaymentDisplay(normalizeInterestPaymentMode(state.financiamiento.linea_construccion_pago_intereses, 'anual'));
+  if ($('fin-constr-pago-int')) $('fin-constr-pago-int').value = constructionInterestMode;
+  if ($('gf-constr-pago-int')) $('gf-constr-pago-int').value = constructionInterestMode;
   setLocalizedInputValue('fin-constr-alzamiento', state.financiamiento.pct_alzamiento ?? 90, 0);
   setText('fin-constr-costo', fmtUf(metrics.total_neto));
   setText('fin-constr-monto', fmtUf(approved));
@@ -5024,78 +5706,68 @@ function renderConstructionFinancing() {
 }
 
 function computeConstructionEP() {
-  // Devuelve arrays mensuales netos: { ep, anticipo, retenciones, subtotal, ivaBruto, ceec, ivaEfectivo, totalPago }
-  const metrics = getConstructionMetrics();
-  const meses = Math.max(1, metrics.plazo_meses);
   const monthCount = getCostMonthCount();
-  const startMonth = getConstructionStartMonth();
-  const defaultStartIndex = Math.max(0, Math.min(monthCount - 1, toNumber(startMonth) - 1));
-  const epLinkKey = state.proyecto?.construction_payment_links?.edppNeto || '';
-  const anticipoLinkKey = state.proyecto?.construction_payment_links?.anticipoNeto || '';
-  const epOffset = getGanttLinkOffset('construction_payment_links', 'edppNeto');
-  const anticipoOffset = getGanttLinkOffset('construction_payment_links', 'anticipoNeto');
-  const epStartIndex = Math.max(0, Math.min(monthCount - 1, getLinkedGanttStartIndex(epLinkKey, defaultStartIndex, epOffset)));
-  const constructionStartIndex = Math.max(0, Math.min(monthCount - 1, toNumber(startMonth) - 1));
-  const dist = buildConstructionSCurve(metrics, meses);
-  const cfg = getGlobalFinancialParams();
-  const ceecPct = getEffectiveCeecPct() / 100;
-  const anticipoPct = Math.max(0, toNumber(metrics.anticipo_pct)) / 100;
-  const anticipoTotal = metrics.total_neto * anticipoPct;
-  const anticipoMonth = anticipoLinkKey
-    ? Math.max(0, Math.min(monthCount - 1, getLinkedGanttStartIndex(anticipoLinkKey, Math.max(0, defaultStartIndex - 1), anticipoOffset)))
-    : Math.max(0, defaultStartIndex - 1);
+  return withCalculationCache('constructionEp', ['construccion', 'gantt', 'financiamiento', 'proyecto', 'formulas'], monthCount, () => {
+    // Devuelve arrays mensuales netos: { ep, anticipo, retenciones, subtotal, ivaBruto, ceec, ivaEfectivo, totalPago }
+    const metrics = getConstructionMetrics();
+    const meses = Math.max(1, metrics.plazo_meses);
+    const startMonth = getConstructionStartMonth();
+    const defaultStartIndex = Math.max(0, Math.min(monthCount - 1, toNumber(startMonth) - 1));
+    const epLinkKey = getGanttLinkValue('construction_payment_links', 'edppNeto');
+    const anticipoLinkKey = getGanttLinkValue('construction_payment_links', 'anticipoNeto');
+    const epOffset = getGanttLinkOffset('construction_payment_links', 'edppNeto');
+    const anticipoOffset = getGanttLinkOffset('construction_payment_links', 'anticipoNeto');
+    const epStartIndex = Math.max(0, Math.min(monthCount - 1, getLinkedGanttStartIndex(epLinkKey, defaultStartIndex, epOffset)));
+    const constructionStartIndex = Math.max(0, Math.min(monthCount - 1, toNumber(startMonth) - 1));
+    const dist = buildConstructionSCurve(metrics, meses);
+    const ceecPct = getEffectiveCeecPct() / 100;
+    const anticipoPct = Math.max(0, toNumber(metrics.anticipo_pct)) / 100;
+    const anticipoTotal = metrics.total_neto * anticipoPct;
+    const anticipoMonth = anticipoLinkKey
+      ? Math.max(0, Math.min(monthCount - 1, getLinkedGanttStartIndex(anticipoLinkKey, Math.max(0, defaultStartIndex - 1), anticipoOffset)))
+      : Math.max(0, defaultStartIndex - 1);
 
-  const epBase = createMonthlyArray(monthCount, 0);
-  const anticipoBase = createMonthlyArray(monthCount, 0);
-  const retencionesBase = createMonthlyArray(monthCount, 0);
+    const epBase = createMonthlyArray(monthCount, 0);
+    const anticipoBase = createMonthlyArray(monthCount, 0);
+    const retencionesBase = createMonthlyArray(monthCount, 0);
 
-  // Anticipo: desembolso completo un mes antes del inicio de construcciÃ³n
-  anticipoBase[Math.max(0, defaultStartIndex - 1)] += anticipoTotal;
+    anticipoBase[Math.max(0, defaultStartIndex - 1)] += anticipoTotal;
 
-  // Durante la obra: EDPP neto del saldo de contrato despues de anticipo.
-  for (let i = 0; i < meses; i += 1) {
-    const m = Math.min(monthCount - 1, defaultStartIndex + i);
-    epBase[m] += toNumber(dist.monthlyCosts[i]); // EDPP neto del mes
-    anticipoBase[m] -= toNumber(dist.monthlyAnticipoRecovery[i]); // compatibilidad: normalmente 0, el EP ya descuenta anticipo
-    retencionesBase[m] -= toNumber(dist.monthlyRetention[i]); // retenciÃ³n del mes
-  }
+    for (let i = 0; i < meses; i += 1) {
+      const m = Math.min(monthCount - 1, defaultStartIndex + i);
+      epBase[m] += toNumber(dist.monthlyCosts[i]);
+      anticipoBase[m] -= toNumber(dist.monthlyAnticipoRecovery[i]);
+      retencionesBase[m] -= toNumber(dist.monthlyRetention[i]);
+    }
 
-  // DevoluciÃ³n de retenciones al final de obra
-  const totalRet = dist.retentionAmount;
-  const finalM = Math.min(monthCount - 1, defaultStartIndex + meses);
-  retencionesBase[finalM] += totalRet;
+    const totalRet = dist.retentionAmount;
+    const finalM = Math.min(monthCount - 1, defaultStartIndex + meses);
+    retencionesBase[finalM] += totalRet;
 
-  const ep = epLinkKey ? shiftMonthlySeries(epBase, epStartIndex, monthCount) : epBase;
-  const anticipo = anticipoLinkKey ? shiftMonthlySeries(anticipoBase, anticipoMonth, monthCount) : anticipoBase;
-  const retenciones = epLinkKey ? shiftMonthlySeries(retencionesBase, epStartIndex, monthCount) : retencionesBase;
+    const ep = epLinkKey ? shiftMonthlySeries(epBase, epStartIndex, monthCount) : epBase;
+    const anticipo = anticipoLinkKey ? shiftMonthlySeries(anticipoBase, anticipoMonth, monthCount) : anticipoBase;
+    const retenciones = epLinkKey ? shiftMonthlySeries(retencionesBase, epStartIndex, monthCount) : retencionesBase;
 
-  // Calcular columnas derivadas
-  const subtotal = createMonthlyArray(monthCount, 0);
-  const ivaBruto = createMonthlyArray(monthCount, 0);
-  const ceec = createMonthlyArray(monthCount, 0);
-  const ivaEfectivo = createMonthlyArray(monthCount, 0);
-  const totalPago = createMonthlyArray(monthCount, 0);
+    const subtotal = createMonthlyArray(monthCount, 0);
+    const ivaBruto = createMonthlyArray(monthCount, 0);
+    const ceec = createMonthlyArray(monthCount, 0);
+    const ivaEfectivo = createMonthlyArray(monthCount, 0);
+    const totalPago = createMonthlyArray(monthCount, 0);
 
-  for (let m = 0; m < monthCount; m += 1) {
-    const sub = toNumber(ep[m]) + toNumber(anticipo[m]) + toNumber(retenciones[m]);
-    subtotal[m] = sub;
-    // IVA bruto: 19% del subtotal neto. Como el subtotal es costo (negativo),
-    // el IVA bruto también es negativo.
-    const ivaB = sub * 0.19;
-    ivaBruto[m] = ivaB;
-    // CEEC: crédito tributario POSITIVO que compensa el IVA. Se calcula como
-    // ceec_pct × |IVA bruto|. Independiente del signo del subtotal.
-    const ceecVal = Math.abs(toNumber(ivaB)) * ceecPct;
-    ceec[m] = ceecVal;
-    // IVA efectivo = IVA bruto + CEEC. Como IVA bruto es negativo y CEEC es
-    // positivo, el resultado es un IVA menos negativo (lo que efectivamente
-    // se paga al SII después del beneficio).
-    const ivaE = ivaB + ceecVal;
-    ivaEfectivo[m] = ivaE;
-    totalPago[m] = sub + ivaE;
-  }
+    for (let m = 0; m < monthCount; m += 1) {
+      const sub = toNumber(ep[m]) + toNumber(anticipo[m]) + toNumber(retenciones[m]);
+      subtotal[m] = sub;
+      const ivaB = sub * 0.19;
+      ivaBruto[m] = ivaB;
+      const ceecVal = Math.abs(toNumber(ivaB)) * ceecPct;
+      ceec[m] = ceecVal;
+      const ivaE = ivaB + ceecVal;
+      ivaEfectivo[m] = ivaE;
+      totalPago[m] = sub + ivaE;
+    }
 
-  return { ep, anticipo, retenciones, subtotal, ivaBruto, ceec, ivaEfectivo, totalPago, startMonth, constructionStartIndex, epStartIndex, meses, anticipoMonth, anticipoTotal };
+    return { ep, anticipo, retenciones, subtotal, ivaBruto, ceec, ivaEfectivo, totalPago, startMonth, constructionStartIndex, epStartIndex, meses, anticipoMonth, anticipoTotal };
+  });
 }
 
 function renderConstructionEP() {
@@ -5112,8 +5784,8 @@ function renderConstructionEP() {
 
   const total = (arr) => arr.reduce((a, b) => a + toNumber(b), 0);
   const rows = [
-    { key: 'ep_bruto', label: 'EP (EDPP neto)', values: data.ep, formula: 'EDPP_neto(t) = saldo neto contrato despues de anticipo distribuido por curva S', color: '#fff' },
-    { key: 'anticipo', label: 'Anticipo neto', values: data.anticipo, formula: `+Anticipo neto total un mes antes de construccion; los EDPP reparten el saldo neto del contrato  (Total = ${fmtUf(data.anticipoTotal)})`, color: '#fbbf24' },
+    { key: 'ep_bruto', label: 'EP (EDPP neto)', values: data.ep, formula: 'EDPP_neto(t) = total contrato neto x % curva mensual', color: '#fff' },
+    { key: 'anticipo', label: 'Anticipo neto', values: data.anticipo, formula: `+Anticipo neto total un mes antes de construccion; recuperacion proporcional segun curva  (Total = ${fmtUf(data.anticipoTotal)})`, color: '#fbbf24' },
     { key: 'retenciones', label: 'Retenciones netas', values: data.retenciones, formula: 'Retencion neta mensual y devolucion neta total al final de obra.', color: '#fbbf24' },
     { key: 'subtotal', label: 'Subtotal neto', values: data.subtotal, formula: 'EDPP neto + Anticipo neto + Retenciones netas', bold: true, color: '#22c55e' },
     { key: 'iva_bruto', label: 'IVA bruto (19%)', values: data.ivaBruto, formula: 'Subtotal neto Ã— 19%', color: '#94a3b8' },
@@ -5137,9 +5809,9 @@ function renderConstructionEP() {
     bg: r.bold ? '#f0fdf4' : '#fff',
     totalText: fmtUf(total(r.values)),
     actionHtml: r.key === 'ep_bruto'
-      ? renderTinyGanttLinkControl('construction_payment_links', 'edppNeto', state.proyecto?.construction_payment_links?.edppNeto || '')
+      ? renderTinyGanttLinkControl('construction_payment_links', 'edppNeto', getGanttLinkValue('construction_payment_links', 'edppNeto'))
       : (r.key === 'anticipo'
-        ? renderTinyGanttLinkControl('construction_payment_links', 'anticipoNeto', state.proyecto?.construction_payment_links?.anticipoNeto || '')
+        ? renderTinyGanttLinkControl('construction_payment_links', 'anticipoNeto', getGanttLinkValue('construction_payment_links', 'anticipoNeto'))
         : ''),
   })), { includeTotal: true });
   setHtml('constr-ep-tfoot', '');
@@ -5163,7 +5835,7 @@ function renderConstructionGF(epData) {
 
   const pagosLinea = createMonthlyArray(monthCount, 0);
   const acumulado = createMonthlyArray(monthCount, 0);
-  const interesMensual = createMonthlyArray(monthCount, 0);
+  const interesMensualDevengado = createMonthlyArray(monthCount, 0);
   const impTimbres = createMonthlyArray(monthCount, 0);
 
   let prevAcum = 0;
@@ -5176,13 +5848,12 @@ function renderConstructionGF(epData) {
     const saldoDisponible = Math.max(0, prevAcum + g);
     const pago = Math.max(0, Math.min(saldoDisponible, pagoObjetivo));
     pagosLinea[t] = -pago;
-    const apertura = Math.max(0, prevAcum);
     acumulado[t] = prevAcum + g + pagosLinea[t];
-    const cierre = Math.max(0, acumulado[t]);
-    const saldoPromedio = (apertura + cierre) / 2;
-    interesMensual[t] = saldoPromedio * tasaMensual;
+    interesMensualDevengado[t] = Math.max(0, acumulado[t]) * tasaMensual;
     prevAcum = acumulado[t];
   }
+  const interestMode = normalizeInterestPaymentMode(state.financiamiento.linea_construccion_pago_intereses, 'anual');
+  const interesPagado = distributeAccruedInterest(interesMensualDevengado, acumulado, interestMode);
 
   if (DEBUG_PAGOS_LINEA) {
     console.log('PAGOS LINEA DEBUG', {
@@ -5203,7 +5874,7 @@ function renderConstructionGF(epData) {
   const rows = [
     { label: 'GIROS (desde EP)', values: giros, formula: 'GIROS(t) = TOTAL_A_PAGO_c_IVA(t)  [conectado a tabla EP]', color: '#22c55e' },
     { label: 'ACUMULADO', values: acumulado, formula: 'ACUMULADO(t) = ACUMULADO(tâˆ’1) + GIROS(t) + PAGOS_LINEA(t)', bold: true, color: '#0f172a' },
-    { label: `INTERÃ‰S (${cfg.tasa_construccion}% anual)`, values: interesMensual, formula: `INTERÃ‰S(t) = ACUMULADO(t) Ã— ${cfg.tasa_construccion}%/12`, color: '#f59e0b' },
+    { label: `INTERÉS ${getInterestPaymentDisplay(interestMode).toUpperCase()} (${cfg.tasa_construccion}% anual)`, values: interesPagado, formula: `Interés mensual devengado = saldo acumulado del mes × ${cfg.tasa_construccion}%/12 · pago ${getInterestPaymentDisplay(interestMode).toLowerCase()}`, color: '#f59e0b' },
     { label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, values: impTimbres, formula: `IMP_TIMBRES(t) = GIROS(t) Ã— ${cfg.pct_timbres}%`, color: '#f59e0b' },
   ];
 
@@ -5239,6 +5910,7 @@ function onConfigParamChange(force = false) {
   });
   state.proyecto.pct_timbres = 0.8;
   if ($('cfg-pct-timbres')) $('cfg-pct-timbres').value = '0.8';
+  markCalculationDirty(['proyecto', 'financiamiento'], 'global config');
   if (!force && shouldDeferEditingWork()) {
     queueDeferredEditCallback('global-config-change', () => onConfigParamChange(true));
     return;
@@ -5256,40 +5928,126 @@ function onConfigParamChange(force = false) {
 }
 window.onConfigParamChange = onConfigParamChange;
 
-function buildConstructionSCurve(metrics, meses) {
+function getEdpCurvePresetWeights(mode, months, metrics = {}) {
+  const size = Math.max(1, Math.round(toNumber(months)));
+  const curveMode = normalizeEdpCurveMode(mode);
+  if (curveMode === 'linear') return Array.from({ length: size }, () => 1);
+  if (curveMode === 'smooth_s') {
+    return Array.from({ length: size }, (_, index) => {
+      const x = (index + 0.5) / size;
+      return Math.max(0.001, Math.sin(Math.PI * x) ** 1.35);
+    });
+  }
+  if (curveMode === 'front_loaded') {
+    return Array.from({ length: size }, (_, index) => (size - index) ** 1.35);
+  }
+  if (curveMode === 'back_loaded') {
+    return Array.from({ length: size }, (_, index) => (index + 1) ** 1.35);
+  }
+
   const width = Math.max(0.08, toNumber(metrics.ancho_curva || 0.5));
   const peak = Math.min(0.92, Math.max(0.08, toNumber(metrics.peak_gasto || 0.5)));
-  const anticipoPct = Math.max(0, toNumber(metrics.anticipo_pct)) / 100;
-  const retencionPct = Math.max(0, toNumber(metrics.retencion_pct)) / 100;
-  const anticipoAmount = metrics.total_neto * anticipoPct;
-  const epBaseNeta = Math.max(0, metrics.total_neto - anticipoAmount);
-  const weights = Array.from({ length: meses }, (_, index) => {
-    const x = meses === 1 ? 1 : index / (meses - 1);
+  return Array.from({ length: size }, (_, index) => {
+    const x = size === 1 ? 1 : index / (size - 1);
     const gaussian = Math.exp(-((x - peak) ** 2) / (2 * (width ** 2)));
-    const rampIn = Math.min(1, (index + 1) / Math.max(1, Math.round(meses * 0.28)));
-    const rampOut = Math.min(1, (meses - index) / Math.max(1, Math.round(meses * 0.22)));
+    const rampIn = Math.min(1, (index + 1) / Math.max(1, Math.round(size * 0.28)));
+    const rampOut = Math.min(1, (size - index) / Math.max(1, Math.round(size * 0.22)));
     return Math.max(0.001, gaussian * rampIn * rampOut);
   });
-  const weightTotal = weights.reduce((sum, value) => sum + value, 0) || 1;
-  const monthlyCosts = weights.map((weight) => (epBaseNeta * weight) / weightTotal);
-  const monthlyAnticipoRecovery = monthlyCosts.map(() => 0);
-  const monthlyRetention = monthlyCosts.map((value, index) => Math.max(0, value - monthlyAnticipoRecovery[index]) * retencionPct);
-  const monthlyEdppNet = monthlyCosts.map((value, index) => Math.max(0, value - monthlyAnticipoRecovery[index] - monthlyRetention[index]));
-  const cumulativeCosts = monthlyCosts.reduce((acc, value, index) => {
-    acc.push((acc[index - 1] || 0) + value);
+}
+
+function normalizeWeightsToPercentages(weights = []) {
+  const source = Array.isArray(weights) && weights.length ? weights.map((value) => Math.max(0, toNumber(value))) : [1];
+  const totalWeight = source.reduce((sum, value) => sum + value, 0) || 1;
+  return source.map((value) => (value / totalWeight) * 100);
+}
+
+function getPresetEdpCurvePercentages(mode, months, metrics = {}) {
+  return normalizeWeightsToPercentages(getEdpCurvePresetWeights(mode, months, metrics));
+}
+
+function getConstructionEdpCurveConfig(months = getConstructionDuration()) {
+  const config = normalizeEdpCurveConfig(
+    state.construccion?.edp_curve
+    || state.construccion?.edpCurve
+    || state.proyecto?.formula_overrides?.edpCurve
+    || {},
+    months
+  );
+  state.construccion = normalizeConstruccion({
+    ...(state.construccion || {}),
+    edp_curve: config,
+  });
+  return config;
+}
+
+function syncConstructionEdpCurveToFormulaOverrides() {
+  if (!state.construccion) return;
+  const config = normalizeEdpCurveConfig(state.construccion.edp_curve || {}, state.construccion.plazo_meses || getConstructionDuration());
+  state.construccion.edp_curve = config;
+  state.proyecto = normalizeProject({
+    ...(state.proyecto || {}),
+    formula_overrides: {
+      ...(state.proyecto?.formula_overrides || {}),
+      edpCurve: config,
+    },
+  });
+  if (window.__bricsaFormulaPatch?.formulaOverrides) {
+    window.__bricsaFormulaPatch.formulaOverrides = normalizeFormulaOverrides({
+      ...window.__bricsaFormulaPatch.formulaOverrides,
+      edpCurve: config,
+    });
+  }
+}
+
+function getEffectiveEdpCurve(metrics, months) {
+  const config = getConstructionEdpCurveConfig(months);
+  const isManual = config.manualEnabled || config.mode === 'custom';
+  const monthlyPercentages = isManual
+    ? normalizeEdpCurveConfig(config, months).monthlyPercentages
+    : getPresetEdpCurvePercentages(config.mode, months, metrics);
+  const cumulativePercentages = monthlyPercentages.reduce((acc, value, index) => {
+    acc.push((acc[index - 1] || 0) + toNumber(value));
     return acc;
   }, []);
-  const cumulativePct = cumulativeCosts.map((value) => value / Math.max(1, metrics.total_neto) * 100);
   return {
-    monthlyCosts,
-    monthlyAnticipoRecovery,
-    monthlyRetention,
-    monthlyEdppNet,
-    cumulativeCosts,
-    cumulativePct,
-    anticipoAmount,
-    retentionAmount: monthlyRetention.reduce((sum, value) => sum + value, 0),
+    config,
+    monthlyPercentages,
+    cumulativePercentages,
+    totalPct: monthlyPercentages.reduce((sum, value) => sum + toNumber(value), 0),
   };
+}
+
+function buildConstructionSCurve(metrics, meses) {
+  const safeMeses = Math.max(1, Math.round(toNumber(meses) || 1));
+  return withCalculationCache('constructionSCurve', ['construccion', 'gantt', 'formulas'], safeMeses, () => {
+    const anticipoPct = Math.max(0, toNumber(metrics.anticipo_pct)) / 100;
+    const retencionPct = Math.max(0, toNumber(metrics.retencion_pct)) / 100;
+    const anticipoAmount = metrics.total_neto * anticipoPct;
+    const effectiveCurve = getEffectiveEdpCurve(metrics, safeMeses);
+    const monthlyCosts = effectiveCurve.monthlyPercentages.map((pct) => metrics.total_neto * toNumber(pct) / 100);
+    const monthlyAnticipoRecovery = monthlyCosts.map((value) => Math.max(0, value) * anticipoPct);
+    const monthlyRetention = monthlyCosts.map((value, index) => Math.max(0, value - monthlyAnticipoRecovery[index]) * retencionPct);
+    const monthlyEdppNet = monthlyCosts.map((value, index) => Math.max(0, value - monthlyAnticipoRecovery[index] - monthlyRetention[index]));
+    const cumulativeCosts = monthlyCosts.reduce((acc, value, index) => {
+      acc.push((acc[index - 1] || 0) + value);
+      return acc;
+    }, []);
+    const cumulativePct = effectiveCurve.cumulativePercentages.map((value) => Math.min(120, Math.max(0, value)));
+    return {
+      monthlyCosts,
+      monthlyPercentages: effectiveCurve.monthlyPercentages,
+      monthlyAnticipoRecovery,
+      monthlyRetention,
+      monthlyEdppNet,
+      cumulativeCosts,
+      cumulativePct,
+      totalPct: effectiveCurve.totalPct,
+      curveConfig: effectiveCurve.config,
+      anticipoAmount,
+      retentionAmount: monthlyRetention.reduce((sum, value) => sum + value, 0),
+    };
+  });
 }
 
 function renderConstructionSCurveChart(metrics, distribution) {
@@ -5312,19 +6070,6 @@ function renderConstructionSCurveChart(metrics, distribution) {
           borderColor: '#2563eb',
           borderWidth: 1,
           borderRadius: 5,
-          yAxisID: 'y',
-        },
-        {
-          type: 'line',
-          label: 'EDPP neto base',
-          data: distribution.monthlyCosts,
-          borderColor: '#f59e0b',
-          backgroundColor: 'rgba(245,158,11,.12)',
-          tension: 0.28,
-          pointRadius: 2,
-          pointHoverRadius: 4,
-          borderDash: [6, 4],
-          fill: false,
           yAxisID: 'y',
         },
         {
@@ -5378,7 +6123,7 @@ function renderConstructionSCurveChart(metrics, distribution) {
               if (!items?.length || items[0].dataset?.yAxisID === 'y1') return [];
               const index = items[0].dataIndex;
               return [
-                `Anticipo ya descontado del saldo EP: ${fmtUf(distribution.anticipoAmount)}`,
+                `Anticipo recuperado total: ${fmtUf(distribution.anticipoAmount)}`,
                 `RetenciÃ³n: ${fmtUf(distribution.monthlyRetention[index])}`,
               ];
             },
@@ -5413,6 +6158,211 @@ function renderConstructionSCurveChart(metrics, distribution) {
   });
 }
 
+function getEdpCurveModeLabel(mode) {
+  const labels = {
+    auto: 'Curva automática',
+    linear: 'Curva lineal',
+    smooth_s: 'Curva S suave',
+    front_loaded: 'Curva S concentrada al inicio',
+    back_loaded: 'Curva S concentrada al final',
+    custom: 'Curva personalizada',
+  };
+  return labels[normalizeEdpCurveMode(mode)] || labels.auto;
+}
+
+function renderEdpCurveControls(distribution = null) {
+  const modeSelect = $('edp-curve-mode');
+  const manualToggle = $('edp-curve-manual');
+  const editor = $('edp-curve-editor');
+  const status = $('edp-curve-status');
+  const total = $('edp-curve-total');
+  if (!modeSelect || !manualToggle || !editor || !status || !total) return;
+
+  const metrics = getConstructionMetrics();
+  const months = Math.max(1, toNumber(metrics.plazo_meses || getConstructionDuration()));
+  const config = getConstructionEdpCurveConfig(months);
+  const effective = distribution || buildConstructionSCurve(metrics, months);
+  modeSelect.value = config.mode;
+  if (config.mode !== 'custom') {
+    modeSelect.dataset.lastPresetMode = config.mode;
+  } else if (!modeSelect.dataset.lastPresetMode) {
+    modeSelect.dataset.lastPresetMode = 'auto';
+  }
+  manualToggle.checked = !!config.manualEnabled;
+  const shouldShowEditor = config.manualEnabled || config.mode === 'custom';
+  editor.hidden = !shouldShowEditor;
+  editor.innerHTML = shouldShowEditor ? renderEdpCurveEditorHtml(config, months) : '';
+  renderEdpCurveStatus(effective.totalPct);
+  total.textContent = `Suma ${fmtNumber(effective.totalPct, 2)}%`;
+  localizeNumberInputs(editor);
+}
+
+function renderEdpCurveEditorHtml(config, months) {
+  const values = normalizeEdpCurveConfig(config, months).monthlyPercentages;
+  let cumulative = 0;
+  const cumulativeValues = values.map((value) => {
+    cumulative += toNumber(value);
+    return cumulative;
+  });
+  return `
+    <div class="edp-curve-editor-scroll">
+      <table class="edp-curve-editor-table">
+        <tbody>
+          <tr>
+            <th>Mes</th>
+            ${values.map((_, index) => `<td>${index + 1}</td>`).join('')}
+          </tr>
+          <tr>
+            <th>% EDP mensual</th>
+            ${values.map((value, index) => `
+              <td>
+                <input
+                  class="inp edp-curve-input"
+                  type="text"
+                  inputmode="decimal"
+                  data-localized-number="1"
+                  value="${escapeHtml(fmtInputNumber(value, 2))}"
+                  oninput="onEdpCurveMonthlyInput(${index}, this)"
+                  onblur="onEdpCurveMonthlyInput(${index}, this)"
+                >
+              </td>
+            `).join('')}
+          </tr>
+          <tr>
+            <th>% acumulado</th>
+            ${cumulativeValues.map((value) => `<td class="edp-curve-cumulative">${fmtNumber(value, 1)}%</td>`).join('')}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderEdpCurveStatus(totalPct = null) {
+  const status = $('edp-curve-status');
+  const total = $('edp-curve-total');
+  if (!status || !total) return;
+  const metrics = getConstructionMetrics();
+  const months = Math.max(1, toNumber(metrics.plazo_meses || getConstructionDuration()));
+  const config = getConstructionEdpCurveConfig(months);
+  const effectiveTotal = totalPct == null
+    ? getEffectiveEdpCurve(metrics, months).totalPct
+    : toNumber(totalPct);
+  const delta = 100 - effectiveTotal;
+  total.textContent = `Suma ${fmtNumber(effectiveTotal, 2)}%`;
+  status.className = 'edp-curve-status';
+  if (Math.abs(delta) <= 0.01) {
+    status.classList.add('is-ok');
+    status.textContent = `${getEdpCurveModeLabel(config.mode)} · 100% correcto`;
+  } else if (delta > 0) {
+    status.classList.add('is-warn');
+    status.textContent = `Falta ${fmtNumber(delta, 2)}%`;
+  } else {
+    status.classList.add('is-error');
+    status.textContent = `Sobran ${fmtNumber(Math.abs(delta), 2)}%`;
+  }
+}
+
+function refreshEdpCurveDependents({ renderEditor = false } = {}) {
+  const metrics = getConstructionMetrics();
+  const months = Math.max(1, toNumber(metrics.plazo_meses || getConstructionDuration()));
+  const distribution = buildConstructionSCurve(metrics, months);
+  setText('retencion-monto', fmtUf(distribution.retentionAmount));
+  renderConstructionSCurveChart(metrics, distribution);
+  const epData = renderConstructionEP();
+  renderConstructionGF(epData);
+  renderProjectCashflow();
+  renderKpis();
+  renderEdpCurveStatus(distribution.totalPct);
+  if (renderEditor) renderEdpCurveControls(distribution);
+  scheduleAutosave('construccion');
+}
+
+function onEdpCurveModeChange(select) {
+  const metrics = getConstructionMetrics();
+  const months = Math.max(1, toNumber(metrics.plazo_meses || getConstructionDuration()));
+  const current = getConstructionEdpCurveConfig(months);
+  const mode = normalizeEdpCurveMode(select?.value);
+  if (select && mode !== 'custom') select.dataset.lastPresetMode = mode;
+  const seedPreset = mode !== 'custom' && current.manualEnabled;
+  const next = normalizeEdpCurveConfig({
+    ...current,
+    mode,
+    manualEnabled: mode === 'custom' ? true : current.manualEnabled,
+    monthlyPercentages: seedPreset
+      ? getPresetEdpCurvePercentages(mode, months, metrics)
+      : current.monthlyPercentages.some((value) => toNumber(value) > 0)
+      ? current.monthlyPercentages
+      : getPresetEdpCurvePercentages(mode === 'custom' ? 'auto' : mode, months, metrics),
+  }, months);
+  state.construccion.edp_curve = next;
+  syncConstructionEdpCurveToFormulaOverrides();
+  markCalculationDirty('construccion', 'edp curve mode');
+  refreshEdpCurveDependents({ renderEditor: true });
+}
+
+function onEdpCurveManualToggle(input) {
+  const metrics = getConstructionMetrics();
+  const months = Math.max(1, toNumber(metrics.plazo_meses || getConstructionDuration()));
+  const current = getConstructionEdpCurveConfig(months);
+  const manualEnabled = !!input?.checked;
+  const modeSelect = $('edp-curve-mode');
+  const fallbackPresetMode = normalizeEdpCurveMode(
+    modeSelect?.dataset?.lastPresetMode
+    || (current.mode !== 'custom' ? current.mode : 'auto')
+  );
+  const seedMode = current.mode === 'custom' ? fallbackPresetMode : current.mode;
+  const hasCustomValues = current.monthlyPercentages.some((value) => toNumber(value) > 0);
+  const monthlyPercentages = manualEnabled && current.mode !== 'custom'
+    ? getPresetEdpCurvePercentages(seedMode, months, metrics)
+    : (hasCustomValues ? current.monthlyPercentages : getPresetEdpCurvePercentages(seedMode, months, metrics));
+  const nextMode = !manualEnabled && current.mode === 'custom' ? seedMode : current.mode;
+  state.construccion.edp_curve = normalizeEdpCurveConfig({
+    mode: nextMode,
+    manualEnabled,
+    monthlyPercentages,
+  }, months);
+  syncConstructionEdpCurveToFormulaOverrides();
+  markCalculationDirty('construccion', 'edp curve toggle');
+  refreshEdpCurveDependents({ renderEditor: true });
+}
+
+function updateEdpCurveEditorCumulative(values = []) {
+  const cells = Array.from(document.querySelectorAll('#edp-curve-editor .edp-curve-cumulative'));
+  let cumulative = 0;
+  cells.forEach((cell, index) => {
+    cumulative += toNumber(values[index]);
+    cell.textContent = `${fmtNumber(cumulative, 1)}%`;
+  });
+}
+
+function onEdpCurveMonthlyInput(index, input) {
+  const months = Math.max(1, getConstructionDuration());
+  const current = getConstructionEdpCurveConfig(months);
+  const values = normalizeEdpCurveConfig(current, months).monthlyPercentages;
+  values[index] = Math.max(0, toNumber(input?.value));
+  state.construccion.edp_curve = normalizeEdpCurveConfig({
+    mode: 'custom',
+    manualEnabled: true,
+    monthlyPercentages: values,
+  }, months);
+  syncConstructionEdpCurveToFormulaOverrides();
+  markCalculationDirty('construccion', 'edp curve monthly');
+  const select = $('edp-curve-mode');
+  const toggle = $('edp-curve-manual');
+  if (select) select.value = 'custom';
+  if (toggle) toggle.checked = true;
+  updateEdpCurveEditorCumulative(values);
+  const currentEventType = String(window.event?.type || '').toLowerCase();
+  if (currentEventType === 'input') {
+    renderEdpCurveStatus(values.reduce((sum, value) => sum + toNumber(value), 0));
+    scheduleRenderJob('edp-curve-dependents', () => refreshEdpCurveDependents({ renderEditor: false }), 220);
+    return;
+  }
+  cancelRenderJob('edp-curve-dependents');
+  refreshEdpCurveDependents({ renderEditor: false });
+}
+
 function getFinancingSourceRows(sourceType) {
   const category = ensureCostosState().find((item) => item.nombre === 'GASTOS FINANCIEROS');
   const matcher = sourceType === 'terreno' ? /^Terreno/i : /^Construccion/i;
@@ -5427,6 +6377,29 @@ function renderFinancingSourcePlanilla(sourceType) {
 
   // Terreno: patrÃ³n unificado GIROS / ACUMULADO / INTERÃ‰S / TIMBRES con fÃ³rmulas visibles
   if (sourceType === 'terreno') {
+    const normalizeTerrainInterestPaymentMode = (value) => {
+      const normalized = String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+      if (normalized.includes('mensual')) return 'mensual';
+      if (normalized.includes('trimestral')) return 'trimestral';
+      if (normalized.includes('semestral')) return 'semestral';
+      if (normalized.includes('anual')) return 'anual';
+      if (normalized.includes('vencimiento') || normalized.includes('escritur')) return 'al_vencimiento';
+      return 'semestral';
+    };
+    const getTerrainInterestPaymentInterval = (mode) => {
+      if (mode === 'mensual') return 1;
+      if (mode === 'trimestral') return 3;
+      if (mode === 'semestral') return 6;
+      if (mode === 'anual') return 12;
+      return 0;
+    };
+    const terrainInterestMode = normalizeTerrainInterestPaymentMode(state.financiamiento?.credito_terreno_pago_intereses);
+    const terrainInterestInterval = getTerrainInterestPaymentInterval(terrainInterestMode);
+
     const labels = getCostMonthLabels();
     const monthCount = getCostMonthCount();
     const cfg = getGlobalFinancialParams();
@@ -5440,7 +6413,7 @@ function renderFinancingSourcePlanilla(sourceType) {
       : 0;
     // Giro: mismo mes de compra de terreno (desde Gantt)
     const terrainPurchaseMonthDefault = Math.min(monthCount - 1, Math.max(0, toNumber(getTerrainMilestone()?.inicio || 0)));
-    const terrainGirosLink = state.proyecto?.land_finance_links?.giros || '';
+    const terrainGirosLink = getGanttLinkValue('land_finance_links', 'giros');
     const terrainGirosOffset = getGanttLinkOffset('land_finance_links', 'giros');
     const terrainPurchaseMonth = Math.min(
       monthCount - 1,
@@ -5448,7 +6421,7 @@ function renderFinancingSourcePlanilla(sourceType) {
     );
     // Pago lÃ­nea: mismo mes del anticipo de construcciÃ³n (mes antes del inicio de obra)
     const anticipoLineaMonthDefault = Math.max(0, Math.min(monthCount - 1, getConstructionStartMonth() - 1));
-    const terrenoPagoLineaLink = state.proyecto?.land_finance_links?.pagoLinea || '';
+    const terrenoPagoLineaLink = getGanttLinkValue('land_finance_links', 'pagoLinea');
     const terrenoPagoLineaOffset = getGanttLinkOffset('land_finance_links', 'pagoLinea');
     const anticipoLineaMonth = Math.max(
       0,
@@ -5476,20 +6449,53 @@ function renderFinancingSourcePlanilla(sourceType) {
       acumulado[t] = prevAcum + toNumber(giros[t]) + toNumber(pagosLinea[t]);
       prevAcum = acumulado[t];
     }
-    // Pass 2: interÃ©s anual â€” se paga en el aniversario del giro (o al cierre anticipado)
-    const interesAnual = createMonthlyArray(monthCount, 0);
+    // Pass 2: interÃ©s segÃºn frecuencia de pago
+    const interesPagado = createMonthlyArray(monthCount, 0);
     let accrued = 0;
+    let financedMonths = 0;
     for (let t = 0; t < monthCount; t += 1) {
-      accrued += Math.max(0, acumulado[t]) * tasaMensual;
-      const monthsSinceGiro = t - terrainPurchaseMonth;
-      const isAnniversary = monthsSinceGiro > 0 && monthsSinceGiro % 12 === 0;
+      const saldo = Math.max(0, acumulado[t]);
+      const interesMes = saldo * tasaMensual;
+      accrued += interesMes;
+      if (saldo > 0) financedMonths += 1;
+
       const isCreditPaidOff = acumulado[t] <= 0 && t > 0 && acumulado[t - 1] > 0;
-      if ((isAnniversary || isCreditPaidOff) && accrued > 0) {
-        interesAnual[t] = accrued;
+      const isPeriodicPayment = terrainInterestInterval > 0
+        && saldo > 0
+        && financedMonths > 0
+        && financedMonths % terrainInterestInterval === 0;
+      const isMaturityPayment = terrainInterestMode === 'al_vencimiento' && isCreditPaidOff;
+
+      if ((isPeriodicPayment || isMaturityPayment || isCreditPaidOff) && accrued > 0) {
+        interesPagado[t] = accrued;
         accrued = 0;
       }
     }
-    if (accrued > 0) interesAnual[monthCount - 1] += accrued;
+    if (accrued > 0 && monthCount > 0) {
+      let fallbackIndex = monthCount - 1;
+      for (let t = monthCount - 1; t >= 0; t -= 1) {
+        if (toNumber(acumulado[t]) > 0 || toNumber(giros[t]) !== 0 || toNumber(pagosLinea[t]) !== 0) {
+          fallbackIndex = t;
+          break;
+        }
+      }
+      interesPagado[fallbackIndex] += accrued;
+    }
+
+    const interestLabelByMode = {
+      mensual: 'INTERÉS MENSUAL',
+      trimestral: 'INTERÉS TRIMESTRAL',
+      semestral: 'INTERÉS SEMESTRAL',
+      anual: 'INTERÉS ANUAL',
+      al_vencimiento: 'INTERÉS AL VENCIMIENTO',
+    };
+    const interestFormulaByMode = {
+      mensual: 'INTERÉS(t) = ACUMULADO(t) × Tasa anual / 12 · pagado cada mes con saldo',
+      trimestral: 'INTERÉS TRIMESTRAL = suma de 3 intereses mensuales · pagado cada 3 meses o al cierre',
+      semestral: 'INTERÉS SEMESTRAL = suma de 6 intereses mensuales · pagado cada 6 meses o al cierre',
+      anual: 'INTERÉS ANUAL = suma de 12 intereses mensuales · pagado cada 12 meses o al cierre',
+      al_vencimiento: 'INTERÉS AL VENCIMIENTO = acumulado mensual de interés · pagado al cierre de la deuda',
+    };
 
     setHtml('terreno-fin-planilla-head', `
       <tr>
@@ -5501,7 +6507,7 @@ function renderFinancingSourcePlanilla(sourceType) {
       { key: 'giros', label: 'GIROS', values: giros, formula: `GIROS = % lÃ­nea Ã— Costo terreno Â· desembolso en mes compra`, color: '#22c55e' },
       { key: 'pago_linea', label: 'PAGO LÃNEA', values: pagosLinea, formula: `PAGO_LÃNEA(t) = pago al vencimiento del plazo de la lÃ­nea de terreno`, color: '#ef4444' },
       { key: 'acumulado', label: 'ACUMULADO', values: acumulado, formula: 'ACUMULADO(t) = ACUMULADO(tâˆ’1) + GIROS(t) + PAGOS_LINEA(t)', bold: true, color: '#0f172a' },
-      { key: 'interes', label: `INTERÃ‰S ANUAL (${tasaTerreno}%)`, values: interesAnual, formula: `Acumulado anual de interÃ©s Â· pagado en aniversario del giro o al cierre anticipado`, color: '#f59e0b' },
+      { key: 'interes', label: `${interestLabelByMode[terrainInterestMode] || 'INTERÉS'} (${tasaTerreno}%)`, values: interesPagado, formula: interestFormulaByMode[terrainInterestMode] || 'Interés según configuración de pago', color: '#f59e0b' },
       { key: 'timbres', label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, values: impTimbres, formula: `IMP_TIMBRES(t) = GIROS(t) Ã— ${cfg.pct_timbres}%`, color: '#f59e0b' },
     ];
 
@@ -5521,9 +6527,9 @@ function renderFinancingSourcePlanilla(sourceType) {
       bg: r.bold ? '#f8fafc' : '#fff',
       totalText: fmtUf((r.values || []).reduce((acc, value) => acc + toNumber(value), 0)),
       actionHtml: r.key === 'giros'
-        ? renderTinyGanttLinkControl('land_finance_links', 'giros', state.proyecto?.land_finance_links?.giros || '')
+        ? renderTinyGanttLinkControl('land_finance_links', 'giros', getGanttLinkValue('land_finance_links', 'giros'))
         : (r.key === 'pago_linea'
-          ? renderTinyGanttLinkControl('land_finance_links', 'pagoLinea', state.proyecto?.land_finance_links?.pagoLinea || '')
+          ? renderTinyGanttLinkControl('land_finance_links', 'pagoLinea', getGanttLinkValue('land_finance_links', 'pagoLinea'))
           : ''),
     })), { includeTotal: true });
     setHtml('terreno-fin-planilla-tfoot', '');
@@ -5610,6 +6616,7 @@ function onTerrainFinancialInputChange() {
     target.editable_source = 'terreno';
   });
 
+  markCalculationDirty('terreno', 'terrain financial input');
   scheduleRenderJob('terreno-financial-dependencies', () => {
     renderTerrainModule();
     renderCostosModule();
@@ -6133,55 +7140,58 @@ function mapLegacyCategoryName(name, partidaName = '') {
 }
 
 function buildCostContext() {
-  const terrenoBase = getTerrainBaseCost();
-  const proyecto = normalizeProject(state.proyecto);
-  const construccionMetrics = getConstructionMetrics();
-  const accessorySales = getAccessorySalesConfig();
-  const salesMetrics = getTotalSalesMetrics();
-  const totalInterior = state.cabida.reduce((sum, row) => sum + (toNumber(row.sup_interior) * toNumber(row.cantidad)), 0);
-  const totalTerrazas = state.cabida.reduce((sum, row) => sum + (toNumber(row.sup_terrazas) * toNumber(row.cantidad)), 0);
-  const totalUnidades = state.cabida.reduce((sum, row) => sum + toNumber(row.cantidad), 0);
-  const totalUnidadesVenta = toNumber(salesMetrics.totalUnidades) || totalUnidades;
-  const m2Vendibles = state.cabida.reduce((sum, row) => sum + (getSellableAreaPerUnit(row.sup_interior, row.sup_terrazas) * toNumber(row.cantidad)), 0);
-  const totalTerrenoCalculado = toNumber(proyecto.terreno_m2_neto) * toNumber(proyecto.terreno_precio_uf_m2);
-  return {
-    meses_construccion: getConstructionDuration(),
-    m2_utiles: getUsefulMunicipalAreaTotal(),
-    m2_municipales: getUsefulMunicipalAreaTotal(),
-    m2_comunes: getCommonAreaTotal(),
-    m2_interior_total: totalInterior,
-    m2_terrazas_total: totalTerrazas,
-    m2_sobre_cota_0: getAboveGradeAreaTotal(),
-    m2_subterraneo: construccionMetrics.sup_bajo_tierra,
-    m2_construccion_total: construccionMetrics.sup_total,
-    m2_losa_total: construccionMetrics.sup_total,
-    m2_vendibles: m2Vendibles,
-    m2_vendible_deptos: m2Vendibles,
-    m2_por_unidad: totalUnidades ? m2Vendibles / totalUnidades : 0,
-    unidades_totales: totalUnidadesVenta,
-    total_unidades: totalUnidadesVenta,
-    terreno_m2_bruto: toNumber(proyecto.terreno_m2_bruto),
-    terreno_m2_afectacion: toNumber(proyecto.terreno_m2_afectacion),
-    terreno_m2_neto: toNumber(proyecto.terreno_m2_neto),
-    terreno_precio_uf_m2: toNumber(proyecto.terreno_precio_uf_m2),
-    terreno_total_calculado: totalTerrenoCalculado,
-    construccion_uf_m2_sobre_tierra: toNumber(construccionMetrics.costo_uf_m2_sobre_tierra),
-    construccion_uf_m2_bajo_tierra: toNumber(construccionMetrics.costo_uf_m2_bajo_tierra),
-    construccion_uf_m2_promedio: toNumber(construccionMetrics.uf_prom),
-    precio_promedio_unidad: toNumber(salesMetrics.precioPromedio),
-    valor_promedio_total_unidad: toNumber(salesMetrics.precioPromedio),
-    precio_estacionamiento: toNumber(accessorySales.precio_estacionamiento),
-    precio_bodega: toNumber(accessorySales.precio_bodega),
-    total_estacionamientos: toNumber(proyecto.estacionamientos_cantidad),
-    total_bodegas: toNumber(proyecto.bodegas_cantidad),
-    ventas_totales: toNumber(salesMetrics.total),
-    valor_venta_total_proyecto: toNumber(salesMetrics.total),
-    ventas_totales_deptos: toNumber(salesMetrics.totalDeptos),
-    ventas_totales_accesorios: toNumber(salesMetrics.totalAccesorios),
-    total_construccion: construccionMetrics.total_neto,
-    total_terreno: terrenoBase,
-    ventas_brutas: toNumber(state.calculos.ventas_brutas),
-  };
+  return withCalculationCache('costContext', ['proyecto', 'cabida', 'terreno', 'construccion', 'ventas', 'gantt', 'costos', 'financiamiento', 'calculos'], '', () => {
+    const terrenoBase = getTerrainBaseCost();
+    const proyecto = normalizeProject(state.proyecto);
+    const construccionMetrics = getConstructionMetrics();
+    const accessorySales = getAccessorySalesConfig();
+    const salesMetrics = getTotalSalesMetrics();
+    const totalInterior = state.cabida.reduce((sum, row) => sum + (toNumber(row.sup_interior) * toNumber(row.cantidad)), 0);
+    const totalTerrazas = state.cabida.reduce((sum, row) => sum + (toNumber(row.sup_terrazas) * toNumber(row.cantidad)), 0);
+    const totalUnidades = state.cabida.reduce((sum, row) => sum + toNumber(row.cantidad), 0);
+    const totalUnidadesVenta = toNumber(salesMetrics.totalUnidades) || totalUnidades;
+    const m2Vendibles = state.cabida.reduce((sum, row) => sum + (getSellableAreaPerUnit(row.sup_interior, row.sup_terrazas) * toNumber(row.cantidad)), 0);
+    const totalTerrenoCalculado = toNumber(proyecto.terreno_m2_neto) * toNumber(proyecto.terreno_precio_uf_m2);
+    const m2Utiles = getUsefulMunicipalAreaTotal();
+    return {
+      meses_construccion: getConstructionDuration(),
+      m2_utiles: m2Utiles,
+      m2_municipales: m2Utiles,
+      m2_comunes: getCommonAreaTotal(),
+      m2_interior_total: totalInterior,
+      m2_terrazas_total: totalTerrazas,
+      m2_sobre_cota_0: getAboveGradeAreaTotal(),
+      m2_subterraneo: construccionMetrics.sup_bajo_tierra,
+      m2_construccion_total: construccionMetrics.sup_total,
+      m2_losa_total: construccionMetrics.sup_total,
+      m2_vendibles: m2Vendibles,
+      m2_vendible_deptos: m2Vendibles,
+      m2_por_unidad: totalUnidades ? m2Vendibles / totalUnidades : 0,
+      unidades_totales: totalUnidadesVenta,
+      total_unidades: totalUnidadesVenta,
+      terreno_m2_bruto: toNumber(proyecto.terreno_m2_bruto),
+      terreno_m2_afectacion: toNumber(proyecto.terreno_m2_afectacion),
+      terreno_m2_neto: toNumber(proyecto.terreno_m2_neto),
+      terreno_precio_uf_m2: toNumber(proyecto.terreno_precio_uf_m2),
+      terreno_total_calculado: totalTerrenoCalculado,
+      construccion_uf_m2_sobre_tierra: toNumber(construccionMetrics.costo_uf_m2_sobre_tierra),
+      construccion_uf_m2_bajo_tierra: toNumber(construccionMetrics.costo_uf_m2_bajo_tierra),
+      construccion_uf_m2_promedio: toNumber(construccionMetrics.uf_prom),
+      precio_promedio_unidad: toNumber(salesMetrics.precioPromedio),
+      valor_promedio_total_unidad: toNumber(salesMetrics.precioPromedio),
+      precio_estacionamiento: toNumber(accessorySales.precio_estacionamiento),
+      precio_bodega: toNumber(accessorySales.precio_bodega),
+      total_estacionamientos: toNumber(proyecto.estacionamientos_cantidad),
+      total_bodegas: toNumber(proyecto.bodegas_cantidad),
+      ventas_totales: toNumber(salesMetrics.total),
+      valor_venta_total_proyecto: toNumber(salesMetrics.total),
+      ventas_totales_deptos: toNumber(salesMetrics.totalDeptos),
+      ventas_totales_accesorios: toNumber(salesMetrics.totalAccesorios),
+      total_construccion: construccionMetrics.total_neto,
+      total_terreno: terrenoBase,
+      ventas_brutas: toNumber(state.calculos.ventas_brutas),
+    };
+  });
 }
 
 function normalizeFormulaNumberLiteral(value) {
@@ -6239,6 +7249,22 @@ function addFormulaReferenceAlias(map, key, value) {
 
 function buildFormulaReferenceMaps(context = {}, catalog = null) {
   const formulaCatalog = catalog || getFormulaCatalogForContext(context);
+  if (context && typeof context === 'object' && formulaCatalog && typeof formulaCatalog === 'object') {
+    let contextCache = formulaReferenceMapsCache.get(context);
+    if (!contextCache) {
+      contextCache = new WeakMap();
+      formulaReferenceMapsCache.set(context, contextCache);
+    } else if (contextCache.has(formulaCatalog)) {
+      return contextCache.get(formulaCatalog);
+    }
+    const maps = buildFormulaReferenceMapsUncached(context, formulaCatalog);
+    contextCache.set(formulaCatalog, maps);
+    return maps;
+  }
+  return buildFormulaReferenceMapsUncached(context, formulaCatalog);
+}
+
+function buildFormulaReferenceMapsUncached(context = {}, formulaCatalog = []) {
   const values = new Map();
   const bracketValues = new Map();
   Object.entries(context || {}).forEach(([key, value]) => addFormulaReferenceAlias(values, key, value));
@@ -6501,39 +7527,42 @@ function evaluateExpressionFormula(expression, context = {}, catalog = null) {
 }
 
 function getProjectMonthlySalesFlows(monthCount) {
-  const ingresosPromesa = createMonthlyArray(monthCount, 0);
-  const ingresosEscrituracion = createMonthlyArray(monthCount, 0);
-  const totals = getTotalSalesMetrics();
-  const settings = getGlobalPaymentSettings();
-  const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct));
-  const escrituraPct = Math.max(0, 100 - piePct);
-  const cuotaMonths = Math.max(1, Math.round(toNumber(settings.pie_cuoton_pct) || 1));
-  const pieUnidad = totals.precioPromedio * piePct / 100;
-  const escrituraUnidad = totals.precioPromedio * escrituraPct / 100;
-  const { promesas: unidadesPromesadas, escrituras: unidadesEscrituradas } = getPromesasEscrituracionUnidades(monthCount);
+  const safeMonthCount = Math.max(0, Math.round(toNumber(monthCount) || getCostMonthCount()));
+  return withCalculationCache('monthlySalesFlows', ['ventas', 'cabida', 'gantt', 'proyecto'], safeMonthCount, () => {
+    const ingresosPromesa = createMonthlyArray(safeMonthCount, 0);
+    const ingresosEscrituracion = createMonthlyArray(safeMonthCount, 0);
+    const totals = getTotalSalesMetrics();
+    const settings = getGlobalPaymentSettings();
+    const piePct = Math.min(100, Math.max(0, settings.pie_promesa_pct));
+    const escrituraPct = Math.max(0, 100 - piePct);
+    const cuotaMonths = Math.max(1, Math.round(toNumber(settings.pie_cuoton_pct) || 1));
+    const pieUnidad = totals.precioPromedio * piePct / 100;
+    const escrituraUnidad = totals.precioPromedio * escrituraPct / 100;
+    const { promesas: unidadesPromesadas, escrituras: unidadesEscrituradas } = getPromesasEscrituracionUnidades(safeMonthCount);
 
-  Array.from({ length: monthCount }, (_, month) => {
-    const unidadesPromesa = toNumber(unidadesPromesadas[month]);
-    const unidadesEscritura = toNumber(unidadesEscrituradas[month]);
-    const promesaTotal = unidadesPromesa * pieUnidad;
-    if (settings.forma_pago_promesa === 'unico') {
-      ingresosPromesa[month] += promesaTotal;
-    } else {
-      const cuotaMensual = cuotaMonths ? promesaTotal / cuotaMonths : promesaTotal;
-      for (let offset = 0; offset < cuotaMonths; offset += 1) {
-        if (month + offset < ingresosPromesa.length) ingresosPromesa[month + offset] += cuotaMensual;
+    for (let month = 0; month < safeMonthCount; month += 1) {
+      const unidadesPromesa = toNumber(unidadesPromesadas[month]);
+      const unidadesEscritura = toNumber(unidadesEscrituradas[month]);
+      const promesaTotal = unidadesPromesa * pieUnidad;
+      if (settings.forma_pago_promesa === 'unico') {
+        ingresosPromesa[month] += promesaTotal;
+      } else {
+        const cuotaMensual = cuotaMonths ? promesaTotal / cuotaMonths : promesaTotal;
+        for (let offset = 0; offset < cuotaMonths; offset += 1) {
+          if (month + offset < ingresosPromesa.length) ingresosPromesa[month + offset] += cuotaMensual;
+        }
       }
+      ingresosEscrituracion[month] += unidadesEscritura * escrituraUnidad;
     }
-    ingresosEscrituracion[month] += unidadesEscritura * escrituraUnidad;
-  });
 
-  return {
-    unidadesPromesadas,
-    unidadesEscrituradas,
-    ingresosPromesa,
-    ingresosEscrituracion,
-    ingresosTotal: ingresosPromesa.map((value, index) => toNumber(value) + toNumber(ingresosEscrituracion[index])),
-  };
+    return {
+      unidadesPromesadas,
+      unidadesEscrituradas,
+      ingresosPromesa,
+      ingresosEscrituracion,
+      ingresosTotal: ingresosPromesa.map((value, index) => toNumber(value) + toNumber(ingresosEscrituracion[index])),
+    };
+  });
 }
 
 function buildMonthlyContext(monthIndex, monthCount) {
@@ -6654,14 +7683,24 @@ function evaluateCostPartida(partida, context) {
 }
 
 function getProjectFinalMonth() {
-  const ganttEnd = state.gantt.reduce((max, row) => Math.max(max, toNumber(row.fin), toNumber(row.inicio) + Math.max(1, toNumber(row.duracion || 1)) - 1), 0);
-  const ventasEnd = state.ventasCronograma.reduce((max, row) => Math.max(max, toNumber(row.mes_inicio) + Math.max(1, toNumber(row.duracion || 1)) - 1), 0);
-  const constructionEnd = getConstructionStartMonth() + getConstructionDuration() - 1;
-  return Math.max(12, ganttEnd, ventasEnd, constructionEnd);
+  return withCalculationCache('projectFinalMonth', ['proyecto', 'gantt', 'ventas', 'construccion'], '', () => {
+    const ganttEnd = state.gantt.reduce((max, row) => Math.max(max, toNumber(row.fin), toNumber(row.inicio) + Math.max(1, toNumber(row.duracion || 1)) - 1), 0);
+    const ventasEnd = state.ventasCronograma.reduce((max, row) => Math.max(max, toNumber(row.mes_inicio) + Math.max(1, toNumber(row.duracion || 1)) - 1), 0);
+    const constructionEnd = getConstructionStartMonth() + getConstructionDuration() - 1;
+    const operationalEnd = Math.max(12, ganttEnd, ventasEnd, constructionEnd);
+    const baseDate = getCostStartDate();
+    const finalDate = addMonths(baseDate, operationalEnd);
+    const taxPaymentDate = new Date(finalDate.getFullYear() + 1, 3, 1);
+    const taxPaymentMonth = (taxPaymentDate.getFullYear() - baseDate.getFullYear()) * 12
+      + (taxPaymentDate.getMonth() - baseDate.getMonth());
+    return Math.max(operationalEnd, taxPaymentMonth);
+  });
 }
 
 function getCostMonthCount() {
-  return Math.max(13, Math.ceil(getProjectFinalMonth()) + 1);
+  return withCalculationCache('costMonthCount', ['proyecto', 'gantt', 'ventas', 'construccion'], '', () => (
+    Math.max(13, Math.ceil(getProjectFinalMonth()) + 1)
+  ));
 }
 
 function createMonthlyArray(length = getCostMonthCount(), fill = 0) {
@@ -6669,8 +7708,11 @@ function createMonthlyArray(length = getCostMonthCount(), fill = 0) {
 }
 
 function getCostMonthLabels() {
-  const baseDate = getCostStartDate();
-  return Array.from({ length: getCostMonthCount() }, (_, index) => formatCostMonthLabel(addMonths(baseDate, index)));
+  const monthCount = getCostMonthCount();
+  return withCalculationCache('costMonthLabels', ['proyecto', 'gantt', 'ventas', 'construccion'], monthCount, () => {
+    const baseDate = getCostStartDate();
+    return Array.from({ length: monthCount }, (_, index) => formatCostMonthLabel(addMonths(baseDate, index)));
+  });
 }
 
 function getCostStartDate() {
@@ -6873,6 +7915,13 @@ function buildFinancialCostRows(manualRows = []) {
 }
 
 function ensureCostosState() {
+  const cacheKey = getCalculationCacheKey(['proyecto', 'cabida', 'terreno', 'construccion', 'ventas', 'gantt', 'costos', 'financiamiento', 'formulas'], '');
+  const cached = calculationCache.slots.costosState;
+  if (cached && cached.key === cacheKey && Array.isArray(cached.value)) {
+    state.costos = cached.value;
+    return state.costos;
+  }
+  const startedAt = performance.now();
   const byCategory = new Map(COST_CATEGORY_ORDER.map((name) => [name, { id: '', nombre: name, partidas: [] }]));
   (state.costos || []).forEach((category) => {
     const normalizedCategoryName = getCanonicalCostCategoryName(category.nombre) || mapLegacyCategoryName(category.nombre);
@@ -6915,6 +7964,8 @@ function ensureCostosState() {
     };
   });
 
+  calculationCache.slots.costosState = { key: cacheKey, value: state.costos };
+  perfLog('cache:miss:costosState', { ms: Math.round(performance.now() - startedAt) });
   return state.costos;
 }
 
@@ -7284,19 +8335,32 @@ function renderCostPlanilla() {
     `;
   }).join(''));
 
-  const { financial } = getProjectMonthlyCostBreakdown();
+  const financialBreakdown = typeof window !== 'undefined' && typeof window.getFinancialCostBreakdownForCashflow === 'function'
+    ? window.getFinancialCostBreakdownForCashflow(monthCount)
+    : { total: getProjectMonthlyCostBreakdown().financial };
+  const financial = Array.isArray(financialBreakdown.total)
+    ? financialBreakdown.total
+    : createMonthlyArray(monthCount, 0);
+  const financialSubrows = [
+    { label: 'Intereses', values: financialBreakdown.interest || createMonthlyArray(monthCount, 0) },
+    { label: 'Impuesto de Timbres y Estampillas', values: financialBreakdown.stamp || createMonthlyArray(monthCount, 0) },
+    { label: 'Comisiones Bancarias', values: financialBreakdown.commissions || createMonthlyArray(monthCount, 0) },
+  ];
   const totalFinancial = financial.reduce((sum, value) => sum + toNumber(value), 0);
   const monthlyTotalsWithFinancial = monthlyOperativeTotals.map((value, index) => (
     toNumber(value) + toNumber(financial[index])
   ));
   const totalNetoWithFinancial = totalNeto + totalFinancial;
+  const financialCollapsed = Object.prototype.hasOwnProperty.call(collapsedState, 'GASTOS FINANCIEROS')
+    ? !!collapsedState['GASTOS FINANCIEROS']
+    : false;
 
   const financialRow = `
-    <tr class="cat-row">
+    <tr class="cat-row ${!financialCollapsed ? 'is-expanded' : ''}" data-cost-category="GASTOS FINANCIEROS">
       <td colspan="3" style="padding:2px 6px">
         <div class="cost-category-header">
           <div class="cost-category-title">
-            <button class="btn-collapse-cost" type="button" disabled style="opacity:.45;cursor:not-allowed">&middot;</button>
+            <button class="btn-collapse-cost" type="button" onclick="toggleCostCategoryCollapse('GASTOS FINANCIEROS')" title="Expandir o colapsar">${financialCollapsed ? '&#9656;' : '&#9662;'}</button>
             <span class="cost-category-name">GASTOS FINANCIEROS</span>
           </div>
         </div>
@@ -7305,6 +8369,20 @@ function renderCostPlanilla() {
       <td class="cat-total-cell"><strong>${fmtTableAmount(0, { kind: 'cost' })}</strong></td>
       ${financial.map((value) => `<td class="cat-total-cell"><strong>${fmtTableAmount(value, { kind: 'cost' })}</strong></td>`).join('')}
     </tr>
+    ${financialSubrows.map((row) => {
+      const rowValues = Array.from({ length: monthCount }, (_, index) => toNumber(row.values?.[index]));
+      const rowTotal = rowValues.reduce((sum, value) => sum + toNumber(value), 0);
+      return `
+        <tr class="partida-row is-subpartida" data-cost-cat-row="GASTOS FINANCIEROS"${financialCollapsed ? ' style="display:none"' : ''}>
+          <td style="text-align:center"></td>
+          <td><input class="inp" value="${escapeHtml(row.label)}" disabled/></td>
+          <td class="cost-config-cell"><span class="badge badge-yellow">AUTO</span></td>
+          <td style="text-align:center;color:#22c55e;font-weight:800"><span class="cost-total-cell">${fmtTableAmount(rowTotal, { kind: 'cost' })}</span></td>
+          <td class="cost-iva-cell" style="text-align:center"><span class="badge">NO</span></td>
+          ${rowValues.map((value) => `<td data-month-cell style="text-align:center">${fmtTableAmount(value, { kind: 'cost' })}</td>`).join('')}
+        </tr>
+      `;
+    }).join('')}
   `;
   const tbody = $('planilla-tbody');
   if (tbody) tbody.insertAdjacentHTML('beforeend', financialRow);
@@ -7330,21 +8408,33 @@ function renderCostosModule() {
 
 function getProjectMonthlyCostBreakdown() {
   const monthCount = getCostMonthCount();
-  const operative = createMonthlyArray(monthCount, 0);
-  const financial = createMonthlyArray(monthCount, 0);
-  const context = buildCostContext();
-  ensureCostosState().forEach((category) => {
-    const isFinancial = category.nombre === 'GASTOS FINANCIEROS';
-    const target = isFinancial ? financial : operative;
-    (category.partidas || []).forEach((partida) => {
-      if (isFinancial && /Linea aprobada|Pago de linea/i.test(partida.nombre || '')) return;
-      const distribution = getMonthlyDistributionForPartida(partida, monthCount, context);
-      distribution.forEach((value, index) => {
-        if (index < target.length) target[index] += toNumber(value);
+  return withCalculationCache('monthlyCostBreakdown', ['proyecto', 'cabida', 'terreno', 'construccion', 'ventas', 'gantt', 'costos', 'financiamiento', 'formulas'], monthCount, () => {
+    const operative = createMonthlyArray(monthCount, 0);
+    const financial = createMonthlyArray(monthCount, 0);
+    const context = buildCostContext();
+    ensureCostosState().forEach((category) => {
+      const isFinancial = category.nombre === 'GASTOS FINANCIEROS';
+      const target = isFinancial ? financial : operative;
+      (category.partidas || []).forEach((partida) => {
+        if (isFinancial && /Linea aprobada|Pago de linea/i.test(partida.nombre || '')) return;
+        const distribution = getMonthlyDistributionForPartida(partida, monthCount, context);
+        distribution.forEach((value, index) => {
+          if (index < target.length) target[index] += toNumber(value);
+        });
       });
     });
+    if (typeof window !== 'undefined' && typeof window.getFinancialCostBreakdownForCashflow === 'function') {
+      const syncedFinancial = window.getFinancialCostBreakdownForCashflow(monthCount);
+      return {
+        operative,
+        financial: Array.isArray(syncedFinancial?.total)
+          ? syncedFinancial.total.map((value) => toNumber(value))
+          : financial,
+        monthCount,
+      };
+    }
+    return { operative, financial, monthCount };
   });
-  return { operative, financial, monthCount };
 }
 
 function getProjectMonthlyCosts(includeFinancial = true) {
@@ -7393,8 +8483,7 @@ function renderProjectCashflow() {
   const costs = breakdown.operative;
   const financialCosts = breakdown.financial;
   const costsTotal = costs.map((v, i) => v + financialCosts[i]);
-
-  // Flujo operativo bruto = Ingresos - Costos
+  const subtotalEgresosNetos = costsTotal.slice();
   const flujoOperativoBruto = income.map((v, i) => v - costsTotal[i]);
 
   // IVA
@@ -7404,18 +8493,31 @@ function renderProjectCashflow() {
   const totalEgresosBrutos = costsTotal.map((value, index) => (
     toNumber(value) + toNumber(ivaCredito[index]) + toNumber(ivaSettlement.pagoIva[index])
   ));
-  const flujoMensualBruto = income.map((value, index) => toNumber(value) - toNumber(totalEgresosBrutos[index]));
+  const flujoBruto = income.map((value, index) => toNumber(value) - toNumber(totalEgresosBrutos[index]));
+  const gastosFinancierosSigned = financialCosts.map((value) => -toNumber(value));
+  const ivaCreditoSigned = ivaCredito.map((value) => -toNumber(value));
+  const ivaDebitoSigned = ivaDebito.map((value) => toNumber(value));
+  const pagoIvaSigned = ivaSettlement.pagoIva.map((value) => -toNumber(value));
+  const flujoPuro = flujoBruto.map((value, index) => (
+    toNumber(value)
+    - toNumber(gastosFinancierosSigned[index])
+    - toNumber(ivaCreditoSigned[index])
+    - toNumber(ivaDebitoSigned[index])
+    - toNumber(pagoIvaSigned[index])
+  ));
+  const flujoAntesImpuestos = flujoPuro.map((value, index) => (
+    toNumber(value)
+    + toNumber(gastosFinancierosSigned[index])
+  ));
   renderIvaDebitoPanel();
 
-  // Flujo antes de impuestos = operativo - pago de IVA efectivo al SII
-  const flujoAntesImpuestos = flujoMensualBruto.slice();
-
-  // PPM + Impuesto Renta
   const ppm = getMonthlyPPM(income);
-  const impRenta = getMonthlyImpuestoRenta(flujoAntesImpuestos, income);
-
-  // Flujo despuÃ©s de impuestos
-  const flujoDespuesImpuestos = flujoAntesImpuestos.map((v, i) => v + toNumber(ppm[i]) + toNumber(impRenta[i]));
+  const totalIncomeForTax = income.reduce((sum, value) => sum + toNumber(value), 0);
+  const projectGrossMarginPct = totalIncomeForTax
+    ? flujoBruto.reduce((sum, value) => sum + toNumber(value), 0) / totalIncomeForTax
+    : 0;
+  const impRenta = getMonthlyImpuestoRenta(flujoBruto, income, ppm, getMonthlyGrossEscrituras(monthCount), projectGrossMarginPct);
+  const flujoDespuesImpuestos = flujoBruto.map((v, i) => v + toNumber(ppm[i]) + toNumber(impRenta[i]));
 
   const cumulative = cumulativeSeries(flujoDespuesImpuestos);
   const cumulativeBruto = cumulativeSeries(flujoOperativoBruto);
@@ -7423,29 +8525,48 @@ function renderProjectCashflow() {
   const totalCosts = costs.reduce((sum, value) => sum + value, 0);
   const totalFinancial = financialCosts.reduce((sum, value) => sum + value, 0);
   const totalEgresosBrutosValue = totalEgresosBrutos.reduce((sum, value) => sum + value, 0);
+  const totalFlujoBrutoBase = flujoBruto.reduce((a, b) => a + b, 0);
+  const totalFlujoPuro = flujoPuro.reduce((a, b) => a + b, 0);
+  const totalFlujoAntesImpuestos = flujoAntesImpuestos.reduce((a, b) => a + b, 0);
   const totalFlujoBruto = flujoOperativoBruto.reduce((a, b) => a + b, 0);
-  const totalFlujoMensualBruto = flujoMensualBruto.reduce((a, b) => a + b, 0);
-  const totalFlujoAntes = flujoAntesImpuestos.reduce((a, b) => a + b, 0);
   const totalFlujoDespues = flujoDespuesImpuestos.reduce((a, b) => a + b, 0);
+  const totalPpm = ppm.reduce((a, b) => a + toNumber(b), 0);
+  const totalImpRenta = impRenta.reduce((a, b) => a + toNumber(b), 0);
   const margin = totalFlujoDespues;
   const capitalNeed = Math.abs(Math.min(0, ...cumulative));
   const capitalNeedSin = Math.abs(Math.min(0, ...cumulativeBruto));
   const payback = cumulative.findIndex((value) => value >= 0);
 
-  // TIR real (mensual â†’ anual)
-  const tirNetaAnual = irrAnualFromMensual(flujoDespuesImpuestos);
-  const tirBrutaAnual = irrAnualFromMensual(flujoOperativoBruto);
+  const financialSummary = getFinancialSummary({
+    monthCount,
+    incomeSource: income,
+    costs,
+    financialTotal: financialCosts,
+    subtotalEgresos: subtotalEgresosNetos,
+    ivaCreditoSource: ivaCredito,
+    ivaDebitoSource: ivaDebito,
+    ivaSettlement,
+    totalEgresosBrutos,
+    flujoBruto,
+    ppm,
+    impRenta,
+    flujoDespuesImpuestos,
+  });
 
-  setText('flujo-margen-sin', fmtUf(totalFlujoBruto));
-  setText('flujo-margen-sin-pct', `${fmtPct(totalIncome ? totalFlujoBruto / totalIncome * 100 : 0)} s/ventas`);
-  setText('flujo-margen-con', fmtUf(margin));
-  setText('flujo-margen-con-pct', `${fmtPct(totalIncome ? margin / totalIncome * 100 : 0)} s/ventas`);
+  window.__lastFinancialSummary = financialSummary;
+  updateResumenFinancialKpis(financialSummary);
+  renderFlowSummaryCards(financialSummary);
+
+  setText('flujo-margen-sin', fmtUf(financialSummary.utilidadBruta));
+  setText('flujo-margen-sin-pct', `${fmtPct(toNumber(financialSummary.margenBrutoPct) * 100)} s/ventas`);
+  setText('flujo-margen-con', fmtUf(financialSummary.utilidadNeta));
+  setText('flujo-margen-con-pct', `${fmtPct(toNumber(financialSummary.margenNetoPct) * 100)} s/ventas`);
   setText('flujo-k-sin', fmtUf(capitalNeedSin));
   setText('flujo-k-con', fmtUf(capitalNeed));
   setText('flujo-roe-sin', fmtPct(capitalNeedSin ? totalFlujoBruto / capitalNeedSin * 100 : 0));
   setText('flujo-roe-con', fmtPct(capitalNeed ? margin / capitalNeed * 100 : 0));
-  setText('flujo-tir-sin', fmtPct(tirBrutaAnual * 100));
-  setText('flujo-tir-con', fmtPct(tirNetaAnual * 100));
+  setText('flujo-tir-sin', financialSummary.tirAntesImpuestos == null ? '-' : fmtPct(financialSummary.tirAntesImpuestos * 100));
+  setText('flujo-tir-con', financialSummary.tirDespuesImpuestos == null ? '-' : fmtPct(financialSummary.tirDespuesImpuestos * 100));
   setText('flujo-payback-sin', payback >= 0 ? formatTimelineMonthLabel(payback) : 'Sin recupero');
   setText('flujo-payback-con', payback >= 0 ? formatTimelineMonthLabel(payback) : 'Sin recupero');
   setText('flujo-leverage', `${fmtNumber(capitalNeed && totalIncome ? capitalNeed / totalIncome : 0, 2)}x`);
@@ -7460,25 +8581,25 @@ function renderProjectCashflow() {
     return `<div class="dist-row"><div class="dist-label">${escapeHtml(label)}</div><div class="dist-bar-wrap"><div class="dist-bar" style="width:${Math.max(2, Math.min(100, Math.abs(pct)))}%;background:${color}"></div></div><div class="dist-pct">${fmtPct(pct)}</div></div>`;
   }).join(''));
 
-  setHtml('flujo-tabla-header', `<tr><th style="text-align:left;min-width:220px">Concepto</th><th style="text-align:center;min-width:90px">FÃ³rmula</th><th class="flow-total-col">Total</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}</tr>`);
+  setHtml('flujo-tabla-header', `<tr><th style="text-align:left;min-width:220px">Concepto</th><th style="text-align:center;min-width:90px">FÃ³rmula</th><th class="flow-total-col">Total</th>${labels.map((label) => `<th data-month-col>${escapeHtml(label)}</th>`).join('')}</tr>`);
 
   const rows = [
-    { label: 'Ingresos (Ventas)', values: income, sign: '+', formula: 'SUMA(Ventas por mes)', refs: [{ label: 'Total ingresos', value: fmtUf(totalIncome) }] },
+    { label: 'Ingresos / Ventas', values: income, sign: '+', formula: 'SUMA(Ventas por mes)', refs: [{ label: 'Total ingresos', value: fmtUf(totalIncome) }] },
     { label: 'Costos base', values: costs.map((v) => -v), sign: '-', formula: 'SUMA(Costos proyecto sin gastos financieros)', refs: [{ label: 'Total costos', value: fmtUf(totalCosts) }] },
-    { label: 'Gastos financieros', values: financialCosts.map((v) => -v), sign: '-', formula: 'Intereses + Timbres + Alzamiento', refs: [{ label: 'Total GF', value: fmtUf(totalFinancial) }] },
-    { label: 'Total Egresos Brutos', values: totalEgresosBrutos.map((v) => -v), sign: '-', formula: 'Costos base + Gastos financieros + IVA credito + Pago IVA', refs: [{ label: 'Total egresos brutos', value: fmtUf(totalEgresosBrutosValue) }] },
-    { label: 'Flujo mensual bruto', values: flujoMensualBruto, sign: '=', bold: true, formula: 'Ingresos brutos - Total Egresos Brutos', refs: [{ label: 'Total', value: fmtUf(totalFlujoMensualBruto) }] },
-    { label: 'Flujo operativo bruto', values: flujoOperativoBruto, sign: '=', bold: true, formula: 'Ingresos - Costos - Gastos financieros', refs: [{ label: 'Total', value: fmtUf(totalFlujoBruto) }] },
-    { label: 'IVA crÃ©dito', values: ivaCredito.map((v) => -v), sign: '-', formula: '-SUMA(Egresos con check IVA Ã— 19%)', refs: [{ label: 'Total IVA crÃ©dito', value: fmtUf(ivaCredito.reduce((a, b) => a + b, 0)) }] },
+    { label: 'Gastos financieros', values: gastosFinancierosSigned, sign: '-', formula: 'Intereses + Timbres + Comisiones Bancarias', refs: [{ label: 'Total GF', value: fmtUf(totalFinancial) }] },
+    { label: 'Subtotal Egresos Netos', values: subtotalEgresosNetos.map((v) => -v), sign: '-', bold: true, formula: 'Subtotal Egresos Netos = Gastos + Gastos financieros', refs: [{ label: 'Total subtotal', value: fmtUf(subtotalEgresosNetos.reduce((a, b) => a + toNumber(b), 0)) }] },
+    { label: 'Pago del IVA', values: pagoIvaSigned, sign: '-', bold: true, formula: 'Pago del IVA = MAX(Remanente anterior + IVA mensual, 0)', refs: [{ label: 'Total pago IVA', value: fmtUf(ivaSettlement.pagoIva.reduce((a, b) => a + b, 0)) }] },
+    { label: 'IVA crÃ©dito', values: ivaCreditoSigned, sign: '-', formula: '-SUMA(Egresos con check IVA Ã— 19%)', refs: [{ label: 'Total IVA crÃ©dito', value: fmtUf(ivaCredito.reduce((a, b) => a + b, 0)) }] },
     { label: 'IVA dÃ©bito', values: ivaDebito, sign: '+', formula: 'Ingresos brutos escriturados Ã— Factor IVA dÃ©bito (IVA / IB)', refs: [{ label: 'Total IVA dÃ©bito', value: fmtUf(ivaDebito.reduce((a, b) => a + b, 0)) }, { label: 'Factor IVA dÃ©bito', value: fmtNumber(getIvaDebitoAnalysis().factor, 4) }] },
     { label: 'IVA mensual', values: ivaSettlement.ivaMensual, sign: '=', formula: 'IVA debito - IVA credito', refs: [{ label: 'Total IVA mensual', value: fmtUf(ivaSettlement.ivaMensual.reduce((a, b) => a + b, 0)) }] },
     { label: 'Remanente IVA mensual', values: ivaSettlement.remanente, sign: '=', formula: 'MIN(Remanente anterior + IVA mensual, 0)', refs: [{ label: 'Remanente final', value: fmtUf(ivaSettlement.remanente[ivaSettlement.remanente.length - 1] || 0) }] },
-    { label: 'Pago IVA', values: ivaSettlement.pagoIva.map((v) => -v), sign: '-', formula: 'Si IVA mensual > 0: pago el exceso sobre remanente anterior; si no, 0', refs: [{ label: 'Total pago IVA', value: fmtUf(ivaSettlement.pagoIva.reduce((a, b) => a + b, 0)) }] },
-    { label: 'Flujo antes de impuestos', values: flujoAntesImpuestos, sign: '=', bold: true, formula: 'Flujo operativo bruto - Pago IVA', refs: [{ label: 'Total', value: fmtUf(totalFlujoAntes) }] },
-    { label: 'PPM', values: ppm, sign: '-', formula: '-1% Ã— Ingresos escrituraciÃ³n / (1 + factor_IVA)', refs: [{ label: 'Total PPM', value: fmtUf(ppm.reduce((a, b) => a + b, 0)) }] },
-    { label: 'Impuesto Renta', values: impRenta, sign: '-', formula: `-${getGlobalFinancialParams().pct_impuesto_renta}% Ã— (Escrituras aÃ±o Ã— Valor prom. Ã— Margen). Pago abril aÃ±o siguiente`, refs: [{ label: 'Total Renta', value: fmtUf(impRenta.reduce((a, b) => a + b, 0)) }] },
-    { label: 'Flujo despuÃ©s de impuestos', values: flujoDespuesImpuestos, sign: '=', bold: true, formula: 'Flujo antes de impuestos + PPM + Impuesto Renta', refs: [{ label: 'Total', value: fmtUf(totalFlujoDespues) }] },
-    { label: 'Flujo acumulado', values: cumulative, sign: 'âˆ‘', bold: true, formula: 'ACUMULADO(t) = ACUMULADO(t-1) + Flujo despuÃ©s impuestos(t)', refs: [] },
+    { label: 'Total Egresos Brutos', values: totalEgresosBrutos.map((v) => -v), sign: '-', bold: true, formula: 'Total Egresos Brutos = Subtotal Egresos Netos + IVA credito + Pago del IVA', refs: [{ label: 'Total egresos brutos', value: fmtUf(totalEgresosBrutosValue) }] },
+    { label: 'Flujo Bruto', values: flujoBruto, sign: '=', bold: true, formula: 'Flujo Bruto = Ingresos Brutos - Total Egresos Brutos', refs: [{ label: 'Total', value: fmtUf(totalFlujoBrutoBase) }] },
+    { label: 'Flujo puro', values: flujoPuro, sign: '=', bold: true, formula: 'Flujo puro = Flujo Bruto - Gastos financieros - IVA credito - IVA debito - Pago del IVA, usando cada fila con su signo actual', refs: [{ label: 'Total', value: fmtUf(totalFlujoPuro) }] },
+    { label: 'Flujo antes de impuestos', values: flujoAntesImpuestos, sign: '=', bold: true, formula: 'Flujo antes de impuestos = Flujo puro + Gastos financieros, usando Gastos financieros con su signo actual', refs: [{ label: 'Total', value: fmtUf(totalFlujoAntesImpuestos) }] },
+    { label: 'Flujo despuÃ©s de impuestos', values: flujoDespuesImpuestos, sign: '=', bold: true, formula: 'Flujo despues de impuestos = Flujo Bruto - Pago Provisional Mensual - Impuesto a la Renta', refs: [{ label: 'Total', value: fmtUf(totalFlujoDespues) }] },
+    { label: 'Pago Provisional Mensual', values: ppm, sign: '-', formula: '-1% x base neta de ingresos por escritura', refs: [{ label: 'Total PPM', value: fmtUf(ppm.reduce((a, b) => a + b, 0)) }] },
+    { label: 'Impuesto a la Renta', values: impRenta, sign: '-', formula: '-(27% x Margen Bruto % x Ganancias ano anterior - PPM ano anterior), pagado solo en abril', refs: [{ label: 'Total Renta', value: fmtUf(impRenta.reduce((a, b) => a + b, 0)) }] },
   ];
 
   setHtml('flujo-tabla-tbody', rows.map((row) => {
@@ -7487,7 +8608,7 @@ function renderProjectCashflow() {
     const bgRow = row.bold ? 'background:#0f172a' : '';
     const rowTotal = row.values.reduce((sum, value) => sum + toNumber(value), 0);
     return `
-      <tr style="${bgRow}">
+      <tr class="${row.bold ? 'finance-total-row' : ''}" style="${bgRow}">
         <td style="text-align:left;font-weight:${row.bold ? 800 : 600};color:${row.bold ? '#22c55e' : '#fff'}">${escapeHtml(row.label)}</td>
         <td style="text-align:center;position:relative" class="formula-host">
           <button type="button" onclick="toggleFormulaPop('${popId}', event)" style="background:none;border:1px solid #475569;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:10px;cursor:pointer">Æ’x</button>
@@ -7498,13 +8619,17 @@ function renderProjectCashflow() {
           </div>
         </td>
         <td class="flow-total-col">${fmtTableAmount(rowTotal, { kind: 'income', total: true })}</td>
-        ${row.values.map((value) => `<td style="text-align:center;color:${row.bold ? '#22c55e' : '#fff'}">${fmtTableAmount(value, { kind: 'income' })}</td>`).join('')}
+        ${row.values.map((value) => `<td data-month-cell style="text-align:center;color:${row.bold ? '#22c55e' : '#fff'}">${fmtTableAmount(value, { kind: 'income' })}</td>`).join('')}
       </tr>`;
   }).join(''));
 }
 
 function getCostFormulaCatalog(contextOverride = null) {
   const context = contextOverride || buildCostContext();
+  if (context && typeof context === 'object') {
+    const cached = formulaCatalogCache.get(context);
+    if (cached) return cached;
+  }
   const globalPaymentSettings = getGlobalPaymentSettings();
   const totalUnits = toNumber(context.total_unidades) || state.cabida.reduce((sum, row) => sum + toNumber(row.cantidad), 0);
   const precioPromedioUnidad = toNumber(context.precio_promedio_unidad);
@@ -7615,7 +8740,9 @@ function getCostFormulaCatalog(contextOverride = null) {
     const key = String(entry.token || '').toLowerCase();
     if (key && !uniqueByToken.has(key)) uniqueByToken.set(key, entry);
   });
-  return Array.from(uniqueByToken.values());
+  const catalog = Array.from(uniqueByToken.values());
+  if (context && typeof context === 'object') formulaCatalogCache.set(context, catalog);
+  return catalog;
 }
 
 function getFormulaCatalogForContext(context = null) {
@@ -7875,6 +9002,10 @@ function scrollFinancialPlanilla(containerId, offset) {
   scrollTableById(containerId, offset);
 }
 
+function scrollResumenGantt(offset) {
+  scrollTableById('resumen-gantt-scroll', offset);
+}
+
 const FORMULA_REF_GROUPS = [
   {
     label: 'Ingresos',
@@ -8086,6 +9217,7 @@ function saveCostFormulaModal() {
   const context = buildCostContext();
   partida.distribucion_mensual = getMonthlyDistributionForPartida(partida, getCostMonthCount(), context);
   partida.total_neto = partida.distribucion_mensual.reduce((sum, value) => sum + toNumber(value), 0);
+  markCalculationDirty(partida.editable_source === 'terreno' ? 'terreno' : 'costos', 'cost formula save');
   syncCostFormulaRowFields(categoryName, index, partida);
   closeCostFormulaModal({ render: false });
   if (partida.editable_source === 'terreno') renderTerrainModule();
@@ -8114,6 +9246,7 @@ function applyCostFormulaModalAutosave() {
   const context = buildCostContext();
   partida.distribucion_mensual = getMonthlyDistributionForPartida(partida, getCostMonthCount(), context);
   partida.total_neto = partida.distribucion_mensual.reduce((sum, value) => sum + toNumber(value), 0);
+  markCalculationDirty(partida.editable_source === 'terreno' ? 'terreno' : 'costos', 'cost formula autosave');
   syncCostFormulaRowFields(categoryName, index, partida);
   scheduleAutosave(partida.editable_source === 'terreno' ? 'terreno' : 'costos');
 }
@@ -8901,6 +10034,7 @@ function addPaymentPlanItem(type) {
   if (type === 'periodico') plan.periodicos.push({ inicio_ref: 'MANUAL_0', inicio_offset: 0, fin_ref: 'MANUAL_0', fin_offset: 0, cada_meses: 1, monto: 0 });
   partida.plan_pago = serializeInteractivePaymentPlan(plan);
   if (partida.editable_source === 'terreno') partida.auto_origen = false;
+  markCalculationDirty(partida.editable_source === 'terreno' ? 'terreno' : 'costos', 'payment template');
   openLegacyPaymentPlanModal(state.costosUi.activePaymentCategory, state.costosUi.activePaymentIndex);
   scheduleAutosave(partida.editable_source === 'terreno' ? 'terreno' : 'costos');
 }
@@ -8976,6 +10110,7 @@ function applyQuickPaymentTemplate(templateType) {
 
   partida.plan_pago = serializeInteractivePaymentPlan(plan);
   if (partida.editable_source === 'terreno') partida.auto_origen = false;
+  markCalculationDirty(partida.editable_source === 'terreno' ? 'terreno' : 'costos', 'remove payment plan item');
   openLegacyPaymentPlanModal(state.costosUi.activePaymentCategory, state.costosUi.activePaymentIndex);
   scheduleAutosave(partida.editable_source === 'terreno' ? 'terreno' : 'costos');
 }
@@ -9034,6 +10169,7 @@ function savePaymentPlanModal() {
 
   partida.plan_pago = serializeInteractivePaymentPlan({ tramos, hitos, periodicos });
   if (partida.editable_source === 'terreno') partida.auto_origen = false;
+  markCalculationDirty(partida.editable_source === 'terreno' ? 'terreno' : 'costos', 'payment plan save');
   closePaymentPlanModal();
   if (partida.editable_source === 'terreno') renderTerrainModule();
   renderCostosModule();
@@ -9074,6 +10210,7 @@ function applyPaymentPlanAutosave() {
 
   partida.plan_pago = serializeInteractivePaymentPlan({ tramos, hitos, periodicos });
   if (partida.editable_source === 'terreno') partida.auto_origen = false;
+  markCalculationDirty(partida.editable_source === 'terreno' ? 'terreno' : 'costos', 'payment plan autosave');
   scheduleAutosave(partida.editable_source === 'terreno' ? 'terreno' : 'costos');
 }
 
@@ -10052,11 +11189,38 @@ function renderCostConfigRefPanel() {
   }).join('') || '<div style="font-size:11px;color:#94a3b8">Sin referencias disponibles</div>';
 }
 
+let costConfigPreviewTimer = null;
+function scheduleCostConfigPreview(delay = 160) {
+  window.clearTimeout(costConfigPreviewTimer);
+  costConfigPreviewTimer = window.setTimeout(() => {
+    costConfigPreviewTimer = null;
+    window.requestAnimationFrame(() => updateCostConfigPreview(true));
+  }, Math.max(0, delay));
+}
+
+function cancelCostConfigPreview() {
+  window.clearTimeout(costConfigPreviewTimer);
+  costConfigPreviewTimer = null;
+}
+
+function shouldDebounceCostConfigPreview(force = false) {
+  if (force) return false;
+  const activeEvent = window.event;
+  return activeEvent?.type === 'input'
+    && !!activeEvent.target?.closest?.('#cost-config-modal');
+}
+
 function updateCostConfigPreview(force = false) {
+  if (shouldDebounceCostConfigPreview(force)) {
+    scheduleCostConfigPreview();
+    return;
+  }
+  cancelCostConfigPreview();
   if (!force && shouldDeferEditingWork()) {
     queueDeferredEditCallback('cost-config-preview', () => updateCostConfigPreview(true));
     return;
   }
+  const startedAt = performance.now();
   const partida = getActiveCostConfigPartida();
   if (!partida) return;
   const config = readCostConfigForm();
@@ -10097,6 +11261,7 @@ function updateCostConfigPreview(force = false) {
       }).join('')}
     </div>
   `);
+  perfLog('cost-config-preview', { ms: Math.round(performance.now() - startedAt) });
 }
 
 function openCostConfigModal(categoryName, index) {
@@ -10120,6 +11285,7 @@ function openCostConfigModal(categoryName, index) {
 }
 
 function closeCostConfigModal(options = {}) {
+  cancelCostConfigPreview();
   const wasActive = state.costosUi.activeConfigCategory != null;
   state.costosUi.activeConfigCategory = null;
   state.costosUi.activeConfigIndex = null;
@@ -10159,6 +11325,7 @@ function saveCostConfigModal() {
     ? 'expr_mensual'
     : (usesFormulaTotal ? 'expr' : 'manual');
   if (partida.editable_source === 'terreno') partida.auto_origen = false;
+  markCalculationDirty(partida.editable_source === 'terreno' ? 'terreno' : 'costos', 'cost config save');
   closeCostConfigModal({ render: false });
   if (partida.editable_source === 'terreno') renderTerrainModule();
   renderCostosModule();
@@ -10225,6 +11392,7 @@ function removeCostPartida(categoryName, index) {
 
   // 2. Mutate state
   category.partidas.splice(index, 1);
+  markCalculationDirty('costos', 'remove cost row');
 
   // 3. Re-render planilla only (updates totals accurately, skips renderCostStructure)
   scheduleRenderJob('costos-planilla', () => {
@@ -10243,9 +11411,8 @@ function renderProjectHeader() {
 }
 
 function renderKpis() {
-  setText('kpi-ventas', fmtUf(state.calculos.ventas_brutas));
-  setText('kpi-margen', fmtUf(state.calculos.margen_neto));
-  setText('kpi-margen-pct', `${fmtPct(state.calculos.margen_pct)} s/ventas`);
+  const summary = window.__lastFinancialSummary || getFinancialSummary();
+  updateResumenFinancialKpis(summary);
 
   const deudaMax = toNumber(state.calculos.costos_netos) * ((toNumber(state.financiamiento.credito_terreno_pct) + toNumber(state.financiamiento.linea_construccion_pct)) / 200);
   const intereses = toNumber(state.calculos.costos_netos) * ((toNumber(state.financiamiento.credito_terreno_tasa) + toNumber(state.financiamiento.linea_construccion_tasa)) / 200);
@@ -10274,6 +11441,7 @@ function renderCapitalModule() {
 }
 
 function renderAll() {
+  const startedAt = performance.now();
   cancelAllRenderJobs();
   syncConstructionMilestone(state.construccion?.plazo_meses || 1);
   renderProjectSelector();
@@ -10290,6 +11458,8 @@ function renderAll() {
   renderCapitalModule();
   localizeNumberInputs(document);
   normalizeVisibleTextEncoding(document.body);
+  normalizeAppTables(document);
+  perfLog('render:all', { ms: Math.round(performance.now() - startedAt) });
 }
 
 function prepareStateForSave({ includeCostos = true } = {}) {
@@ -10341,6 +11511,7 @@ async function finishSave({ silent = false } = {}) {
   }
   if (state.proyectoId) {
     state.calculos = await api(`/api/proyectos/${state.proyectoId}/calculos`).catch(() => state.calculos);
+    markCalculationDirty('calculos', 'finish save');
   }
   renderAll();
   await refreshHealthStatus();
@@ -10414,7 +11585,7 @@ function readConstruccionFinanciamientoFromEditor() {
     linea_construccion_activo: true,
     linea_construccion_pct: toNumber($('fin-constr-pct')?.value),
     linea_construccion_tasa: toNumber($('fin-constr-tasa')?.value),
-    linea_construccion_pago_intereses: $('fin-constr-pago-int')?.value || 'Anual',
+    linea_construccion_pago_intereses: $('gf-constr-pago-int')?.value || $('fin-constr-pago-int')?.value || 'Anual',
     linea_construccion_pago_capital: 'Contra Escrituraciones',
     pct_alzamiento: toNumber($('fin-constr-alzamiento')?.value ?? state.financiamiento.pct_alzamiento ?? 90),
   });
@@ -10423,6 +11594,7 @@ function readConstruccionFinanciamientoFromEditor() {
 function onCabidaInputChange(force = false) {
   state.proyecto = normalizeProject(getCabidaProjectSettingsFromEditor());
   state.cabida = getCabidaRowsFromEditor();
+  markCalculationDirty('cabida', 'cabida input');
   if (!force && shouldDeferEditingWork()) {
     queueDeferredEditCallback('cabida-input-change', () => onCabidaInputChange(true));
     return;
@@ -10448,6 +11620,7 @@ function onTerrenoInputChange(force = false) {
     ...state.proyecto,
     tasa_interes_terreno: toNumber(state.financiamiento.credito_terreno_tasa),
   });
+  markCalculationDirty('terreno', 'terreno input');
   if (!force && shouldDeferEditingWork()) {
     queueDeferredEditCallback('terreno-input-change', () => onTerrenoInputChange(true));
     return;
@@ -10486,6 +11659,7 @@ function readConstruccionFromEditor() {
 function updateConstrParams(force = false) {
   state.construccion = readConstruccionFromEditor();
   state.financiamiento = readConstruccionFinanciamientoFromEditor();
+  markCalculationDirty('construccion', 'construccion input');
   if (!force && shouldDeferEditingWork()) {
     queueDeferredEditCallback('construccion-input-change', () => updateConstrParams(true));
     return;
@@ -10506,6 +11680,7 @@ function updateConstrParams(force = false) {
 
 function onGanttInputChange(force = false) {
   state.gantt = readGanttEditor();
+  markCalculationDirty('gantt', 'gantt input');
   if (!force && shouldDeferEditingWork()) {
     queueDeferredEditCallback('gantt-input-change', () => onGanttInputChange(true));
     return;
@@ -10678,6 +11853,7 @@ function readVentasCronogramaEditor() {
 function onVentasInputChange(force = false) {
   state.ventasConfig = readVentasConfigEditor();
   state.ventasCronograma = readVentasCronogramaEditor();
+  markCalculationDirty('ventas', 'ventas input');
   if (!force && shouldDeferEditingWork()) {
     queueDeferredEditCallback('ventas-input-change', () => onVentasInputChange(true));
     return;
@@ -10695,6 +11871,7 @@ function onVentasInputChange(force = false) {
 
 function onVentasVelocityChange(force = false) {
   state.ventasCronograma = readVentasCronogramaEditor();
+  markCalculationDirty('ventas', 'ventas velocity');
   if (!force && shouldDeferEditingWork()) {
     queueDeferredEditCallback('ventas-velocity-change', () => onVentasVelocityChange(true));
     return;
@@ -10852,6 +12029,7 @@ function readCostosEditor(options = {}) {
     category.partidas = (category.partidas || []).filter((partida) => !isEmptyNewCostPartida(partida));
   });
   state.costos = categories;
+  if (recompute) markCalculationDirty('costos', 'read costos editor');
   return categories;
 }
 
@@ -10939,6 +12117,7 @@ function agregarPartidaLinea(categoryName) {
     total_neto: 0,
     distribucion_mensual: createMonthlyArray(),
   });
+  markCalculationDirty('costos', 'add cost row');
   costosUi.collapsed[normalizedCategoryName] = false;
   scheduleProjectUiStateSave();
   if (!insertCostPartidaRow(normalizedCategoryName, category.partidas[category.partidas.length - 1], category.partidas.length - 1)) {
@@ -11026,6 +12205,7 @@ function dropCostRow(event) {
   copy.splice(targetIndex, 0, moved);
   category.partidas = copy;
   state.costDrag = null;
+  markCalculationDirty('costos', 'reorder cost row');
   renderCostosModule();
   scheduleAutosave('costos');
 }
@@ -11087,7 +12267,33 @@ async function loadProject(projectId) {
   const capital = repairMojibakeDeep(capitalRaw);
   const calculos = repairMojibakeDeep(calculosRaw);
 
-  state.proyecto = applyProjectLocalMeta(proyecto);
+  const projectStoredLinks = normalizeGanttLinks(
+    proyecto?.gantt_links
+    || proyecto?.ganttLinks
+    || proyecto?.formula_overrides?.ganttLinks
+    || proyecto?.formula_overrides?.gantt_links
+    || {}
+  );
+  const financeStoredLinks = normalizeGanttLinks(financiamiento?.gantt_links || financiamiento?.ganttLinks || {});
+  const mergedRuntimeLinks = {
+    constructionPayments: {
+      ...financeStoredLinks.constructionPayments,
+      ...projectStoredLinks.constructionPayments,
+    },
+    landFinance: {
+      ...financeStoredLinks.landFinance,
+      ...projectStoredLinks.landFinance,
+    },
+  };
+  const mergedProjectLinks = {
+    ...proyecto,
+    gantt_links: mergedRuntimeLinks,
+    formula_overrides: {
+      ...(proyecto?.formula_overrides || {}),
+      ganttLinks: mergedRuntimeLinks,
+    },
+  };
+  state.proyecto = applyProjectLocalMeta(mergedProjectLinks);
   if (typeof window.applyPersistedFormulaOverrides === 'function') {
     window.applyPersistedFormulaOverrides(state.proyecto.formula_overrides);
   }
@@ -11095,12 +12301,16 @@ async function loadProject(projectId) {
   state.gantt = normalizeGanttRows(gantt);
   state.ventasConfig = ventasData.config || [];
   state.ventasCronograma = ventasData.cronograma || [];
-  state.construccion = normalizeConstruccion(construccion);
+  state.construccion = normalizeConstruccion({
+    ...construccion,
+    edp_curve: state.proyecto?.formula_overrides?.edpCurve || construccion?.edp_curve || construccion?.edpCurve || {},
+  });
   state.costos = costos;
   state.financiamiento = normalizeFinanciamiento(financiamiento);
   state.capital = normalizeCapital(capital);
   state.calculos = calculos;
   loadProjectUiState(projectId);
+  markCalculationDirty('all', 'load project');
 
   renderAll();
 }
@@ -11275,6 +12485,7 @@ function agregarUso(defaultLabel = 'Departamento') {
 
 window.showTab = showTab;
 window.toggleTabDock = toggleTabDock;
+window.markCalculationDirty = markCalculationDirty;
 window.openTabDock = openTabDock;
 window.closeTabDock = closeTabDock;
 window.openProjectsPanel = openProjectsPanel;
@@ -11312,6 +12523,9 @@ window.guardarVentas = guardarVentas;
 window.guardarCapital = guardarCapital;
 window.calcularCapital = calcularCapital;
 window.updateConstrParams = updateConstrParams;
+window.onEdpCurveModeChange = onEdpCurveModeChange;
+window.onEdpCurveManualToggle = onEdpCurveManualToggle;
+window.onEdpCurveMonthlyInput = onEdpCurveMonthlyInput;
 window.guardarCostos = guardarCostos;
 window.agregarPartidaLinea = agregarPartidaLinea;
 window.addCostPartidaFromButton = addCostPartidaFromButton;
@@ -11322,6 +12536,12 @@ window.aplicarPlanPagoFila = aplicarPlanPagoFila;
 window.setCostFlowMode = setCostFlowMode;
 window.scrollCostPlanilla = scrollCostPlanilla;
 window.scrollFinancialPlanilla = scrollFinancialPlanilla;
+window.scrollResumenGantt = scrollResumenGantt;
+window.getFinancialSummary = getFinancialSummary;
+window.getAnnualIrrFromMonthlyOrNull = getAnnualIrrFromMonthlyOrNull;
+window.getFlowSeriesForAnnualTir = getFlowSeriesForAnnualTir;
+window.annualizeMonthlyIRR = annualizeMonthlyIRR;
+window.updateResumenFinancialKpis = updateResumenFinancialKpis;
 window.openCostFormulaModal = openCostFormulaModal;
 window.renderFormulaRefPanel = renderFormulaRefPanel;
 window.toggleFormulaRefGroup = toggleFormulaRefGroup;
@@ -11394,6 +12614,7 @@ document.addEventListener('keydown', (event) => {
 
 document.addEventListener('DOMContentLoaded', async () => {
   normalizeVisibleTextEncoding(document.body);
+  setupAppTableNormalization();
   ensureProjectControls();
   ensureActionButtons();
   setupLocalizedNumberInputs();

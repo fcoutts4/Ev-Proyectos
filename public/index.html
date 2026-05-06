@@ -368,9 +368,9 @@ tbody tr:hover{background:#f8fafc}
 .gantt-track{height:18px}
 .gantt-bar{top:2px;height:14px;border-radius:5px}
 
-/* Resumen ejecutivo: menos saturaciÃ³n y mejor jerarquÃ­a */
+/* Resumen: menos saturaciÃ³n y mejor jerarquÃ­a */
 #tab-resumen .resumen-banner{margin-bottom:16px}
-#tab-resumen #kpi-grid{gap:10px;margin-bottom:16px}
+#tab-resumen #kpi-grid{display:grid;gap:10px;margin-bottom:16px}
 #tab-resumen .resumen-main-grid{display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:16px}
 #tab-resumen .resumen-secondary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px}
 #tab-resumen{overflow-x:hidden}
@@ -694,8 +694,20 @@ tbody tr:hover{background:#f3f7fb!important}
 .flow-row-label span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .flow-toggle{width:22px;height:22px;min-height:22px!important;border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:6px;font-size:11px;font-weight:800;line-height:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;flex:0 0 auto}
 .flow-toggle:hover{background:#eef3f8}
+.flow-toggle-spacer{width:22px;height:22px;min-width:22px;flex:0 0 auto;display:inline-block}
 .flow-origin{font-size:10px;color:#64748b;font-weight:700;line-height:1.25;max-width:320px}
+.flow-origin-cell{position:relative;max-width:280px}
+.flow-origin-trigger{width:100%;border:0;background:transparent;color:#64748b;text-align:left;font-size:10px;font-weight:700;line-height:1.25;cursor:pointer;padding:0;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flow-origin-trigger:hover{color:#1d4ed8}
+.flow-origin-pop{display:none;position:absolute;z-index:80;left:0;top:100%;margin-top:5px;width:min(420px,70vw);max-height:320px;overflow:auto;background:#fff;border:1px solid var(--app-table-border-strong,#c7d2e0);border-radius:8px;box-shadow:0 12px 28px rgba(15,23,42,.18);padding:10px 12px;color:#0f172a;text-align:left}
+.flow-origin-pop.is-open{display:block}
+.flow-origin-pop-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px;font-size:10px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:.06em}
+.flow-origin-pop-close{width:20px;height:20px;border:1px solid #cbd5e1;background:#fff;color:#475569;border-radius:6px;line-height:1;cursor:pointer;font-size:12px;font-weight:800}
+.flow-origin-pop .flow-origin{max-width:none;white-space:normal;color:#334155;font-size:11px}
 .flow-total-col{text-align:right!important;min-width:110px;background:#f8fafc!important;font-weight:800!important;color:#0f172a!important}
+.flow-total-col.flow-total-positive span{color:#1d4ed8!important}
+.flow-total-col.flow-total-negative span{color:#b91c1c!important}
+.flow-total-col.flow-total-zero span{color:#64748b!important}
 .flow-row-level-1 td:first-child{padding-left:24px!important}
 .flow-row-level-2 td:first-child{padding-left:44px!important}
 .flow-row-total td{background:#eef3f8!important;font-weight:700!important}
@@ -703,6 +715,16 @@ tbody tr:hover{background:#f3f7fb!important}
 .flow-row-iva td{background:#f8fafc!important;font-weight:700!important}
 .flow-row-muted td{color:#475569!important}
 .flow-value-cost,.amount-cost,.flow-value-negative,.amount-negative{color:#334155!important}
+#flujo-tabla tbody tr[data-flow-row="ingresos"] td{background:#f8fbff!important}
+#flujo-tabla tbody tr[data-flow-row="gastos"] td,#flujo-tabla tbody tr[data-flow-row="gastos_financieros"] td{background:#fbfcfe!important}
+#flujo-tabla tbody tr[data-flow-row="subtotal_egresos_neto"] td{background:#eef7f1!important}
+#flujo-tabla tbody tr[data-flow-row="pago_del_iva"] td,#flujo-tabla tbody tr[data-flow-row="iva_credito"] td,#flujo-tabla tbody tr[data-flow-row="iva_debito"] td,#flujo-tabla tbody tr[data-flow-row="iva_mensual"] td,#flujo-tabla tbody tr[data-flow-row="iva_remanente"] td{background:#f8fafc!important}
+#flujo-tabla tbody tr[data-flow-row="total_egresos_brutos"] td{background:#eef3f8!important}
+#flujo-tabla tbody tr[data-flow-row="flujo_bruto"] td{background:#edf6ff!important}
+#flujo-tabla tbody tr[data-flow-row="flujo_puro"] td{background:#edf8f1!important}
+#flujo-tabla tbody tr[data-flow-row="flujo_antes_impuestos"] td{background:#edf8f1!important}
+#flujo-tabla tbody tr[data-flow-row="flujo_despues_impuestos"] td{background:#edf8f1!important}
+#flujo-tabla tbody tr[data-flow-row="pago_provisional_mensual"] td,#flujo-tabla tbody tr[data-flow-row="impuesto_a_la_renta"] td{background:#fff8f1!important}
 .flow-origin-stack{display:flex;flex-direction:column;gap:7px;align-items:flex-start}
 .flow-calc-details{width:auto;max-width:100%;border:0;background:transparent;border-radius:0;color:#1e3a8a}
 .flow-calc-details[open]{width:min(460px,70vw)}
@@ -726,9 +748,28 @@ tbody tr:hover{background:#f3f7fb!important}
 .gf-param-panel .inp{font-weight:700;min-height:28px!important;height:28px;padding:2px 8px;font-size:11px}
 .gf-param-panel .gf-label{font-size:9px!important;margin-bottom:2px!important;line-height:1.2}
 .gf-param-panel .gf-unit{font-size:10px!important}
+.gf-param-grid{display:grid;grid-template-columns:minmax(150px,180px) minmax(95px,120px) minmax(145px,170px);gap:8px;align-items:end}
+.gf-param-field{min-width:0}
+.gf-param-input-row{display:flex;align-items:center;gap:6px}
+.gf-param-input-row .inp{max-width:86px;text-align:right}
+.gf-param-field select.inp{max-width:160px;text-align:left}
+@media (max-width: 760px){
+  .gf-param-grid{grid-template-columns:1fr}
+  .gf-param-input-row .inp,.gf-param-field select.inp{max-width:none}
+}
 #tab-reportes.reportes-blank{min-height:calc(100vh - 160px);background:#fff;border:1px solid #e2e8f0;border-radius:10px}
 #kpi-grid{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))!important}
 .flow-kpi-grid{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))!important}
+.flow-summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:8px;margin-bottom:14px}
+.flow-summary-card{background:#fff;border:1px solid var(--app-table-border-strong,#c7d2e0);border-radius:8px;padding:9px 10px;min-height:64px}
+.flow-summary-label{font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;line-height:1.15;margin-bottom:5px}
+.flow-summary-value{font-size:15px;font-weight:900;color:#0f172a;line-height:1.15;white-space:nowrap}
+.flow-summary-card.is-main{background:#0f172a;border-color:#0f172a}
+.flow-summary-card.is-main .flow-summary-label{color:#94a3b8}
+.flow-summary-card.is-main .flow-summary-value{color:#fff}
+.flow-summary-card.is-good .flow-summary-value{color:#16a34a}
+.flow-summary-card.is-warn .flow-summary-value{color:#b45309}
+.flow-summary-card.is-bad .flow-summary-value{color:#dc2626}
 .ventas-crono-table{width:100%;table-layout:fixed}
 .ventas-crono-table col.col-link{width:32%}
 .ventas-crono-table col.col-num{width:16%}
@@ -737,25 +778,28 @@ tbody tr:hover{background:#f3f7fb!important}
 /* Tablas uniformes en toda la app: fondo claro, sin franjas de color por seccion */
 .finance-fixed-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gantt-link-chip{
-  max-width:118px;
-  height:22px;
-  padding:2px 7px;
-  border:1px solid #9ec5fe;
-  border-radius:999px;
-  background:#fbfdff;
-  color:#315b7d;
-  font-size:10px;
+  max-width:96px;
+  min-height:18px;
+  height:18px;
+  padding:1px 6px;
+  border:1px solid #bfccda;
+  border-radius:5px;
+  background:#ffffff;
+  color:#3f556d;
+  font-size:9px;
   font-weight:700;
   display:inline-flex;
   align-items:center;
   justify-content:center;
   flex:0 0 auto;
   cursor:pointer;
+  line-height:1;
+  transition:background .14s ease,border-color .14s ease,color .14s ease,box-shadow .14s ease;
 }
 .gantt-link-chip span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.gantt-link-chip.is-linked{border-color:#9bc6a4;background:#fbfffc;color:#315f3a}
-.gantt-link-chip:hover{border-color:#7db3f4;background:#f6fbff}
-.gantt-link-chip.is-linked:hover{border-color:#7dbb88;background:#f5fff7}
+.gantt-link-chip.is-linked{border-color:#a8c7ae;background:#f9fdf9;color:#2f5a37}
+.gantt-link-chip:hover{border-color:#8eb2d8;background:#f7fbff;color:#2f4f6a}
+.gantt-link-chip.is-linked:hover{border-color:#88b693;background:#f4fbf5;color:#264f2f}
 .gantt-link-chip:focus{outline:2px solid rgba(59,130,246,.22);outline-offset:1px}
 .gantt-link-popover{
   position:fixed;
@@ -1313,6 +1357,490 @@ table:not(.gantt-table) .tfoot-dark td,
 #tab-construccion .construction-ep-card .finance-fixed-concept-cell{min-height:34px;height:34px}
 #tab-construccion .construction-ep-card .formula-host{padding-top:0!important;padding-bottom:0!important}
 #tab-construccion .construction-ep-card .formula-readonly{display:block;font-size:10px;line-height:1.15;color:#334155;background:#f8fafc;border:1px solid #dbe4ee;border-radius:6px;padding:5px 7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.edp-curve-panel{border:1px solid #dbe4ee;background:#f8fafc;border-radius:8px;padding:8px 10px;margin-bottom:10px}
+.edp-curve-controls{display:flex;align-items:end;gap:10px;flex-wrap:wrap}
+.edp-curve-field{display:flex;flex-direction:column;gap:3px;min-width:150px}
+.edp-curve-field label{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#64748b}
+.edp-curve-field .inp{height:28px!important;min-height:28px!important;padding:3px 8px!important;font-size:11px}
+.edp-curve-toggle{display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 9px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:#475569;font-size:10px;font-weight:800;white-space:nowrap}
+.edp-curve-toggle input{margin:0}
+.edp-curve-status,.edp-curve-total{display:inline-flex;align-items:center;height:24px;padding:0 8px;border-radius:999px;border:1px solid #dbe4ee;background:#fff;font-size:10px;font-weight:800;color:#475569;white-space:nowrap}
+.edp-curve-status.is-ok{border-color:#bbf7d0;background:#f0fdf4;color:#166534}
+.edp-curve-status.is-warn{border-color:#fde68a;background:#fffbeb;color:#92400e}
+.edp-curve-status.is-error{border-color:#fecaca;background:#fef2f2;color:#991b1b}
+.edp-curve-editor{margin-top:8px}
+.edp-curve-editor[hidden]{display:none}
+.edp-curve-editor-scroll{max-width:100%;overflow-x:auto;overflow-y:hidden;border:1px solid #e2e8f0;border-radius:8px;background:#fff}
+.edp-curve-editor-table{width:max-content;min-width:100%;border-collapse:separate;border-spacing:0}
+.edp-curve-editor-table th{position:sticky;left:0;z-index:2;min-width:116px;text-align:left;background:#f8fafc!important;color:#475569;font-size:9px;padding:6px 8px;border-right:1px solid #e2e8f0}
+.edp-curve-editor-table td{min-width:58px;text-align:center;padding:4px 5px;font-size:10px;border-bottom:1px solid #f1f5f9;background:#fff}
+.edp-curve-input{width:50px!important;min-width:50px!important;height:24px!important;min-height:24px!important;padding:2px 4px!important;text-align:center;font-size:10px!important}
+.edp-curve-cumulative{font-weight:800;color:#166534}
+
+/* ===== UNIFIED TABLE SYSTEM ===== */
+:root{
+  --app-table-head-bg:#e8eef5;
+  --app-table-head-text:#0b2545;
+  --app-table-row-bg:#ffffff;
+  --app-table-row-hover-bg:#f3f7fb;
+  --app-table-month-bg:#f8fafc;
+  --app-table-total-bg:#eef3f8;
+  --app-table-border:#d7e0ea;
+  --app-table-border-strong:#c7d2e0;
+  --app-table-radius:10px;
+  --app-table-sticky-bg:#ffffff;
+  --app-table-row-h:34px;
+  --app-table-head-h:30px;
+  --app-table-cell-py:5px;
+  --app-table-cell-px:8px;
+  --app-table-cell-lh:1.15;
+  --app-table-month-w:92px;
+  --app-table-concept-w:224px;
+  --app-table-fixed-total-w:156px;
+  --app-table-shadow-right:8px 0 12px -14px rgba(15,23,42,.45),1px 0 0 var(--app-table-border-strong);
+  --app-table-shadow-left:-10px 0 14px -14px rgba(15,23,42,.45),-1px 0 0 var(--app-table-border-strong);
+}
+.tbl-scroll,.res-table-scroll,.finance-date-scroll,.finance-split-shell,.flow-planilla,.edp-curve-editor-scroll,.monthly-preview-scroll{
+  border-color:var(--app-table-border-strong)!important;
+  scrollbar-gutter:stable;
+  overscroll-behavior-inline:contain;
+}
+table.app-table{
+  width:100%;
+  border-collapse:separate!important;
+  border-spacing:0!important;
+  background:var(--app-table-row-bg)!important;
+  border:1px solid var(--app-table-border-strong)!important;
+  border-radius:var(--app-table-radius)!important;
+  overflow:hidden;
+  font-variant-numeric:tabular-nums;
+}
+.finance-split-shell table.app-table,.flow-planilla table.app-table,.tbl-scroll table.app-table,.res-table-scroll table.app-table,.monthly-preview-scroll table.app-table{
+  border-radius:0!important;
+}
+.app-table th,.app-table td{
+  box-sizing:border-box;
+  vertical-align:middle!important;
+  line-height:var(--app-table-cell-lh)!important;
+  border-bottom:1px solid var(--app-table-border)!important;
+  border-right:1px solid var(--app-table-border)!important;
+  white-space:nowrap;
+}
+.app-table th:last-child,.app-table td:last-child{border-right:0!important}
+.app-table thead th{
+  height:var(--app-table-head-h)!important;
+  min-height:var(--app-table-head-h)!important;
+  padding:var(--app-table-cell-py) var(--app-table-cell-px)!important;
+  background:var(--app-table-head-bg)!important;
+  color:var(--app-table-head-text)!important;
+  font-size:10px!important;
+  font-weight:800!important;
+  letter-spacing:.04em!important;
+  text-transform:uppercase;
+  text-align:center;
+  border-bottom:1px solid var(--app-table-border-strong)!important;
+}
+.app-table tbody td,.app-table tfoot td{
+  height:var(--app-table-row-h)!important;
+  min-height:var(--app-table-row-h)!important;
+  padding:var(--app-table-cell-py) var(--app-table-cell-px)!important;
+  background:var(--app-table-row-bg)!important;
+  color:var(--app-table-head-text)!important;
+  font-size:11px!important;
+  font-weight:500!important;
+}
+.app-table tbody tr:hover > td{background:var(--app-table-row-hover-bg)!important}
+.app-table td[style*="color"],.app-table th[style*="color"],.app-table strong{color:var(--app-table-head-text)!important}
+.app-table th[data-month-col],.app-table.monthly-table th[data-month-col],
+#planilla-table thead th:nth-child(n+6),#flujo-tabla thead th:nth-child(n+4){
+  width:var(--app-table-month-w)!important;
+  min-width:var(--app-table-month-w)!important;
+  max-width:var(--app-table-month-w)!important;
+  background:var(--app-table-head-bg)!important;
+  color:var(--app-table-head-text)!important;
+  text-align:center!important;
+}
+.app-table td[data-month-cell],
+#planilla-table tbody tr:not(.cat-row):not(.subcat-row) td:nth-child(n+6),
+#planilla-table tfoot td:nth-child(n+6),
+#flujo-tabla tbody td:nth-child(n+4){
+  width:var(--app-table-month-w)!important;
+  min-width:var(--app-table-month-w)!important;
+  max-width:var(--app-table-month-w)!important;
+  background:var(--app-table-month-bg)!important;
+  text-align:right!important;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+#constr-ep-table th:nth-child(3),#constr-fin-planilla-table th:nth-child(3),
+#terreno-fin-planilla-table th:nth-child(3),#flujo-ventas-table th:nth-child(3){
+  background:var(--app-table-head-bg)!important;
+  box-shadow:none!important;
+}
+#constr-ep-table td:nth-child(3),#constr-fin-planilla-table td:nth-child(3),
+#terreno-fin-planilla-table td:nth-child(3),#flujo-ventas-table td:nth-child(3){
+  background:var(--app-table-month-bg)!important;
+  box-shadow:none!important;
+}
+.app-table tfoot td,
+.app-table tr.tfoot-dark > td,
+.app-table tr.tfoot-green > td,
+.app-table tr.finance-total-row > td,
+.app-table .cat-total-cell,
+.app-table .cat-total-cell strong,
+.app-table .flow-row-total td,
+.app-table .flow-row-subtotal td{
+  background:var(--app-table-total-bg)!important;
+  color:var(--app-table-head-text)!important;
+  border-top:1px solid var(--app-table-border-strong)!important;
+  border-bottom:1px solid var(--app-table-border-strong)!important;
+  font-weight:700!important;
+}
+.app-table tr.finance-total-row > td[data-month-cell],
+.app-table tfoot td[data-month-cell],
+#planilla-table tfoot td:nth-child(n+6),
+#flujo-ventas-table tfoot td,
+#flujo-tabla tr.finance-total-row td[data-month-cell]{
+  background:var(--app-table-total-bg)!important;
+}
+.app-table .cat-row td,.app-table .subcat-row td,.app-table .flow-category-row td{
+  height:var(--app-table-row-h)!important;
+  min-height:var(--app-table-row-h)!important;
+  background:var(--app-table-total-bg)!important;
+  color:var(--app-table-head-text)!important;
+  border-bottom:1px solid var(--app-table-border-strong)!important;
+  font-size:10px!important;
+  font-weight:800!important;
+  letter-spacing:.04em!important;
+  text-transform:uppercase;
+}
+.app-table .inp,.app-table input:not([type="checkbox"]):not([type="color"]):not([type="hidden"]),.app-table select{
+  height:26px!important;
+  min-height:26px!important;
+  padding:3px 7px!important;
+  line-height:1.1!important;
+  font-size:11px!important;
+  box-sizing:border-box!important;
+  vertical-align:middle!important;
+}
+.app-table select{padding-right:24px!important}
+.app-table .btn-outline,.app-table .btn-primary,.app-table .btn-dark,.app-table button{
+  min-height:24px!important;
+  height:auto;
+  padding:3px 8px!important;
+  font-size:10px!important;
+  line-height:1.1!important;
+}
+.app-table .gantt-link-chip,.app-table .cost-config-pill,.app-table .plan-status-pill,.app-table .badge{
+  min-height:20px!important;
+  height:20px!important;
+  padding:2px 7px!important;
+  line-height:1!important;
+  vertical-align:middle!important;
+}
+.finance-split-shell{
+  grid-template-columns:calc(var(--app-table-concept-w) + var(--app-table-fixed-total-w)) minmax(0,1fr)!important;
+  border:1px solid var(--app-table-border-strong)!important;
+  background:var(--app-table-row-bg)!important;
+  isolation:isolate;
+}
+.finance-split-fixed{
+  background:var(--app-table-sticky-bg)!important;
+  box-shadow:var(--app-table-shadow-right)!important;
+  z-index:4!important;
+}
+.finance-split-fixed table{
+  width:calc(var(--app-table-concept-w) + var(--app-table-fixed-total-w))!important;
+  min-width:calc(var(--app-table-concept-w) + var(--app-table-fixed-total-w))!important;
+}
+.finance-fixed-concept-col,.finance-date-table .finance-concept-col,.finance-date-table .finance-sticky-left{
+  width:var(--app-table-concept-w)!important;
+  min-width:var(--app-table-concept-w)!important;
+  max-width:var(--app-table-concept-w)!important;
+}
+.finance-fixed-total-col{
+  width:var(--app-table-fixed-total-w)!important;
+  min-width:var(--app-table-fixed-total-w)!important;
+  max-width:var(--app-table-fixed-total-w)!important;
+  text-align:right!important;
+}
+.finance-fixed-concept-cell{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:6px!important;
+  height:var(--app-table-row-h)!important;
+  min-height:var(--app-table-row-h)!important;
+  background:var(--app-table-sticky-bg)!important;
+}
+.finance-split-fixed .finance-total-row .finance-fixed-concept-cell,
+.finance-split-fixed .finance-total-row .finance-fixed-total-col{background:var(--app-table-total-bg)!important}
+.finance-split-scroll{background:var(--app-table-row-bg)!important}
+.finance-split-scroll .finance-date-table th:first-child,
+.finance-split-scroll .finance-date-table td:first-child{
+  position:static!important;
+  left:auto!important;
+  width:var(--app-table-month-w)!important;
+  min-width:var(--app-table-month-w)!important;
+  max-width:var(--app-table-month-w)!important;
+  box-shadow:none!important;
+}
+#planilla-table thead th:nth-child(1),
+#planilla-table tbody tr:not(.cat-row):not(.subcat-row) td:nth-child(1){
+  position:sticky!important;
+  left:0!important;
+  z-index:12!important;
+  width:60px!important;
+  min-width:60px!important;
+  max-width:60px!important;
+  background:var(--app-table-sticky-bg)!important;
+}
+#planilla-table thead th:nth-child(2),
+#planilla-table tbody tr:not(.cat-row):not(.subcat-row) td:nth-child(2){
+  position:sticky!important;
+  left:60px!important;
+  z-index:12!important;
+  width:var(--app-table-concept-w)!important;
+  min-width:var(--app-table-concept-w)!important;
+  max-width:var(--app-table-concept-w)!important;
+  background:var(--app-table-sticky-bg)!important;
+  box-shadow:var(--app-table-shadow-right)!important;
+}
+#planilla-table thead th:nth-child(1),#planilla-table thead th:nth-child(2){
+  z-index:24!important;
+  background:var(--app-table-head-bg)!important;
+}
+#planilla-table tbody tr.finance-total-row td:nth-child(1),
+#planilla-table tbody tr.finance-total-row td:nth-child(2){background:var(--app-table-total-bg)!important}
+#planilla-table thead th:nth-child(4),
+#planilla-table tbody tr:not(.cat-row):not(.subcat-row) td:nth-child(4){
+  position:sticky!important;
+  right:0!important;
+  z-index:13!important;
+  width:128px!important;
+  min-width:128px!important;
+  max-width:128px!important;
+  background:var(--app-table-sticky-bg)!important;
+  box-shadow:var(--app-table-shadow-left)!important;
+  text-align:right!important;
+}
+#planilla-table thead th:nth-child(4){
+  z-index:25!important;
+  background:var(--app-table-head-bg)!important;
+}
+#flujo-tabla thead th:first-child,#flujo-tabla tbody td:first-child{
+  position:sticky!important;
+  left:0!important;
+  z-index:12!important;
+  width:var(--app-table-concept-w)!important;
+  min-width:var(--app-table-concept-w)!important;
+  max-width:var(--app-table-concept-w)!important;
+  background:var(--app-table-sticky-bg)!important;
+  box-shadow:var(--app-table-shadow-right)!important;
+}
+#flujo-tabla thead th:first-child{
+  z-index:24!important;
+  background:var(--app-table-head-bg)!important;
+}
+#flujo-tabla .flow-total-col{
+  position:sticky!important;
+  right:0!important;
+  z-index:13!important;
+  width:var(--app-table-fixed-total-w)!important;
+  min-width:var(--app-table-fixed-total-w)!important;
+  max-width:var(--app-table-fixed-total-w)!important;
+  background:var(--app-table-sticky-bg)!important;
+  box-shadow:var(--app-table-shadow-left)!important;
+  text-align:right!important;
+}
+#flujo-tabla thead .flow-total-col{
+  z-index:25!important;
+  background:var(--app-table-head-bg)!important;
+}
+#flujo-tabla tr.finance-total-row td:first-child,
+#flujo-tabla tr.finance-total-row .flow-total-col{background:var(--app-table-total-bg)!important}
+.gantt-table.app-table th,.gantt-table.app-table td{
+  height:var(--app-table-row-h)!important;
+  min-height:var(--app-table-row-h)!important;
+  background:var(--app-table-row-bg)!important;
+  border-color:var(--app-table-border)!important;
+}
+.gantt-table.app-table thead th,.gantt-table.app-table .gantt-sticky-head{
+  height:var(--app-table-head-h)!important;
+  min-height:var(--app-table-head-h)!important;
+  background:var(--app-table-head-bg)!important;
+  color:var(--app-table-head-text)!important;
+}
+.gantt-table.app-table .gantt-sticky-left,.gantt-table.app-table .gantt-sticky-right{
+  background:var(--app-table-sticky-bg)!important;
+}
+.gantt-table.app-table .gantt-sticky-head{background:var(--app-table-head-bg)!important}
+.constr-surface-table.app-table tfoot td,.edp-curve-editor-table.app-table th,.edp-curve-editor-table.app-table td{
+  height:var(--app-table-row-h)!important;
+  min-height:var(--app-table-row-h)!important;
+}
+.monthly-preview-scroll .app-table th,.monthly-preview-scroll .app-table td{
+  height:28px!important;
+  min-height:28px!important;
+}
+#tab-terreno table.app-table th,#tab-construccion table.app-table th,
+#tab-ventas table.app-table th,#tab-cabida table.app-table th,
+#tab-resumen table.app-table th,#tab-costos table.app-table th,#tab-flujo table.app-table th{
+  height:var(--app-table-head-h)!important;
+  min-height:var(--app-table-head-h)!important;
+  padding:var(--app-table-cell-py) var(--app-table-cell-px)!important;
+  line-height:var(--app-table-cell-lh)!important;
+  background:var(--app-table-head-bg)!important;
+  color:var(--app-table-head-text)!important;
+  border-bottom:1px solid var(--app-table-border-strong)!important;
+}
+#tab-terreno table.app-table td,#tab-construccion table.app-table td,
+#tab-ventas table.app-table td,#tab-cabida table.app-table td,
+#tab-resumen table.app-table td,#tab-costos table.app-table td,#tab-flujo table.app-table td,
+#planilla-table.app-table .partida-row td,#planilla-table.app-table .partida-row.is-subpartida td,
+#planilla-table.app-table .cat-row td{
+  height:var(--app-table-row-h)!important;
+  min-height:var(--app-table-row-h)!important;
+  padding:var(--app-table-cell-py) var(--app-table-cell-px)!important;
+  line-height:var(--app-table-cell-lh)!important;
+  border-bottom:1px solid var(--app-table-border)!important;
+}
+#tab-terreno table.app-table .inp,#tab-construccion table.app-table .inp,
+#tab-ventas table.app-table .inp,#tab-cabida table.app-table .inp,
+#tab-resumen table.app-table .inp,#tab-costos table.app-table .inp,#tab-flujo table.app-table .inp,
+#planilla-table.app-table .inp,#formas-pago-table.app-table .inp,#ventas-precios-table.app-table .inp{
+  height:26px!important;
+  min-height:26px!important;
+  padding:3px 7px!important;
+  line-height:1.1!important;
+  font-size:11px!important;
+}
+#tab-terreno table.app-table td[data-month-cell],#tab-construccion table.app-table td[data-month-cell],
+#tab-ventas table.app-table td[data-month-cell],#tab-costos table.app-table td[data-month-cell],
+#tab-flujo table.app-table td[data-month-cell],
+#flujo-tabla.app-table tbody td:nth-child(n+4),#planilla-table.app-table tbody tr:not(.cat-row):not(.subcat-row) td:nth-child(n+6){
+  background:var(--app-table-month-bg)!important;
+  text-align:right!important;
+}
+#tab-terreno table.app-table tr.finance-total-row td,#tab-construccion table.app-table tr.finance-total-row td,
+#tab-ventas table.app-table tr.finance-total-row td,#tab-costos table.app-table tfoot td,
+#tab-flujo table.app-table .flow-row-total td,#tab-flujo table.app-table .flow-row-subtotal td,
+#tab-cabida table.app-table tfoot td,#tab-resumen table.app-table tfoot td{
+  background:var(--app-table-total-bg)!important;
+  color:var(--app-table-head-text)!important;
+  border-top:1px solid var(--app-table-border-strong)!important;
+  border-bottom:1px solid var(--app-table-border-strong)!important;
+  font-weight:700!important;
+}
+/* Final consistency pass: visible table chrome follows Flujo de Caja. */
+.tbl-scroll,.res-table-scroll,.finance-date-scroll,.finance-split-shell,.flow-planilla,.edp-curve-editor-scroll,.monthly-preview-scroll,.resumen-gantt-scroll{
+  border:1px solid var(--app-table-border-strong)!important;
+  border-radius:var(--app-table-radius)!important;
+  background:var(--app-table-row-bg)!important;
+}
+.tbl-scroll,.res-table-scroll,.finance-date-scroll,.flow-planilla,.edp-curve-editor-scroll,.monthly-preview-scroll,.resumen-gantt-scroll{
+  overflow:auto!important;
+}
+.finance-split-shell{
+  overflow:hidden!important;
+}
+#cost-planilla-scroll.tbl-scroll,#flujo-ventas-scroll.finance-split-shell,.flow-planilla{
+  border-top:1px solid var(--app-table-border-strong)!important;
+}
+.tbl-scroll > table.app-table,.res-table-scroll > table.app-table,.flow-planilla > table.app-table,
+.edp-curve-editor-scroll > table.app-table,.monthly-preview-scroll > table.app-table,
+.finance-split-shell table.app-table,.resumen-gantt-scroll table.app-table{
+  border:0!important;
+  border-radius:0!important;
+}
+#cost-planilla-scroll.tbl-scroll,.flow-planilla{
+  box-shadow:none!important;
+}
+#planilla-table.app-table,#flujo-tabla.app-table{
+  min-width:1520px!important;
+  border-collapse:separate!important;
+  border-spacing:0!important;
+}
+#planilla-table.app-table thead th,#flujo-tabla.app-table thead th{
+  height:var(--app-table-head-h)!important;
+  min-height:var(--app-table-head-h)!important;
+  padding:var(--app-table-cell-py) var(--app-table-cell-px)!important;
+  background:var(--app-table-head-bg)!important;
+  color:var(--app-table-head-text)!important;
+  border-bottom:1px solid var(--app-table-border-strong)!important;
+  border-right:1px solid var(--app-table-border)!important;
+  font-size:10px!important;
+  font-weight:800!important;
+  letter-spacing:.04em!important;
+  text-transform:uppercase;
+}
+#planilla-table.app-table tbody td,#planilla-table.app-table tfoot td,
+#flujo-tabla.app-table tbody td,#flujo-tabla.app-table tfoot td{
+  height:var(--app-table-row-h)!important;
+  min-height:var(--app-table-row-h)!important;
+  padding:var(--app-table-cell-py) var(--app-table-cell-px)!important;
+  line-height:var(--app-table-cell-lh)!important;
+  border-bottom:1px solid var(--app-table-border)!important;
+  border-right:1px solid var(--app-table-border)!important;
+}
+#planilla-table.app-table .cat-row td,#planilla-table.app-table .subcat-row td,
+#flujo-tabla.app-table .flow-category-row td,#flujo-tabla.app-table .flow-row-total td,
+#flujo-tabla.app-table .flow-row-subtotal td{
+  background:var(--app-table-total-bg)!important;
+  color:var(--app-table-head-text)!important;
+  border-top:1px solid var(--app-table-border-strong)!important;
+  border-bottom:1px solid var(--app-table-border-strong)!important;
+  font-weight:700!important;
+}
+.finance-split-scroll .finance-date-table.app-table{
+  width:max-content!important;
+  min-width:max-content!important;
+  table-layout:fixed!important;
+}
+.finance-split-scroll .finance-date-table.app-table th,
+.finance-split-scroll .finance-date-table.app-table td,
+.finance-date-table.app-table th[data-month-col],
+.finance-date-table.app-table td[data-month-cell],
+#planilla-table.app-table th[data-month-col],
+#planilla-table.app-table td[data-month-cell],
+#flujo-tabla.app-table thead th:nth-child(n+4),
+#flujo-tabla.app-table tbody td:nth-child(n+4){
+  width:var(--app-table-month-w)!important;
+  min-width:var(--app-table-month-w)!important;
+  max-width:var(--app-table-month-w)!important;
+  box-sizing:border-box!important;
+}
+#tab-terreno .finance-split-scroll .finance-date-table th:first-child,
+#tab-terreno .finance-split-scroll .finance-date-table td:first-child,
+#tab-construccion .finance-split-scroll .finance-date-table th:first-child,
+#tab-construccion .finance-split-scroll .finance-date-table td:first-child,
+#tab-ventas .finance-split-scroll .finance-date-table th:first-child,
+#tab-ventas .finance-split-scroll .finance-date-table td:first-child{
+  position:static!important;
+  left:auto!important;
+  right:auto!important;
+  width:var(--app-table-month-w)!important;
+  min-width:var(--app-table-month-w)!important;
+  max-width:var(--app-table-month-w)!important;
+  padding:var(--app-table-cell-py) var(--app-table-cell-px)!important;
+  background:var(--app-table-month-bg)!important;
+  box-shadow:none!important;
+}
+#tab-terreno .finance-split-scroll .finance-date-table thead th:first-child,
+#tab-construccion .finance-split-scroll .finance-date-table thead th:first-child,
+#tab-ventas .finance-split-scroll .finance-date-table thead th:first-child{
+  background:var(--app-table-head-bg)!important;
+}
+#flujo-tabla.app-table tbody tr[data-flow-row="ingresos"] td{background:#f8fbff!important}
+#flujo-tabla.app-table tbody tr[data-flow-row="gastos"] td,#flujo-tabla.app-table tbody tr[data-flow-row="gastos_financieros"] td{background:#fbfcfe!important}
+#flujo-tabla.app-table tbody tr[data-flow-row="subtotal_egresos_neto"] td{background:#eef7f1!important}
+#flujo-tabla.app-table tbody tr[data-flow-row="pago_del_iva"] td,#flujo-tabla.app-table tbody tr[data-flow-row="iva_credito"] td,#flujo-tabla.app-table tbody tr[data-flow-row="iva_debito"] td,#flujo-tabla.app-table tbody tr[data-flow-row="iva_mensual"] td,#flujo-tabla.app-table tbody tr[data-flow-row="iva_remanente"] td{background:#f8fafc!important}
+#flujo-tabla.app-table tbody tr[data-flow-row="total_egresos_brutos"] td{background:#eef3f8!important}
+#flujo-tabla.app-table tbody tr[data-flow-row="flujo_bruto"] td{background:#edf6ff!important}
+#flujo-tabla.app-table tbody tr[data-flow-row="flujo_puro"] td{background:#edf8f1!important}
+#flujo-tabla.app-table tbody tr[data-flow-row="flujo_antes_impuestos"] td{background:#edf8f1!important}
+#flujo-tabla.app-table tbody tr[data-flow-row="flujo_despues_impuestos"] td{background:#edf8f1!important}
+#flujo-tabla.app-table tbody tr[data-flow-row="pago_provisional_mensual"] td,#flujo-tabla.app-table tbody tr[data-flow-row="impuesto_a_la_renta"] td{background:#fff8f1!important}
 @media (max-width: 1100px){
   #tab-construccion .construction-global-strip{grid-template-columns:1fr}
   #tab-construccion .construction-global-kicker{margin-bottom:2px}
@@ -1365,7 +1893,7 @@ table:not(.gantt-table) .tfoot-dark td,
   <div class="tab-dock" id="tabDock">
     <div class="tab-nav-wrap" id="tabNavWrap">
       <div class="tab-nav" id="tabBar">
-        <button class="tab-btn active" type="button" data-tab-target="resumen" onclick="showTab('resumen',this)">Resumen Ejecutivo</button>
+        <button class="tab-btn active" type="button" data-tab-target="resumen" onclick="showTab('resumen',this)">Resumen</button>
         <button class="tab-btn" type="button" data-tab-target="cabida" onclick="showTab('cabida',this)">Cabida Proyecto</button>
         <button class="tab-btn" type="button" data-tab-target="terreno" onclick="showTab('terreno',this)">Terreno</button>
         <button class="tab-btn" type="button" data-tab-target="construccion" onclick="showTab('construccion',this)">ConstrucciÃ³n</button>
@@ -1397,30 +1925,34 @@ table:not(.gantt-table) .tfoot-dark td,
 </div>
 
   <!-- KPIs -->
-  <div style="display:grid;grid-template-columns:repeat(5,1fr)" id="kpi-grid">
+  <div id="kpi-grid">
     <div class="kpi-card kpi-green">
-      <div class="kpi-label">Ventas Totales</div>
-      <div class="kpi-value" style="color:#16a34a" id="kpi-ventas">647.950 UF</div>
+      <div class="kpi-label">Ingresos brutos</div>
+      <div class="kpi-value" style="color:#16a34a" id="kpi-ingresos-brutos">0 UF</div>
   </div>
     <div class="kpi-card kpi-blue">
-      <div class="kpi-label">Margen Neto (Fin)</div>
-      <div class="kpi-value" style="color:#1d4ed8" id="kpi-margen">81.569 UF</div>
-      <div class="kpi-sub" id="kpi-margen-pct">12.6% s/ventas</div>
+      <div class="kpi-label">Ingresos netos</div>
+      <div class="kpi-value" style="color:#1d4ed8" id="kpi-ingresos-netos">0 UF</div>
   </div>
     <div class="kpi-card kpi-purple">
-      <div class="kpi-label">TIR Pura</div>
-      <div class="kpi-value" style="color:#7c3aed" id="kpi-tir-pura">11.0%</div>
-      <div class="kpi-sub">S/Financiamiento</div>
+      <div class="kpi-label">Utilidad bruta</div>
+      <div class="kpi-value" style="color:#7c3aed" id="kpi-utilidad-bruta">0 UF</div>
   </div>
     <div class="kpi-card kpi-orange">
-      <div class="kpi-label">TIR Financiada</div>
-      <div class="kpi-value" style="color:#ea580c" id="kpi-tir-fin">18.8%</div>
-      <div class="kpi-sub">Anual</div>
+      <div class="kpi-label">Utilidad neta</div>
+      <div class="kpi-value" style="color:#ea580c" id="kpi-utilidad-neta">0 UF</div>
   </div>
     <div class="kpi-card kpi-amber">
-      <div class="kpi-label">Aporte mÃ¡ximo</div>
-      <div class="kpi-value" style="color:#b45309" id="kpi-cap">145.655 UF</div>
-      <div class="kpi-sub" id="kpi-cap-sub">En Mes 40</div>
+      <div class="kpi-label">Margen bruto</div>
+      <div class="kpi-value" style="color:#b45309" id="kpi-margen-bruto">0,0%</div>
+  </div>
+    <div class="kpi-card kpi-blue">
+      <div class="kpi-label">TIR antes de impuestos</div>
+      <div class="kpi-value" style="color:#1d4ed8" id="kpi-tir-antes">-</div>
+  </div>
+    <div class="kpi-card kpi-green">
+      <div class="kpi-label">TIR despuÃ©s de impuestos</div>
+      <div class="kpi-value" style="color:#16a34a" id="kpi-tir-despues">-</div>
   </div>
 </div>
 
@@ -1429,10 +1961,14 @@ table:not(.gantt-table) .tfoot-dark td,
 
     <!-- Gantt -->
     <div class="card resumen-gantt-card">
-      <div class="sec-title"> CARTA GANTT
-        <span style="margin-left:auto;font-weight:400;font-size:10px;text-transform:none;color:#94a3b8">Pasa el cursor sobre el grÃ¡fico para ver el detalle</span>
-    </div>
-      <div class="resumen-gantt-scroll">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="sec-title" style="margin-bottom:0"> CARTA GANTT</div>
+        <div class="planilla-nav">
+          <button class="btn-outline" type="button" onclick="scrollResumenGantt(-480)">Mes -</button>
+          <button class="btn-outline" type="button" onclick="scrollResumenGantt(480)">Mes +</button>
+        </div>
+      </div>
+      <div id="resumen-gantt-scroll" class="resumen-gantt-scroll">
         <div id="gantt-preview"></div>
     </div>
   </div>
@@ -1603,7 +2139,11 @@ table:not(.gantt-table) .tfoot-dark td,
         <div class="terrain-field third">
           <div class="compact-label">Pago intereses</div>
           <select class="inp" id="fin-terreno-pago-int" onchange="onTerrenoInputChange()">
-            <option>Semestral</option><option>Mensual</option><option>Anual</option><option>Contra Escrituraciones</option>
+            <option>Mensual</option>
+            <option>Trimestral</option>
+            <option selected>Semestral</option>
+            <option>Anual</option>
+            <option>Al vencimiento</option>
           </select>
         </div>
       </div>
@@ -2009,7 +2549,11 @@ table:not(.gantt-table) .tfoot-dark td,
       <div>
         <div style="font-size:10px;color:#94a3b8;margin-bottom:4px">Pago intereses</div>
         <select class="inp" id="fin-constr-pago-int" onchange="updateConstrParams()">
-          <option>Anual</option><option>Mensual</option><option>Semestral</option><option>Contra Escrituraciones</option>
+          <option>Mensual</option>
+          <option>Trimestral</option>
+          <option>Semestral</option>
+          <option>Anual</option>
+          <option>Al vencimiento</option>
         </select>
       </div>
       <div>
@@ -2033,6 +2577,28 @@ table:not(.gantt-table) .tfoot-dark td,
         <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-ep-scroll', -480)">Mes -</button>
         <button class="btn-outline" type="button" onclick="scrollFinancialPlanilla('constr-ep-scroll', 480)">Mes +</button>
       </div>
+    </div>
+    <div class="edp-curve-panel">
+      <div class="edp-curve-controls">
+        <div class="edp-curve-field">
+          <label for="edp-curve-mode">Curva S</label>
+          <select class="inp" id="edp-curve-mode" onchange="onEdpCurveModeChange(this)">
+            <option value="auto">Curva automática</option>
+            <option value="linear">Curva lineal</option>
+            <option value="smooth_s">Curva S suave</option>
+            <option value="front_loaded">Curva S concentrada al inicio</option>
+            <option value="back_loaded">Curva S concentrada al final</option>
+            <option value="custom">Curva personalizada</option>
+          </select>
+        </div>
+        <label class="edp-curve-toggle">
+          <input type="checkbox" id="edp-curve-manual" onchange="onEdpCurveManualToggle(this)">
+          <span>Editar curva manualmente</span>
+        </label>
+        <span id="edp-curve-status" class="edp-curve-status">100% correcto</span>
+        <span id="edp-curve-total" class="edp-curve-total">Suma 100%</span>
+      </div>
+      <div id="edp-curve-editor" class="edp-curve-editor" hidden></div>
     </div>
     <div id="constr-ep-scroll" class="finance-split-shell">
       <div class="finance-split-fixed">
@@ -2065,20 +2631,30 @@ table:not(.gantt-table) .tfoot-dark td,
     </div>
     <div class="gf-param-panel">
       <div class="sec-title" style="margin-bottom:10px">PARÃMETROS GASTOS FINANCIEROS</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">
-        <div>
-          <label class="gf-label" style="color:#64748b;display:block">Tasa_interes_construccion</label>
-          <div style="display:flex;align-items:center;gap:6px">
+      <div class="gf-param-grid">
+        <div class="gf-param-field">
+          <label class="gf-label" style="color:#64748b;display:block">Tasa interés construcción</label>
+          <div class="gf-param-input-row">
             <input type="text" inputmode="decimal" data-localized-number="1" step="0.01" class="inp" id="gf-tasa-construccion" oninput="syncGfConstructionParams()">
             <span class="gf-unit" style="color:#64748b">anual %</span>
           </div>
         </div>
-        <div>
+        <div class="gf-param-field">
           <label class="gf-label" style="color:#64748b;display:block">%Timbres</label>
-          <div style="display:flex;align-items:center;gap:6px">
+          <div class="gf-param-input-row">
             <input type="text" inputmode="decimal" data-localized-number="1" step="0.01" class="inp" id="gf-pct-timbres" value="0.8" readonly disabled aria-disabled="true" title="Valor fijo no editable">
             <span class="gf-unit" style="color:#64748b">%</span>
           </div>
+        </div>
+        <div class="gf-param-field">
+          <label class="gf-label" style="color:#64748b;display:block">Pago intereses</label>
+          <select class="inp" id="gf-constr-pago-int" onchange="syncGfConstructionParams()">
+            <option>Mensual</option>
+            <option>Trimestral</option>
+            <option>Semestral</option>
+            <option>Anual</option>
+            <option>Al vencimiento</option>
+          </select>
         </div>
       </div>
     </div>
@@ -2128,7 +2704,7 @@ table:not(.gantt-table) .tfoot-dark td,
 
     <div id="cost-iva-panel" class="cost-iva-panel-slot"></div>
     <div id="cost-planilla-scroll" class="tbl-scroll" style="border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px">
-      <table id="planilla-table">
+      <table id="planilla-table" class="app-table">
         <thead id="planilla-head"></thead>
         <tbody id="planilla-tbody"></tbody>
         <tfoot id="planilla-tfoot"></tfoot>
@@ -2197,40 +2773,7 @@ table:not(.gantt-table) .tfoot-dark td,
 </div>
 
   <!-- KPIs Flujo -->
-  <div class="flow-kpi-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:16px">
-
-    <!-- Margen -->
-    <div class="card-dark" style="border-radius:12px;padding:18px">
-      <div style="font-size:10px;font-weight:700;color:#22c55e;text-transform:uppercase;margin-bottom:8px"> MARGEN DEL PROYECTO</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div>
-          <div style="font-size:10px;color:#94a3b8">SIN FINANCIACIÃ“N</div>
-          <div style="font-size:1.4rem;font-weight:900;color:#fff" id="flujo-margen-sin">100.661 UF</div>
-          <div style="font-size:10px;color:#22c55e" id="flujo-margen-sin-pct">15.5%</div>
-      </div>
-        <div>
-          <div style="font-size:10px;color:#94a3b8">CON FINANCIACIÃ“N</div>
-          <div style="font-size:1.4rem;font-weight:900;color:#3b82f6" id="flujo-margen-con">81.569 UF</div>
-          <div style="font-size:10px;color:#3b82f6" id="flujo-margen-con-pct">12.6%</div>
-      </div>
-    </div>
-  </div>
-
-    <!-- TIR -->
-    <div class="card" style="border:1px solid #fecaca">
-      <div style="font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;margin-bottom:8px"> TIR ANUAL</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div>
-          <div style="font-size:10px;color:#94a3b8">Pura del Proyecto</div>
-          <div style="font-size:1.3rem;font-weight:900;color:#0f172a" id="flujo-tir-sin">11.0%</div>
-      </div>
-        <div>
-          <div style="font-size:10px;color:#94a3b8">Sobre Patrimonio</div>
-          <div style="font-size:1.3rem;font-weight:900;color:#7c3aed" id="flujo-tir-con">18.8%</div>
-      </div>
-    </div>
-</div>
-</div>
+  <div id="flujo-resumen-grid" class="flow-summary-grid"></div>
 
   <!-- Tabla Flujo de Caja Completo -->
   <div style="margin-bottom:16px">
@@ -2241,12 +2784,32 @@ table:not(.gantt-table) .tfoot-dark td,
       </div>
     </div>
     <div class="flow-planilla">
-      <table style="min-width:1400px" id="flujo-tabla">
+      <table style="min-width:1400px" id="flujo-tabla" class="app-table">
         <thead id="flujo-tabla-header"></thead>
         <tbody id="flujo-tabla-tbody"></tbody>
     </table>
   </div>
 </div>
+
+  <!-- Tabla Flujo Bancos -->
+  <div style="margin-bottom:16px">
+    <div class="planilla-header">
+      <div>
+        <div style="font-size:13px;font-weight:900;color:#fff;letter-spacing:.08em;text-transform:uppercase">FLUJO BANCOS</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:2px">Giros, pagos e intereses bancarios del proyecto.</div>
+      </div>
+      <div class="planilla-nav">
+        <button class="btn-outline" type="button" onclick="scrollBankFlowPlanilla(-480)">Mes -</button>
+        <button class="btn-outline" type="button" onclick="scrollBankFlowPlanilla(480)">Mes +</button>
+      </div>
+    </div>
+    <div id="flujo-bancos-scroll" class="flow-planilla">
+      <table style="min-width:1400px" id="flujo-bancos-tabla" class="app-table">
+        <thead id="flujo-bancos-header"></thead>
+        <tbody id="flujo-bancos-tbody"></tbody>
+      </table>
+    </div>
+  </div>
 </div><!-- end tab flujo -->
 
 <div id="tab-reportes" class="tab-pane reportes-blank"></div><!-- end tab reportes -->
@@ -2558,10 +3121,19 @@ table:not(.gantt-table) .tfoot-dark td,
 
   function normalizeFormulaOverrides(value) {
     const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    const normalizeGanttLinksLocal = (links) => (
+      typeof normalizeGanttLinks === 'function'
+        ? normalizeGanttLinks(links)
+        : (links && typeof links === 'object' && !Array.isArray(links) ? links : {})
+    );
     return {
       flow: source.flow && typeof source.flow === 'object' && !Array.isArray(source.flow) ? { ...source.flow } : {},
       ep: source.ep && typeof source.ep === 'object' && !Array.isArray(source.ep) ? { ...source.ep } : {},
       gf: source.gf && typeof source.gf === 'object' && !Array.isArray(source.gf) ? { ...source.gf } : {},
+      ganttLinks: normalizeGanttLinksLocal(source.ganttLinks || source.gantt_links || {}),
+      edpCurve: typeof normalizeEdpCurveConfig === 'function'
+        ? normalizeEdpCurveConfig(source.edpCurve || source.edp_curve || {})
+        : (source.edpCurve || source.edp_curve || {}),
     };
   }
 
@@ -2694,6 +3266,9 @@ table:not(.gantt-table) .tfoot-dark td,
   function setFormula(scope, key, value) {
     if (!patchState.formulaOverrides[scope]) patchState.formulaOverrides[scope] = {};
     patchState.formulaOverrides[scope][key] = String(value || '');
+    if (typeof window.markCalculationDirty === 'function') {
+      window.markCalculationDirty('formulas', `formula ${scope}:${key}`);
+    }
     schedulePersistFormulaOverrides();
     if (typeof scheduleAutosave === 'function') scheduleAutosave('proyecto');
   }
@@ -2878,6 +3453,14 @@ table:not(.gantt-table) .tfoot-dark td,
     const cfg = getGlobalFinancialParams();
     const tasa = document.getElementById('gf-tasa-construccion');
     const timbres = document.getElementById('gf-pct-timbres');
+    const pagoIntereses = document.getElementById('gf-constr-pago-int');
+    const pagoInteresesTop = document.getElementById('fin-constr-pago-int');
+    const normalizedPaymentMode = typeof normalizeInterestPaymentMode === 'function'
+      ? normalizeInterestPaymentMode(state.financiamiento?.linea_construccion_pago_intereses || pagoInteresesTop?.value || 'Anual', 'anual')
+      : 'anual';
+    const paymentDisplay = typeof getInterestPaymentDisplay === 'function'
+      ? getInterestPaymentDisplay(normalizedPaymentMode)
+      : 'ANUAL';
     if (tasa && document.activeElement !== tasa) {
       tasa.value = fmtInputNumber(cfg.tasa_construccion, 2);
       if (typeof prepareLocalizedNumberInput === 'function') prepareLocalizedNumberInput(tasa);
@@ -2889,15 +3472,25 @@ table:not(.gantt-table) .tfoot-dark td,
       timbres.setAttribute('aria-disabled', 'true');
       if (typeof prepareLocalizedNumberInput === 'function') prepareLocalizedNumberInput(timbres);
     }
+    if (pagoIntereses && document.activeElement !== pagoIntereses) pagoIntereses.value = paymentDisplay;
+    if (pagoInteresesTop && document.activeElement !== pagoInteresesTop) pagoInteresesTop.value = paymentDisplay;
   }
   window.syncGfParamMirror = syncGfParamMirror;
 
   window.syncGfConstructionParams = function syncGfConstructionParams() {
     const tasa = document.getElementById('gf-tasa-construccion');
     const timbres = document.getElementById('gf-pct-timbres');
+    const pagoIntereses = document.getElementById('gf-constr-pago-int');
+    const pagoInteresesTop = document.getElementById('fin-constr-pago-int');
     const cfgTasa = document.getElementById('cfg-tasa-construccion');
     const cfgTimbres = document.getElementById('cfg-pct-timbres');
     if (tasa && cfgTasa) cfgTasa.value = tasa.value;
+    const selectedPaymentMode = pagoIntereses?.value || pagoInteresesTop?.value || 'Anual';
+    if (pagoInteresesTop) pagoInteresesTop.value = selectedPaymentMode;
+    if (pagoIntereses) pagoIntereses.value = selectedPaymentMode;
+    state.financiamiento = normalizeFinanciamiento(Object.assign({}, state.financiamiento, {
+      linea_construccion_pago_intereses: selectedPaymentMode,
+    }));
     if (timbres) {
       timbres.value = fmtInputNumber(0.8, 2);
       timbres.readOnly = true;
@@ -2909,41 +3502,42 @@ table:not(.gantt-table) .tfoot-dark td,
       if (typeof prepareLocalizedNumberInput === 'function') prepareLocalizedNumberInput(cfgTimbres);
     }
     if (typeof onConfigParamChange === 'function') onConfigParamChange();
+    if (typeof scheduleAutosave === 'function') scheduleAutosave('construccion');
     syncGfParamMirror();
   };
 
   if (typeof buildConstructionSCurve === 'function') {
     buildConstructionSCurve = function patchedBuildConstructionSCurve(metrics, meses) {
-      const width = Math.max(0.08, toNumber(metrics.ancho_curva || 0.5));
-      const peak = Math.min(0.92, Math.max(0.08, toNumber(metrics.peak_gasto || 0.5)));
       const anticipoPct = Math.max(0, toNumber(metrics.anticipo_pct)) / 100;
       const retencionPct = Math.max(0, toNumber(metrics.retencion_pct)) / 100;
       const anticipoAmount = metrics.total_neto * anticipoPct;
-      const epBaseNeta = Math.max(0, metrics.total_neto - anticipoAmount);
-      const weights = Array.from({ length: meses }, (_, index) => {
-        const x = meses === 1 ? 1 : index / (meses - 1);
-        const gaussian = Math.exp(-((x - peak) ** 2) / (2 * (width ** 2)));
-        const rampIn = Math.min(1, (index + 1) / Math.max(1, Math.round(meses * 0.28)));
-        const rampOut = Math.min(1, (meses - index) / Math.max(1, Math.round(meses * 0.22)));
-        return Math.max(0.001, gaussian * rampIn * rampOut);
-      });
-      const weightTotal = weights.reduce((sum, value) => sum + value, 0) || 1;
-      const monthlyCosts = weights.map((weight) => (epBaseNeta * weight) / weightTotal);
-      const monthlyAnticipoRecovery = monthlyCosts.map(() => 0);
-      const monthlyRetention = monthlyCosts.map((value) => Math.max(0, value) * retencionPct);
-      const monthlyEdppNet = monthlyCosts.map((value, index) => Math.max(0, value - monthlyRetention[index]));
+      const effectiveCurve = typeof getEffectiveEdpCurve === 'function'
+        ? getEffectiveEdpCurve(metrics, meses)
+        : {
+          monthlyPercentages: Array.from({ length: meses }, () => 100 / Math.max(1, meses)),
+          cumulativePercentages: Array.from({ length: meses }, (_, index) => (index + 1) * 100 / Math.max(1, meses)),
+          totalPct: 100,
+          config: { mode: 'auto', manualEnabled: false, monthlyPercentages: [] },
+        };
+      const monthlyCosts = effectiveCurve.monthlyPercentages.map((pct) => metrics.total_neto * toNumber(pct) / 100);
+      const monthlyAnticipoRecovery = monthlyCosts.map((value) => Math.max(0, value) * anticipoPct);
+      const monthlyRetention = monthlyCosts.map((value, index) => Math.max(0, value - monthlyAnticipoRecovery[index]) * retencionPct);
+      const monthlyEdppNet = monthlyCosts.map((value, index) => Math.max(0, value - monthlyAnticipoRecovery[index] - monthlyRetention[index]));
       const cumulativeCosts = monthlyCosts.reduce((acc, value, index) => {
         acc.push((acc[index - 1] || 0) + value);
         return acc;
       }, []);
-      const cumulativePct = cumulativeCosts.map((value) => value / Math.max(1, metrics.total_neto) * 100);
+      const cumulativePct = effectiveCurve.cumulativePercentages.map((value) => Math.min(120, Math.max(0, value)));
       return {
         monthlyCosts,
+        monthlyPercentages: effectiveCurve.monthlyPercentages,
         monthlyAnticipoRecovery,
         monthlyRetention,
         monthlyEdppNet,
         cumulativeCosts,
         cumulativePct,
+        totalPct: effectiveCurve.totalPct,
+        curveConfig: effectiveCurve.config,
         anticipoAmount,
         retentionAmount: monthlyRetention.reduce((sum, value) => sum + value, 0),
       };
@@ -3038,9 +3632,9 @@ table:not(.gantt-table) .tfoot-dark td,
         bg: row.bold ? '#f0fdf4' : '#fff',
         totalText: formatAmount(total(row.values), row.mode, true),
         actionHtml: row.key === 'ep_bruto'
-          ? renderTinyGanttLinkControl('construction_payment_links', 'edppNeto', state.proyecto?.construction_payment_links?.edppNeto || '')
+          ? renderTinyGanttLinkControl('construction_payment_links', 'edppNeto', typeof getGanttLinkValue === 'function' ? getGanttLinkValue('construction_payment_links', 'edppNeto') : (state.proyecto?.construction_payment_links?.edppNeto || ''))
           : (row.key === 'anticipo'
-            ? renderTinyGanttLinkControl('construction_payment_links', 'anticipoNeto', state.proyecto?.construction_payment_links?.anticipoNeto || '')
+            ? renderTinyGanttLinkControl('construction_payment_links', 'anticipoNeto', typeof getGanttLinkValue === 'function' ? getGanttLinkValue('construction_payment_links', 'anticipoNeto') : (state.proyecto?.construction_payment_links?.anticipoNeto || ''))
             : ''),
       })), { includeTotal: true });
       setHtml('constr-ep-tfoot', '');
@@ -3117,13 +3711,20 @@ table:not(.gantt-table) .tfoot-dark td,
       addSeries(series, 'ACUMULADO', acumulado, 'acumulado');
       rows.push({ key: 'acumulado', label: 'ACUMULADO', formula: acumFormula, values: acumulado, mode: 'signed', bold: true });
 
-      const interesDefault = acumulado.map((value, index) => {
-        const apertura = Math.max(0, toNumber(index > 0 ? acumulado[index - 1] : 0));
-        const cierre = Math.max(0, toNumber(value));
-        const saldoPromedio = (apertura + cierre) / 2;
-        return saldoPromedio * (cfg.tasa_construccion / 100) / 12;
-      });
-      pushRow({ key: 'interes', label: `INTERES (${fmtInputNumber(cfg.tasa_construccion, 2)}% anual)`, fallback: interesDefault, formula: '[ACUMULADO] * [Tasa_interes_construccion] / 12 / 100', mode: 'cost' });
+      const interesMensualDevengado = acumulado.map((value) => (
+        Math.max(0, toNumber(value)) * (cfg.tasa_construccion / 100) / 12
+      ));
+      const interestMode = typeof normalizeInterestPaymentMode === 'function'
+        ? normalizeInterestPaymentMode(state.financiamiento?.linea_construccion_pago_intereses, 'anual')
+        : 'anual';
+      const interestDisplay = typeof getInterestPaymentDisplay === 'function'
+        ? getInterestPaymentDisplay(interestMode)
+        : 'ANUAL';
+      const interesDefault = typeof distributeAccruedInterest === 'function'
+        ? distributeAccruedInterest(interesMensualDevengado, acumulado, interestMode)
+        : interesMensualDevengado;
+      addSeries(series, 'INTERES', interesDefault, 'interes');
+      rows.push({ key: 'interes', label: `INTERES ${String(interestDisplay).toUpperCase()} (${fmtInputNumber(cfg.tasa_construccion, 2)}% anual)`, formula: 'Interes devengado mensual = saldo acumulado del mes por tasa anual / 12, agrupado segun Pago intereses', values: interesDefault, mode: 'cost' });
       const timbresDefault = giros.map((value) => value * (cfg.pct_timbres / 100));
       pushRow({ key: 'timbres', label: `IMP. TIMBRES (${fmtInputNumber(cfg.pct_timbres, 2)}%)`, fallback: timbresDefault, formula: '[GIROS (desde EP)] * [Timbres] / 100', mode: 'cost' });
 
@@ -3288,7 +3889,9 @@ table:not(.gantt-table) .tfoot-dark td,
       : 0;
     const terrainMilestone = typeof getTerrainMilestone === 'function' ? getTerrainMilestone() : null;
     const terrainPurchaseMonthDefault = Math.min(maxMonth, Math.max(0, toNumber(terrainMilestone?.inicio || 0)));
-    const terrainGirosLink = state.proyecto?.land_finance_links?.giros || '';
+    const terrainGirosLink = typeof getGanttLinkValue === 'function'
+      ? getGanttLinkValue('land_finance_links', 'giros')
+      : (state.proyecto?.land_finance_links?.giros || '');
     const terrainGirosOffset = typeof getGanttLinkOffset === 'function'
       ? getGanttLinkOffset('land_finance_links', 'giros')
       : 0;
@@ -3299,7 +3902,9 @@ table:not(.gantt-table) .tfoot-dark td,
         : terrainPurchaseMonthDefault)
     );
     const anticipoLineaMonthDefault = Math.max(0, Math.min(maxMonth, getConstructionStartMonth() - 1));
-    const terrenoPagoLineaLink = state.proyecto?.land_finance_links?.pagoLinea || '';
+    const terrenoPagoLineaLink = typeof getGanttLinkValue === 'function'
+      ? getGanttLinkValue('land_finance_links', 'pagoLinea')
+      : (state.proyecto?.land_finance_links?.pagoLinea || '');
     const terrenoPagoLineaOffset = typeof getGanttLinkOffset === 'function'
       ? getGanttLinkOffset('land_finance_links', 'pagoLinea')
       : 0;
@@ -3346,7 +3951,7 @@ table:not(.gantt-table) .tfoot-dark td,
     }
     if (monthCount && accrued > 0) interest[monthCount - 1] += accrued;
 
-    return { interest, stamp };
+    return { giros, pagosLinea, acumulado, interest, stamp };
   }
 
   function getConstructionEPFlowForCashflow(monthCount) {
@@ -3442,18 +4047,18 @@ table:not(.gantt-table) .tfoot-dark td,
     });
     addSeries(series, 'ACUMULADO', acumulado, 'acumulado');
 
-    const interestDefault = acumulado.map((value, index) => {
-      const apertura = Math.max(0, toNumber(index > 0 ? acumulado[index - 1] : 0));
-      const cierre = Math.max(0, toNumber(value));
-      const saldoPromedio = (apertura + cierre) / 2;
-      return saldoPromedio * (toNumber(cfg.tasa_construccion) / 100) / 12;
-    });
-    const interest = normalizeMonthlySeries(evaluateSeries(
-      getFormula('gf', 'interes', '[ACUMULADO] * [Tasa_interes_construccion] / 12 / 100'),
-      series,
-      scalars,
-      interestDefault
-    ), monthCount);
+    const interestMonthlyAccrual = acumulado.map((value) => (
+      Math.max(0, toNumber(value)) * (toNumber(cfg.tasa_construccion) / 100) / 12
+    ));
+    const interestMode = typeof normalizeInterestPaymentMode === 'function'
+      ? normalizeInterestPaymentMode(state.financiamiento?.linea_construccion_pago_intereses, 'anual')
+      : 'anual';
+    const interest = normalizeMonthlySeries(
+      typeof distributeAccruedInterest === 'function'
+        ? distributeAccruedInterest(interestMonthlyAccrual, acumulado, interestMode)
+        : interestMonthlyAccrual,
+      monthCount
+    );
 
     const stampDefault = giros.map((value) => Math.max(0, toNumber(value)) * (toNumber(cfg.pct_timbres) / 100));
     const stamp = normalizeMonthlySeries(evaluateSeries(
@@ -3463,13 +4068,170 @@ table:not(.gantt-table) .tfoot-dark td,
       stampDefault
     ), monthCount);
 
-    return { interest, stamp };
+    return { giros, pagosLinea, acumulado, interest, stamp };
   }
 
   function getBankCommissionsForCashflow(monthCount) {
     const units = getPromesasEscrituracionUnidades(monthCount).promesas || [];
     return normalizeMonthlySeries(units, monthCount).map((value) => Math.max(0, value) * 2.5);
   }
+
+  function getFinancialCostBreakdownForCashflow(monthCount) {
+    const terrainFinancial = getTerrainFinancialFlowForCashflow(monthCount);
+    const constructionFinancial = getConstructionFinancialFlowForCashflow(monthCount);
+    const interest = sumMonthlySeries([terrainFinancial.interest, constructionFinancial.interest], monthCount);
+    const stamp = sumMonthlySeries([terrainFinancial.stamp, constructionFinancial.stamp], monthCount);
+    const commissions = getBankCommissionsForCashflow(monthCount);
+    const total = sumMonthlySeries([interest, stamp, commissions], monthCount);
+    return {
+      interest,
+      stamp,
+      commissions,
+      total,
+      terrainFinancial,
+      constructionFinancial,
+    };
+  }
+  window.getFinancialCostBreakdownForCashflow = getFinancialCostBreakdownForCashflow;
+
+  function signedInterestSeries(values, monthCount) {
+    return normalizeMonthlySeries(values, monthCount).map((value) => (
+      toNumber(value) === 0 ? 0 : -Math.abs(toNumber(value))
+    ));
+  }
+
+  function getBankFlowForCashflow(monthCount) {
+    const financial = getFinancialCostBreakdownForCashflow(monthCount);
+    const terrain = financial.terrainFinancial || {};
+    const construction = financial.constructionFinancial || {};
+    const landGiros = normalizeMonthlySeries(terrain.giros, monthCount);
+    const landPagos = normalizeMonthlySeries(terrain.pagosLinea, monthCount);
+    const landInterest = signedInterestSeries(terrain.interest, monthCount);
+    const landTotal = sumMonthlySeries([landGiros, landPagos, landInterest], monthCount);
+    const constructionGiros = normalizeMonthlySeries(construction.giros, monthCount);
+    const constructionPagos = normalizeMonthlySeries(construction.pagosLinea, monthCount);
+    const constructionInterest = signedInterestSeries(construction.interest, monthCount);
+    const constructionTotal = sumMonthlySeries([constructionGiros, constructionPagos, constructionInterest], monthCount);
+    const bankGiros = sumMonthlySeries([landGiros, constructionGiros], monthCount);
+    const bankPagos = sumMonthlySeries([landPagos, constructionPagos], monthCount);
+    const bankInterest = sumMonthlySeries([landInterest, constructionInterest], monthCount);
+    const bankTotal = sumMonthlySeries([bankGiros, bankPagos, bankInterest], monthCount);
+    return {
+      terrain: { giros: landGiros, pagos: landPagos, interest: landInterest, total: landTotal },
+      construction: { giros: constructionGiros, pagos: constructionPagos, interest: constructionInterest, total: constructionTotal },
+      total: { giros: bankGiros, pagos: bankPagos, interest: bankInterest, total: bankTotal, acumulado: cumulativeSeries(bankTotal) },
+    };
+  }
+  window.getBankFlowForCashflow = getBankFlowForCashflow;
+
+  function renderBankFlowTable(monthCount, labels, bankFlow = null) {
+    if (!$('flujo-bancos-tabla')) return;
+    const flow = bankFlow || getBankFlowForCashflow(monthCount);
+    const rows = [];
+    const parentStack = [];
+    function pushRow(row) {
+      const parents = parentStack.slice();
+      rows.push({
+        ...row,
+        parents,
+        collapsed: row.toggleKey ? isFlowCollapsedKey(row.toggleKey, row.defaultCollapsed) : false,
+        hidden: parents.some((parent) => isFlowCollapsedKey(parent.key, parent.defaultCollapsed)),
+      });
+    }
+    function pushChildren(groupKey, defaultCollapsed, callback) {
+      parentStack.push({ key: groupKey, defaultCollapsed: !!defaultCollapsed });
+      callback();
+      parentStack.pop();
+    }
+
+    pushRow({
+      key: 'bank_terreno_total',
+      label: 'TERRENO - Total',
+      values: flow.terrain.total,
+      toggleKey: 'flow_bank_terreno',
+      defaultCollapsed: true,
+      total: true,
+    });
+    pushChildren('flow_bank_terreno', true, () => {
+      pushRow({ key: 'bank_terreno_giros', label: 'TERRENO - Giros', values: flow.terrain.giros, level: 1 });
+      pushRow({ key: 'bank_terreno_pagos', label: 'TERRENO - Pagos', values: flow.terrain.pagos, level: 1 });
+      pushRow({ key: 'bank_terreno_intereses', label: 'TERRENO - Pago intereses', values: flow.terrain.interest, level: 1 });
+    });
+
+    pushRow({
+      key: 'bank_construccion_total',
+      label: 'CONSTRUCCION - Total',
+      values: flow.construction.total,
+      toggleKey: 'flow_bank_construccion',
+      defaultCollapsed: true,
+      total: true,
+    });
+    pushChildren('flow_bank_construccion', true, () => {
+      pushRow({ key: 'bank_construccion_giros', label: 'CONSTRUCCION - Giros', values: flow.construction.giros, level: 1 });
+      pushRow({ key: 'bank_construccion_pagos', label: 'CONSTRUCCION - Pagos', values: flow.construction.pagos, level: 1 });
+      pushRow({ key: 'bank_construccion_intereses', label: 'CONSTRUCCION - Pago intereses', values: flow.construction.interest, level: 1 });
+    });
+
+    pushRow({
+      key: 'bank_total',
+      label: 'FLUJO BANCOS TOTAL',
+      values: flow.total.total,
+      toggleKey: 'flow_bank_total',
+      defaultCollapsed: true,
+      total: true,
+    });
+    pushChildren('flow_bank_total', true, () => {
+      pushRow({ key: 'bank_giros', label: 'FLUJO BANCOS - Giros', values: flow.total.giros, level: 1 });
+      pushRow({ key: 'bank_pagos', label: 'FLUJO BANCOS - Pagos', values: flow.total.pagos, level: 1 });
+      pushRow({ key: 'bank_intereses', label: 'FLUJO BANCOS - Pago intereses', values: flow.total.interest, level: 1 });
+    });
+    pushRow({
+      key: 'bank_acumulado',
+      label: 'FLUJO BANCOS ACUMULADO',
+      values: flow.total.acumulado,
+      totalValue: flow.total.acumulado[flow.total.acumulado.length - 1] || 0,
+      subtotal: true,
+    });
+
+    function renderToggle(row) {
+      if (!row.toggleKey) return '<span class="flow-toggle-spacer" aria-hidden="true"></span>';
+      const defaultFlag = row.defaultCollapsed ? 'true' : 'false';
+      return `<button class="flow-toggle" type="button" onclick="toggleFlowCategory('${escapeHtml(row.toggleKey)}', ${defaultFlag})" aria-label="${row.collapsed ? 'Abrir' : 'Cerrar'} ${escapeHtml(row.label)}">${row.collapsed ? '+' : '-'}</button>`;
+    }
+    function totalClass(value) {
+      const number = toNumber(value);
+      if (number > 0.000001) return 'flow-total-positive';
+      if (number < -0.000001) return 'flow-total-negative';
+      return 'flow-total-zero';
+    }
+
+    setHtml('flujo-bancos-header', `<tr><th style="text-align:left;min-width:280px">Concepto</th><th class="flow-total-col">Total</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}</tr>`);
+    setHtml('flujo-bancos-tbody', rows.map((row) => {
+      const className = [
+        `flow-row-level-${row.level || 0}`,
+        row.total ? 'flow-row-total' : '',
+        row.subtotal ? 'flow-row-subtotal' : '',
+      ].filter(Boolean).join(' ');
+      const parentKeys = (row.parents || []).map((parent) => parent.key).join(' ');
+      const rowTotal = row.totalValue != null ? toNumber(row.totalValue) : total(row.values);
+      return `
+        <tr class="${className}" data-flow-row="${escapeHtml(row.key)}" data-flow-label="${escapeHtml(row.label)}" data-flow-parents="${escapeHtml(parentKeys)}"${row.toggleKey ? ` data-flow-toggle-key="${escapeHtml(row.toggleKey)}" data-flow-default-collapsed="${row.defaultCollapsed ? '1' : '0'}"` : ''}${row.hidden ? ' style="display:none"' : ''}>
+          <td style="text-align:left;font-weight:${row.total || row.subtotal ? 800 : 600};color:#0f172a">
+            <div class="flow-row-label">${renderToggle(row)}<span>${escapeHtml(row.label)}</span></div>
+          </td>
+          <td class="flow-total-col ${totalClass(rowTotal)}">${formatAmount(rowTotal, 'signed', true)}</td>
+          ${row.values.map((value) => `<td data-flow-value style="text-align:center;${row.total || row.subtotal ? 'font-weight:700' : ''}">${formatAmount(value, 'signed')}</td>`).join('')}
+        </tr>
+      `;
+    }).join(''));
+    applyFlowCollapseState();
+  }
+  window.renderBankFlowTable = renderBankFlowTable;
+
+  window.scrollBankFlowPlanilla = function scrollBankFlowPlanilla(offset) {
+    const el = document.getElementById('flujo-bancos-scroll');
+    if (el) el.scrollLeft += toNumber(offset);
+  };
 
   function getCostIvaCreditoForCashflow(monthCount) {
     const monthly = createMonthlyArray(monthCount, 0);
@@ -3493,12 +4255,13 @@ table:not(.gantt-table) .tfoot-dark td,
       const labels = getCostMonthLabels();
       const incomeSource = normalizeMonthlySeries(getProjectMonthlyIncome(monthCount), monthCount);
       const costStructure = getCostFlowStructure(monthCount);
-      const terrainFinancial = getTerrainFinancialFlowForCashflow(monthCount);
-      const constructionFinancial = getConstructionFinancialFlowForCashflow(monthCount);
-      const commissions = getBankCommissionsForCashflow(monthCount);
-      const interestTotal = sumMonthlySeries([terrainFinancial.interest, constructionFinancial.interest], monthCount);
-      const stampTotal = sumMonthlySeries([terrainFinancial.stamp, constructionFinancial.stamp], monthCount);
-      const financialTotal = sumMonthlySeries([interestTotal, stampTotal, commissions], monthCount);
+      const financialBreakdown = getFinancialCostBreakdownForCashflow(monthCount);
+      const terrainFinancial = financialBreakdown.terrainFinancial;
+      const constructionFinancial = financialBreakdown.constructionFinancial;
+      const commissions = financialBreakdown.commissions;
+      const interestTotal = financialBreakdown.interest;
+      const stampTotal = financialBreakdown.stamp;
+      const financialTotal = financialBreakdown.total;
       const subtotalEgresos = sumMonthlySeries([costStructure.total, financialTotal], monthCount);
       const ivaCreditoSource = getCostIvaCreditoForCashflow(monthCount);
       const ivaDebitoSource = normalizeMonthlySeries(getMonthlyIvaDebito(incomeSource), monthCount);
@@ -3507,28 +4270,88 @@ table:not(.gantt-table) .tfoot-dark td,
         toNumber(value) + toNumber(ivaCreditoSource[index]) + toNumber(ivaSettlement.pagoIva[index])
       ));
       if (typeof renderIvaDebitoPanel === 'function') renderIvaDebitoPanel();
+      const ppm = typeof getMonthlyPPM === 'function'
+        ? normalizeMonthlySeries(getMonthlyPPM(incomeSource), monthCount)
+        : createMonthlyArray(monthCount, 0);
+      const flujoBruto = incomeSource.map((value, index) => toNumber(value) - toNumber(totalEgresosBrutos[index]));
+      const gastosFinancierosSigned = financialTotal.map((value) => -toNumber(value));
+      const ivaCreditoSigned = ivaCreditoSource.map((value) => -toNumber(value));
+      const ivaDebitoSigned = ivaDebitoSource.map((value) => toNumber(value));
+      const pagoIvaSigned = ivaSettlement.pagoIva.map((value) => -toNumber(value));
+      const bankFlow = getBankFlowForCashflow(monthCount);
+      const flujoPuro = flujoBruto.map((value, index) => (
+        toNumber(value)
+        - toNumber(gastosFinancierosSigned[index])
+        - toNumber(ivaCreditoSigned[index])
+        - toNumber(ivaDebitoSigned[index])
+        - toNumber(pagoIvaSigned[index])
+      ));
+      const flujoAntesImpuestos = flujoPuro.map((value, index) => (
+        toNumber(value)
+        + toNumber(gastosFinancierosSigned[index])
+      ));
       const flujoSinIva = incomeSource.map((value, index) => toNumber(value) - toNumber(subtotalEgresos[index]));
+      const projectGrossMarginPct = total(incomeSource) ? total(flujoBruto) / total(incomeSource) : 0;
+      const impRenta = typeof getMonthlyImpuestoRenta === 'function'
+        ? normalizeMonthlySeries(getMonthlyImpuestoRenta(flujoBruto, incomeSource, ppm, getMonthlyGrossEscrituras(monthCount), projectGrossMarginPct), monthCount)
+        : createMonthlyArray(monthCount, 0);
+      const flujoDespuesImpuestos = flujoBruto.map((value, index) => (
+        toNumber(value) + toNumber(ppm[index]) + toNumber(impRenta[index])
+      ));
       const flujoConIva = incomeSource.map((value, index) => toNumber(value) - toNumber(totalEgresosBrutos[index]));
       const cumulativeSin = cumulativeSeries(flujoSinIva);
-      const cumulativeCon = cumulativeSeries(flujoConIva);
+      const cumulativeCon = cumulativeSeries(flujoDespuesImpuestos);
       const totalIncome = total(incomeSource);
       const totalGastos = total(costStructure.total);
       const totalFinancial = total(financialTotal);
       const totalSubtotal = total(subtotalEgresos);
       const totalEgresosBrutosValue = total(totalEgresosBrutos);
+      const totalFlujoBruto = total(flujoBruto);
       const totalFlujoSin = total(flujoSinIva);
-      const totalFlujoCon = total(flujoConIva);
+      const totalFlujoCon = total(flujoDespuesImpuestos);
+      const totalPpm = total(ppm);
+      const totalImpRenta = total(impRenta);
       const capitalNeedSin = Math.abs(cumulativeSin.reduce((min, value) => Math.min(min, toNumber(value)), 0));
       const capitalNeedCon = Math.abs(cumulativeCon.reduce((min, value) => Math.min(min, toNumber(value)), 0));
+      const flowSummary = typeof getFinancialSummary === 'function'
+        ? getFinancialSummary({
+          monthCount,
+          incomeSource,
+          costs: costStructure.total,
+          financialTotal,
+          subtotalEgresos,
+          ivaCreditoSource,
+          ivaDebitoSource,
+          ivaSettlement,
+          totalEgresosBrutos,
+          flujoBruto,
+          ppm,
+          impRenta,
+          flujoDespuesImpuestos,
+        })
+        : {
+          ingresosBrutos: totalIncome,
+          ingresosNetos: totalIncome - total(ivaDebitoSource),
+          utilidadBruta: totalFlujoBruto,
+          utilidadNeta: totalFlujoCon,
+          margenBrutoPct: totalIncome ? totalFlujoBruto / totalIncome : 0,
+          tirAntesImpuestos: null,
+          tirDespuesImpuestos: null,
+        };
 
-      setText('flujo-margen-sin', fmtUf(totalFlujoSin));
-      setText('flujo-margen-sin-pct', `${fmtPct(totalIncome ? totalFlujoSin / totalIncome * 100 : 0)} s/ventas`);
-      setText('flujo-margen-con', fmtUf(totalFlujoCon));
-      setText('flujo-margen-con-pct', `${fmtPct(totalIncome ? totalFlujoCon / totalIncome * 100 : 0)} s/ventas`);
+      setText('flujo-margen-sin', fmtUf(flowSummary.utilidadBruta));
+      setText('flujo-margen-sin-pct', `${fmtPct(toNumber(flowSummary.margenBrutoPct) * 100)} s/ventas`);
+      setText('flujo-margen-con', fmtUf(flowSummary.utilidadNeta));
+      setText('flujo-margen-con-pct', `${fmtPct(toNumber(flowSummary.margenNetoPct) * 100)} s/ventas`);
       setText('flujo-k-sin', fmtUf(capitalNeedSin));
       setText('flujo-k-con', fmtUf(capitalNeedCon));
-      setText('flujo-tir-sin', fmtPct(irrAnualFromMensual(flujoSinIva) * 100));
-      setText('flujo-tir-con', fmtPct(irrAnualFromMensual(flujoConIva) * 100));
+      setText('flujo-tir-sin', flowSummary.tirAntesImpuestos == null ? '-' : fmtPct(flowSummary.tirAntesImpuestos * 100));
+      setText('flujo-tir-con', flowSummary.tirDespuesImpuestos == null ? '-' : fmtPct(flowSummary.tirDespuesImpuestos * 100));
+      window.__lastFinancialSummary = flowSummary;
+      if (typeof updateResumenFinancialKpis === 'function') updateResumenFinancialKpis(flowSummary);
+      if (typeof renderFlowSummaryCards === 'function') {
+        renderFlowSummaryCards(flowSummary);
+      }
 
       setHtml('estructura-proyecto-list', [
         ['Ventas', totalIncome, '#16a34a'],
@@ -3565,7 +4388,7 @@ table:not(.gantt-table) .tfoot-dark td,
 
       pushRow({
         key: 'ingresos',
-        label: 'Ingresos (Ventas)',
+        label: 'Ingresos / Ventas',
         origin: 'Referencia de ventas para KPIs',
         values: incomeSource,
         mode: 'signed',
@@ -3634,7 +4457,7 @@ table:not(.gantt-table) .tfoot-dark td,
         const interestCollapsed = isFlowCollapsedKey('flow_gf_intereses', true);
         pushRow({
           key: 'gf_intereses',
-          label: 'Intereses CrÃ©dito Banco',
+          label: 'Intereses',
           origin: 'Hoja Terreno + Hoja ConstrucciÃ³n',
           values: interestTotal,
           mode: 'cost',
@@ -3652,7 +4475,7 @@ table:not(.gantt-table) .tfoot-dark td,
         const stampCollapsed = isFlowCollapsedKey('flow_gf_timbres', true);
         pushRow({
           key: 'gf_timbres',
-          label: 'Impto. Timbre Y Estampillas',
+          label: 'Impuesto de Timbres y Estampillas',
           origin: 'Hoja Terreno + Hoja ConstrucciÃ³n',
           values: stampTotal,
           mode: 'cost',
@@ -3669,7 +4492,7 @@ table:not(.gantt-table) .tfoot-dark td,
 
         pushRow({
           key: 'gf_comisiones',
-          label: 'Comisiones Bancarias',
+          label: 'Comisiones bancarias',
           origin: '2,5 UF por promesa',
           values: commissions,
           mode: 'cost',
@@ -3681,97 +4504,178 @@ table:not(.gantt-table) .tfoot-dark td,
       pushRow({
         key: 'subtotal_egresos_neto',
         label: 'Subtotal Egresos Neto',
-        origin: 'Gastos + Gastos financieros Â· neto sin IVA',
+        origin: 'Subtotal Egresos Netos = Gastos + Gastos financieros',
         values: subtotalEgresos,
         mode: 'cost',
         sign: '-',
         subtotal: true,
       });
       pushRow({
-        key: 'iva_pago',
-        label: 'Pago IVA',
-        origin: 'Pago al SII solo por saldo positivo luego de aplicar remanente',
-        values: ivaSettlement.pagoIva,
-        mode: 'cost',
-        sign: '-',
-        iva: true,
-        toggleKey: 'flow_pago_iva',
-        defaultCollapsed: true,
-        collapsed: isFlowCollapsedKey('flow_pago_iva', true),
-      });
-      pushGroupChildren('flow_pago_iva', true, () => {
-        pushRow({
-          key: 'iva_credito',
-          label: 'IVA CrÃ©dito',
-          origin: '19% solo sobre costos con IVA activado',
-          values: ivaCreditoSource,
-          mode: 'cost',
-          sign: '-',
-          level: 1,
-          iva: true,
-          muted: true,
-        });
-        pushRow({
-          key: 'iva_debito',
-          label: 'IVA DÃ©bito',
-          origin: 'Ingresos brutos escriturados Ã— Factor IVA DÃ©bito (IVA / IB)',
-          originHtml: renderIvaDebitoFlowCalcDetails(),
-          values: ivaDebitoSource,
-          mode: 'signed',
-          sign: '+',
-          level: 1,
-          iva: true,
-          muted: true,
-        });
-        pushRow({
-          key: 'iva_mensual',
-          label: 'IVA mensual',
-          origin: 'IVA DÃ©bito + IVA CrÃ©dito (crÃ©dito como egreso negativo)',
-          values: ivaSettlement.ivaMensual,
-          mode: 'signed',
-          sign: '=',
-          level: 1,
-          iva: true,
-          muted: true,
-        });
-        pushRow({
-          key: 'iva_remanente',
-          label: 'Remanente IVA mensual',
-          origin: 'MIN(Remanente anterior + IVA mensual, 0)',
-          values: ivaSettlement.remanente,
-          mode: 'signed',
-          sign: '=',
-          level: 1,
-          iva: true,
-          muted: true,
-        });
-      });
-      pushRow({
         key: 'total_egresos_brutos',
         label: 'Total Egresos Brutos',
-        origin: 'Subtotal Egresos Neto + IVA CrÃ©dito + Pago IVA',
+        origin: 'Total Egresos Brutos = Subtotal Egresos Netos + IVA CrÃ©dito + Pago del IVA',
         values: totalEgresosBrutos,
         mode: 'cost',
         sign: '-',
         total: true,
+        toggleKey: 'flow_total_egresos_brutos',
+        defaultCollapsed: false,
+        collapsed: isFlowCollapsedKey('flow_total_egresos_brutos', false),
+      });
+      pushGroupChildren('flow_total_egresos_brutos', false, () => {
+        pushRow({
+          key: 'pago_del_iva',
+          label: 'Pago del IVA',
+          origin: 'Pago del IVA = MAX(Remanente anterior + IVA mensual, 0)',
+          values: ivaSettlement.pagoIva,
+          mode: 'cost',
+          sign: '-',
+          iva: true,
+          toggleKey: 'flow_pago_iva',
+          defaultCollapsed: true,
+          collapsed: isFlowCollapsedKey('flow_pago_iva', true),
+        });
+        pushGroupChildren('flow_pago_iva', true, () => {
+          pushRow({
+            key: 'iva_credito',
+            label: 'IVA CrÃ©dito',
+            origin: '19% solo sobre costos con IVA activado',
+            values: ivaCreditoSource,
+            mode: 'cost',
+            sign: '-',
+            level: 1,
+            iva: true,
+            muted: true,
+          });
+          pushRow({
+            key: 'iva_debito',
+            label: 'IVA DÃ©bito',
+            origin: 'Ingresos brutos escriturados Ã— Factor IVA DÃ©bito (IVA / IB)',
+            originHtml: renderIvaDebitoFlowCalcDetails(),
+            values: ivaDebitoSource,
+            mode: 'signed',
+            sign: '+',
+            level: 1,
+            iva: true,
+            muted: true,
+          });
+          pushRow({
+            key: 'iva_mensual',
+            label: 'IVA mensual',
+            origin: 'IVA mensual = IVA DÃ©bito - IVA CrÃ©dito',
+            values: ivaSettlement.ivaMensual,
+            mode: 'signed',
+            sign: '=',
+            level: 1,
+            iva: true,
+            muted: true,
+          });
+          pushRow({
+            key: 'iva_remanente',
+            label: 'Remanente IVA mensual',
+            origin: 'Remanente IVA mensual = MIN(Remanente anterior + IVA mensual, 0)',
+            values: ivaSettlement.remanente,
+            mode: 'signed',
+            sign: '=',
+            level: 1,
+            iva: true,
+            muted: true,
+          });
+        });
       });
       pushRow({
-        key: 'flujo_mensual_bruto',
-        label: 'Flujo mensual bruto',
-        origin: 'Ingresos brutos - Total Egresos Brutos',
-        values: flujoConIva,
+        key: 'flujo_bruto',
+        label: 'Flujo Bruto',
+        origin: 'Flujo Bruto = Ingresos Brutos - Total Egresos Brutos',
+        values: flujoBruto,
         mode: 'signed',
         sign: '=',
         total: true,
       });
+      pushRow({
+        key: 'flujo_puro',
+        label: 'Flujo puro',
+        origin: 'Flujo puro = Flujo Bruto - Gastos financieros - IVA Credito - IVA Debito - Pago del IVA, usando cada fila con su signo actual',
+        values: flujoPuro,
+        mode: 'signed',
+        sign: '=',
+        total: true,
+      });
+      pushRow({
+        key: 'flujo_antes_impuestos',
+        label: 'Flujo antes de impuestos',
+        origin: 'Flujo antes de impuestos = Flujo puro + Gastos financieros, usando Gastos financieros con su signo actual',
+        values: flujoAntesImpuestos,
+        mode: 'signed',
+        sign: '=',
+        total: true,
+      });
+      pushRow({
+        key: 'flujo_despues_impuestos',
+        label: 'Flujo despuÃ©s de impuestos',
+        origin: 'Flujo despuÃ©s de impuestos = Flujo Bruto - Pago Provisional Mensual - Impuesto a la Renta',
+        values: flujoDespuesImpuestos,
+        mode: 'signed',
+        sign: '=',
+        total: true,
+        toggleKey: 'flow_despues_impuestos',
+        defaultCollapsed: true,
+        collapsed: isFlowCollapsedKey('flow_despues_impuestos', true),
+      });
+      pushGroupChildren('flow_despues_impuestos', true, () => {
+        pushRow({
+          key: 'pago_provisional_mensual',
+          label: 'Pago Provisional Mensual',
+          origin: '1% de base neta de ingresos por escritura desde inicio de escrituraciÃ³n',
+          values: ppm,
+          mode: 'signed',
+          sign: '-',
+          level: 1,
+          muted: true,
+        });
+        pushRow({
+          key: 'impuesto_a_la_renta',
+          label: 'Impuesto a la Renta',
+          origin: '27% x Margen Bruto % x Ganancias del aÃ±o anterior - PPM del aÃ±o anterior; pago solo en abril',
+          values: impRenta,
+          mode: 'signed',
+          sign: '-',
+          level: 1,
+          muted: true,
+        });
+      });
 
       function renderToggle(row) {
-        if (!row.toggleKey) return '';
+        if (!row.toggleKey) return '<span class="flow-toggle-spacer" aria-hidden="true"></span>';
         const defaultFlag = row.defaultCollapsed ? 'true' : 'false';
         return `<button class="flow-toggle" type="button" onclick="toggleFlowCategory('${escapeHtml(row.toggleKey)}', ${defaultFlag})" aria-label="${row.collapsed ? 'Abrir' : 'Cerrar'} ${escapeHtml(row.label)}">${row.collapsed ? '+' : '-'}</button>`;
       }
+      function getFlowTotalClass(row, rowTotal) {
+        const displayTotal = row.mode === 'cost' ? -Math.abs(toNumber(rowTotal)) : toNumber(rowTotal);
+        if (displayTotal > 0.000001) return 'flow-total-positive';
+        if (displayTotal < -0.000001) return 'flow-total-negative';
+        return 'flow-total-zero';
+      }
+      function renderOriginPopover(row, id) {
+        const shortText = String(row.origin || row.label || '').trim();
+        const visibleText = shortText || 'Ver lÃ³gica';
+        const fullHtml = row.originHtml || `<div class="flow-origin">${escapeHtml(visibleText)}</div>`;
+        return `
+          <div class="flow-origin-cell">
+            <button class="flow-origin-trigger" type="button" onclick="toggleFlowOriginPopover('${id}', event)" title="${escapeHtml(visibleText)}">${escapeHtml(visibleText)}</button>
+            <div id="${id}" class="flow-origin-pop">
+              <div class="flow-origin-pop-head">
+                <span>Origen / LÃ³gica</span>
+                <button class="flow-origin-pop-close" type="button" onclick="closeFlowOriginPopovers()" aria-label="Cerrar">x</button>
+              </div>
+              ${fullHtml}
+            </div>
+          </div>
+        `;
+      }
 
       const body = rows.map((row) => {
+        const originPopId = `flow-origin-${row.key}-${Math.random().toString(36).slice(2, 8)}`;
         const className = [
           `flow-row-level-${row.level || 0}`,
           row.total ? 'flow-row-total' : '',
@@ -3779,34 +4683,40 @@ table:not(.gantt-table) .tfoot-dark td,
           row.iva ? 'flow-row-iva' : '',
           row.muted ? 'flow-row-muted' : '',
         ].filter(Boolean).join(' ');
-        const originHtml = row.originHtml || `<div class="flow-origin">${escapeHtml(row.origin || '')}</div>`;
         const parentKeys = (row.parents || []).map((parent) => parent.key).join(' ');
+        const rowTotal = total(row.values);
+        const totalClass = getFlowTotalClass(row, rowTotal);
         return `
           <tr class="${className}" data-flow-row="${escapeHtml(row.key)}" data-flow-label="${escapeHtml(row.label)}" data-flow-parents="${escapeHtml(parentKeys)}"${row.toggleKey ? ` data-flow-toggle-key="${escapeHtml(row.toggleKey)}" data-flow-default-collapsed="${row.defaultCollapsed ? '1' : '0'}"` : ''}${row.hidden ? ' style="display:none"' : ''}>
             <td style="text-align:left;font-weight:${row.total || row.subtotal || row.iva ? 800 : 600};color:#0f172a">
               <div class="flow-row-label">${renderToggle(row)}<span>${escapeHtml(row.label)}</span></div>
             </td>
-            <td>${originHtml}</td>
-            <td class="flow-total-col">${formatAmount(total(row.values), row.mode, true)}</td>
+            <td>${renderOriginPopover(row, originPopId)}</td>
+            <td class="flow-total-col ${totalClass}">${formatAmount(rowTotal, row.mode, true)}</td>
             ${row.values.map((value) => `<td data-flow-value style="text-align:center;${row.total || row.subtotal || row.iva ? 'font-weight:700' : ''}">${formatAmount(value, row.mode)}</td>`).join('')}
           </tr>
         `;
       }).join('');
       setHtml('flujo-tabla-tbody', body);
       applyFlowCollapseState();
+      renderBankFlowTable(monthCount, labels, bankFlow);
     };
     window.renderProjectCashflow = renderProjectCashflow;
   }
 
   function applyFlowCollapseState() {
-    const tbody = document.getElementById('flujo-tabla-tbody');
-    if (!tbody) return;
-    tbody.querySelectorAll('[data-flow-row]').forEach((row) => {
+    const tbodies = Array.from(document.querySelectorAll('#flujo-tabla-tbody,#flujo-bancos-tbody'));
+    if (!tbodies.length) return;
+    const defaultByKey = {};
+    tbodies.forEach((tbody) => tbody.querySelectorAll('[data-flow-toggle-key]').forEach((row) => {
+      defaultByKey[row.dataset.flowToggleKey] = row.dataset.flowDefaultCollapsed === '1';
+    }));
+    tbodies.forEach((tbody) => tbody.querySelectorAll('[data-flow-row]').forEach((row) => {
       const parents = String(row.dataset.flowParents || '').split(/\s+/).filter(Boolean);
-      const shouldHide = parents.some((key) => isFlowCollapsedKey(key, true));
+      const shouldHide = parents.some((key) => isFlowCollapsedKey(key, defaultByKey[key] ?? true));
       row.style.display = shouldHide ? 'none' : '';
-    });
-    tbody.querySelectorAll('[data-flow-toggle-key]').forEach((row) => {
+    }));
+    tbodies.forEach((tbody) => tbody.querySelectorAll('[data-flow-toggle-key]').forEach((row) => {
       const key = row.dataset.flowToggleKey;
       const defaultCollapsed = row.dataset.flowDefaultCollapsed === '1';
       const collapsed = isFlowCollapsedKey(key, defaultCollapsed);
@@ -3815,7 +4725,7 @@ table:not(.gantt-table) .tfoot-dark td,
       button.textContent = collapsed ? '+' : '-';
       button.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
       button.setAttribute('aria-label', `${collapsed ? 'Abrir' : 'Cerrar'} ${row.dataset.flowLabel || 'grupo'}`);
-    });
+    }));
   }
 
   window.toggleFlowCategory = function toggleFlowCategory(category, defaultCollapsed) {
@@ -3823,6 +4733,26 @@ table:not(.gantt-table) .tfoot-dark td,
     applyFlowCollapseState();
     schedulePersistUiState();
   };
+
+  function closeFlowOriginPopovers() {
+    document.querySelectorAll('.flow-origin-pop.is-open').forEach((popover) => popover.classList.remove('is-open'));
+  }
+  window.closeFlowOriginPopovers = closeFlowOriginPopovers;
+  window.toggleFlowOriginPopover = function toggleFlowOriginPopover(id, event) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    const target = document.getElementById(id);
+    if (!target) return;
+    const wasOpen = target.classList.contains('is-open');
+    closeFlowOriginPopovers();
+    if (!wasOpen) target.classList.add('is-open');
+  };
+  if (!document.body.dataset.flowOriginPopoverBound) {
+    document.addEventListener('click', (event) => {
+      if (!event.target.closest('.flow-origin-cell')) closeFlowOriginPopovers();
+    });
+    document.body.dataset.flowOriginPopoverBound = '1';
+  }
 
   function enhanceCostFormulaInputs() {
     const header = document.querySelector('#planilla-head th:nth-child(3)');
