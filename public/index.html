@@ -725,6 +725,9 @@ tbody tr:hover{background:#f3f7fb!important}
 #flujo-tabla tbody tr[data-flow-row="flujo_antes_impuestos"] td{background:#edf8f1!important}
 #flujo-tabla tbody tr[data-flow-row="flujo_despues_impuestos"] td{background:#edf8f1!important}
 #flujo-tabla tbody tr[data-flow-row="pago_provisional_mensual"] td,#flujo-tabla tbody tr[data-flow-row="impuesto_a_la_renta"] td{background:#fff8f1!important}
+#flujo-bricsa-tabla tbody tr[data-bricsa-row="flujo_caja_proyecto"] td{background:#edf6ff!important}
+#flujo-bricsa-tabla tbody tr[data-bricsa-row="total"] td{background:#eef3f8!important;font-weight:800!important}
+#flujo-bricsa-tabla tbody tr[data-bricsa-row="acumulado"] td{background:#edf8f1!important;font-weight:800!important}
 .flow-origin-stack{display:flex;flex-direction:column;gap:7px;align-items:flex-start}
 .flow-calc-details{width:auto;max-width:100%;border:0;background:transparent;border-radius:0;color:#1e3a8a}
 .flow-calc-details[open]{width:min(460px,70vw)}
@@ -1841,6 +1844,9 @@ table.app-table{
 #flujo-tabla.app-table tbody tr[data-flow-row="flujo_antes_impuestos"] td{background:#edf8f1!important}
 #flujo-tabla.app-table tbody tr[data-flow-row="flujo_despues_impuestos"] td{background:#edf8f1!important}
 #flujo-tabla.app-table tbody tr[data-flow-row="pago_provisional_mensual"] td,#flujo-tabla.app-table tbody tr[data-flow-row="impuesto_a_la_renta"] td{background:#fff8f1!important}
+#flujo-bricsa-tabla.app-table tbody tr[data-bricsa-row="flujo_caja_proyecto"] td{background:#edf6ff!important}
+#flujo-bricsa-tabla.app-table tbody tr[data-bricsa-row="total"] td{background:#eef3f8!important;font-weight:800!important}
+#flujo-bricsa-tabla.app-table tbody tr[data-bricsa-row="acumulado"] td{background:#edf8f1!important;font-weight:800!important}
 @media (max-width: 1100px){
   #tab-construccion .construction-global-strip{grid-template-columns:1fr}
   #tab-construccion .construction-global-kicker{margin-bottom:2px}
@@ -1901,6 +1907,7 @@ table.app-table{
         <button class="tab-btn" type="button" data-tab-target="gantt" onclick="showTab('gantt',this)">Carta Gantt</button>
         <button class="tab-btn" type="button" data-tab-target="costos" onclick="showTab('costos',this)">Costos del Proyecto</button>
         <button class="tab-btn" type="button" data-tab-target="flujo" onclick="showTab('flujo',this)">Flujo de Caja</button>
+        <button class="tab-btn" type="button" data-tab-target="flujo-bricsa" onclick="showTab('flujo-bricsa',this)">Flujo Bricsa</button>
         <button class="tab-btn" type="button" data-tab-target="reportes" onclick="showTab('reportes',this)">Reportes</button>
       </div>
     </div>
@@ -2811,6 +2818,51 @@ table.app-table{
     </div>
   </div>
 </div><!-- end tab flujo -->
+
+<div id="tab-flujo-bricsa" class="tab-pane">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:12px;flex-wrap:wrap">
+    <div>
+      <div style="font-size:16px;font-weight:800;color:#0f172a">FLUJO BRICSA</div>
+      <div style="font-size:11px;color:#94a3b8">Flujo mensual asignado a Bricsa y honorarios relacionados.</div>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:.05em">
+      <span>% participaciÃ³n Bricsa</span>
+      <input id="bricsa-participacion-pct" class="inp" type="text" inputmode="decimal" data-localized-number="1" value="100" oninput="setBricsaParticipationPct(this.value)" style="width:92px;text-align:right;min-height:32px;height:32px">
+    </label>
+  </div>
+
+  <div style="margin-bottom:16px">
+    <div class="planilla-header">
+      <div>
+        <div style="font-size:13px;font-weight:900;color:#fff;letter-spacing:.08em;text-transform:uppercase">FLUJO BRICSA MENSUAL</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:2px">ParticipaciÃ³n del flujo del proyecto y honorarios tomados desde Costos del Proyecto.</div>
+      </div>
+      <div class="planilla-nav">
+        <button class="btn-outline" type="button" onclick="scrollBricsaFlowPlanilla(-480)">Mes -</button>
+        <button class="btn-outline" type="button" onclick="scrollBricsaFlowPlanilla(480)">Mes +</button>
+      </div>
+    </div>
+    <div id="flujo-bricsa-scroll" class="flow-planilla">
+      <table style="min-width:1400px" id="flujo-bricsa-tabla" class="app-table">
+        <thead id="flujo-bricsa-header"></thead>
+        <tbody id="flujo-bricsa-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="margin-bottom:16px">
+    <div class="planilla-header">
+      <div>
+        <div style="font-size:13px;font-weight:900;color:#fff;letter-spacing:.08em;text-transform:uppercase">ESCENARIOS ACUMULADOS BRICSA</div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:2px">Comparativo de flujo acumulado y TIR anualizada por escenario.</div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid var(--border-strong);border-top:none;border-radius:0 0 10px 10px;padding:14px">
+      <div id="flujo-bricsa-scenarios-kpis" class="flow-summary-grid" style="margin-bottom:12px"></div>
+      <div id="flujo-bricsa-scenarios-chart" style="width:100%;min-height:320px"></div>
+    </div>
+  </div>
+</div><!-- end tab flujo bricsa -->
 
 <div id="tab-reportes" class="tab-pane reportes-blank"></div><!-- end tab reportes -->
 
@@ -4279,6 +4331,9 @@ table.app-table{
       const ivaDebitoSigned = ivaDebitoSource.map((value) => toNumber(value));
       const pagoIvaSigned = ivaSettlement.pagoIva.map((value) => -toNumber(value));
       const bankFlow = getBankFlowForCashflow(monthCount);
+      const flujoBancosTotalSigned = normalizeMonthlySeries(bankFlow?.total?.total, monthCount);
+      const timbresSigned = stampTotal.map((value) => -toNumber(value));
+      const comisionesBancariasSigned = commissions.map((value) => -toNumber(value));
       const flujoPuro = flujoBruto.map((value, index) => (
         toNumber(value)
         - toNumber(gastosFinancierosSigned[index])
@@ -4288,14 +4343,16 @@ table.app-table{
       ));
       const flujoAntesImpuestos = flujoPuro.map((value, index) => (
         toNumber(value)
-        + toNumber(gastosFinancierosSigned[index])
+        + toNumber(flujoBancosTotalSigned[index])
+        + toNumber(timbresSigned[index])
+        + toNumber(comisionesBancariasSigned[index])
       ));
       const flujoSinIva = incomeSource.map((value, index) => toNumber(value) - toNumber(subtotalEgresos[index]));
       const projectGrossMarginPct = total(incomeSource) ? total(flujoBruto) / total(incomeSource) : 0;
       const impRenta = typeof getMonthlyImpuestoRenta === 'function'
         ? normalizeMonthlySeries(getMonthlyImpuestoRenta(flujoBruto, incomeSource, ppm, getMonthlyGrossEscrituras(monthCount), projectGrossMarginPct), monthCount)
         : createMonthlyArray(monthCount, 0);
-      const flujoDespuesImpuestos = flujoBruto.map((value, index) => (
+      const flujoDespuesImpuestos = flujoAntesImpuestos.map((value, index) => (
         toNumber(value) + toNumber(ppm[index]) + toNumber(impRenta[index])
       ));
       const flujoConIva = incomeSource.map((value, index) => toNumber(value) - toNumber(totalEgresosBrutos[index]));
@@ -4325,6 +4382,8 @@ table.app-table{
           ivaSettlement,
           totalEgresosBrutos,
           flujoBruto,
+          flujoPuro,
+          flujoAntesImpuestos,
           ppm,
           impRenta,
           flujoDespuesImpuestos,
@@ -4338,6 +4397,7 @@ table.app-table{
           tirAntesImpuestos: null,
           tirDespuesImpuestos: null,
         };
+      flowSummary.projectId = state.proyectoId;
 
       setText('flujo-margen-sin', fmtUf(flowSummary.utilidadBruta));
       setText('flujo-margen-sin-pct', `${fmtPct(toNumber(flowSummary.margenBrutoPct) * 100)} s/ventas`);
@@ -4604,7 +4664,7 @@ table.app-table{
       pushRow({
         key: 'flujo_antes_impuestos',
         label: 'Flujo antes de impuestos',
-        origin: 'Flujo antes de impuestos = Flujo puro + Gastos financieros, usando Gastos financieros con su signo actual',
+        origin: 'Flujo antes de impuestos = Flujo puro + Flujo bancos total + Timbres + Comisiones bancarias, usando cada fila con su signo actual',
         values: flujoAntesImpuestos,
         mode: 'signed',
         sign: '=',
@@ -4613,7 +4673,7 @@ table.app-table{
       pushRow({
         key: 'flujo_despues_impuestos',
         label: 'Flujo despuÃ©s de impuestos',
-        origin: 'Flujo despuÃ©s de impuestos = Flujo Bruto - Pago Provisional Mensual - Impuesto a la Renta',
+        origin: 'Flujo despuÃ©s de impuestos = Flujo antes de impuestos + Pago Provisional Mensual + Impuesto a la Renta',
         values: flujoDespuesImpuestos,
         mode: 'signed',
         sign: '=',
@@ -4700,6 +4760,7 @@ table.app-table{
       setHtml('flujo-tabla-tbody', body);
       applyFlowCollapseState();
       renderBankFlowTable(monthCount, labels, bankFlow);
+      if (typeof renderBricsaFlow === 'function') renderBricsaFlow();
     };
     window.renderProjectCashflow = renderProjectCashflow;
   }

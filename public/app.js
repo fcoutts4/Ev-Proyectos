@@ -161,6 +161,7 @@ function showTab(tabId, button) {
   if (activeButton) activeButton.scrollIntoView({ block: 'nearest', inline: 'center' });
   if (button) scrollTabPaneBelowSticky(activePane);
   closeTabDock();
+  if (targetTabId === 'flujo-bricsa' && typeof renderBricsaFlow === 'function') renderBricsaFlow();
   perfLog(`tab:${targetTabId}`, { ms: Math.round(performance.now() - startedAt) });
 }
 
@@ -329,7 +330,7 @@ function normalizeAppTables(root = document) {
     if (!table.classList.contains('gantt-table')) table.classList.add('financial-table');
     const isMonthly = table.classList.contains('finance-date-table')
       || !!table.querySelector('[data-month-col],[data-month-cell]')
-      || ['planilla-table', 'flujo-tabla', 'flujo-ventas-table', 'constr-ep-table', 'constr-fin-planilla-table', 'terreno-fin-planilla-table'].includes(table.id);
+      || ['planilla-table', 'flujo-tabla', 'flujo-bricsa-tabla', 'flujo-ventas-table', 'constr-ep-table', 'constr-fin-planilla-table', 'terreno-fin-planilla-table'].includes(table.id);
     if (isMonthly) table.classList.add('monthly-table');
     const isScrollable = !!table.closest('.tbl-scroll,.res-table-scroll,.finance-split-shell,.finance-date-scroll,.flow-planilla,.edp-curve-editor-scroll,.monthly-preview-scroll')
       || table.classList.contains('gantt-table');
@@ -1948,8 +1949,8 @@ function getAnnualIrrFromMonthlyOrNull(flowsMensuales) {
 
 function getFlowSeriesForAnnualTir(flowsMensuales) {
   const flows = Array.isArray(flowsMensuales) ? flowsMensuales.map((value) => toNumber(value)) : [];
-  // Replica el rango Excel usado para validar TIR: parte en el segundo mes visible del flujo.
-  return flows.length > 1 ? flows.slice(1) : flows;
+  const firstMeaningfulIndex = flows.findIndex((value) => Math.abs(toNumber(value)) > 0.000001);
+  return firstMeaningfulIndex > 0 ? flows.slice(firstMeaningfulIndex) : flows;
 }
 
 function getFinancialSummary(options = {}) {
@@ -1974,6 +1975,31 @@ function getFinancialSummary(options = {}) {
     toNumber(value) + toNumber(ivaCredito[index]) + toNumber(pagoIva[index])
   )));
   const flujoBruto = normalize(pickSeries(options.flujoBruto, options.series?.flujoBruto) || income.map((value, index) => toNumber(value) - toNumber(totalEgresosBrutos[index])));
+  const financialBreakdownForCashflow = typeof window !== 'undefined' && typeof window.getFinancialCostBreakdownForCashflow === 'function'
+    ? window.getFinancialCostBreakdownForCashflow(monthCount)
+    : null;
+  const bankFlowForCashflow = typeof window !== 'undefined' && typeof window.getBankFlowForCashflow === 'function'
+    ? window.getBankFlowForCashflow(monthCount)
+    : null;
+  const gastosFinancierosSigned = financialCosts.map((value) => -toNumber(value));
+  const ivaCreditoSigned = ivaCredito.map((value) => -toNumber(value));
+  const pagoIvaSigned = pagoIva.map((value) => -toNumber(value));
+  const flujoPuro = normalize(pickSeries(options.flujoPuro, options.series?.flujoPuro) || flujoBruto.map((value, index) => (
+    toNumber(value)
+    - toNumber(gastosFinancierosSigned[index])
+    - toNumber(ivaCreditoSigned[index])
+    - toNumber(ivaDebito[index])
+    - toNumber(pagoIvaSigned[index])
+  )));
+  const flujoBancosTotalSigned = normalize(pickSeries(options.flujoBancosTotal, options.series?.flujoBancosTotal) || bankFlowForCashflow?.total?.total);
+  const timbresSigned = normalize(pickSeries(options.timbresSigned, options.series?.timbresSigned) || financialBreakdownForCashflow?.stamp).map((value) => -Math.abs(toNumber(value)));
+  const comisionesBancariasSigned = normalize(pickSeries(options.comisionesBancariasSigned, options.series?.comisionesBancariasSigned) || financialBreakdownForCashflow?.commissions).map((value) => -Math.abs(toNumber(value)));
+  const flujoAntesImpuestos = normalize(pickSeries(options.flujoAntesImpuestos, options.series?.flujoAntesImpuestos) || flujoPuro.map((value, index) => (
+    toNumber(value)
+    + toNumber(flujoBancosTotalSigned[index])
+    + toNumber(timbresSigned[index])
+    + toNumber(comisionesBancariasSigned[index])
+  )));
   const ppm = normalize(pickSeries(options.ppm, options.series?.ppm) || getMonthlyPPM(income));
   const margenBrutoPct = sum(income) ? sum(flujoBruto) / sum(income) : 0;
   const impRenta = normalize(pickSeries(options.impRenta, options.impuestoRenta, options.series?.impuestoRenta) || getMonthlyImpuestoRenta(
@@ -1983,7 +2009,7 @@ function getFinancialSummary(options = {}) {
     getMonthlyGrossEscrituras(monthCount),
     margenBrutoPct
   ));
-  const flujoDespuesImpuestos = normalize(pickSeries(options.flujoDespuesImpuestos, options.series?.flujoDespuesImpuestos) || flujoBruto.map((value, index) => (
+  const flujoDespuesImpuestos = normalize(pickSeries(options.flujoDespuesImpuestos, options.series?.flujoDespuesImpuestos) || flujoAntesImpuestos.map((value, index) => (
     toNumber(value) + toNumber(ppm[index]) + toNumber(impRenta[index])
   )));
   const ingresosNetosSeries = normalize(pickSeries(options.ingresosNetosSeries, options.series?.ingresosNetos) || income.map((value, index) => toNumber(value) - toNumber(ivaDebito[index])));
@@ -1998,6 +2024,7 @@ function getFinancialSummary(options = {}) {
       ingresosBrutos: income,
       ingresosNetos: ingresosNetosSeries,
       flujoBruto,
+      flujoAntesImpuestos,
       flujoDespuesImpuestos,
       ivaCredito,
       ivaDebito,
@@ -2014,7 +2041,7 @@ function getFinancialSummary(options = {}) {
     utilidadNeta,
     margenBrutoPct,
     margenNetoPct: ingresosBrutos ? utilidadNeta / ingresosBrutos : 0,
-    tirAntesImpuestos: getAnnualIrrFromMonthlyOrNull(getFlowSeriesForAnnualTir(flujoBruto)),
+    tirAntesImpuestos: getAnnualIrrFromMonthlyOrNull(getFlowSeriesForAnnualTir(flujoAntesImpuestos)),
     tirDespuesImpuestos: getAnnualIrrFromMonthlyOrNull(getFlowSeriesForAnnualTir(flujoDespuesImpuestos)),
     egresosNetos: -sum(subtotalEgresos),
     totalEgresosBrutos: -sum(totalEgresosBrutos),
@@ -7683,11 +7710,19 @@ function evaluateCostPartida(partida, context) {
 }
 
 function getProjectFinalMonth() {
-  return withCalculationCache('projectFinalMonth', ['proyecto', 'gantt', 'ventas', 'construccion'], '', () => {
+  return withCalculationCache('projectFinalMonth', ['proyecto', 'gantt', 'ventas', 'construccion', 'formulas'], '', () => {
     const ganttEnd = state.gantt.reduce((max, row) => Math.max(max, toNumber(row.fin), toNumber(row.inicio) + Math.max(1, toNumber(row.duracion || 1)) - 1), 0);
     const ventasEnd = state.ventasCronograma.reduce((max, row) => Math.max(max, toNumber(row.mes_inicio) + Math.max(1, toNumber(row.duracion || 1)) - 1), 0);
     const constructionEnd = getConstructionStartMonth() + getConstructionDuration() - 1;
-    const operationalEnd = Math.max(12, ganttEnd, ventasEnd, constructionEnd);
+    const constructionRetentionEnd = getConstructionStartMonth() + getConstructionDuration();
+    const defaultConstructionStartIndex = Math.max(0, getConstructionStartMonth() - 1);
+    const anticipoLinkKey = typeof getGanttLinkValue === 'function' ? getGanttLinkValue('construction_payment_links', 'anticipoNeto') : '';
+    const anticipoOffset = typeof getGanttLinkOffset === 'function' ? getGanttLinkOffset('construction_payment_links', 'anticipoNeto') : 0;
+    const anticipoIndex = anticipoLinkKey
+      ? getLinkedGanttStartIndex(anticipoLinkKey, Math.max(0, defaultConstructionStartIndex - 1), anticipoOffset)
+      : Math.max(0, defaultConstructionStartIndex - 1);
+    const constructoraRetentionEnd = anticipoIndex + getConstructionDuration();
+    const operationalEnd = Math.max(12, ganttEnd, ventasEnd, constructionEnd, constructionRetentionEnd, constructoraRetentionEnd);
     const baseDate = getCostStartDate();
     const finalDate = addMonths(baseDate, operationalEnd);
     const taxPaymentDate = new Date(finalDate.getFullYear() + 1, 3, 1);
@@ -8454,6 +8489,352 @@ function cumulativeSeries(values) {
   }, []);
 }
 
+const BRICSA_FLOW_PARTICIPATION_STORAGE_PREFIX = 'evproyectos.bricsaFlow.participationPct';
+
+function getBricsaFlowProjectStorageKey() {
+  const projectKey = String(state?.proyectoId || state?.proyecto?.id || 'global');
+  return `${BRICSA_FLOW_PARTICIPATION_STORAGE_PREFIX}.${projectKey}`;
+}
+
+function getStoredBricsaParticipationPct() {
+  try {
+    const raw = window.localStorage.getItem(getBricsaFlowProjectStorageKey());
+    if (raw === null || raw === '') return 100;
+    const value = toNumber(raw);
+    return Number.isFinite(value) ? Math.max(0, value) : 100;
+  } catch (error) {
+    void error;
+    return 100;
+  }
+}
+
+function parseBricsaParticipationPct(value) {
+  if (String(value ?? '').trim() === '') return 100;
+  const parsed = toNumber(value);
+  if (!Number.isFinite(parsed)) return 100;
+  const pct = parsed > 0 && parsed <= 1 ? parsed * 100 : parsed;
+  return Math.max(0, pct);
+}
+
+function persistBricsaParticipationPct(value) {
+  try {
+    window.localStorage.setItem(getBricsaFlowProjectStorageKey(), String(parseBricsaParticipationPct(value)));
+  } catch (error) {
+    void error;
+  }
+}
+
+function setBricsaParticipationPct(value) {
+  persistBricsaParticipationPct(value);
+  renderBricsaFlow();
+}
+
+function findBricsaCostSubpartidaMonthly(categoryMatchers = [], nameMatcher = null, monthCount = getCostMonthCount()) {
+  const categories = typeof ensureCostosState === 'function' ? ensureCostosState() : [];
+  const context = typeof buildCostContext === 'function' ? buildCostContext() : null;
+  const categoryKeys = categoryMatchers.map((item) => getCostNameMatchKey(item));
+  const categoryMatches = (category) => {
+    if (!categoryKeys.length) return true;
+    const key = getCostNameMatchKey(category?.nombre);
+    return categoryKeys.some((candidate) => key === candidate || key.includes(candidate) || candidate.includes(key));
+  };
+  const findIn = (items) => {
+    for (const category of items) {
+      for (const partida of (category.partidas || [])) {
+        const key = getCostNameMatchKey(partida?.nombre);
+        if (typeof nameMatcher === 'function' ? nameMatcher(key, partida, category) : key === getCostNameMatchKey(nameMatcher)) {
+          return {
+            found: true,
+            category: category.nombre || '',
+            label: partida.nombre || '',
+            values: getMonthlyDistributionForPartida(partida, monthCount, context),
+          };
+        }
+      }
+    }
+    return null;
+  };
+  const scoped = findIn(categories.filter(categoryMatches));
+  const fallback = scoped || findIn(categories);
+  return fallback || {
+    found: false,
+    category: '',
+    label: '',
+    values: createMonthlyArray(monthCount, 0),
+  };
+}
+
+function getBricsaFlowData(monthCount = getCostMonthCount()) {
+  const normalize = (values) => createMonthlyArray(monthCount, 0).map((_, index) => toNumber(values?.[index]));
+  const participationPct = getStoredBricsaParticipationPct();
+  const participationFactor = participationPct / 100;
+  const cachedSummary = window.__lastFinancialSummary?.series?.flujoDespuesImpuestos
+    && String(window.__lastFinancialSummary.projectId || '') === String(state?.proyectoId || '')
+    ? window.__lastFinancialSummary
+    : null;
+  const summary = cachedSummary || (typeof getFinancialSummary === 'function' ? getFinancialSummary() : null);
+  const positiveSeries = (values) => normalize(values).map((value) => Math.abs(toNumber(value)));
+  const flujoDespuesImpuestos = normalize(summary?.series?.flujoDespuesImpuestos);
+  const flujoCajaProyecto = flujoDespuesImpuestos.map((value) => toNumber(value) * participationFactor);
+  const honorariosGestion = findBricsaCostSubpartidaMonthly(['ADMINISTRACION'], (key) => (
+    key.includes('GESTION INMOBILIARIA')
+    || key.includes('HONO Y ASES GESTION')
+    || key.includes('HONORARIOS GESTION')
+  ), monthCount);
+  const honorariosVenta = findBricsaCostSubpartidaMonthly(['VENTAS'], (key) => (
+    key.includes('HONORARIOS ESCRITURACION')
+    || (key.includes('HONORARIO') && key.includes('ESCRITUR'))
+  ), monthCount);
+  const honorarioArquitectura = findBricsaCostSubpartidaMonthly(['HONORARIOS'], (key) => (
+    key.includes('HONORARIO ARQUITECTURA')
+    || key.includes('HONORARIOS ARQUITECTURA')
+    || key.includes('ARQUITECTURA')
+  ), monthCount);
+  const constructoraData = getBricsaConstructoraFlow(monthCount);
+  const flujoConstructora = constructoraData.values;
+  const honorariosGestionValues = positiveSeries(honorariosGestion.values);
+  const honorariosVentaValues = positiveSeries(honorariosVenta.values);
+  const honorarioArquitecturaValues = positiveSeries(honorarioArquitectura.values);
+  const total = createMonthlyArray(monthCount, 0).map((_, index) => (
+    toNumber(flujoCajaProyecto[index])
+    + toNumber(honorariosGestionValues[index])
+    + toNumber(honorariosVentaValues[index])
+    + toNumber(honorarioArquitecturaValues[index])
+    + toNumber(flujoConstructora[index])
+  ));
+  return {
+    participationPct,
+    flujoCajaProyecto,
+    honorariosGestion: honorariosGestionValues,
+    honorariosVenta: honorariosVentaValues,
+    honorarioArquitectura: honorarioArquitecturaValues,
+    flujoConstructora,
+    total,
+    acumulado: cumulativeSeries(total),
+    sources: {
+      honorariosGestion,
+      honorariosVenta,
+      honorarioArquitectura,
+      flujoConstructora: constructoraData,
+    },
+  };
+}
+
+function getBricsaScenarioData(monthCount = getCostMonthCount()) {
+  const normalize = (values) => createMonthlyArray(monthCount, 0).map((_, index) => toNumber(values?.[index]));
+  const participationPct = getStoredBricsaParticipationPct();
+  const participationFactor = participationPct / 100;
+  const cachedSummary = window.__lastFinancialSummary?.series?.flujoDespuesImpuestos
+    && String(window.__lastFinancialSummary.projectId || '') === String(state?.proyectoId || '')
+    ? window.__lastFinancialSummary
+    : null;
+  const summary = cachedSummary || (typeof getFinancialSummary === 'function' ? getFinancialSummary() : null);
+  const baseFlow = normalize(summary?.series?.flujoDespuesImpuestos);
+  const constructoraData = getBricsaConstructoraFlow(monthCount);
+  const fallbackConstructionStart = Math.max(0, Math.round(toNumber(getConstructionStartMonth()) - 1));
+  const constructionFirstFlow = getFirstNonZeroMonth(
+    typeof computeConstructionEP === 'function'
+      ? normalize(computeConstructionEP()?.subtotal)
+      : []
+  );
+  const cutMonth = Number.isFinite(toNumber(constructoraData.anticipoMonth))
+    ? Math.max(0, Math.round(toNumber(constructoraData.anticipoMonth)))
+    : (constructionFirstFlow >= 0 ? constructionFirstFlow : fallbackConstructionStart);
+  const byParticipation = baseFlow.map((value) => toNumber(value) * participationFactor);
+  const full = baseFlow.slice();
+  const investorFromConstruction = baseFlow.map((value, index) => (
+    toNumber(value) * (index < cutMonth ? 1 : participationFactor)
+  ));
+  const annualTir = (values) => getAnnualIrrFromMonthlyOrNull(getFlowSeriesForAnnualTir(values));
+  return {
+    cutMonth,
+    scenarios: [
+      {
+        key: 'participacion',
+        label: `Bricsa según ${fmtNumber(participationPct, 2)}%`,
+        shortLabel: 'TIR Bricsa según %',
+        color: '#2563eb',
+        flow: byParticipation,
+        accumulated: cumulativeSeries(byParticipation),
+        tir: annualTir(byParticipation),
+      },
+      {
+        key: 'bricsa_100',
+        label: 'Bricsa 100%',
+        shortLabel: 'TIR Bricsa 100%',
+        color: '#16a34a',
+        flow: full,
+        accumulated: cumulativeSeries(full),
+        tir: annualTir(full),
+      },
+      {
+        key: 'inversionista_construccion',
+        label: 'Inversionista desde construcción',
+        shortLabel: 'TIR inversionista desde construcción',
+        color: '#7c3aed',
+        flow: investorFromConstruction,
+        accumulated: cumulativeSeries(investorFromConstruction),
+        tir: annualTir(investorFromConstruction),
+      },
+    ],
+  };
+}
+
+function renderBricsaScenarioChart() {
+  if (!$('flujo-bricsa-scenarios-chart')) return;
+  const monthCount = getCostMonthCount();
+  const labels = getCostMonthLabels();
+  const data = getBricsaScenarioData(monthCount);
+  const fmtTir = (value) => (value === null || value === undefined || !Number.isFinite(toNumber(value)) ? '-' : fmtPct(toNumber(value) * 100));
+  const finalValue = (scenario) => scenario.accumulated[scenario.accumulated.length - 1] || 0;
+  setHtml('flujo-bricsa-scenarios-kpis', data.scenarios.map((scenario) => `
+    <div class="flow-summary-card ${scenario.tir == null ? '' : (toNumber(scenario.tir) >= 0 ? 'is-good' : 'is-bad')}">
+      <div class="flow-summary-label">${escapeHtml(scenario.shortLabel)}</div>
+      <div class="flow-summary-value">${escapeHtml(fmtTir(scenario.tir))}</div>
+      <div style="font-size:10px;color:#64748b;margin-top:4px">${escapeHtml(fmtUf(finalValue(scenario)))}</div>
+    </div>
+  `).join(''));
+
+  const width = 1120;
+  const height = 320;
+  const pad = { left: 72, right: 26, top: 24, bottom: 48 };
+  const innerW = width - pad.left - pad.right;
+  const innerH = height - pad.top - pad.bottom;
+  const allValues = data.scenarios.flatMap((scenario) => scenario.accumulated.map((value) => toNumber(value)));
+  const minValue = Math.min(0, ...allValues);
+  const maxValue = Math.max(0, ...allValues);
+  const range = Math.max(1, maxValue - minValue);
+  const x = (index) => pad.left + (monthCount <= 1 ? 0 : (index / (monthCount - 1)) * innerW);
+  const y = (value) => pad.top + ((maxValue - toNumber(value)) / range) * innerH;
+  const points = (scenario) => scenario.accumulated.map((value, index) => `${x(index).toFixed(2)},${y(value).toFixed(2)}`).join(' ');
+  const tickCount = Math.min(5, monthCount);
+  const yTicks = Array.from({ length: tickCount }, (_, index) => minValue + (range * index / Math.max(1, tickCount - 1)));
+  const labelStep = Math.max(1, Math.ceil(monthCount / 8));
+  const xTicks = labels.map((label, index) => ({ label, index })).filter((item) => item.index % labelStep === 0 || item.index === labels.length - 1);
+  const zeroY = y(0);
+  const svg = `
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Escenarios acumulados Bricsa" style="width:100%;height:320px;display:block">
+      <rect x="0" y="0" width="${width}" height="${height}" fill="#fff"/>
+      ${yTicks.map((tick) => `
+        <line x1="${pad.left}" y1="${y(tick).toFixed(2)}" x2="${width - pad.right}" y2="${y(tick).toFixed(2)}" stroke="#e2e8f0" stroke-width="1"/>
+        <text x="${pad.left - 10}" y="${(y(tick) + 4).toFixed(2)}" text-anchor="end" font-size="10" fill="#64748b">${escapeHtml(fmtUf(tick))}</text>
+      `).join('')}
+      <line x1="${pad.left}" y1="${zeroY.toFixed(2)}" x2="${width - pad.right}" y2="${zeroY.toFixed(2)}" stroke="#94a3b8" stroke-width="1.2"/>
+      ${xTicks.map((tick) => `
+        <line x1="${x(tick.index).toFixed(2)}" y1="${pad.top}" x2="${x(tick.index).toFixed(2)}" y2="${height - pad.bottom}" stroke="#f1f5f9" stroke-width="1"/>
+        <text x="${x(tick.index).toFixed(2)}" y="${height - 22}" text-anchor="middle" font-size="10" fill="#64748b">${escapeHtml(String(tick.label))}</text>
+      `).join('')}
+      ${data.scenarios.map((scenario) => `
+        <polyline fill="none" stroke="${scenario.color}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" points="${points(scenario)}"/>
+      `).join('')}
+      <g transform="translate(${pad.left}, ${height - 8})">
+        ${data.scenarios.map((scenario, index) => `
+          <g transform="translate(${index * 300}, 0)">
+            <line x1="0" y1="-4" x2="22" y2="-4" stroke="${scenario.color}" stroke-width="3" stroke-linecap="round"/>
+            <text x="30" y="0" font-size="11" fill="#334155" font-weight="700">${escapeHtml(scenario.label)}</text>
+          </g>
+        `).join('')}
+      </g>
+    </svg>
+  `;
+  setHtml('flujo-bricsa-scenarios-chart', svg);
+}
+
+function getBricsaConstructoraFlow(monthCount = getCostMonthCount()) {
+  const values = createMonthlyArray(monthCount, 0);
+  const metrics = typeof getConstructionMetrics === 'function' ? getConstructionMetrics() : {};
+  const epData = typeof computeConstructionEP === 'function' ? computeConstructionEP() : null;
+  const contratoNeto = Math.max(0, toNumber(metrics.total_neto));
+  const contratoSinUtilidad = Math.max(0, toNumber(metrics.base_contrato || (contratoNeto / (1 + (Math.max(0, toNumber(metrics.utilidad_pct)) / 100)))));
+  const utilidadPct = Math.max(0, toNumber(metrics.utilidad_pct)) / 100;
+  const anticipoPct = Math.max(0, toNumber(metrics.anticipo_pct)) / 100;
+  const mesesContrato = Math.max(1, Math.round(toNumber(metrics.plazo_meses || epData?.meses || getConstructionDuration())));
+  const anticipoMonth = Math.max(0, Math.round(toNumber(epData?.anticipoMonth ?? Math.max(0, getConstructionStartMonth() - 2))));
+  const utilidadTotal = contratoSinUtilidad * utilidadPct;
+  const anticipo = contratoNeto * anticipoPct;
+  const posterior = (utilidadTotal - anticipo) / mesesContrato;
+
+  if (anticipoMonth < monthCount) values[anticipoMonth] += Math.abs(anticipo);
+  for (let index = 1; index <= mesesContrato; index += 1) {
+    const month = anticipoMonth + index;
+    if (month >= monthCount) break;
+    values[month] += posterior > 0 ? -posterior : posterior;
+  }
+
+  const finalMonth = Math.min(monthCount - 1, anticipoMonth + mesesContrato);
+  if (finalMonth >= 0 && monthCount > 0) {
+    const currentTotal = values.reduce((sum, value) => sum + toNumber(value), 0);
+    values[finalMonth] += utilidadTotal - currentTotal;
+  }
+
+  return {
+    found: contratoNeto > 0 && utilidadPct > 0,
+    values,
+    contratoNeto,
+    contratoSinUtilidad,
+    utilidadPct,
+    anticipoPct,
+    mesesContrato,
+    anticipoMonth,
+    utilidadTotal,
+  };
+}
+
+function renderBricsaFlow() {
+  if (!$('flujo-bricsa-tabla')) return;
+  const monthCount = getCostMonthCount();
+  const labels = getCostMonthLabels();
+  const data = getBricsaFlowData(monthCount);
+  const input = $('bricsa-participacion-pct');
+  if (input && document.activeElement !== input) input.value = fmtInputNumber(data.participationPct, 2);
+  const sumValues = (values) => (values || []).reduce((sum, value) => sum + toNumber(value), 0);
+  const totalClass = (value) => {
+    const number = toNumber(value);
+    if (number > 0.000001) return 'flow-total-positive';
+    if (number < -0.000001) return 'flow-total-negative';
+    return 'flow-total-zero';
+  };
+  const formatBricsaAmount = (value, options = {}) => {
+    const number = toNumber(value);
+    const text = options.total ? `${fmtNumber(number)} UF` : fmtNumber(number);
+    const className = number < -0.000001 ? 'amount-negative' : '';
+    return `<span class="${className}">${escapeHtml(text)}</span>`;
+  };
+  const rows = [
+    { key: 'flujo_caja_proyecto', label: 'Flujo caja proyecto', values: data.flujoCajaProyecto, total: true },
+    { key: 'honorarios_gestion', label: 'Honorarios Gestión', values: data.honorariosGestion, source: data.sources.honorariosGestion },
+    { key: 'honorarios_venta', label: 'Honorarios Venta', values: data.honorariosVenta, source: data.sources.honorariosVenta },
+    { key: 'honorario_arquitectura', label: 'Honorario Arquitectura', values: data.honorarioArquitectura, source: data.sources.honorarioArquitectura },
+    { key: 'flujo_constructora', label: 'Flujo Constructora', values: data.flujoConstructora, source: data.sources.flujoConstructora },
+    { key: 'total', label: 'Total', values: data.total, total: true },
+    { key: 'acumulado', label: 'Acumulado', values: data.acumulado, total: true, totalValue: data.acumulado[data.acumulado.length - 1] || 0 },
+  ];
+  setHtml('flujo-bricsa-header', `<tr><th style="text-align:left;min-width:280px">Concepto</th><th class="flow-total-col">Total</th>${labels.map((label) => `<th data-month-col>${escapeHtml(label)}</th>`).join('')}</tr>`);
+  setHtml('flujo-bricsa-tbody', rows.map((row) => {
+    const rowTotal = row.totalValue != null ? toNumber(row.totalValue) : sumValues(row.values);
+    const sourceTitle = row.source
+      ? (row.source.contratoNeto != null
+        ? `Base sin utilidad ${fmtUf(row.source.contratoSinUtilidad)} - Utilidad ${fmtPct(toNumber(row.source.utilidadPct) * 100)} - Anticipo sobre contrato neto ${fmtPct(toNumber(row.source.anticipoPct) * 100)} - ${row.source.mesesContrato} meses + retencion`
+        : (row.source.found ? `${row.source.category} / ${row.source.label}` : 'Subpartida no encontrada'))
+      : '';
+    return `
+      <tr class="${row.total ? 'flow-row-total' : ''}" data-bricsa-row="${escapeHtml(row.key)}" title="${escapeHtml(sourceTitle)}">
+        <td style="text-align:left;font-weight:${row.total ? 800 : 600};color:#0f172a">
+          <div class="flow-row-label"><span class="flow-toggle-spacer" aria-hidden="true"></span><span>${escapeHtml(row.label)}</span></div>
+        </td>
+        <td class="flow-total-col ${totalClass(rowTotal)}">${formatBricsaAmount(rowTotal, { total: true })}</td>
+        ${row.values.map((value) => `<td data-month-cell style="text-align:center;${row.total ? 'font-weight:700' : ''}">${formatBricsaAmount(value)}</td>`).join('')}
+      </tr>
+    `;
+  }).join(''));
+  renderBricsaScenarioChart();
+}
+
+function scrollBricsaFlowPlanilla(offset) {
+  const el = $('flujo-bricsa-scroll');
+  if (el) el.scrollLeft += toNumber(offset);
+}
+
 function getIvaSettlementSeries(ivaCredito = [], ivaDebito = [], monthCount = Math.max(ivaCredito.length, ivaDebito.length)) {
   const ivaMensual = createMonthlyArray(monthCount, 0);
   const remanente = createMonthlyArray(monthCount, 0);
@@ -8498,6 +8879,15 @@ function renderProjectCashflow() {
   const ivaCreditoSigned = ivaCredito.map((value) => -toNumber(value));
   const ivaDebitoSigned = ivaDebito.map((value) => toNumber(value));
   const pagoIvaSigned = ivaSettlement.pagoIva.map((value) => -toNumber(value));
+  const financialBreakdownForCashflow = typeof window !== 'undefined' && typeof window.getFinancialCostBreakdownForCashflow === 'function'
+    ? window.getFinancialCostBreakdownForCashflow(monthCount)
+    : null;
+  const bankFlowForCashflow = typeof window !== 'undefined' && typeof window.getBankFlowForCashflow === 'function'
+    ? window.getBankFlowForCashflow(monthCount)
+    : null;
+  const flujoBancosTotalSigned = bankFlowForCashflow?.total?.total || createMonthlyArray(monthCount, 0);
+  const timbresSigned = (financialBreakdownForCashflow?.stamp || createMonthlyArray(monthCount, 0)).map((value) => -toNumber(value));
+  const comisionesBancariasSigned = (financialBreakdownForCashflow?.commissions || createMonthlyArray(monthCount, 0)).map((value) => -toNumber(value));
   const flujoPuro = flujoBruto.map((value, index) => (
     toNumber(value)
     - toNumber(gastosFinancierosSigned[index])
@@ -8507,7 +8897,9 @@ function renderProjectCashflow() {
   ));
   const flujoAntesImpuestos = flujoPuro.map((value, index) => (
     toNumber(value)
-    + toNumber(gastosFinancierosSigned[index])
+    + toNumber(flujoBancosTotalSigned[index])
+    + toNumber(timbresSigned[index])
+    + toNumber(comisionesBancariasSigned[index])
   ));
   renderIvaDebitoPanel();
 
@@ -8517,7 +8909,9 @@ function renderProjectCashflow() {
     ? flujoBruto.reduce((sum, value) => sum + toNumber(value), 0) / totalIncomeForTax
     : 0;
   const impRenta = getMonthlyImpuestoRenta(flujoBruto, income, ppm, getMonthlyGrossEscrituras(monthCount), projectGrossMarginPct);
-  const flujoDespuesImpuestos = flujoBruto.map((v, i) => v + toNumber(ppm[i]) + toNumber(impRenta[i]));
+  const flujoDespuesImpuestos = flujoAntesImpuestos.map((value, index) => (
+    toNumber(value) + toNumber(ppm[index]) + toNumber(impRenta[index])
+  ));
 
   const cumulative = cumulativeSeries(flujoDespuesImpuestos);
   const cumulativeBruto = cumulativeSeries(flujoOperativoBruto);
@@ -8548,10 +8942,13 @@ function renderProjectCashflow() {
     ivaSettlement,
     totalEgresosBrutos,
     flujoBruto,
+    flujoPuro,
+    flujoAntesImpuestos,
     ppm,
     impRenta,
     flujoDespuesImpuestos,
   });
+  financialSummary.projectId = state.proyectoId;
 
   window.__lastFinancialSummary = financialSummary;
   updateResumenFinancialKpis(financialSummary);
@@ -8596,8 +8993,8 @@ function renderProjectCashflow() {
     { label: 'Total Egresos Brutos', values: totalEgresosBrutos.map((v) => -v), sign: '-', bold: true, formula: 'Total Egresos Brutos = Subtotal Egresos Netos + IVA credito + Pago del IVA', refs: [{ label: 'Total egresos brutos', value: fmtUf(totalEgresosBrutosValue) }] },
     { label: 'Flujo Bruto', values: flujoBruto, sign: '=', bold: true, formula: 'Flujo Bruto = Ingresos Brutos - Total Egresos Brutos', refs: [{ label: 'Total', value: fmtUf(totalFlujoBrutoBase) }] },
     { label: 'Flujo puro', values: flujoPuro, sign: '=', bold: true, formula: 'Flujo puro = Flujo Bruto - Gastos financieros - IVA credito - IVA debito - Pago del IVA, usando cada fila con su signo actual', refs: [{ label: 'Total', value: fmtUf(totalFlujoPuro) }] },
-    { label: 'Flujo antes de impuestos', values: flujoAntesImpuestos, sign: '=', bold: true, formula: 'Flujo antes de impuestos = Flujo puro + Gastos financieros, usando Gastos financieros con su signo actual', refs: [{ label: 'Total', value: fmtUf(totalFlujoAntesImpuestos) }] },
-    { label: 'Flujo despuÃ©s de impuestos', values: flujoDespuesImpuestos, sign: '=', bold: true, formula: 'Flujo despues de impuestos = Flujo Bruto - Pago Provisional Mensual - Impuesto a la Renta', refs: [{ label: 'Total', value: fmtUf(totalFlujoDespues) }] },
+    { label: 'Flujo antes de impuestos', values: flujoAntesImpuestos, sign: '=', bold: true, formula: 'Flujo antes de impuestos = Flujo puro + Flujo bancos total + Timbres + Comisiones bancarias, usando cada fila con su signo actual', refs: [{ label: 'Total', value: fmtUf(totalFlujoAntesImpuestos) }] },
+    { label: 'Flujo despuÃ©s de impuestos', values: flujoDespuesImpuestos, sign: '=', bold: true, formula: 'Flujo despues de impuestos = Flujo antes de impuestos + Pago Provisional Mensual + Impuesto a la Renta', refs: [{ label: 'Total', value: fmtUf(totalFlujoDespues) }] },
     { label: 'Pago Provisional Mensual', values: ppm, sign: '-', formula: '-1% x base neta de ingresos por escritura', refs: [{ label: 'Total PPM', value: fmtUf(ppm.reduce((a, b) => a + b, 0)) }] },
     { label: 'Impuesto a la Renta', values: impRenta, sign: '-', formula: '-(27% x Margen Bruto % x Ganancias ano anterior - PPM ano anterior), pagado solo en abril', refs: [{ label: 'Total Renta', value: fmtUf(impRenta.reduce((a, b) => a + b, 0)) }] },
   ];
@@ -8622,6 +9019,7 @@ function renderProjectCashflow() {
         ${row.values.map((value) => `<td data-month-cell style="text-align:center;color:${row.bold ? '#22c55e' : '#fff'}">${fmtTableAmount(value, { kind: 'income' })}</td>`).join('')}
       </tr>`;
   }).join(''));
+  renderBricsaFlow();
 }
 
 function getCostFormulaCatalog(contextOverride = null) {
@@ -12537,6 +12935,9 @@ window.setCostFlowMode = setCostFlowMode;
 window.scrollCostPlanilla = scrollCostPlanilla;
 window.scrollFinancialPlanilla = scrollFinancialPlanilla;
 window.scrollResumenGantt = scrollResumenGantt;
+window.scrollBricsaFlowPlanilla = scrollBricsaFlowPlanilla;
+window.setBricsaParticipationPct = setBricsaParticipationPct;
+window.renderBricsaFlow = renderBricsaFlow;
 window.getFinancialSummary = getFinancialSummary;
 window.getAnnualIrrFromMonthlyOrNull = getAnnualIrrFromMonthlyOrNull;
 window.getFlowSeriesForAnnualTir = getFlowSeriesForAnnualTir;
