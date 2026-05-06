@@ -813,14 +813,10 @@ function normalizeProject(project = {}) {
     pct_impuesto_renta: source.pct_impuesto_renta ?? 27,
     construction_payment_links: source.construction_payment_links && typeof source.construction_payment_links === 'object'
       ? { ...source.construction_payment_links }
-      : (state?.proyecto?.construction_payment_links && typeof state.proyecto.construction_payment_links === 'object'
-        ? { ...state.proyecto.construction_payment_links }
-        : {}),
+      : {},
     land_finance_links: source.land_finance_links && typeof source.land_finance_links === 'object'
       ? { ...source.land_finance_links }
-      : (state?.proyecto?.land_finance_links && typeof state.proyecto.land_finance_links === 'object'
-        ? { ...state.proyecto.land_finance_links }
-        : {}),
+      : {},
     formula_overrides: normalizeFormulaOverrides(source.formula_overrides),
   };
 }
@@ -984,14 +980,38 @@ function getGlobalFinancialParams() {
 function getGanttLinkOptions() {
   return (state.gantt || [])
     .map((row) => ({
+      row,
       key: String(row.id || row.nombre || '').trim(),
       name: String(row.nombre || '').trim() || 'Hito',
     }))
     .filter((item) => item.key);
 }
 
+function normalizeGanttLookupKey(value) {
+  const canonical = typeof canonicalizeGanttName === 'function'
+    ? canonicalizeGanttName(value)
+    : String(value || '');
+  return String(canonical || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function findGanttLinkRow(linkKey) {
+  const key = String(linkKey || '').trim();
+  if (!key) return null;
+  const rows = state.gantt || [];
+  return rows.find((row) => String(row.id || '').trim() === key)
+    || rows.find((row) => String(row.nombre || '').trim() === key)
+    || rows.find((row) => normalizeGanttLookupKey(row.nombre) === normalizeGanttLookupKey(key))
+    || null;
+}
+
 function renderTinyGanttLinkControl(group, key, selectedKey = '') {
   const options = getGanttLinkOptions();
+  const selectedRow = findGanttLinkRow(selectedKey);
   return `
     <select
       class="gantt-link-mini"
@@ -1002,15 +1022,37 @@ function renderTinyGanttLinkControl(group, key, selectedKey = '') {
       aria-label="Vincular fila a actividad Gantt"
     >
       <option value="">Vincular</option>
-      ${options.map((option) => `<option value="${escapeHtml(option.key)}" ${String(selectedKey) === String(option.key) ? 'selected' : ''}>${escapeHtml(option.name)}</option>`).join('')}
+      ${options.map((option) => {
+        const selected = selectedRow ? option.row === selectedRow : String(selectedKey) === String(option.key);
+        return `<option value="${escapeHtml(option.key)}" ${selected ? 'selected' : ''}>${escapeHtml(option.name)}</option>`;
+      }).join('')}
     </select>
   `;
 }
 
 function getLinkedGanttStartIndex(linkKey, fallbackIndex = 0) {
-  const key = String(linkKey || '').trim();
-  if (!key) return Math.max(0, toNumber(fallbackIndex));
-  return resolvePaymentReference(`START:${key}`, 0);
+  const row = findGanttLinkRow(linkKey);
+  if (!row) return Math.max(0, toNumber(fallbackIndex));
+  return Math.max(0, toNumber(row.inicio));
+}
+
+function getFirstNonZeroMonth(series = []) {
+  return (Array.isArray(series) ? series : []).findIndex((value) => Math.abs(toNumber(value)) > 1e-9);
+}
+
+function shiftMonthlySeries(series = [], targetStartMonth = 0, monthCount = null) {
+  const length = Math.max(0, Math.round(toNumber(monthCount ?? series.length)));
+  const source = Array.isArray(series) ? series.map((value) => toNumber(value)) : [];
+  const shifted = createMonthlyArray(length, 0);
+  const first = getFirstNonZeroMonth(source);
+  if (first < 0) return shifted;
+  const target = Math.max(0, Math.round(toNumber(targetStartMonth)));
+  for (let index = first; index < source.length; index += 1) {
+    const targetIndex = target + (index - first);
+    if (targetIndex >= length) break;
+    shifted[targetIndex] += toNumber(source[index]);
+  }
+  return shifted;
 }
 
 function onMiniGanttLinkChange(select) {
@@ -1024,8 +1066,13 @@ function onMiniGanttLinkChange(select) {
   if (value) state.proyecto[group][key] = value;
   else delete state.proyecto[group][key];
 
-  if (typeof renderConstructionModule === 'function') renderConstructionModule();
-  scheduleAutosave('proyecto');
+  if (group === 'land_finance_links') {
+    renderTerrainModule();
+  } else if (group === 'construction_payment_links') {
+    renderConstruccion();
+  }
+  if (typeof renderProjectCashflow === 'function') renderProjectCashflow();
+  scheduleAutosave(group === 'land_finance_links' ? 'terreno' : 'construccion');
 }
 
 function normalizePercent(value) {
@@ -1735,6 +1782,7 @@ async function persistAutosaveScopes(scopes, { silent = true } = {}) {
       'POST',
       proyecto.formula_overrides || {}
     );
+    queueAutosaveRequest(requests, 'proyecto', `/api/proyectos/${state.proyectoId}`, 'PUT', proyecto);
   }
 
   if (scopeSet.has('cabida') || scopeSet.has('terreno') || scopeSet.has('construccion')) {
@@ -4834,7 +4882,7 @@ function computeConstructionEP() {
   const defaultStartIndex = Math.max(0, Math.min(monthCount - 1, toNumber(startMonth) - 1));
   const epLinkKey = state.proyecto?.construction_payment_links?.edppNeto || '';
   const anticipoLinkKey = state.proyecto?.construction_payment_links?.anticipoNeto || '';
-  const epStartIndex = getLinkedGanttStartIndex(epLinkKey, defaultStartIndex);
+  const epStartIndex = Math.max(0, Math.min(monthCount - 1, getLinkedGanttStartIndex(epLinkKey, defaultStartIndex)));
   const constructionStartIndex = Math.max(0, Math.min(monthCount - 1, toNumber(startMonth) - 1));
   const dist = buildConstructionSCurve(metrics, meses);
   const cfg = getGlobalFinancialParams();
@@ -4845,25 +4893,29 @@ function computeConstructionEP() {
     ? Math.max(0, Math.min(monthCount - 1, getLinkedGanttStartIndex(anticipoLinkKey, Math.max(0, defaultStartIndex - 1))))
     : Math.max(0, defaultStartIndex - 1);
 
-  const ep = createMonthlyArray(monthCount, 0);
-  const anticipo = createMonthlyArray(monthCount, 0);
-  const retenciones = createMonthlyArray(monthCount, 0);
+  const epBase = createMonthlyArray(monthCount, 0);
+  const anticipoBase = createMonthlyArray(monthCount, 0);
+  const retencionesBase = createMonthlyArray(monthCount, 0);
 
   // Anticipo: desembolso completo un mes antes del inicio de construcciÃ³n
-  anticipo[anticipoMonth] += anticipoTotal;
+  anticipoBase[Math.max(0, defaultStartIndex - 1)] += anticipoTotal;
 
   // Durante la obra: EDPP neto del saldo de contrato despues de anticipo.
   for (let i = 0; i < meses; i += 1) {
-    const m = Math.min(monthCount - 1, epStartIndex + i);
-    ep[m] += toNumber(dist.monthlyCosts[i]); // EDPP neto del mes
-    anticipo[m] -= toNumber(dist.monthlyAnticipoRecovery[i]); // compatibilidad: normalmente 0, el EP ya descuenta anticipo
-    retenciones[m] -= toNumber(dist.monthlyRetention[i]); // retenciÃ³n del mes
+    const m = Math.min(monthCount - 1, defaultStartIndex + i);
+    epBase[m] += toNumber(dist.monthlyCosts[i]); // EDPP neto del mes
+    anticipoBase[m] -= toNumber(dist.monthlyAnticipoRecovery[i]); // compatibilidad: normalmente 0, el EP ya descuenta anticipo
+    retencionesBase[m] -= toNumber(dist.monthlyRetention[i]); // retenciÃ³n del mes
   }
 
   // DevoluciÃ³n de retenciones al final de obra
   const totalRet = dist.retentionAmount;
-  const finalM = Math.min(monthCount - 1, epStartIndex + meses);
-  retenciones[finalM] += totalRet;
+  const finalM = Math.min(monthCount - 1, defaultStartIndex + meses);
+  retencionesBase[finalM] += totalRet;
+
+  const ep = epLinkKey ? shiftMonthlySeries(epBase, epStartIndex, monthCount) : epBase;
+  const anticipo = anticipoLinkKey ? shiftMonthlySeries(anticipoBase, anticipoMonth, monthCount) : anticipoBase;
+  const retenciones = epLinkKey ? shiftMonthlySeries(retencionesBase, epStartIndex, monthCount) : retencionesBase;
 
   // Calcular columnas derivadas
   const subtotal = createMonthlyArray(monthCount, 0);
@@ -4908,14 +4960,14 @@ function renderConstructionEP() {
 
   const total = (arr) => arr.reduce((a, b) => a + toNumber(b), 0);
   const rows = [
-    { label: 'EP (EDPP neto)', values: data.ep, formula: 'EDPP_neto(t) = saldo neto contrato despues de anticipo distribuido por curva S', color: '#fff' },
-    { label: 'Anticipo neto', values: data.anticipo, formula: `+Anticipo neto total un mes antes de construccion; los EDPP reparten el saldo neto del contrato  (Total = ${fmtUf(data.anticipoTotal)})`, color: '#fbbf24' },
-    { label: 'Retenciones netas', values: data.retenciones, formula: 'Retencion neta mensual y devolucion neta total al final de obra.', color: '#fbbf24' },
-    { label: 'Subtotal neto', values: data.subtotal, formula: 'EDPP neto + Anticipo neto + Retenciones netas', bold: true, color: '#22c55e' },
-    { label: 'IVA bruto (19%)', values: data.ivaBruto, formula: 'Subtotal neto Ã— 19%', color: '#94a3b8' },
-    { label: `CEEC (${cfg.pct_ceec}%)`, values: data.ceec, formula: `${cfg.pct_ceec}% Ã— IVA bruto (en valor absoluto)  Â·  CrÃ©dito tributario en UF (siempre positivo)`, color: '#a855f7' },
-    { label: 'IVA efectivo', values: data.ivaEfectivo, formula: 'IVA bruto + CEEC', color: '#94a3b8' },
-    { label: 'TOTAL A PAGO (c/IVA)', values: data.totalPago, formula: 'Subtotal neto + IVA efectivo  â†’  alimenta GIROS', bold: true, color: '#22c55e' },
+    { key: 'ep_bruto', label: 'EP (EDPP neto)', values: data.ep, formula: 'EDPP_neto(t) = saldo neto contrato despues de anticipo distribuido por curva S', color: '#fff' },
+    { key: 'anticipo', label: 'Anticipo neto', values: data.anticipo, formula: `+Anticipo neto total un mes antes de construccion; los EDPP reparten el saldo neto del contrato  (Total = ${fmtUf(data.anticipoTotal)})`, color: '#fbbf24' },
+    { key: 'retenciones', label: 'Retenciones netas', values: data.retenciones, formula: 'Retencion neta mensual y devolucion neta total al final de obra.', color: '#fbbf24' },
+    { key: 'subtotal', label: 'Subtotal neto', values: data.subtotal, formula: 'EDPP neto + Anticipo neto + Retenciones netas', bold: true, color: '#22c55e' },
+    { key: 'iva_bruto', label: 'IVA bruto (19%)', values: data.ivaBruto, formula: 'Subtotal neto Ã— 19%', color: '#94a3b8' },
+    { key: 'ceec', label: `CEEC (${cfg.pct_ceec}%)`, values: data.ceec, formula: `${cfg.pct_ceec}% Ã— IVA bruto (en valor absoluto)  Â·  CrÃ©dito tributario en UF (siempre positivo)`, color: '#a855f7' },
+    { key: 'iva_efectivo', label: 'IVA efectivo', values: data.ivaEfectivo, formula: 'IVA bruto + CEEC', color: '#94a3b8' },
+    { key: 'total_pago', label: 'TOTAL A PAGO (c/IVA)', values: data.totalPago, formula: 'Subtotal neto + IVA efectivo  â†’  alimenta GIROS', bold: true, color: '#22c55e' },
   ];
 
   setHtml('constr-ep-tbody', rows.map((r) => {
@@ -4932,9 +4984,9 @@ function renderConstructionEP() {
     color: r.bold ? '#166534' : '#334155',
     bg: r.bold ? '#f0fdf4' : '#fff',
     totalText: fmtUf(total(r.values)),
-    actionHtml: r.label === 'EP (EDPP neto)'
+    actionHtml: r.key === 'ep_bruto'
       ? renderTinyGanttLinkControl('construction_payment_links', 'edppNeto', state.proyecto?.construction_payment_links?.edppNeto || '')
-      : (r.label === 'Anticipo neto'
+      : (r.key === 'anticipo'
         ? renderTinyGanttLinkControl('construction_payment_links', 'anticipoNeto', state.proyecto?.construction_payment_links?.anticipoNeto || '')
         : ''),
   })), { includeTotal: true });
@@ -5249,11 +5301,17 @@ function renderFinancingSourcePlanilla(sourceType) {
       Math.min(monthCount - 1, getLinkedGanttStartIndex(terrenoPagoLineaLink, anticipoLineaMonthDefault))
     );
 
-    const giros = createMonthlyArray(monthCount, 0);
-    giros[terrainPurchaseMonth] = approved;
+    const girosBase = createMonthlyArray(monthCount, 0);
+    girosBase[terrainPurchaseMonthDefault] = approved;
+    const giros = terrainGirosLink
+      ? shiftMonthlySeries(girosBase, terrainPurchaseMonth, monthCount)
+      : girosBase;
 
-    const pagosLinea = createMonthlyArray(monthCount, 0);
-    pagosLinea[anticipoLineaMonth] = -approved;
+    const pagosLineaBase = createMonthlyArray(monthCount, 0);
+    pagosLineaBase[anticipoLineaMonthDefault] = -approved;
+    const pagosLinea = terrenoPagoLineaLink
+      ? shiftMonthlySeries(pagosLineaBase, anticipoLineaMonth, monthCount)
+      : pagosLineaBase;
 
     const acumulado = createMonthlyArray(monthCount, 0);
     const impTimbres = createMonthlyArray(monthCount, 0);
@@ -5286,11 +5344,11 @@ function renderFinancingSourcePlanilla(sourceType) {
     `);
 
     const rows = [
-      { label: 'GIROS', values: giros, formula: `GIROS = % lÃ­nea Ã— Costo terreno Â· desembolso en mes compra`, color: '#22c55e' },
-      { label: 'PAGO LÃNEA', values: pagosLinea, formula: `PAGO_LÃNEA(t) = pago al vencimiento del plazo de la lÃ­nea de terreno`, color: '#ef4444' },
-      { label: 'ACUMULADO', values: acumulado, formula: 'ACUMULADO(t) = ACUMULADO(tâˆ’1) + GIROS(t) + PAGOS_LINEA(t)', bold: true, color: '#0f172a' },
-      { label: `INTERÃ‰S ANUAL (${tasaTerreno}%)`, values: interesAnual, formula: `Acumulado anual de interÃ©s Â· pagado en aniversario del giro o al cierre anticipado`, color: '#f59e0b' },
-      { label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, values: impTimbres, formula: `IMP_TIMBRES(t) = GIROS(t) Ã— ${cfg.pct_timbres}%`, color: '#f59e0b' },
+      { key: 'giros', label: 'GIROS', values: giros, formula: `GIROS = % lÃ­nea Ã— Costo terreno Â· desembolso en mes compra`, color: '#22c55e' },
+      { key: 'pago_linea', label: 'PAGO LÃNEA', values: pagosLinea, formula: `PAGO_LÃNEA(t) = pago al vencimiento del plazo de la lÃ­nea de terreno`, color: '#ef4444' },
+      { key: 'acumulado', label: 'ACUMULADO', values: acumulado, formula: 'ACUMULADO(t) = ACUMULADO(tâˆ’1) + GIROS(t) + PAGOS_LINEA(t)', bold: true, color: '#0f172a' },
+      { key: 'interes', label: `INTERÃ‰S ANUAL (${tasaTerreno}%)`, values: interesAnual, formula: `Acumulado anual de interÃ©s Â· pagado en aniversario del giro o al cierre anticipado`, color: '#f59e0b' },
+      { key: 'timbres', label: `IMP. TIMBRES (${cfg.pct_timbres}%)`, values: impTimbres, formula: `IMP_TIMBRES(t) = GIROS(t) Ã— ${cfg.pct_timbres}%`, color: '#f59e0b' },
     ];
 
     setHtml('terreno-fin-planilla-tbody', rows.map((r) => {
@@ -5308,9 +5366,9 @@ function renderFinancingSourcePlanilla(sourceType) {
       color: r.color,
       bg: r.bold ? '#f8fafc' : '#fff',
       totalText: fmtUf((r.values || []).reduce((acc, value) => acc + toNumber(value), 0)),
-      actionHtml: /GIROS/i.test(String(r.label || ''))
+      actionHtml: r.key === 'giros'
         ? renderTinyGanttLinkControl('land_finance_links', 'giros', state.proyecto?.land_finance_links?.giros || '')
-        : (/PAGO/i.test(String(r.label || '')) && /L[ÍIÃ]NEA/i.test(String(r.label || ''))
+        : (r.key === 'pago_linea'
           ? renderTinyGanttLinkControl('land_finance_links', 'pagoLinea', state.proyecto?.land_finance_links?.pagoLinea || '')
           : ''),
     })), { includeTotal: true });
@@ -8135,7 +8193,7 @@ function getEstadoPlanPago(partida, total = 0, monthCount = getCostMonthCount())
 function resolvePaymentReference(refValue, offset = 0) {
   if (!refValue || refValue === 'MANUAL_0') return Math.max(0, toNumber(offset));
   const [kind, rawKey] = String(refValue).split(':');
-  const match = state.gantt.find((row) => String(row.id || row.nombre) === rawKey);
+  const match = findGanttLinkRow(rawKey);
   if (!match) return Math.max(0, toNumber(offset));
   return Math.max(0, (kind === 'END' ? toNumber(match.fin) : toNumber(match.inicio)) + toNumber(offset));
 }
