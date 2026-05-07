@@ -2559,6 +2559,13 @@ function fmtTableAmount(value, options = {}) {
   return total ? `${fmtNumber(signed, decimals)} UF` : fmtNumber(signed, decimals);
 }
 
+function getTableAmountSignClass(value, options = {}) {
+  const signed = getSignedAmount(value, options.kind || 'neutral');
+  if (signed > 0.000001) return 'flow-total-positive';
+  if (signed < -0.000001) return 'flow-total-negative';
+  return 'flow-total-zero';
+}
+
 function fmtPct(value) {
   return `${fmtNumber(value, 1)}%`;
 }
@@ -8545,11 +8552,8 @@ function renderCostPlanilla() {
 
   setHtml('planilla-head', `
     <tr>
-      <th style="width:60px"></th>
-      <th style="min-width:220px;text-align:left">Partida</th>
-      <th class="cost-config-cell">Configurar</th>
-      <th style="min-width:110px">Total neto</th>
-      <th style="width:64px">IVA</th>
+      <th class="flow-concept-col" style="text-align:left">Concepto</th>
+      <th class="flow-total-col">Total</th>
       ${monthLabels.map((label) => `<th data-month-col>${escapeHtml(label)}</th>`).join('')}
     </tr>
   `);
@@ -8594,7 +8598,7 @@ function renderCostPlanilla() {
         if (sectionLabel && sectionLabel !== previousLabel) {
           categoryRows.push(`
             <tr class="subcat-row" data-cost-cat-row="${escapeHtml(categoria.nombre)}"${isCollapsed ? ' style="display:none"' : ''}>
-              <td colspan="${5 + monthCount}">${escapeHtml(sectionLabel)}</td>
+              <td colspan="${2 + monthCount}">${escapeHtml(sectionLabel)}</td>
             </tr>
           `);
         }
@@ -8618,40 +8622,49 @@ function renderCostPlanilla() {
       distribucion.forEach((value, monthIndex) => { categoryMonthlyTotals[monthIndex] += value; });
       const isActiveIva = costosUi.activeIvaCategory === categoria.nombre
         && Number.parseInt(costosUi.activeIvaIndex, 10) === index;
+      const totalSignClass = getTableAmountSignClass(total, { kind: 'cost' });
+      const rowTools = rowReadOnly
+        ? '<span class="cost-row-tools-spacer" aria-hidden="true"></span>'
+        : `<span class="row-tools">${isProtectedDefault ? '<button class="btn-outline btn-delete-inline" type="button" title="Subpartida base protegida" disabled>&times;</button>' : `<button class="btn-outline btn-delete-inline" type="button" title="Eliminar subpartida" onclick="removeCostPartida('${escapeHtml(categoria.nombre)}', ${index})">&times;</button>`}<span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span></span>`;
+      const configControl = planEditable
+        ? `<span class="cost-config-pill ${estadoCosto.className}" onclick="openCostConfigModal('${escapeHtml(categoria.nombre)}', ${index})" title="Configurar costo">${escapeHtml(estadoCosto.label)}</span>`
+        : '<span class="badge badge-yellow">AUTO</span>';
 
       categoryRows.push(`
         <tr class="partida-row is-subpartida" data-cost-cat-row="${escapeHtml(categoria.nombre)}"${isCollapsed ? ' style="display:none"' : ''} data-cost-row data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" data-cost-id="${escapeHtml(partida.id || '')}" ${rowReadOnly ? 'data-auto="1" data-readonly="1"' : 'draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)"'}>
-          <td style="text-align:center">${rowReadOnly ? '' : `<span class="row-tools">${isProtectedDefault ? '<button class="btn-outline btn-delete-inline" type="button" title="Subpartida base protegida" disabled>&times;</button>' : `<button class="btn-outline btn-delete-inline" type="button" title="Eliminar subpartida" onclick="removeCostPartida('${escapeHtml(categoria.nombre)}', ${index})">&times;</button>`}<span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span></span>`}</td>
-          <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${rowReadOnly ? 'disabled' : ''}/></td>
-          <td class="cost-config-cell">${planEditable ? `<span class="cost-config-pill ${estadoCosto.className}" onclick="openCostConfigModal('${escapeHtml(categoria.nombre)}', ${index})" title="Configurar costo">${escapeHtml(estadoCosto.label)}</span>` : '<span class="badge badge-yellow">AUTO</span>'}</td>
-          <td style="text-align:center;color:#22c55e;font-weight:800"><span class="cost-total-cell" ${rowReadOnly ? '' : `onclick="openCostConfigModal('${escapeHtml(categoria.nombre)}', ${index})"`} title="${rowReadOnly ? escapeHtml(linkedSourceHint) : 'Configurar costo'}">${fmtTableAmount(total, { kind: 'cost' })}${partida.formula_tipo === 'expr_mensual' || estadoCosto.className === 'estado-monthly' ? '<span class="cost-total-badge">MES</span>' : ''}</span><input type="hidden" class="cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}"/><input type="hidden" data-field="formula_tipo" value="${escapeHtml(partida.formula_tipo || 'expr')}"/></td>
-          <td class="cost-iva-cell" style="text-align:center">
-            <span class="cost-iva-actions">
-              <input class="cost-iva-check" type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''} ${rowReadOnly ? 'disabled' : ''}/>
-              <button class="cost-iva-btn ${isActiveIva ? 'is-active' : ''}" type="button" data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" data-cost-id="${escapeHtml(partida.id || '')}" onclick="openCostIvaPanelFromButton(this)" title="Ver calculo de IVA" aria-label="Ver calculo de IVA para ${escapeHtml(partida.nombre || 'Subpartida')}">IVA</button>
-            </span>
+          <td class="flow-concept-col">
+            <div class="flow-row-label cost-flow-row-label">
+              <span class="flow-toggle-spacer" aria-hidden="true"></span>
+              ${rowTools}
+              <span class="cost-concept-name"><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}" ${rowReadOnly ? 'disabled' : ''}/></span>
+              <span class="cost-concept-actions">
+                ${configControl}
+                <span class="cost-iva-actions">
+                  <input class="cost-iva-check" type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''} ${rowReadOnly ? 'disabled' : ''}/>
+                  <button class="cost-iva-btn ${isActiveIva ? 'is-active' : ''}" type="button" data-category="${escapeHtml(categoria.nombre)}" data-index="${index}" data-cost-id="${escapeHtml(partida.id || '')}" onclick="openCostIvaPanelFromButton(this)" title="Ver calculo de IVA" aria-label="Ver calculo de IVA para ${escapeHtml(partida.nombre || 'Subpartida')}">IVA</button>
+                </span>
+              </span>
+            </div>
+            <input type="hidden" class="cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}"/>
+            <input type="hidden" data-field="formula_tipo" value="${escapeHtml(partida.formula_tipo || 'expr')}"/>
           </td>
+          <td class="flow-total-col ${totalSignClass}"><span class="cost-total-cell" ${rowReadOnly ? '' : `onclick="openCostConfigModal('${escapeHtml(categoria.nombre)}', ${index})"`} title="${rowReadOnly ? escapeHtml(linkedSourceHint) : 'Configurar costo'}">${fmtTableAmount(total, { kind: 'cost' })}${partida.formula_tipo === 'expr_mensual' || estadoCosto.className === 'estado-monthly' ? '<span class="cost-total-badge">MES</span>' : ''}</span></td>
           ${distribucion.map((value) => `<td data-month-cell style="text-align:center">${fmtTableAmount(value, { kind: 'cost' })}</td>`).join('')}
         </tr>
       `);
     });
 
     return `
-      <tr class="cat-row ${!isCollapsed ? 'is-expanded' : ''}" data-cost-category="${escapeHtml(categoria.nombre)}">
-        <td colspan="3" style="padding:2px 6px">
-          <div class="cost-category-header">
-            <div class="cost-category-title">
-              <button class="btn-collapse-cost" type="button" onclick="${hasSubpartidas ? `toggleCostCategoryCollapse('${escapeHtml(categoria.nombre)}')` : ''}" title="${hasSubpartidas ? 'Expandir o colapsar' : 'Sin subpartidas'}" ${hasSubpartidas ? '' : 'disabled style="opacity:.45;cursor:not-allowed"'}>${hasSubpartidas ? (isCollapsed ? '&#9656;' : '&#9662;') : '&middot;'}</button>
-              <span class="cost-category-name">${escapeHtml(categoryDisplayName)}</span>
-              ${canAddSubpartida ? `<button class="btn-add-cost btn-subpartida" type="button" data-category="${escapeHtml(categoria.nombre)}" onclick="addCostPartidaFromButton(this); return false;" title="Agregar subpartida" aria-label="Agregar subpartida a ${escapeHtml(categoryDisplayName)}"><span class="btn-add-icon" aria-hidden="true">+</span><span>Subpartida</span></button>` : ''}
-            </div>
-            <div class="cost-category-actions">
-            </div>
+      <tr class="cat-row cost-category-row ${!isCollapsed ? 'is-expanded' : ''}" data-cost-category="${escapeHtml(categoria.nombre)}">
+        <td class="flow-concept-col">
+          <div class="flow-row-label cost-flow-row-label">
+            ${hasSubpartidas ? `<button class="flow-toggle btn-collapse-cost" type="button" onclick="toggleCostCategoryCollapse('${escapeHtml(categoria.nombre)}')" title="Expandir o colapsar">${isCollapsed ? '+' : '-'}</button>` : '<span class="flow-toggle-spacer" aria-hidden="true"></span>'}
+            <span class="cost-category-name">${escapeHtml(categoryDisplayName)}</span>
+            ${canAddSubpartida ? `<button class="btn-add-cost btn-subpartida" type="button" data-category="${escapeHtml(categoria.nombre)}" onclick="addCostPartidaFromButton(this); return false;" title="Agregar subpartida" aria-label="Agregar subpartida a ${escapeHtml(categoryDisplayName)}"><span class="btn-add-icon" aria-hidden="true">+</span></button>` : ''}
           </div>
         </td>
-        <td class="cat-total-cell cat-total-neto"><strong>${fmtTableAmount(categoryTotalNeto, { kind: 'cost', total: true })}</strong></td>
-        <td class="cat-total-cell"><strong>${fmtTableAmount(categoryTotalIva, { kind: 'cost' })}</strong></td>
-        ${categoryMonthlyTotals.map((value) => `<td class="cat-total-cell"><strong>${fmtTableAmount(value, { kind: 'cost' })}</strong></td>`).join('')}
+        <td class="flow-total-col ${getTableAmountSignClass(categoryTotalNeto, { kind: 'cost' })}"><span>${fmtTableAmount(categoryTotalNeto, { kind: 'cost', total: true })}</span></td>
+        ${categoryMonthlyTotals.map((value) => `<td data-month-cell>${fmtTableAmount(value, { kind: 'cost' })}</td>`).join('')}
       </tr>
       ${categoryRows.join('')}
     `;
@@ -8678,29 +8691,30 @@ function renderCostPlanilla() {
     : false;
 
   const financialRow = `
-    <tr class="cat-row ${!financialCollapsed ? 'is-expanded' : ''}" data-cost-category="GASTOS FINANCIEROS">
-      <td colspan="3" style="padding:2px 6px">
-        <div class="cost-category-header">
-          <div class="cost-category-title">
-            <button class="btn-collapse-cost" type="button" onclick="toggleCostCategoryCollapse('GASTOS FINANCIEROS')" title="Expandir o colapsar">${financialCollapsed ? '&#9656;' : '&#9662;'}</button>
-            <span class="cost-category-name">GASTOS FINANCIEROS</span>
-          </div>
+    <tr class="cat-row cost-category-row ${!financialCollapsed ? 'is-expanded' : ''}" data-cost-category="GASTOS FINANCIEROS">
+      <td class="flow-concept-col">
+        <div class="flow-row-label cost-flow-row-label">
+          <button class="flow-toggle btn-collapse-cost" type="button" onclick="toggleCostCategoryCollapse('GASTOS FINANCIEROS')" title="Expandir o colapsar">${financialCollapsed ? '+' : '-'}</button>
+          <span class="cost-category-name">GASTOS FINANCIEROS</span>
         </div>
       </td>
-      <td class="cat-total-cell cat-total-neto"><strong>${fmtTableAmount(totalFinancial, { kind: 'cost', total: true })}</strong></td>
-      <td class="cat-total-cell"><strong>${fmtTableAmount(0, { kind: 'cost' })}</strong></td>
-      ${financial.map((value) => `<td class="cat-total-cell"><strong>${fmtTableAmount(value, { kind: 'cost' })}</strong></td>`).join('')}
+      <td class="flow-total-col ${getTableAmountSignClass(totalFinancial, { kind: 'cost' })}"><span>${fmtTableAmount(totalFinancial, { kind: 'cost', total: true })}</span></td>
+      ${financial.map((value) => `<td data-month-cell>${fmtTableAmount(value, { kind: 'cost' })}</td>`).join('')}
     </tr>
     ${financialSubrows.map((row) => {
       const rowValues = Array.from({ length: monthCount }, (_, index) => toNumber(row.values?.[index]));
       const rowTotal = rowValues.reduce((sum, value) => sum + toNumber(value), 0);
       return `
         <tr class="partida-row is-subpartida" data-cost-cat-row="GASTOS FINANCIEROS"${financialCollapsed ? ' style="display:none"' : ''}>
-          <td style="text-align:center"></td>
-          <td><input class="inp" value="${escapeHtml(row.label)}" disabled/></td>
-          <td class="cost-config-cell"><span class="badge badge-yellow">AUTO</span></td>
-          <td style="text-align:center;color:#22c55e;font-weight:800"><span class="cost-total-cell">${fmtTableAmount(rowTotal, { kind: 'cost' })}</span></td>
-          <td class="cost-iva-cell" style="text-align:center"><span class="badge">NO</span></td>
+          <td class="flow-concept-col">
+            <div class="flow-row-label cost-flow-row-label">
+              <span class="flow-toggle-spacer" aria-hidden="true"></span>
+              <span class="cost-row-tools-spacer" aria-hidden="true"></span>
+              <span class="cost-concept-name"><input class="inp" value="${escapeHtml(row.label)}" disabled/></span>
+              <span class="cost-concept-actions"><span class="badge badge-yellow">AUTO</span></span>
+            </div>
+          </td>
+          <td class="flow-total-col ${getTableAmountSignClass(rowTotal, { kind: 'cost' })}"><span class="cost-total-cell">${fmtTableAmount(rowTotal, { kind: 'cost' })}</span></td>
           ${rowValues.map((value) => `<td data-month-cell style="text-align:center">${fmtTableAmount(value, { kind: 'cost' })}</td>`).join('')}
         </tr>
       `;
@@ -8710,11 +8724,10 @@ function renderCostPlanilla() {
   if (tbody) tbody.insertAdjacentHTML('beforeend', financialRow);
 
   setHtml('planilla-tfoot', `
-    <tr class="tfoot-dark">
-      <td colspan="3">Totales</td>
-      <td>${fmtTableAmount(totalNetoWithFinancial, { kind: 'cost', total: true })}</td>
-      <td>${fmtTableAmount(totalIva, { kind: 'cost' })}</td>
-      ${monthlyTotalsWithFinancial.map((value) => `<td>${fmtTableAmount(value, { kind: 'cost' })}</td>`).join('')}
+    <tr class="tfoot-dark finance-total-row">
+      <td class="flow-concept-col">Totales</td>
+      <td class="flow-total-col ${getTableAmountSignClass(totalNetoWithFinancial, { kind: 'cost' })}"><span>${fmtTableAmount(totalNetoWithFinancial, { kind: 'cost', total: true })}</span></td>
+      ${monthlyTotalsWithFinancial.map((value) => `<td data-month-cell>${fmtTableAmount(value, { kind: 'cost' })}</td>`).join('')}
     </tr>
   `);
 
@@ -9934,7 +9947,7 @@ function toggleCostCategoryCollapse(categoryName) {
 
   catRow.classList.toggle('is-expanded', !newCollapsed);
   const arrow = catRow.querySelector('.btn-collapse-cost');
-  if (arrow && !arrow.disabled) arrow.innerHTML = newCollapsed ? '&#9656;' : '&#9662;';
+  if (arrow && !arrow.disabled) arrow.textContent = newCollapsed ? '+' : '-';
 
   const childRows = tbody.querySelectorAll(`tr[data-cost-cat-row="${safeName}"]`);
   childRows.forEach((row) => { row.style.display = newCollapsed ? 'none' : ''; });
@@ -13004,19 +13017,27 @@ function renderCostDraftPartidaRow(categoryName, partida, index, isCollapsed = f
     : getEstadoCosto(partida, total, monthCount, null, distribution);
   const isProtectedDefault = !!partida.isDefault;
   const rowStyle = isCollapsed ? ' style="display:none"' : '';
+  const totalSignClass = getTableAmountSignClass(total, { kind: 'cost' });
 
   return `
     <tr class="partida-row is-subpartida" data-cost-cat-row="${escapeHtml(categoryName)}"${rowStyle} data-cost-row data-category="${escapeHtml(categoryName)}" data-index="${index}" data-cost-id="${escapeHtml(partida.id || '')}" draggable="true" ondragstart="startCostDrag(event)" ondragover="allowCostDrop(event)" ondrop="dropCostRow(event)" ondragend="endCostDrag(event)">
-      <td style="text-align:center"><span class="row-tools">${isProtectedDefault ? '<button class="btn-outline btn-delete-inline" type="button" title="Subpartida base protegida" disabled>&times;</button>' : `<button class="btn-outline btn-delete-inline" type="button" title="Eliminar subpartida" onclick="removeCostPartida('${escapeHtml(categoryName)}', ${index})">&times;</button>`}<span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span></span></td>
-      <td><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}"/></td>
-      <td class="cost-config-cell"><span class="cost-config-pill ${estadoCosto.className}" onclick="openCostConfigModal('${escapeHtml(categoryName)}', ${index})" title="Configurar costo">${escapeHtml(estadoCosto.label)}</span></td>
-      <td style="text-align:center;color:#22c55e;font-weight:800"><span class="cost-total-cell" onclick="openCostConfigModal('${escapeHtml(categoryName)}', ${index})" title="Configurar costo">${fmtTableAmount(total, { kind: 'cost' })}</span><input type="hidden" class="cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}"/><input type="hidden" data-field="formula_tipo" value="${escapeHtml(partida.formula_tipo || 'expr')}"/></td>
-      <td class="cost-iva-cell" style="text-align:center">
-        <span class="cost-iva-actions">
-          <input class="cost-iva-check" type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''}/>
-          <button class="cost-iva-btn" type="button" data-category="${escapeHtml(categoryName)}" data-index="${index}" data-cost-id="${escapeHtml(partida.id || '')}" onclick="openCostIvaPanelFromButton(this)" title="Ver calculo de IVA" aria-label="Ver calculo de IVA para ${escapeHtml(partida.nombre || 'Subpartida')}">IVA</button>
-        </span>
+      <td class="flow-concept-col">
+        <div class="flow-row-label cost-flow-row-label">
+          <span class="flow-toggle-spacer" aria-hidden="true"></span>
+          <span class="row-tools">${isProtectedDefault ? '<button class="btn-outline btn-delete-inline" type="button" title="Subpartida base protegida" disabled>&times;</button>' : `<button class="btn-outline btn-delete-inline" type="button" title="Eliminar subpartida" onclick="removeCostPartida('${escapeHtml(categoryName)}', ${index})">&times;</button>`}<span class="drag-handle" title="Orden manual">&#8226;&#8226;&#8226;</span></span>
+          <span class="cost-concept-name"><input class="inp" data-field="nombre" value="${escapeHtml(partida.nombre || '')}"/></span>
+          <span class="cost-concept-actions">
+            <span class="cost-config-pill ${estadoCosto.className}" onclick="openCostConfigModal('${escapeHtml(categoryName)}', ${index})" title="Configurar costo">${escapeHtml(estadoCosto.label)}</span>
+            <span class="cost-iva-actions">
+              <input class="cost-iva-check" type="checkbox" data-field="tiene_iva" ${partida.tiene_iva ? 'checked' : ''}/>
+              <button class="cost-iva-btn" type="button" data-category="${escapeHtml(categoryName)}" data-index="${index}" data-cost-id="${escapeHtml(partida.id || '')}" onclick="openCostIvaPanelFromButton(this)" title="Ver calculo de IVA" aria-label="Ver calculo de IVA para ${escapeHtml(partida.nombre || 'Subpartida')}">IVA</button>
+            </span>
+          </span>
+        </div>
+        <input type="hidden" class="cost-hidden-formula" data-field="formula" value="${escapeHtml(getPartidaFormulaText(partida))}"/>
+        <input type="hidden" data-field="formula_tipo" value="${escapeHtml(partida.formula_tipo || 'expr')}"/>
       </td>
+      <td class="flow-total-col ${totalSignClass}"><span class="cost-total-cell" onclick="openCostConfigModal('${escapeHtml(categoryName)}', ${index})" title="Configurar costo">${fmtTableAmount(total, { kind: 'cost' })}</span></td>
       ${distribution.map((value) => `<td data-month-cell style="text-align:center">${fmtTableAmount(value, { kind: 'cost' })}</td>`).join('')}
     </tr>
   `;
@@ -13035,7 +13056,7 @@ function insertCostPartidaRow(categoryName, partida, index) {
     arrow.disabled = false;
     arrow.removeAttribute('style');
     arrow.title = 'Expandir o colapsar';
-    arrow.innerHTML = '&#9662;';
+    arrow.textContent = '-';
     arrow.onclick = () => toggleCostCategoryCollapse(categoryName);
     arrow.setAttribute('aria-expanded', 'true');
   }

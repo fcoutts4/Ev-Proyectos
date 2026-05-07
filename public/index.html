@@ -1849,16 +1849,19 @@ table.app-table{
 #flujo-bricsa-tabla.app-table tbody tr[data-bricsa-row="acumulado"] td{background:#edf8f1!important;font-weight:800!important}
 
 /* Sticky Concepto + Total para tablas mensuales de flujo. */
+#tab-costos .flow-planilla,
 #tab-flujo .flow-planilla,
 #tab-flujo-bricsa .flow-planilla{
   position:relative!important;
 }
+#tab-costos table.monthly-flow-table.sticky-concept-total,
 #tab-flujo table.monthly-flow-table.sticky-concept-total,
 #tab-flujo-bricsa table.monthly-flow-table.sticky-concept-total{
   border-collapse:separate!important;
   border-spacing:0!important;
   overflow:visible!important;
 }
+#tab-costos table.monthly-flow-table.sticky-concept-total .flow-concept-col,
 #tab-flujo table.monthly-flow-table.sticky-concept-total .flow-concept-col,
 #tab-flujo-bricsa table.monthly-flow-table.sticky-concept-total .flow-concept-col{
   position:sticky!important;
@@ -1871,6 +1874,7 @@ table.app-table{
   text-align:left!important;
   background-clip:padding-box!important;
 }
+#tab-costos table.monthly-flow-table.sticky-concept-total .flow-total-col,
 #tab-flujo table.monthly-flow-table.sticky-concept-total .flow-total-col,
 #tab-flujo-bricsa table.monthly-flow-table.sticky-concept-total .flow-total-col{
   position:sticky!important;
@@ -1884,11 +1888,13 @@ table.app-table{
   background-clip:padding-box!important;
   box-shadow:var(--app-table-shadow-right)!important;
 }
+#tab-costos table.monthly-flow-table.sticky-concept-total thead .flow-concept-col,
 #tab-flujo table.monthly-flow-table.sticky-concept-total thead .flow-concept-col,
 #tab-flujo-bricsa table.monthly-flow-table.sticky-concept-total thead .flow-concept-col{
   z-index:40!important;
   background:var(--app-table-head-bg)!important;
 }
+#tab-costos table.monthly-flow-table.sticky-concept-total thead .flow-total-col,
 #tab-flujo table.monthly-flow-table.sticky-concept-total thead .flow-total-col,
 #tab-flujo-bricsa table.monthly-flow-table.sticky-concept-total thead .flow-total-col{
   z-index:41!important;
@@ -1906,6 +1912,8 @@ table.app-table{
   min-width:96px!important;
   max-width:96px!important;
 }
+#tab-costos table.monthly-flow-table.sticky-concept-total th[data-month-col],
+#tab-costos table.monthly-flow-table.sticky-concept-total td[data-month-cell],
 #tab-flujo table.monthly-flow-table.sticky-concept-total th[data-month-col],
 #tab-flujo table.monthly-flow-table.sticky-concept-total td[data-month-cell],
 #tab-flujo-bricsa table.monthly-flow-table.sticky-concept-total th[data-month-col],
@@ -1914,6 +1922,156 @@ table.app-table{
   min-width:var(--app-table-month-w)!important;
   max-width:var(--app-table-month-w)!important;
   box-sizing:border-box!important;
+}
+#tab-costos table.monthly-flow-table.sticky-concept-total th[data-month-col],
+#tab-costos table.monthly-flow-table.sticky-concept-total td[data-month-cell]{
+  position:static!important;
+  left:auto!important;
+  right:auto!important;
+  box-shadow:none!important;
+}
+#tab-costos table.monthly-flow-table.sticky-concept-total .flow-total-col.flow-total-positive span{color:#1d4ed8!important}
+#tab-costos table.monthly-flow-table.sticky-concept-total .flow-total-col.flow-total-negative span{color:#b91c1c!important}
+#tab-costos table.monthly-flow-table.sticky-concept-total .flow-total-col.flow-total-zero span{color:#64748b!important}
+#planilla-table .cost-flow-row-label{
+  width:100%;
+  min-width:0;
+  gap:6px;
+  position:relative;
+}
+#planilla-table .flow-toggle.btn-collapse-cost,
+#planilla-table .flow-toggle-spacer{
+  width:22px!important;
+  min-width:22px!important;
+  max-width:22px!important;
+  height:22px!important;
+  min-height:22px!important;
+}
+#planilla-table .cost-concept-name{
+  flex:1 1 auto;
+  min-width:0;
+  display:block;
+}
+#planilla-table .cost-concept-name .inp{
+  width:100%!important;
+  min-width:0!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+#planilla-table .cost-concept-actions{
+  display:inline-flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:4px;
+  flex:0 0 auto;
+  min-width:0;
+  position:absolute;
+  right:0;
+  top:50%;
+  transform:translateY(-50%);
+  padding-left:18px;
+  background:linear-gradient(90deg, rgba(248,250,252,0), var(--app-table-sticky-bg) 18px);
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .12s ease;
+}
+#planilla-table tr:hover .cost-concept-actions,
+#planilla-table tr:focus-within .cost-concept-actions{
+  opacity:1;
+  pointer-events:auto;
+}
+#planilla-table .row-tools,
+#planilla-table .cost-row-tools-spacer{
+  width:34px;
+  min-width:34px;
+  max-width:34px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  flex:0 0 auto;
+}
+#planilla-table .cost-row-tools-spacer{height:22px}
+#planilla-table .cost-config-pill{
+  min-width:48px!important;
+  max-width:54px!important;
+  width:54px!important;
+}
+#planilla-table .cost-iva-actions{
+  width:46px;
+  min-width:46px;
+  gap:2px;
+}
+#planilla-table .cost-iva-btn{
+  width:28px!important;
+  min-width:28px!important;
+  padding-left:0!important;
+  padding-right:0!important;
+}
+#planilla-table .btn-subpartida{
+  width:22px!important;
+  min-width:22px!important;
+  padding:0!important;
+}
+#planilla-table .cost-total-cell{
+  max-width:100%;
+  justify-content:flex-end;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+#planilla-table .flow-total-col{
+  font-variant-numeric:tabular-nums;
+}
+#tab-costos{
+  --cost-table-concept-w:360px;
+}
+#tab-costos #planilla-table.monthly-flow-table.sticky-concept-total .flow-concept-col{
+  width:var(--cost-table-concept-w)!important;
+  min-width:var(--cost-table-concept-w)!important;
+  max-width:var(--cost-table-concept-w)!important;
+}
+#tab-costos #planilla-table.monthly-flow-table.sticky-concept-total .flow-total-col{
+  left:var(--cost-table-concept-w)!important;
+}
+#tab-costos #planilla-table.monthly-flow-table.sticky-concept-total .flow-total-col{
+  width:var(--app-table-fixed-total-w)!important;
+  min-width:var(--app-table-fixed-total-w)!important;
+  max-width:var(--app-table-fixed-total-w)!important;
+}
+#tab-costos #planilla-table.monthly-flow-table.sticky-concept-total th[data-month-col],
+#tab-costos #planilla-table.monthly-flow-table.sticky-concept-total td[data-month-cell]{
+  width:var(--app-table-month-w)!important;
+  min-width:var(--app-table-month-w)!important;
+  max-width:var(--app-table-month-w)!important;
+  position:static!important;
+  left:auto!important;
+  right:auto!important;
+  box-shadow:none!important;
+}
+#planilla-table tr.cost-category-row > td,
+#planilla-table tr.cost-category-row .flow-concept-col,
+#planilla-table tr.cost-category-row .flow-total-col,
+#planilla-table tr.cost-category-row td[data-month-cell]{
+  background:#e8eef5!important;
+  color:#0b2545!important;
+  border-top:1px solid var(--app-table-border-strong)!important;
+  border-bottom:1px solid var(--app-table-border-strong)!important;
+  font-weight:800!important;
+}
+#planilla-table tr.cost-category-row.is-expanded > td,
+#planilla-table tr.cost-category-row.is-expanded .flow-concept-col,
+#planilla-table tr.cost-category-row.is-expanded .flow-total-col,
+#planilla-table tr.cost-category-row.is-expanded td[data-month-cell]{
+  background:#e8eef5!important;
+}
+#planilla-table tr.cost-category-row .cost-flow-row-label{
+  gap:7px;
+}
+#planilla-table tr.cost-category-row .cost-category-name{
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 @media (max-width: 1100px){
   #tab-construccion .construction-global-strip{grid-template-columns:1fr}
@@ -2786,8 +2944,8 @@ table.app-table{
   </div>
 
     <div id="cost-iva-panel" class="cost-iva-panel-slot"></div>
-    <div id="cost-planilla-scroll" class="tbl-scroll" style="border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px">
-      <table id="planilla-table" class="app-table">
+    <div id="cost-planilla-scroll" class="flow-planilla cost-flow-planilla">
+      <table id="planilla-table" class="app-table monthly-flow-table sticky-concept-total">
         <thead id="planilla-head"></thead>
         <tbody id="planilla-tbody"></tbody>
         <tfoot id="planilla-tfoot"></tfoot>
@@ -4904,8 +5062,8 @@ table.app-table{
   }
 
   function enhanceCostFormulaInputs() {
-    const header = document.querySelector('#planilla-head th:nth-child(3)');
-    if (header) header.textContent = 'Configurar';
+    const table = document.getElementById('planilla-table');
+    if (table) table.classList.add('monthly-flow-table', 'sticky-concept-total');
   }
 
   if (typeof renderCostosModule === 'function') {
