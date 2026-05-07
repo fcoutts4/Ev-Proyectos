@@ -1847,6 +1847,74 @@ table.app-table{
 #flujo-bricsa-tabla.app-table tbody tr[data-bricsa-row="flujo_caja_proyecto"] td{background:#edf6ff!important}
 #flujo-bricsa-tabla.app-table tbody tr[data-bricsa-row="total"] td{background:#eef3f8!important;font-weight:800!important}
 #flujo-bricsa-tabla.app-table tbody tr[data-bricsa-row="acumulado"] td{background:#edf8f1!important;font-weight:800!important}
+
+/* Sticky Concepto + Total para tablas mensuales de flujo. */
+#tab-flujo .flow-planilla,
+#tab-flujo-bricsa .flow-planilla{
+  position:relative!important;
+}
+#tab-flujo table.monthly-flow-table.sticky-concept-total,
+#tab-flujo-bricsa table.monthly-flow-table.sticky-concept-total{
+  border-collapse:separate!important;
+  border-spacing:0!important;
+  overflow:visible!important;
+}
+#tab-flujo table.monthly-flow-table.sticky-concept-total .flow-concept-col,
+#tab-flujo-bricsa table.monthly-flow-table.sticky-concept-total .flow-concept-col{
+  position:sticky!important;
+  left:0!important;
+  right:auto!important;
+  z-index:18!important;
+  width:var(--app-table-concept-w)!important;
+  min-width:var(--app-table-concept-w)!important;
+  max-width:var(--app-table-concept-w)!important;
+  text-align:left!important;
+  background-clip:padding-box!important;
+}
+#tab-flujo table.monthly-flow-table.sticky-concept-total .flow-total-col,
+#tab-flujo-bricsa table.monthly-flow-table.sticky-concept-total .flow-total-col{
+  position:sticky!important;
+  left:var(--app-table-concept-w)!important;
+  right:auto!important;
+  z-index:19!important;
+  width:var(--app-table-fixed-total-w)!important;
+  min-width:var(--app-table-fixed-total-w)!important;
+  max-width:var(--app-table-fixed-total-w)!important;
+  text-align:right!important;
+  background-clip:padding-box!important;
+  box-shadow:var(--app-table-shadow-right)!important;
+}
+#tab-flujo table.monthly-flow-table.sticky-concept-total thead .flow-concept-col,
+#tab-flujo-bricsa table.monthly-flow-table.sticky-concept-total thead .flow-concept-col{
+  z-index:40!important;
+  background:var(--app-table-head-bg)!important;
+}
+#tab-flujo table.monthly-flow-table.sticky-concept-total thead .flow-total-col,
+#tab-flujo-bricsa table.monthly-flow-table.sticky-concept-total thead .flow-total-col{
+  z-index:41!important;
+  background:var(--app-table-head-bg)!important;
+}
+#tab-flujo table.monthly-flow-table.sticky-concept-total .flow-origin-col,
+#tab-flujo-bricsa table.monthly-flow-table.sticky-concept-total .flow-origin-col{
+  width:260px!important;
+  min-width:260px!important;
+  max-width:260px!important;
+}
+#tab-flujo table.monthly-flow-table.sticky-concept-total .flow-formula-col,
+#tab-flujo-bricsa table.monthly-flow-table.sticky-concept-total .flow-formula-col{
+  width:96px!important;
+  min-width:96px!important;
+  max-width:96px!important;
+}
+#tab-flujo table.monthly-flow-table.sticky-concept-total th[data-month-col],
+#tab-flujo table.monthly-flow-table.sticky-concept-total td[data-month-cell],
+#tab-flujo-bricsa table.monthly-flow-table.sticky-concept-total th[data-month-col],
+#tab-flujo-bricsa table.monthly-flow-table.sticky-concept-total td[data-month-cell]{
+  width:var(--app-table-month-w)!important;
+  min-width:var(--app-table-month-w)!important;
+  max-width:var(--app-table-month-w)!important;
+  box-sizing:border-box!important;
+}
 @media (max-width: 1100px){
   #tab-construccion .construction-global-strip{grid-template-columns:1fr}
   #tab-construccion .construction-global-kicker{margin-bottom:2px}
@@ -2530,6 +2598,14 @@ table.app-table{
             <span style="font-size:11px;color:#64748b">%</span>
           </div>
         </div>
+        <div class="compact-box">
+          <div style="font-size:10px;font-weight:700;color:#475569;margin-bottom:6px"> INICIO CONSTRUCCIÓN</div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="text" inputmode="decimal" data-localized-number="1" class="inp" id="constr-pct-inicio" min="0" max="100" step="0.01" value="" oninput="updateConstrParams()" style="width:96px;text-align:center">
+            <span style="font-size:11px;color:#64748b">% promesas</span>
+          </div>
+          <div style="font-size:10px;color:#64748b;margin-top:6px" id="constr-pct-inicio-status">Automático desactivado</div>
+        </div>
       </div>
   </div>
 
@@ -2791,7 +2867,7 @@ table.app-table{
       </div>
     </div>
     <div class="flow-planilla">
-      <table style="min-width:1400px" id="flujo-tabla" class="app-table">
+      <table style="min-width:1400px" id="flujo-tabla" class="app-table monthly-flow-table sticky-concept-total">
         <thead id="flujo-tabla-header"></thead>
         <tbody id="flujo-tabla-tbody"></tbody>
     </table>
@@ -2811,7 +2887,7 @@ table.app-table{
       </div>
     </div>
     <div id="flujo-bancos-scroll" class="flow-planilla">
-      <table style="min-width:1400px" id="flujo-bancos-tabla" class="app-table">
+      <table style="min-width:1400px" id="flujo-bancos-tabla" class="app-table monthly-flow-table sticky-concept-total">
         <thead id="flujo-bancos-header"></thead>
         <tbody id="flujo-bancos-tbody"></tbody>
       </table>
@@ -2843,7 +2919,7 @@ table.app-table{
       </div>
     </div>
     <div id="flujo-bricsa-scroll" class="flow-planilla">
-      <table style="min-width:1400px" id="flujo-bricsa-tabla" class="app-table">
+      <table style="min-width:1400px" id="flujo-bricsa-tabla" class="app-table monthly-flow-table sticky-concept-total">
         <thead id="flujo-bricsa-header"></thead>
         <tbody id="flujo-bricsa-tbody"></tbody>
       </table>
@@ -2860,6 +2936,7 @@ table.app-table{
     <div style="background:#fff;border:1px solid var(--border-strong);border-top:none;border-radius:0 0 10px 10px;padding:14px">
       <div id="flujo-bricsa-scenarios-kpis" class="flow-summary-grid" style="margin-bottom:12px"></div>
       <div id="flujo-bricsa-scenarios-chart" style="width:100%;min-height:320px"></div>
+      <div id="flujo-bricsa-scenario-tables" style="margin-top:14px"></div>
     </div>
   </div>
 </div><!-- end tab flujo bricsa -->
@@ -3560,9 +3637,10 @@ table.app-table{
 
   if (typeof buildConstructionSCurve === 'function') {
     buildConstructionSCurve = function patchedBuildConstructionSCurve(metrics, meses) {
-      const anticipoPct = Math.max(0, toNumber(metrics.anticipo_pct)) / 100;
+      const anticipoPct = Math.min(1, Math.max(0, toNumber(metrics.anticipo_pct)) / 100);
       const retencionPct = Math.max(0, toNumber(metrics.retencion_pct)) / 100;
       const anticipoAmount = metrics.total_neto * anticipoPct;
+      const netoAfterAnticipo = Math.max(0, toNumber(metrics.total_neto) - anticipoAmount);
       const effectiveCurve = typeof getEffectiveEdpCurve === 'function'
         ? getEffectiveEdpCurve(metrics, meses)
         : {
@@ -3570,11 +3648,15 @@ table.app-table{
           cumulativePercentages: Array.from({ length: meses }, (_, index) => (index + 1) * 100 / Math.max(1, meses)),
           totalPct: 100,
           config: { mode: 'auto', manualEnabled: false, monthlyPercentages: [] },
-        };
-      const monthlyCosts = effectiveCurve.monthlyPercentages.map((pct) => metrics.total_neto * toNumber(pct) / 100);
-      const monthlyAnticipoRecovery = monthlyCosts.map((value) => Math.max(0, value) * anticipoPct);
-      const monthlyRetention = monthlyCosts.map((value, index) => Math.max(0, value - monthlyAnticipoRecovery[index]) * retencionPct);
-      const monthlyEdppNet = monthlyCosts.map((value, index) => Math.max(0, value - monthlyAnticipoRecovery[index] - monthlyRetention[index]));
+      };
+      const monthlyCosts = effectiveCurve.monthlyPercentages.map((pct) => netoAfterAnticipo * toNumber(pct) / 100);
+      if (monthlyCosts.length) {
+        const epDiff = netoAfterAnticipo - monthlyCosts.reduce((sum, value) => sum + toNumber(value), 0);
+        monthlyCosts[monthlyCosts.length - 1] += epDiff;
+      }
+      const monthlyAnticipoRecovery = monthlyCosts.map(() => 0);
+      const monthlyRetention = monthlyCosts.map((value) => Math.max(0, value) * retencionPct);
+      const monthlyEdppNet = monthlyCosts.slice();
       const cumulativeCosts = monthlyCosts.reduce((acc, value, index) => {
         acc.push((acc[index - 1] || 0) + value);
         return acc;
@@ -3631,43 +3713,43 @@ table.app-table{
         return values;
       }
 
-      const epNeto = pushRow({ key: 'ep_bruto', label: 'EP (EDPP neto)', fallback: data.ep, formula: '[EDPP neto fuente]', mode: 'cost' });
+      const epNeto = pushRow({ key: 'ep_bruto', label: 'EP (neto)', fallback: data.ep, formula: '[EDPP neto fuente]', mode: 'signed' });
+      addSeries(series, 'EP (EDPP neto)', epNeto, 'ep_edpp_neto_alias');
       addSeries(series, 'EP (EDPP bruto)', epNeto, 'ep_bruto_alias');
-      const anticipoNeto = pushRow({ key: 'anticipo', label: 'Anticipo neto', fallback: data.anticipo, formula: '[Anticipo neto fuente]', mode: 'cost' });
+      const anticipoNeto = pushRow({ key: 'anticipo', label: 'Anticipo neto', fallback: data.anticipo, formula: '[Anticipo neto fuente]', mode: 'signed' });
       addSeries(series, 'Anticipo', anticipoNeto, 'anticipo_alias');
       const retencionesNetas = pushRow({ key: 'retenciones', label: 'Retenciones netas', fallback: data.retenciones, formula: '[Retenciones netas fuente]', mode: 'signed' });
       addSeries(series, 'Retenciones', retencionesNetas, 'retenciones_alias');
-      pushRow({ key: 'subtotal', label: 'Subtotal neto', fallback: data.subtotal, formula: '[EP (EDPP neto)] + [Anticipo neto] + [Retenciones netas]', mode: 'cost', bold: true });
-      const ivaBruto = pushRow({ key: 'iva_bruto', label: 'IVA bruto (19%)', fallback: data.ivaBruto, formula: '[Subtotal neto] * 0.19', mode: 'cost' });
+      pushRow({ key: 'subtotal', label: 'Subtotal neto', fallback: data.subtotal, formula: '[EP (neto)] + [Anticipo neto] + [Retenciones netas]', mode: 'signed', bold: true });
+      const ivaBruto = pushRow({ key: 'iva_bruto', label: 'IVA bruto (19%)', fallback: data.ivaBruto, formula: '[Subtotal neto] * 0.19', mode: 'signed' });
       const ceecPct = typeof getEffectiveCeecPct === 'function' ? toNumber(getEffectiveCeecPct()) : toNumber(cfg.pct_ceec);
       const ceec = ivaBruto.map((value) => Math.abs(toNumber(value)) * ceecPct / 100);
       addSeries(series, `CEEC (${fmtInputNumber(cfg.pct_ceec, 2)}%)`, ceec, 'ceec');
       rows.push({
         key: 'ceec',
         label: `CEEC (${fmtInputNumber(cfg.pct_ceec, 2)}%)`,
-        formula: '[IVA bruto (19%)] * [CEEC] / 100 (valor absoluto de IVA bruto)',
+        formula: '[IVA bruto (19%)] * [CEEC] / 100',
         values: ceec,
         mode: 'signed',
       });
-      const ivaEfectivo = ivaBruto.map((value, index) => (-Math.abs(toNumber(value))) + toNumber(ceec[index]));
+      const ivaEfectivo = ivaBruto.map((value, index) => toNumber(value) - toNumber(ceec[index]));
       addSeries(series, 'IVA efectivo', ivaEfectivo, 'iva_efectivo');
       rows.push({
         key: 'iva_efectivo',
         label: 'IVA efectivo',
-        formula: 'IVA bruto + CEEC',
+        formula: 'IVA bruto - CEEC',
         values: ivaEfectivo,
-        mode: 'cost',
+        mode: 'signed',
       });
       const subtotal = series.subtotal || data.subtotal || [];
-      const subtotalCosto = subtotal.map((value) => -Math.abs(toNumber(value)));
-      const totalPago = subtotalCosto.map((value, index) => toNumber(value) + toNumber(ivaEfectivo[index]));
+      const totalPago = subtotal.map((value, index) => toNumber(value) + toNumber(ivaEfectivo[index]));
       addSeries(series, 'TOTAL A PAGO (c/IVA)', totalPago, 'total_pago');
       rows.push({
         key: 'total_pago',
         label: 'TOTAL A PAGO (c/IVA)',
         formula: 'Subtotal neto + IVA efectivo',
         values: totalPago,
-        mode: 'cost',
+        mode: 'signed',
         bold: true,
       });
 
@@ -3947,10 +4029,13 @@ table.app-table{
     const terrainGirosOffset = typeof getGanttLinkOffset === 'function'
       ? getGanttLinkOffset('land_finance_links', 'giros')
       : 0;
+    const terrainGirosAnchor = typeof getGanttLinkAnchor === 'function'
+      ? getGanttLinkAnchor('land_finance_links', 'giros')
+      : 'start';
     const terrainPurchaseMonth = Math.min(
       maxMonth,
       Math.max(0, typeof getLinkedGanttStartIndex === 'function'
-        ? getLinkedGanttStartIndex(terrainGirosLink, terrainPurchaseMonthDefault, terrainGirosOffset)
+        ? getLinkedGanttStartIndex(terrainGirosLink, terrainPurchaseMonthDefault, terrainGirosOffset, terrainGirosAnchor)
         : terrainPurchaseMonthDefault)
     );
     const anticipoLineaMonthDefault = Math.max(0, Math.min(maxMonth, getConstructionStartMonth() - 1));
@@ -3960,10 +4045,13 @@ table.app-table{
     const terrenoPagoLineaOffset = typeof getGanttLinkOffset === 'function'
       ? getGanttLinkOffset('land_finance_links', 'pagoLinea')
       : 0;
+    const terrenoPagoLineaAnchor = typeof getGanttLinkAnchor === 'function'
+      ? getGanttLinkAnchor('land_finance_links', 'pagoLinea')
+      : 'start';
     const anticipoLineaMonth = Math.max(
       0,
       Math.min(maxMonth, typeof getLinkedGanttStartIndex === 'function'
-        ? getLinkedGanttStartIndex(terrenoPagoLineaLink, anticipoLineaMonthDefault, terrenoPagoLineaOffset)
+        ? getLinkedGanttStartIndex(terrenoPagoLineaLink, anticipoLineaMonthDefault, terrenoPagoLineaOffset, terrenoPagoLineaAnchor)
         : anticipoLineaMonthDefault)
     );
     const girosBase = createMonthlyArray(monthCount, 0);
@@ -4026,21 +4114,21 @@ table.app-table{
       return values;
     }
 
-    const epNeto = evaluateEpRow('ep_bruto', 'EP (EDPP neto)', data.ep, '[EDPP neto fuente]');
+    const epNeto = evaluateEpRow('ep_bruto', 'EP (neto)', data.ep, '[EDPP neto fuente]');
+    addSeries(series, 'EP (EDPP neto)', epNeto, 'ep_edpp_neto_alias');
     addSeries(series, 'EP (EDPP bruto)', epNeto, 'ep_bruto_alias');
     const anticipoNeto = evaluateEpRow('anticipo', 'Anticipo neto', data.anticipo, '[Anticipo neto fuente]');
     addSeries(series, 'Anticipo', anticipoNeto, 'anticipo_alias');
     const retencionesNetas = evaluateEpRow('retenciones', 'Retenciones netas', data.retenciones, '[Retenciones netas fuente]');
     addSeries(series, 'Retenciones', retencionesNetas, 'retenciones_alias');
-    const subtotal = evaluateEpRow('subtotal', 'Subtotal neto', data.subtotal, '[EP (EDPP neto)] + [Anticipo neto] + [Retenciones netas]');
+    const subtotal = evaluateEpRow('subtotal', 'Subtotal neto', data.subtotal, '[EP (neto)] + [Anticipo neto] + [Retenciones netas]');
     const ivaBruto = evaluateEpRow('iva_bruto', 'IVA bruto (19%)', data.ivaBruto, '[Subtotal neto] * 0.19');
     const ceecPct = typeof getEffectiveCeecPct === 'function' ? toNumber(getEffectiveCeecPct()) : toNumber(cfg.pct_ceec);
     const ceec = ivaBruto.map((value) => Math.abs(toNumber(value)) * ceecPct / 100);
     addSeries(series, `CEEC (${fmtInputNumber(cfg.pct_ceec, 2)}%)`, ceec, 'ceec');
-    const ivaEfectivo = ivaBruto.map((value, index) => (-Math.abs(toNumber(value))) + toNumber(ceec[index]));
+    const ivaEfectivo = ivaBruto.map((value, index) => toNumber(value) - toNumber(ceec[index]));
     addSeries(series, 'IVA efectivo', ivaEfectivo, 'iva_efectivo');
-    const subtotalCosto = subtotal.map((value) => -Math.abs(toNumber(value)));
-    const totalPago = subtotalCosto.map((value, index) => toNumber(value) + toNumber(ivaEfectivo[index]));
+    const totalPago = subtotal.map((value, index) => toNumber(value) + toNumber(ivaEfectivo[index]));
     addSeries(series, 'TOTAL A PAGO (c/IVA)', totalPago, 'total_pago');
 
     return Object.assign({}, data, { totalPago, subtotal, ivaEfectivo });
@@ -4257,7 +4345,7 @@ table.app-table{
       return 'flow-total-zero';
     }
 
-    setHtml('flujo-bancos-header', `<tr><th style="text-align:left;min-width:280px">Concepto</th><th class="flow-total-col">Total</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}</tr>`);
+    setHtml('flujo-bancos-header', `<tr><th class="flow-concept-col" style="text-align:left;min-width:280px">Concepto</th><th class="flow-total-col">Total</th>${labels.map((label) => `<th data-month-col>${escapeHtml(label)}</th>`).join('')}</tr>`);
     setHtml('flujo-bancos-tbody', rows.map((row) => {
       const className = [
         `flow-row-level-${row.level || 0}`,
@@ -4268,11 +4356,11 @@ table.app-table{
       const rowTotal = row.totalValue != null ? toNumber(row.totalValue) : total(row.values);
       return `
         <tr class="${className}" data-flow-row="${escapeHtml(row.key)}" data-flow-label="${escapeHtml(row.label)}" data-flow-parents="${escapeHtml(parentKeys)}"${row.toggleKey ? ` data-flow-toggle-key="${escapeHtml(row.toggleKey)}" data-flow-default-collapsed="${row.defaultCollapsed ? '1' : '0'}"` : ''}${row.hidden ? ' style="display:none"' : ''}>
-          <td style="text-align:left;font-weight:${row.total || row.subtotal ? 800 : 600};color:#0f172a">
+          <td class="flow-concept-col" style="text-align:left;font-weight:${row.total || row.subtotal ? 800 : 600};color:#0f172a">
             <div class="flow-row-label">${renderToggle(row)}<span>${escapeHtml(row.label)}</span></div>
           </td>
           <td class="flow-total-col ${totalClass(rowTotal)}">${formatAmount(rowTotal, 'signed', true)}</td>
-          ${row.values.map((value) => `<td data-flow-value style="text-align:center;${row.total || row.subtotal ? 'font-weight:700' : ''}">${formatAmount(value, 'signed')}</td>`).join('')}
+          ${row.values.map((value) => `<td data-flow-value data-month-cell style="text-align:center;${row.total || row.subtotal ? 'font-weight:700' : ''}">${formatAmount(value, 'signed')}</td>`).join('')}
         </tr>
       `;
     }).join(''));
@@ -4427,7 +4515,7 @@ table.app-table{
         return `<div class="dist-row"><div class="dist-label">${escapeHtml(label)}</div><div class="dist-bar-wrap"><div class="dist-bar" style="width:${Math.max(2, Math.min(100, Math.abs(pct)))}%;background:${color}"></div></div><div class="dist-pct">${fmtPct(pct)}</div></div>`;
       }).join(''));
 
-      setHtml('flujo-tabla-header', `<tr><th style="text-align:left;min-width:280px">Concepto</th><th style="text-align:left;min-width:260px">Origen / lÃ³gica</th><th class="flow-total-col">Total</th>${labels.map((label) => `<th>${escapeHtml(label)}</th>`).join('')}</tr>`);
+      setHtml('flujo-tabla-header', `<tr><th class="flow-concept-col" style="text-align:left;min-width:280px">Concepto</th><th class="flow-origin-col" style="text-align:left;min-width:260px">Origen / lÃ³gica</th><th class="flow-total-col">Total</th>${labels.map((label) => `<th data-month-col>${escapeHtml(label)}</th>`).join('')}</tr>`);
 
       const rows = [];
       const parentStack = [];
@@ -4748,12 +4836,12 @@ table.app-table{
         const totalClass = getFlowTotalClass(row, rowTotal);
         return `
           <tr class="${className}" data-flow-row="${escapeHtml(row.key)}" data-flow-label="${escapeHtml(row.label)}" data-flow-parents="${escapeHtml(parentKeys)}"${row.toggleKey ? ` data-flow-toggle-key="${escapeHtml(row.toggleKey)}" data-flow-default-collapsed="${row.defaultCollapsed ? '1' : '0'}"` : ''}${row.hidden ? ' style="display:none"' : ''}>
-            <td style="text-align:left;font-weight:${row.total || row.subtotal || row.iva ? 800 : 600};color:#0f172a">
+            <td class="flow-concept-col" style="text-align:left;font-weight:${row.total || row.subtotal || row.iva ? 800 : 600};color:#0f172a">
               <div class="flow-row-label">${renderToggle(row)}<span>${escapeHtml(row.label)}</span></div>
             </td>
-            <td>${renderOriginPopover(row, originPopId)}</td>
+            <td class="flow-origin-col">${renderOriginPopover(row, originPopId)}</td>
             <td class="flow-total-col ${totalClass}">${formatAmount(rowTotal, row.mode, true)}</td>
-            ${row.values.map((value) => `<td data-flow-value style="text-align:center;${row.total || row.subtotal || row.iva ? 'font-weight:700' : ''}">${formatAmount(value, row.mode)}</td>`).join('')}
+            ${row.values.map((value) => `<td data-flow-value data-month-cell style="text-align:center;${row.total || row.subtotal || row.iva ? 'font-weight:700' : ''}">${formatAmount(value, row.mode)}</td>`).join('')}
           </tr>
         `;
       }).join('');
