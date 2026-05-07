@@ -315,14 +315,49 @@ function setText(id, value) {
   if (el) el.textContent = repairMojibakeText(value);
 }
 
+const MONTHLY_TABLE_IDS = new Set([
+  'planilla-table',
+  'flujo-tabla',
+  'flujo-bricsa-tabla',
+  'flujo-ventas-table',
+  'constr-ep-table',
+  'constr-fin-planilla-table',
+  'terreno-fin-planilla-table',
+]);
+const MONTHLY_FLOW_TABLE_IDS = new Set(['flujo-tabla', 'flujo-bancos-tabla', 'flujo-bricsa-tabla']);
+const FLOW_TABLE_WIDTHS = Object.freeze({
+  concept: 224,
+  total: 156,
+  month: 92,
+  origin: 260,
+  formula: 96,
+  extra: 120,
+});
+const TABLE_MARKUP_RE = /<table(?:\s|>)/i;
+
+function readAppTableHeaderText(cell) {
+  return repairMojibakeText(cell?.textContent || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function getExtraFixedColumnWidth(cell) {
+  const text = readAppTableHeaderText(cell);
+  if (text.includes('origen') || text.includes('logica')) return FLOW_TABLE_WIDTHS.origin;
+  if (text.includes('formula')) return FLOW_TABLE_WIDTHS.formula;
+  return FLOW_TABLE_WIDTHS.extra;
+}
+
 function setHtml(id, value) {
   const el = $(id);
   if (el) {
     const html = String(value ?? '');
     el.innerHTML = html;
     const rootTable = el.matches?.('table') ? el : el.closest?.('table');
-    if (rootTable) normalizeAppTables(rootTable);
-    else if (html.includes('<table')) normalizeAppTables(el);
+    if (rootTable) scheduleAppTableNormalization(rootTable);
+    else if (TABLE_MARKUP_RE.test(html)) scheduleAppTableNormalization(el);
   }
 }
 
@@ -333,18 +368,12 @@ function normalizeAppTables(root = document) {
     ...(scope.matches?.('table') ? [scope] : []),
     ...Array.from(scope.querySelectorAll?.('table') || []),
   ];
-  const monthlyFlowTableIds = new Set(['flujo-tabla', 'flujo-bancos-tabla', 'flujo-bricsa-tabla']);
-  const readHeaderText = (cell) => repairMojibakeText(cell?.textContent || '')
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
   tables.forEach((table) => {
     table.classList.add('app-table');
     if (!table.classList.contains('gantt-table')) table.classList.add('financial-table');
     const isMonthly = table.classList.contains('finance-date-table')
       || !!table.querySelector('[data-month-col],[data-month-cell]')
-      || ['planilla-table', 'flujo-tabla', 'flujo-bricsa-tabla', 'flujo-ventas-table', 'constr-ep-table', 'constr-fin-planilla-table', 'terreno-fin-planilla-table'].includes(table.id);
+      || MONTHLY_TABLE_IDS.has(table.id);
     if (isMonthly) table.classList.add('monthly-table');
     const isScrollable = !!table.closest('.tbl-scroll,.res-table-scroll,.finance-split-shell,.finance-date-scroll,.flow-planilla,.edp-curve-editor-scroll,.monthly-preview-scroll')
       || table.classList.contains('gantt-table');
@@ -353,12 +382,12 @@ function normalizeAppTables(root = document) {
       table.classList.add('has-total-row');
     }
     const headerCells = Array.from(table.tHead?.rows?.[0]?.cells || []);
-    const conceptIndex = headerCells.findIndex((cell) => readHeaderText(cell).startsWith('concepto'));
-    const totalIndex = headerCells.findIndex((cell) => cell.classList.contains('flow-total-col') || readHeaderText(cell) === 'total');
+    const conceptIndex = headerCells.findIndex((cell) => readAppTableHeaderText(cell).startsWith('concepto'));
+    const totalIndex = headerCells.findIndex((cell) => cell.classList.contains('flow-total-col') || readAppTableHeaderText(cell) === 'total');
     const hasMonthColumns = headerCells.some((cell) => cell.hasAttribute('data-month-col'))
       || !!table.querySelector('td[data-month-cell]');
     const isMonthlyFlowTable = table.classList.contains('monthly-flow-table')
-      || monthlyFlowTableIds.has(table.id)
+      || MONTHLY_FLOW_TABLE_IDS.has(table.id)
       || (!!table.closest('.flow-planilla') && conceptIndex >= 0 && (totalIndex >= 0 || hasMonthColumns));
 
     if (!isMonthlyFlowTable || !headerCells.length || conceptIndex < 0) return;
@@ -391,12 +420,12 @@ function normalizeAppTables(root = document) {
     if (monthCount > 0) {
       const extraFixedWidth = headerCells.reduce((sum, cell, index) => {
         if (index === conceptIndex || index === totalIndex || index >= monthStartIndex) return sum;
-        const text = readHeaderText(cell);
-        if (text.includes('origen') || text.includes('logica')) return sum + 260;
-        if (text.includes('formula')) return sum + 96;
-        return sum + 120;
+        return sum + getExtraFixedColumnWidth(cell);
       }, 0);
-      const minWidth = 224 + (totalIndex >= 0 ? 156 : 0) + extraFixedWidth + (monthCount * 92);
+      const minWidth = FLOW_TABLE_WIDTHS.concept
+        + (totalIndex >= 0 ? FLOW_TABLE_WIDTHS.total : 0)
+        + extraFixedWidth
+        + (monthCount * FLOW_TABLE_WIDTHS.month);
       const currentInlineMin = Number.parseFloat(table.style.minWidth || '0') || 0;
       if (minWidth > currentInlineMin) table.style.minWidth = `${minWidth}px`;
     }
@@ -407,10 +436,32 @@ let appTableObserver = null;
 let appTableNormalizeQueued = false;
 const appTableNormalizeRoots = new Set();
 function scheduleAppTableNormalization(root = document) {
-  appTableNormalizeRoots.add(root || document);
+  const target = root || document;
+  const isWholeDocument = target === document || target === document.body || target === document.documentElement;
+  if (isWholeDocument) {
+    appTableNormalizeRoots.clear();
+    appTableNormalizeRoots.add(document);
+  } else {
+    const queuedRoots = Array.from(appTableNormalizeRoots);
+    const alreadyCovered = queuedRoots.some((queuedRoot) => (
+      queuedRoot === document
+      || queuedRoot === document.body
+      || queuedRoot === document.documentElement
+      || (queuedRoot?.nodeType === 1 && queuedRoot.contains?.(target))
+    ));
+    if (!alreadyCovered) {
+      queuedRoots.forEach((queuedRoot) => {
+        if (target?.nodeType === 1 && queuedRoot?.nodeType === 1 && target.contains?.(queuedRoot)) {
+          appTableNormalizeRoots.delete(queuedRoot);
+        }
+      });
+      appTableNormalizeRoots.add(target);
+    }
+  }
   if (appTableNormalizeQueued) return;
   appTableNormalizeQueued = true;
-  window.requestAnimationFrame(() => {
+  const scheduleFrame = window.requestAnimationFrame || ((callback) => window.setTimeout(callback, 0));
+  scheduleFrame(() => {
     appTableNormalizeQueued = false;
     const roots = Array.from(appTableNormalizeRoots);
     appTableNormalizeRoots.clear();
@@ -525,9 +576,7 @@ function flushDeferredEditWork() {
     Object.entries(deferredRenderJobs).forEach(([key, job]) => {
       scheduleRenderJobNow(key, job.callback, job.delay);
     });
-    deferredScopes.forEach((scope) => {
-      scheduleAutosave(scope);
-    });
+    scheduleAutosaves(deferredScopes);
   } finally {
     editSession.flushing = false;
   }
@@ -2792,27 +2841,48 @@ async function persistAutosaveScopes(scopes, { silent = true } = {}) {
   await finishSave({ silent });
 }
 
-function scheduleAutosave(scope, delay = DEFAULT_AUTOSAVE_DELAY) {
-  if (!state.proyectoId || !scope || !AUTOSAVE_SCOPE_LABELS[scope]) return;
+function normalizeAutosaveScopeList(scopes) {
+  const input = Array.isArray(scopes) ? scopes : [scopes];
+  return input
+    .filter((scope) => scope && AUTOSAVE_SCOPE_LABELS[scope])
+    .filter((scope, index, arr) => arr.indexOf(scope) === index);
+}
+
+function describeAutosaveScopes(scopeList) {
+  return scopeList.map((scope) => AUTOSAVE_SCOPE_LABELS[scope] || scope).join(', ');
+}
+
+function scheduleAutosaves(scopes, delay = DEFAULT_AUTOSAVE_DELAY) {
+  const scopeList = normalizeAutosaveScopeList(scopes);
+  if (!state.proyectoId || !scopeList.length) return;
+  const scopeLabel = describeAutosaveScopes(scopeList);
   if (shouldDeferEditingWork()) {
-    state.autosave.queued[scope] = true;
-    state.autosave.dirty[scope] = true;
-    state.editSession.deferredAutosaveScopes[scope] = true;
-    setSyncStatus('dirty', 'CAMBIOS PENDIENTES', `Cambios pendientes en ${AUTOSAVE_SCOPE_LABELS[scope] || scope}`);
+    scopeList.forEach((scope) => {
+      state.autosave.queued[scope] = true;
+      state.autosave.dirty[scope] = true;
+      state.editSession.deferredAutosaveScopes[scope] = true;
+    });
+    setSyncStatus('dirty', 'CAMBIOS PENDIENTES', `Cambios pendientes en ${scopeLabel}`);
     return;
   }
   const hadPending = getPendingAutosaveScopes().length > 0;
-  window.clearTimeout(state.autosave.timers[scope]);
-  state.autosave.timers[scope] = null;
-  state.autosave.queued[scope] = true;
-  state.autosave.dirty[scope] = true;
+  scopeList.forEach((scope) => {
+    window.clearTimeout(state.autosave.timers[scope]);
+    state.autosave.timers[scope] = null;
+    state.autosave.queued[scope] = true;
+    state.autosave.dirty[scope] = true;
+  });
   if (!hadPending) {
-    setSyncStatus('dirty', 'CAMBIOS PENDIENTES', `Cambios pendientes en ${AUTOSAVE_SCOPE_LABELS[scope] || scope}`);
+    setSyncStatus('dirty', 'CAMBIOS PENDIENTES', `Cambios pendientes en ${scopeLabel}`);
   }
   window.clearTimeout(state.autosave.batchTimer);
   state.autosave.batchTimer = window.setTimeout(() => {
     runAutosaveBatch();
   }, Math.max(0, delay));
+}
+
+function scheduleAutosave(scope, delay = DEFAULT_AUTOSAVE_DELAY) {
+  scheduleAutosaves(scope, delay);
 }
 
 async function runAutosaveBatch(scopes = null) {
@@ -2869,6 +2939,7 @@ async function runAutosave(scope) {
   await runAutosaveBatch([scope]);
 }
 window.scheduleAutosave = scheduleAutosave;
+window.scheduleAutosaves = scheduleAutosaves;
 
 document.addEventListener('focusin', (event) => {
   if (isDeferredEditCandidate(event.target)) beginEditSession(event.target);
@@ -6078,8 +6149,7 @@ function onConfigParamChange(force = false) {
   // Propagar tasas a financiamiento legacy
   state.financiamiento.credito_terreno_tasa = toNumber(state.proyecto.tasa_interes_terreno);
   state.financiamiento.linea_construccion_tasa = toNumber(state.proyecto.tasa_interes_construccion);
-  scheduleAutosave('proyecto');
-  scheduleAutosave('terreno');
+  scheduleAutosaves(['proyecto', 'terreno']);
   scheduleRenderJob('global-config-dependencies', () => {
     renderConstruccion();
     if (typeof renderTerrainModule === 'function') renderTerrainModule();
@@ -12348,7 +12418,7 @@ function renderAll() {
   renderCapitalModule();
   localizeNumberInputs(document);
   normalizeVisibleTextEncoding(document.body);
-  normalizeAppTables(document);
+  scheduleAppTableNormalization(document);
   perfLog('render:all', { ms: Math.round(performance.now() - startedAt) });
 }
 
@@ -12499,8 +12569,7 @@ function onCabidaInputChange(force = false) {
     renderCostosModule();
     renderProjectCashflow();
   });
-  scheduleAutosave('cabida');
-  scheduleAutosave('ventas');
+  scheduleAutosaves(['cabida', 'ventas']);
 }
 
 function onTerrenoInputChange(force = false) {
@@ -12565,8 +12634,7 @@ function updateConstrParams(force = false) {
     renderKpis();
     localizeNumberInputs($('tab-construccion') || document);
   });
-  scheduleAutosave('construccion');
-  scheduleAutosave('gantt');
+  scheduleAutosaves(['construccion', 'gantt']);
 }
 
 function onGanttInputChange(force = false) {
@@ -12590,8 +12658,7 @@ function onGanttInputChange(force = false) {
     renderCostosModule();
     renderProjectCashflow();
   });
-  scheduleAutosave('gantt');
-  scheduleAutosave('ventas');
+  scheduleAutosaves(['gantt', 'ventas']);
 }
 
 function agregarHito() {
@@ -12758,8 +12825,7 @@ function onVentasInputChange(force = false) {
     renderCostosModule();
     renderProjectCashflow();
   });
-  scheduleAutosave('ventas');
-  scheduleAutosave('gantt');
+  scheduleAutosaves(['ventas', 'gantt']);
 }
 
 function onVentasVelocityChange(force = false) {
@@ -12781,8 +12847,7 @@ function onVentasVelocityChange(force = false) {
     renderProjectCashflow();
     localizeNumberInputs($('tab-ventas') || document);
   });
-  scheduleAutosave('ventas');
-  scheduleAutosave('gantt');
+  scheduleAutosaves(['ventas', 'gantt']);
 }
 
 const MONTHLY_FORMULA_TOKENS = [
